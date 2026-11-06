@@ -551,7 +551,7 @@
                                             </summary>
                                             <div class="hc-faq-a">
                                                 Go to <strong>Equipment → Loans → Waiting</strong>, then click <strong>Approve</strong> or <strong>Decline</strong>. Both ask for a short note (at least 5 characters). When a faculty member requested several items at once, <strong>Approve all</strong> approves the whole bundle and gives them one Claim QR. Faculty see the result in their Notifications and My Activity.<br><br>
-                                                A request nobody decides before its borrow date has passed is declined automatically. Requests from Organization Advisers that include a letter are only visible to a Super Admin; open the letter from the document chip before deciding.<br><br>
+                                                <strong>Same-day</strong> borrow requests are decided by the system straight away, based on availability and the borrowing rules, so nothing waits for you. <strong>Later-date</strong> requests wait here. If the faculty attached a request letter (recommended, not required), open it from the document chip before deciding. A request nobody decides before its borrow date has passed is declined automatically.<br><br>
                                                 Students who borrow with a faculty code or item code do not need approval. Those loans go straight to <strong>Pickup</strong>.
                                             </div>
                                         </details>
@@ -616,7 +616,7 @@
                                             </summary>
                                             <div class="hc-faq-a">
                                                 Go to <strong>Facilities → Reservations</strong>. You can filter by All, Active, Waiting, Approved, Cancelled or Declined.<br><br>
-                                                <strong>Same-day</strong> reservations are confirmed automatically when the slot is free, so there is nothing to approve. <strong>Later-date</strong> reservations wait for an admin. Open the reservation and click <strong>Approve</strong> or <strong>Decline</strong> with a reason (at least 5 characters). If nobody decides by 12:01 AM on the reservation date, it is declined automatically. Reservations from Organization Advisers with a supporting letter can only be decided by a Super Admin.<br><br>
+                                                <strong>Same-day</strong> reservations are confirmed automatically when the slot is free, so there is nothing to approve. <strong>Later-date</strong> reservations wait for an admin. Open the reservation and click <strong>Approve</strong> or <strong>Decline</strong> with a reason (at least 5 characters). If nobody decides by 12:01 AM on the reservation date, it is declined automatically. A request letter, when the faculty attached one, opens from the reservation details. Any admin can decide these.<br><br>
                                                 Faculty can book from 7:00 AM to 8:00 PM, Monday to Saturday, up to 3 weeks ahead, and can hold at most 2 active reservations at a time.
                                             </div>
                                         </details>
@@ -680,8 +680,8 @@
                                                     <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
                                                 </summary>
                                                 <div class="hc-faq-a">
-                                                    Go to <strong>Faculty → Create Faculty Account</strong>. Enter the first and last name and click <strong>Look up in Faculty Registry</strong> to fill in the Faculty ID, which is permanent. The email must end with <em>@pupsync.edu</em>. Set a password of at least 8 characters (rated Fair or stronger). For an Organization Adviser, tick <strong>Organization adviser</strong> and choose the organization.<br><br>
-                                                    Use the edit button on a faculty row to change the name, email, backup email or adviser details. There is no password reset here; faculty change their own password in their Settings.<br><br>
+                                                    Go to <strong>Faculty → Create Faculty Account</strong>. Enter the first and last name and click <strong>Look up in Faculty Registry</strong> to fill in the Faculty ID, which is permanent. The email must end with <em>@pupsync.edu</em>. Set a password of at least 8 characters (rated Fair or stronger).<br><br>
+                                                    Use the edit button on a faculty row to change the name, email or backup email. There is no password reset here; faculty change their own password in their Settings.<br><br>
                                                     <strong>Delete Account</strong> is blocked while the faculty member still has pending requests, equipment that is not back, or upcoming reservations. You can override this by confirming with your own password. That declines their pending requests and cancels their upcoming reservations. Equipment already out can still be returned, and all history is kept.
                                                 </div>
                                             </details>
@@ -715,7 +715,7 @@
                                                     <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
                                                 </summary>
                                                 <div class="hc-faq-a">
-                                                    <strong>Settings → Borrowing Rules</strong> holds the rule settings (toggles and limits) for the automatic decision engine. New equipment requests are not decided by it: they wait in <strong>Equipment → Loans → Waiting</strong> for an admin. Any automatic decisions that do happen are listed in <strong>Activity</strong> under <em>Automatic</em>.
+                                                    <strong>Settings → Borrowing Rules</strong> holds the rule settings (toggles and limits) for the automatic decision engine. It decides <strong>same-day</strong> equipment requests and room reservations on the spot. <strong>Later-date</strong> equipment requests are not decided by it: they wait in <strong>Equipment → Loans → Waiting</strong> for an admin. Automatic decisions are listed in <strong>Activity</strong> under <em>Automatic</em>.
                                                 </div>
                                             </details>
                                         <?php endif; ?>

@@ -147,47 +147,6 @@
                         </div>
                     </div>
 
-                    <!-- Organization adviser: org borrowing is automatic for advisers -->
-                    <div class="fac-opt-card">
-                        <label class="fac-opt-row" for="fac-adviser">
-                            <span class="fac-opt-text">
-                                <span class="fac-opt-title">Organization adviser</span>
-                                <span class="fac-opt-sub">Gets organization borrowing automatically</span>
-                            </span>
-                            <input type="checkbox" id="fac-adviser" name="is_org_adviser"
-                                value="1" class="faculty-toggle-input">
-                            <span class="faculty-toggle-track"></span>
-                        </label>
-                        <div class="fac-opt-extra" id="fac-org-group" style="display:none;">
-                            <div class="form-group">
-                                <label for="fac-org">Organization</label>
-                                <?php
-                                // Organizations are grouped (Academic / Non-academic, then uncategorised);
-                                // one that already has an adviser is disabled and marked "(taken)".
-                                $orgs_grouped     = orgs_load_grouped($conn);
-                                $orgs_adviser_map = orgs_adviser_map($conn);
-                                $orgs_total = count($orgs_grouped[ORG_CATEGORY_ACADEMIC])
-                                    + count($orgs_grouped[ORG_CATEGORY_NON_ACADEMIC])
-                                    + count($orgs_grouped['']);
-                                if ($orgs_total > 0): ?>
-                                    <select id="fac-org" name="organization_id"
-                                        class="form-control-custom">
-                                        <option value="">&#8212; Select Organization &#8212;</option>
-                                        <?= orgs_render_options($orgs_grouped, $orgs_adviser_map, true) ?>
-                                    </select>
-                                <?php else: ?>
-                                    <select id="fac-org" name="organization_id"
-                                        class="form-control-custom" disabled>
-                                        <option value="">&#8212; Organizations unavailable &#8212;</option>
-                                    </select>
-                                    <small class="faculty-field-error">
-                                        Could not load organizations.
-                                    </small>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                    </div>
-
                     <div id="fac-form-alert" class="alert-banner hidden" role="alert"></div>
 
                     <button type="button" id="fac-submit-btn"
@@ -223,23 +182,18 @@
                             <tr>
                                 <th>Faculty</th>
                                 <th>Faculty ID</th>
-                                <th>Role</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="faculty-list-tbody">
                             <?php
                             $fac_res = $conn->query(
-                                "SELECT u.fullname, u.email, u.backup_email, u.role,"
-                                    . " u.faculty_id, u.organization_id,"
-                                    . " o.name AS org_name"
+                                "SELECT u.fullname, u.email, u.backup_email, u.faculty_id"
                                     . " FROM tbl_users u"
-                                    . " LEFT JOIN tbl_organizations o ON u.organization_id = o.id"
                                     . " ORDER BY u.fullname ASC"
                             );
                             if ($fac_res && $fac_res->num_rows > 0):
                                 while ($frow = $fac_res->fetch_assoc()):
-                                    $isAdviser = ($frow['role'] === 'Organization Adviser');
                                     $idUnset   = faculty_id_is_unset($frow['faculty_id']);
                                     $initFac   = strtoupper(substr(trim($frow['fullname'] ?? '') ?: 'F', 0, 1));
                             ?>
@@ -248,9 +202,6 @@
                                         data-email="<?= htmlspecialchars($frow['email']) ?>"
                                         data-backup-email="<?= htmlspecialchars($frow['backup_email'] ?? '') ?>"
                                         data-faculty-id="<?= htmlspecialchars($frow['faculty_id']) ?>"
-                                        data-role="<?= htmlspecialchars($frow['role']) ?>"
-                                        data-org="<?= htmlspecialchars($frow['org_name'] ?? '') ?>"
-                                        data-org-id="<?= (int)($frow['organization_id'] ?? 0) ?>"
                                         data-init="<?= htmlspecialchars($initFac) ?>">
                                         <td>
                                             <div class="fac-person">
@@ -268,16 +219,6 @@
                                                 <span class="fac-id"><?= htmlspecialchars($frow['faculty_id']) ?></span>
                                             <?php endif; ?>
                                         </td>
-                                        <td>
-                                            <?php if ($isAdviser): ?>
-                                                <span class="fac-role fac-role--adviser">Org Adviser</span>
-                                                <?php if (!empty($frow['org_name'])): ?>
-                                                    <div class="fac-person-sub"><?= htmlspecialchars($frow['org_name']) ?></div>
-                                                <?php endif; ?>
-                                            <?php else: ?>
-                                                <span class="fac-role">Faculty</span>
-                                            <?php endif; ?>
-                                        </td>
                                         <td class="fac-actions">
                                             <button class="ps-btn ps-btn--ghost ps-btn--sm fac-edit-btn" aria-label="Edit account">
                                                 <span class="material-symbols-outlined">edit</span>
@@ -287,7 +228,7 @@
                                 <?php endwhile;
                             else: ?>
                                 <tr id="fac-empty-row">
-                                    <td colspan="4"
+                                    <td colspan="3"
                                         style="text-align:center;padding:3rem;color:var(--text-light)">
                                         <span class="material-symbols-outlined"
                                             style="font-size:40px;display:block;margin:0 auto 10px;opacity:0.3">group</span>

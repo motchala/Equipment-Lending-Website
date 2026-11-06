@@ -15,9 +15,9 @@ declare(strict_types=1);
  * HOW LONG
  *   Same choices as the Borrow form for how the loan was booked, counted from NOW
  *   (see mode(): counter loans made with a faculty item code are hourly too):
- *     hourly ("today") loans   +1 / 2 / 3 / 5 hours (Organization Advisers: 1-12), rounded up to
+ *     hourly ("today") loans   +1 / 2 / 3 / 5 hours, rounded up to
  *                              the next 5 minutes, never past closing time (BookingSchedule::DAY_END)
- *     day loans                +1 / 2 / 3 days (Advisers: +5), keeping the original return time of day
+ *     day loans                +1 / 2 / 3 days, keeping the original return time of day
  *
  * AVAILABILITY (the same ledger the Borrow form and the arbitration engine use)
  *   The units already in the faculty member's hands stay theirs; what must hold is that no
@@ -212,7 +212,7 @@ final class BorrowExtension
      *
      * @return list<array{length:int, unit:string, label:string, due:DateTimeImmutable}>
      */
-    public static function options(array $row, bool $adviser, DateTimeImmutable $now): array
+    public static function options(array $row, DateTimeImmutable $now): array
     {
         $tz  = $now->getTimezone();
         $out = [];
@@ -225,7 +225,7 @@ final class BorrowExtension
             $base  = $now < $open ? $open : $now;
             $base  = (new DateTimeImmutable('@' . (int)(ceil($base->getTimestamp() / 300) * 300)))->setTimezone($tz);
 
-            foreach (BookingSchedule::allowedLengths('today', $adviser) as $hours) {
+            foreach (BookingSchedule::allowedLengths('today') as $hours) {
                 $hours = (int)$hours;
                 $due   = $base->modify('+' . $hours . ' hours');
                 if ($due > $close) {
@@ -243,7 +243,7 @@ final class BorrowExtension
         }
         $time = max(BookingSchedule::DAY_START, min(BookingSchedule::DAY_END, $time));
 
-        foreach (BookingSchedule::allowedLengths('future', $adviser) as $days) {
+        foreach (BookingSchedule::allowedLengths('future') as $days) {
             $days  = (int)$days;
             $due   = new DateTimeImmutable($now->modify('+' . $days . ' days')->format('Y-m-d') . ' ' . $time . ':00', $tz);
             $out[] = ['length' => $days, 'unit' => 'days', 'label' => '+' . $days . ($days === 1 ? ' day' : ' days'), 'due' => $due];
@@ -334,7 +334,7 @@ final class BorrowExtension
      *
      * @return array<string,mixed>
      */
-    public static function preview(mysqli $conn, string $facultyId, int $requestId, bool $adviser): array
+    public static function preview(mysqli $conn, string $facultyId, int $requestId): array
     {
         $ready = self::ensureSchema($conn);
         $now   = new DateTimeImmutable('now', self::tz());
@@ -351,7 +351,7 @@ final class BorrowExtension
 
         $due     = self::dueAt($row);
         $options = [];
-        foreach (self::options($row, $adviser, $now) as $o) {
+        foreach (self::options($row, $now) as $o) {
             $why = self::denial($conn, $row, $o['due'], $now);
             $options[] = [
                 'length'    => $o['length'],
@@ -387,7 +387,7 @@ final class BorrowExtension
      *
      * @return array{ok:bool, error?:string, message?:string, until?:string}
      */
-    public static function extend(mysqli $conn, string $facultyId, int $requestId, int $length, bool $adviser): array
+    public static function extend(mysqli $conn, string $facultyId, int $requestId, int $length): array
     {
         $ready = self::ensureSchema($conn);          // before the transaction
         $now   = new DateTimeImmutable('now', self::tz());
@@ -425,7 +425,7 @@ final class BorrowExtension
             }
 
             $chosen = null;
-            foreach (self::options($row, $adviser, $now) as $o) {
+            foreach (self::options($row, $now) as $o) {
                 if ($o['length'] === $length) {
                     $chosen = $o;
                     break;

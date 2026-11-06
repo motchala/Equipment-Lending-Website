@@ -77,20 +77,55 @@
             (src ? '<img src="' + esc(src) + '" alt="' + esc(alt || '') + '" loading="lazy" data-fallback="1">' : '');
     }
 
+    function readReply(r) {
+        return r.text().then(function (t) {
+            try { return JSON.parse(t); }
+            catch (e) { return { error: 'The server sent an unexpected reply. Please try again.' }; }
+        });
+    }
+    function netError() {
+        return { error: 'Network error. Please check your connection and try again.' };
+    }
+
     function post(url, body) {
         return fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),
             credentials: 'same-origin'
-        }).then(function (r) {
-            return r.text().then(function (t) {
-                try { return JSON.parse(t); }
-                catch (e) { return { error: 'The server sent an unexpected reply. Please try again.' }; }
-            });
-        }).catch(function () {
-            return { error: 'Network error. Please check your connection and try again.' };
-        });
+        }).then(readReply).catch(netError);
+    }
+
+    /* Same as post(), but sends the optional request letter along (multipart) when there is one. */
+    function postWithLetter(url, body, file) {
+        if (!file) return post(url, body);
+        var fd = new FormData();
+        Object.keys(body).forEach(function (k) { fd.append(k, String(body[k])); });
+        fd.append('document', file, file.name);
+        return fetch(url, { method: 'POST', body: fd, credentials: 'same-origin' }).then(readReply).catch(netError);
+    }
+
+    /* Request letter: optional, recommended only for a later date. Returns { file, error }. */
+    var LETTER_HTML = function (id, text) {
+        return '<div class="st-field" id="' + id + 'Wrap" hidden>' +
+            '<label for="' + id + '">Request letter <span class="st-hint" style="display:inline">(recommended)</span></label>' +
+            '<input type="file" class="st-input" id="' + id + '" accept=".pdf,.jpg,.jpeg,.png,.webp">' +
+            '<p class="st-hint">' + text + ' PDF, JPG, PNG or WEBP, up to 5 MB.</p></div>';
+    };
+    function syncLetter(id, dateStr) {
+        var wrap = $(id + 'Wrap'), input = $(id);
+        if (!wrap) return;
+        var later = !!dateStr && dateStr > todayStr();
+        wrap.hidden = !later;
+        if (!later && input) input.value = '';   /* a same-day request never carries a letter */
+    }
+    function pickLetter(id, dateStr) {
+        var input = $(id);
+        if (!input || !input.files || !input.files[0] || !(dateStr > todayStr())) return { file: null, error: '' };
+        var f = input.files[0];
+        if (!/\.(pdf|jpe?g|png|webp)$/i.test(f.name)) return { file: null, error: 'The request letter must be a PDF, JPG, PNG or WEBP file.' };
+        if (f.size > 5 * 1024 * 1024) return { file: null, error: 'The request letter is too large. Maximum size is 5 MB.' };
+        return { file: f, error: '' };
     }
 
     function showAlert(id, msg) {
@@ -296,6 +331,7 @@
             '<div class="st-field"><label for="returnDate">Return date <span class="st-star">*</span></label>' +
             '<input type="date" class="st-input" id="returnDate" min="' + t1 + '" value="' + t1 + '"></div>' +
             '</div>' +
+            LETTER_HTML('borrowLetter', 'Recommended when borrowing on a later date. You can still submit without one.') +
             '<div class="st-alert is-note">' + icon('info') + '<span>Each item creates its own request. Your faculty will be notified.</span></div>' +
             '</form>' +
             '<div class="st-submitbar">' +
@@ -418,7 +454,7 @@
     }
 
     function lockWhere(lock) {
-        ['borrowRoom', 'borrowDate', 'returnDate'].forEach(function (id) { var e = $(id); if (e) e.disabled = lock; });
+        ['borrowRoom', 'borrowDate', 'returnDate', 'borrowLetter'].forEach(function (id) { var e = $(id); if (e) e.disabled = lock; });
     }
 
     function submitBorrow() {
@@ -444,6 +480,8 @@
         if (!ret) return showAlert('flowError', 'Please select a return date.');
         if (borrow < todayStr()) return showAlert('flowError', 'Borrow date cannot be in the past.');
         if (ret <= borrow) return showAlert('flowError', 'Return date must be after the borrow date.');
+        var letter = pickLetter('borrowLetter', borrow);
+        if (letter.error) return showAlert('flowError', letter.error);
 
         var btn = $('btnSubmitBorrow');
         setBusy(btn, true, 'Submitting…');
@@ -457,7 +495,7 @@
             if (i >= items.length) return finishBorrow(room, borrow, ret);
             var cur = items[i];
             var last = (i === items.length - 1);
-            post(URLS.borrow, {
+            postWithLetter(URLS.borrow, {
                 code_db_id: v.code_db_id,
                 faculty_id: v.faculty_id,
                 faculty_name: v.faculty_name,
@@ -469,7 +507,7 @@
                 borrow_date: borrow,
                 return_date: ret,
                 is_last_item: last
-            }).then(function (d) {
+            }, letter.file).then(function (d) {
                 if (d.error) {
                     setBusy(btn, false);
                     updateSummary();
@@ -801,6 +839,7 @@
             '<div class="st-field" style="max-width:200px"><label for="reserveAttendees">Attendees</label>' +
             '<input type="number" class="st-input" id="reserveAttendees" value="1" min="1" inputmode="numeric">' +
             (r.seating_capacity != null && toInt(r.seating_capacity) > 0 ? '<p class="st-hint">This room seats ' + toInt(r.seating_capacity) + '.</p>' : '') + '</div>' +
+            LETTER_HTML('reserveLetter', 'Recommended for reservations on a later date. You can still submit without one.') +
             '<div class="st-actions">' +
             '<button type="button" class="st-btn st-btn-ghost" data-action="back-rooms">Back</button>' +
             '<button type="submit" class="st-btn st-btn-primary" id="btnSubmitRoom">' + icon('event_available') + 'Reserve room</button>' +
@@ -816,6 +855,7 @@
             var startNow = $('reserveStart').value;
             var endOk = startNow && curEnd && hhmmToMin(curEnd) > hhmmToMin(startNow);
             $('reserveEnd').innerHTML = endOptions(startNow, endOk ? curEnd : '');
+            syncLetter('reserveLetter', target.value);
             var d = target.value ? parseYmd(target.value) : null;
             if (d && d.getDay() === 0) showAlert('flowError', 'Reservations are not available on Sundays. Please choose another day.');
             else hideAlert('flowError');
@@ -846,6 +886,8 @@
         if (!end) return showAlert('flowError', 'Please select an end time.');
         if (end <= start) return showAlert('flowError', 'End time must be after start time.');
         if (!purpose) return showAlert('flowError', 'Please enter the purpose.');
+        var letter = pickLetter('reserveLetter', date);
+        if (letter.error) return showAlert('flowError', letter.error);
 
         var btn = $('btnSubmitRoom');
         setBusy(btn, true, 'Submitting…');
@@ -856,7 +898,7 @@
             building: currentBuilding() ? currentBuilding().name : ''
         };
 
-        post(URLS.reserve, {
+        postWithLetter(URLS.reserve, {
             code_db_id: v.code_db_id,
             faculty_id: v.faculty_id,
             faculty_name: v.faculty_name,
@@ -868,7 +910,7 @@
             end_time: end,
             purpose: purpose,
             attendees: attendees
-        }).then(function (d) {
+        }, letter.file).then(function (d) {
             setBusy(btn, false);
             /* A conflict (room taken, past time, …) comes back as an error and the code is NOT used,
                so the student can simply pick another slot with the same code. */
@@ -1083,6 +1125,8 @@
         if (t.hasAttribute && t.hasAttribute('data-eq-qty')) {
             var name = nameOfCard(t);
             if (name) setQty(name, t.value);
+        } else if (t.id === 'borrowDate') {
+            syncLetter('borrowLetter', t.value);
         } else if (t.id === 'reserveDate' || t.id === 'reserveStart') {
             onReserveFieldChange(t);
         }

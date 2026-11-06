@@ -68,7 +68,7 @@ $conn->set_charset('utf8mb4');
 BookingSchedule::ensureSchema($conn);
 
 // Load faculty info
-$stmt_usr = $conn->prepare("SELECT fullname, faculty_id, role FROM tbl_users WHERE faculty_id = ? LIMIT 1");
+$stmt_usr = $conn->prepare("SELECT fullname, faculty_id FROM tbl_users WHERE faculty_id = ? LIMIT 1");
 $stmt_usr->bind_param('s', $_SESSION['faculty_id']);
 $stmt_usr->execute();
 $user = $stmt_usr->get_result()->fetch_assoc();
@@ -79,7 +79,6 @@ if (!$user) {
 }
 $faculty_name = (string)$user['fullname'];
 $faculty_id   = (string)$user['faculty_id'];
-$is_adviser   = BookingSchedule::isAdviserRole((string)($user['role'] ?? ''));
 
 // Room: the cart uses a plain text input (not the room picker).
 // Store as a text label with room_id = null — same as "Outside" in the existing system.
@@ -145,7 +144,7 @@ foreach ($raw_items as $raw) {
     $qty  = max(1, (int)($raw['qty'] ?? 1));
     if ($name === '') continue;
 
-    $chk = BookingSchedule::parse($conn, $pseudo_post, $is_adviser, $name, $qty);
+    $chk = BookingSchedule::parse($conn, $pseudo_post, $name, $qty);
     if (!$chk['ok']) {
         $failed[] = ['name' => $name, 'error' => $chk['error']];
         continue;

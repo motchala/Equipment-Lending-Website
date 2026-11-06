@@ -154,12 +154,6 @@ try {
         export_fail(404, 'Account not found.');
     }
 
-    $org_name = '';
-    if (!empty($u['organization_id'])) {
-        $o = export_rows($conn, 'SELECT name FROM tbl_organizations WHERE id = ? LIMIT 1', 'i', [(int)$u['organization_id']]);
-        $org_name = (string)($o[0]['name'] ?? '');
-    }
-
     // Whitelisted columns only, so the password hash can never end up in the file.
     $g = static fn(string $k): string => trim((string)($u[$k] ?? ''));
     $account = [
@@ -170,7 +164,6 @@ try {
         ['Department',               $g('department')],
         ['Position / Rank',          $g('faculty_rank')],
         ['Account Role',             $g('role')],
-        ['Organization',             $org_name],
         ['Mobile Number',            $g('phone')],
         ['Landline',                 $g('landline')],
         ['Date of Birth',            export_date($g('dob'))],

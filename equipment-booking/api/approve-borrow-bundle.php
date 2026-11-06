@@ -86,15 +86,6 @@ try {
         send_bundle_json(409, 'error', 'At least two bundled requests must still be pending to approve them together.');
     }
 
-    foreach ($waiting as $row) {
-        $sensitive = (string)($row['submitted_as'] ?? '') === 'adviser'
-            && trim((string)($row['document_path'] ?? '')) !== '';
-        if ($sensitive && !admin_is_super_admin($conn)) {
-            $conn->rollback();
-            send_bundle_json(403, 'error', 'Only a Super Admin can approve this bundle.');
-        }
-    }
-
     $inventoryNeeds = [];
     foreach ($waiting as $row) {
         if (!in_array((string)($row['booking_mode'] ?? ''), ['today', 'future'], true)) {

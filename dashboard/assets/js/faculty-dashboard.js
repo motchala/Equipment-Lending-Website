@@ -896,19 +896,19 @@
     /* ================================================================
        BORROW SCHEDULE  (Borrow Request modal: when / how long / how many)
        ----------------------------------------------------------------
-       Today  : start time + 1 / 2 / 3 / 5 hours (advisers: custom hours)
+       Today  : start time + 1 / 2 / 3 / 5 hours
        Later  : date (tomorrow … 3 weeks ahead) + start time + 1 / 2 / 3 days
-                (advisers: also 5) + quantity (up to the item's TOTAL stock)
+                + quantity (up to the item's TOTAL stock) + an optional request letter
        Items that are out right now can still be booked for a later date.
        The server re-checks every rule; this is the friendly front end.
     ================================================================ */
     const BorrowSchedule = (function () {
         const loadedAt = Date.now();
         const pad = n => String(n).padStart(2, '0');
-        const meta = () => window.BOOKING_META || { items: {}, rules: {}, adviser: false, today: todayStr, nowMin: 0 };
+        const meta = () => window.BOOKING_META || { items: {}, rules: {}, today: todayStr, nowMin: 0 };
         const rules = () => Object.assign({
             dayStart: '07:00', dayEnd: '21:00', slot: 30, maxAhead: 21, todayHours: [1, 2, 3, 5],
-            adviserMaxHours: 12, futureDays: [1, 2, 3], adviserFutureDays: [1, 2, 3, 5], graceMin: 15
+            futureDays: [1, 2, 3], graceMin: 15
         }, meta().rules || {});
         const toMin = hhmm => { const p = String(hhmm).split(':'); return (+p[0]) * 60 + (+p[1]); };
         const hhmm = min => pad(Math.floor(min / 60)) + ':' + pad(min % 60);
@@ -923,8 +923,7 @@
 
         function setup(root) {
             const st = {
-                root: root, mode: 'today', length: null, custom: false, item: null, timer: null, ok: null, forcedOff: false,
-                multi: root.dataset.bmMulti === '1', adviser: !!meta().adviser,
+                root: root, mode: 'today', length: null, item: null, timer: null, ok: null, forcedOff: false,
                 form: root.closest('form'),
                 els: {
                     modeInput: q(root, '[data-bm-mode-input]'), durInput: q(root, '[data-bm-duration-input]'),
@@ -932,7 +931,6 @@
                     outToggle: q(root, '[data-bm-outnow-toggle]'), fields: q(root, '[data-bm-fields]'),
                     date: q(root, '[data-bm-date]'), dateHint: q(root, '[data-bm-date-hint]'),
                     time: q(root, '[data-bm-time]'), chips: q(root, '[data-bm-chips]'), lengthLabel: q(root, '[data-bm-length-label]'),
-                    custom: q(root, '[data-bm-custom]'), customInput: q(root, '[data-bm-custom-input]'),
                     qty: q(root, '[data-bm-qty]'), qtyHint: q(root, '[data-bm-qty-hint]'),
                     summary: q(root, '[data-bm-summary]'), avail: q(root, '[data-bm-avail]'),
                     futureOnly: root.querySelectorAll('[data-bm-future-only]')
@@ -945,11 +943,9 @@
             if (st.els.date) st.els.date.addEventListener('change', () => refresh(st));
             st.els.chips.addEventListener('click', e => {
                 const c = e.target.closest('[data-len]'); if (!c || c.disabled) return;
-                if (c.dataset.len === 'custom') { st.custom = true; st.length = parseInt(st.els.customInput.value, 10) || null; if (!st.length) { st.els.customInput.value = Math.min(6, maxCustomHours(st)); st.length = parseInt(st.els.customInput.value, 10); } }
-                else { st.custom = false; st.length = parseInt(c.dataset.len, 10); }
+                st.length = parseInt(c.dataset.len, 10);
                 buildChips(st); refresh(st);
             });
-            if (st.els.customInput) st.els.customInput.addEventListener('input', () => { st.length = parseInt(st.els.customInput.value, 10) || null; refresh(st); });
             if (st.els.qty) {
                 root.querySelector('[data-bm-qty-dec]').addEventListener('click', () => stepQty(st, -1));
                 root.querySelector('[data-bm-qty-inc]').addEventListener('click', () => stepQty(st, 1));
@@ -962,22 +958,6 @@
                 if (!st.forcedOff) { setMode(st, 'future'); }
                 refresh(st);
             });
-            if (st.multi && st.form) {
-                st.form.addEventListener('change', e => {
-                    if (e.target.matches('input[name="items[]"]')) { syncRows(st); refresh(st); }
-                });
-                st.form.addEventListener('click', e => {
-                    const dec = e.target.closest('[data-bm-iq-dec]'), inc = e.target.closest('[data-bm-iq-inc]');
-                    if (!dec && !inc) return;
-                    e.preventDefault();
-                    const inp = (dec || inc).closest('[data-bm-item-qty]').querySelector('input');
-                    inp.value = Math.max(+inp.min || 1, Math.min(+inp.max || 1, (parseInt(inp.value, 10) || 1) + (inc ? 1 : -1)));
-                    refresh(st);
-                });
-                st.form.addEventListener('input', e => {
-                    if (e.target.closest('[data-bm-item-qty]')) { const i = e.target; i.value = Math.max(+i.min || 1, Math.min(+i.max || 1, parseInt(i.value, 10) || 1)); refresh(st); }
-                });
-            }
             if (st.form) st.form.addEventListener('submit', e => {
                 const err = validate(st);
                 if (err) { e.preventDefault(); e.stopImmediatePropagation(); showError(st, err); }
@@ -988,24 +968,17 @@
         /* ---- item + state helpers ------------------------------------ */
         function singleItem(st) { return st.item; }
         function selectedItems(st) {
-            if (!st.multi) return st.item ? [{ name: st.item, qty: currentQty(st) }] : [];
-            return Array.from(st.form.querySelectorAll('input[name="items[]"]:checked')).map(cb => {
-                const row = cb.closest('[data-bm-item]'); const qi = row && row.querySelector('[data-bm-item-qty] input');
-                return { name: cb.value, qty: st.mode === 'future' && qi ? (parseInt(qi.value, 10) || 1) : 1 };
-            });
+            return st.item ? [{ name: st.item, qty: currentQty(st) }] : [];
         }
         function currentQty(st) { return st.mode === 'future' && st.els.qty ? (parseInt(st.els.qty.value, 10) || 1) : 1; }
-        function maxCustomHours(st) {
-            const start = toMin(st.els.time.value || rules().dayStart);
-            return Math.max(1, Math.min(rules().adviserMaxHours, Math.floor((toMin(rules().dayEnd) - start) / 60)));
-        }
 
         /* ---- mode ----------------------------------------------------- */
         function setMode(st, mode) {
-            st.mode = mode; st.length = null; st.custom = false; st.ok = null;
+            st.mode = mode; st.length = null; st.ok = null;
             st.els.modeInput.value = mode;
             st.els.modeBtns.forEach(b => { const on = b.dataset.bmMode === mode; b.classList.toggle('active', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
             st.els.futureOnly.forEach(el => { el.hidden = mode !== 'future'; });
+            if (mode !== 'future') clearLetter(st);   /* a same-day request never carries a request letter */
             const r = rules(), today = parseYmd(meta().today || todayStr);
             if (st.els.date) {
                 st.els.date.min = fmtYmd(addDays(today, 1));
@@ -1016,7 +989,6 @@
             }
             st.els.lengthLabel.textContent = mode === 'today' ? 'For how long?' : 'For how many days?';
             buildTimes(st); buildChips(st);
-            if (st.multi) syncRows(st);
             if (st.els.qty) clampQty(st, true);
             refresh(st);
         }
@@ -1041,23 +1013,22 @@
         function buildChips(st) {
             const r = rules(), box = st.els.chips; box.innerHTML = '';
             const startMin = st.els.time.value ? toMin(st.els.time.value) : toMin(r.dayStart);
-            const list = st.mode === 'today' ? r.todayHours : (st.adviser ? r.adviserFutureDays : r.futureDays);
+            const list = st.mode === 'today' ? r.todayHours : r.futureDays;
             list.forEach(n => {
                 const b = document.createElement('button'); b.type = 'button'; b.className = 'bm-chip'; b.dataset.len = n;
                 b.textContent = st.mode === 'today' ? n + (n === 1 ? ' hr' : ' hrs') : n + (n === 1 ? ' day' : ' days');
                 const tooLong = st.mode === 'today' && (startMin + n * 60 > toMin(r.dayEnd));
-                b.disabled = tooLong; if (tooLong && st.length === n && !st.custom) st.length = null;
-                const on = !st.custom && st.length === n;
+                b.disabled = tooLong; if (tooLong && st.length === n) st.length = null;
+                const on = st.length === n;
                 b.classList.toggle('active', on); b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', on ? 'true' : 'false');
                 box.appendChild(b);
             });
-            if (st.mode === 'today' && st.adviser) {
-                const b = document.createElement('button'); b.type = 'button'; b.className = 'bm-chip bm-chip-custom'; b.dataset.len = 'custom'; b.textContent = 'Custom';
-                b.classList.toggle('active', st.custom); b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', st.custom ? 'true' : 'false');
-                box.appendChild(b);
-            }
-            st.els.custom.hidden = !(st.custom && st.mode === 'today');
-            if (st.custom) { st.els.customInput.max = maxCustomHours(st); if (st.length > maxCustomHours(st)) { st.length = maxCustomHours(st); st.els.customInput.value = st.length; } }
+        }
+
+        /* ---- request letter (Later bookings only) --------------------- */
+        function clearLetter(st) {
+            const f = st.root.querySelector('input[type="file"]');
+            if (f && f.value) { f.value = ''; if (typeof window.syncBorrowDrops === 'function') window.syncBorrowDrops(); }
         }
 
         /* ---- quantity (Later bookings) -------------------------------- */
@@ -1072,21 +1043,6 @@
             if (wrap) { wrap.querySelector('[data-bm-qty-dec]').disabled = +st.els.qty.value <= 1; wrap.querySelector('[data-bm-qty-inc]').disabled = +st.els.qty.value >= max; }
         }
         function stepQty(st, d) { st.els.qty.value = (parseInt(st.els.qty.value, 10) || 1) + d; clampQty(st); refresh(st); }
-
-        /* ---- adviser checklist rows ----------------------------------- */
-        function syncRows(st) {
-            st.form.querySelectorAll('[data-bm-item]').forEach(row => {
-                const cb = row.querySelector('input[name="items[]"]'), shelf = +row.dataset.shelf, total = +row.dataset.total;
-                const blocked = (st.mode === 'today' && shelf < 1) || total < 1;
-                if (blocked && cb.checked) cb.checked = false;
-                cb.disabled = blocked; row.classList.toggle('is-out', blocked);
-                const stat = row.querySelector('[data-bm-stock]');
-                if (stat) stat.textContent = total < 1 ? '(no stock)' : (blocked ? '(out now – use Later date)' : (shelf > 0 ? '(' + shelf + ' available)' : '(out now)'));
-                const qw = row.querySelector('[data-bm-item-qty]'), qi = qw && qw.querySelector('input');
-                const show = cb.checked && st.mode === 'future';
-                if (qw) { qw.hidden = !show; qi.disabled = !show; qi.max = Math.max(1, total); if (+qi.value > +qi.max) qi.value = qi.max; }
-            });
-        }
 
         /* ---- summary + live availability ------------------------------ */
         function windowOf(st) {
@@ -1129,23 +1085,14 @@
                     if (!j || j.ok !== true) { st.ok = false; setAvail(st, (j && j.error) || 'That schedule is not allowed.', 'bad'); return; }
                     const bad = (j.results || []).filter(x => !x.ok);
                     st.ok = bad.length === 0;
-                    if (st.multi) {
-                        (j.results || []).forEach(x => {
-                            const row = Array.from(st.form.querySelectorAll('[data-bm-item]')).find(r => r.dataset.bmItem === x.name);
-                            const s = row && row.querySelector('[data-bm-item-status]');
-                            if (s) { s.textContent = x.ok ? '✓' : '✗'; s.title = x.message; s.className = 'bm-item-status ' + (x.ok ? 'ok' : 'bad'); }
-                        });
-                        setAvail(st, st.ok ? 'All selected items are free for that schedule.' : bad.map(x => x.name + ': ' + x.message).join('  '), st.ok ? 'ok' : 'bad');
-                    } else {
-                        setAvail(st, (j.results[0] || {}).message || '', st.ok ? 'ok' : 'bad');
-                    }
+                    setAvail(st, (j.results[0] || {}).message || '', st.ok ? 'ok' : 'bad');
                 }).catch(() => { st.ok = null; setAvail(st, '', ''); });
         }
 
         /* ---- validation + errors -------------------------------------- */
         function validate(st) {
             const items = selectedItems(st);
-            if (!items.length) return st.multi ? 'Please select at least one item.' : 'No equipment selected.';
+            if (!items.length) return 'No equipment selected.';
             if (st.forcedOff) return 'Turn on “Out right now” to book this item for a later date.';
             if (st.mode === 'future') {
                 if (!st.els.date.value) return 'Please choose a borrow date.';
@@ -1154,7 +1101,6 @@
             }
             if (!st.els.time.value) return 'Please choose a start time.';
             if (!st.length) return st.mode === 'today' ? 'Please choose how long you need it.' : 'Please choose how many days.';
-            if (st.custom && (st.length < 1 || st.length > maxCustomHours(st))) return 'Custom length must be between 1 and ' + maxCustomHours(st) + ' hours.';
             if (!RoomPicker.value(st.form)) return 'Please choose a room.';
             if (st.ok === false) return st.els.avail.textContent || 'That schedule is not available.';
             return null;
@@ -1163,18 +1109,16 @@
 
         /* ---- public --------------------------------------------------- */
         function reset(st) {
-            st.length = null; st.custom = false; st.forcedOff = false; st.ok = null;
-            if (st.els.customInput) st.els.customInput.value = '';
+            st.length = null; st.forcedOff = false; st.ok = null;
             if (st.els.qty) st.els.qty.value = 1;
             if (st.els.outToggle) st.els.outToggle.checked = true;
             st.els.fields.classList.remove('is-off');
             st.els.fields.querySelectorAll('input,select,button').forEach(x => { x.disabled = false; });
             if (st.els.date) st.els.date.value = '';
-            const allowToday = !st.item || (itemMeta(st.item) || {}).shelf > 0 || st.multi;
-            const outNow = !st.multi && st.item && !allowToday;
+            const allowToday = !st.item || (itemMeta(st.item) || {}).shelf > 0;
+            const outNow = st.item && !allowToday;
             if (st.els.outRow) st.els.outRow.hidden = !outNow;
             st.els.modeBtns.forEach(b => { if (b.dataset.bmMode === 'today') b.disabled = outNow; });
-            if (st.multi) { st.form.querySelectorAll('input[name="items[]"]').forEach(cb => { cb.checked = false; }); st.form.querySelectorAll('[data-bm-item-status]').forEach(s => { s.textContent = ''; s.className = 'bm-item-status'; }); }
             setMode(st, outNow ? 'future' : 'today');
             setAvail(st, '', '');
             RoomPicker.reset(st.form);
@@ -1183,10 +1127,10 @@
         return {
             init: function () { RoomPicker.init(); document.querySelectorAll('[data-bm-sched]').forEach(setup); },
             open: function (itemName) {
-                document.querySelectorAll('[data-bm-sched]').forEach(root => { const st = root._bm; if (!st) return; if (!st.multi) st.item = itemName; reset(st); });
+                document.querySelectorAll('[data-bm-sched]').forEach(root => { const st = root._bm; if (!st) return; st.item = itemName; reset(st); });
             },
             resetAll: function () { document.querySelectorAll('[data-bm-sched]').forEach(root => { const st = root._bm; if (st) reset(st); }); },
-            setItemMeta: function () { document.querySelectorAll('[data-bm-sched]').forEach(root => { const st = root._bm; if (st && !st.multi) { clampQty(st); } }); }
+            setItemMeta: function () { document.querySelectorAll('[data-bm-sched]').forEach(root => { const st = root._bm; if (st) { clampQty(st); } }); }
         };
     })();
     window.BorrowSchedule = BorrowSchedule;
@@ -3071,24 +3015,6 @@
                 case 'close-borrow-modal':
                     closeBorrowModal();
                     break;
-                case 'borrow-subtab': {
-                    var tab = el.dataset.tab;
-                    var btnP = document.getElementById('subtab-personal-btn');
-                    var btnA = document.getElementById('subtab-adviser-btn');
-                    var panP = document.getElementById('subtab-personal');
-                    var panA = document.getElementById('subtab-adviser');
-                    if (!btnP || !btnA || !panP || !panA) break;
-                    if (tab === 'personal') {
-                        btnP.classList.add('active'); btnP.setAttribute('aria-selected', 'true');
-                        btnA.classList.remove('active'); btnA.setAttribute('aria-selected', 'false');
-                        panP.classList.add('active'); panA.classList.remove('active');
-                    } else {
-                        btnA.classList.add('active'); btnA.setAttribute('aria-selected', 'true');
-                        btnP.classList.remove('active'); btnP.setAttribute('aria-selected', 'false');
-                        panA.classList.add('active'); panP.classList.remove('active');
-                    }
-                    break;
-                }
                 case 'lending-back':
                     switchLendingSub('browse');
                     break;
@@ -6460,7 +6386,6 @@
 /* ================================================================
    EQUIPMENT CART — multi-item borrowing (today only)
    Self-contained IIFE. Zero changes to any existing borrow logic.
-   Works in both single-mode and dual-mode faculty accounts.
 ================================================================ */
 (function () {
     'use strict';

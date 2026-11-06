@@ -435,7 +435,7 @@ You are PUPSync Room Assistant, an AI assistant for the Polytechnic University o
 - Maximum advance booking: 21 days from today ({$today_date}).
 - Maximum active reservations per faculty: 2 at the same time.
 - Cancellation: only allowed more than 1 hour before the start time.
-- Organisation Advisers may attach a supporting document (PDF, JPG, PNG, max 5 MB) for priority.
+- A request letter (PDF, JPG, PNG, max 5 MB) is recommended for reservations on a later date. It cannot be attached in this chat — tell the faculty to attach it in the Reserve form instead. Same-day reservations do not need a letter.
 - Student-submitted reservations via faculty code count toward the faculty's quota and appear in the faculty's activity.
 
 ## CAMPUSES & BUILDINGS

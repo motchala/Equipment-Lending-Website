@@ -10,6 +10,8 @@
  *   student_name, student_id,
  *   room_id, reservation_date, start_time, end_time,
  *   purpose, attendees, notes (optional)
+ * Sent as multipart/form-data instead when a request letter is attached (later-date
+ * reservations only): the same fields plus the file field "document".
  */
 
 ini_set('display_errors', '0');
@@ -23,7 +25,8 @@ require_once __DIR__ . '/../../config/session.php';
 header('Content-Type: application/json');
 date_default_timezone_set('Asia/Manila');
 
-$body         = json_decode(file_get_contents('php://input'), true);
+$is_multipart = stripos($_SERVER['CONTENT_TYPE'] ?? '', 'multipart/form-data') !== false;
+$body         = $is_multipart ? $_POST : json_decode(file_get_contents('php://input'), true);
 $code_db_id   = intval($body['code_db_id']       ?? 0);
 $faculty_id   = trim($body['faculty_id']          ?? '');
 $faculty_name = trim($body['faculty_name']        ?? '');
@@ -128,6 +131,19 @@ if ($is_future_day) {
     ps_room_ensure_waiting_status($conn);
 }
 $notes_val = $notes !== '' ? $notes : null;
+
+// ── Optional request letter: recommended for a LATER date, ignored for a same-day one ──
+require_once __DIR__ . '/../../shared/core/document-helpers.php';
+$letter_path = null;
+if ($is_future_day && $is_multipart && isset($_FILES['document'])) {
+    $letter_err  = null;
+    $letter_path = ps_store_request_letter($_FILES['document'], 'uploads/room_documents', $student_id, $letter_err);
+    if ($letter_path === null && $letter_err !== null) {
+        fcty_quota_unlock($conn, $faculty_id);
+        echo json_encode(['error' => $letter_err]);
+        exit();
+    }
+}
 $ins = $conn->prepare(
     "INSERT INTO tbl_room_reservations
         (room_id, faculty_id, faculty_name,
@@ -155,6 +171,9 @@ $ins->bind_param(
 if (!$ins->execute()) {
     error_log('[PUPSync] submit-student-reserve insert failed: ' . $conn->error);
     $ins->close();
+    if ($letter_path !== null) {
+        @unlink(dirname(__DIR__, 2) . '/' . $letter_path);
+    }
     fcty_quota_unlock($conn, $faculty_id);
     echo json_encode(['error' => 'Failed to save reservation. Please try again.']);
     exit();
@@ -162,6 +181,15 @@ if (!$ins->execute()) {
 $reservation_id = $conn->insert_id;
 $ins->close();
 fcty_quota_unlock($conn, $faculty_id);
+
+if ($letter_path !== null) {
+    $doc = $conn->prepare('UPDATE tbl_room_reservations SET document_path = ? WHERE id = ?');
+    if ($doc) {
+        $doc->bind_param('si', $letter_path, $reservation_id);
+        $doc->execute();
+        $doc->close();
+    }
+}
 
 // ── Run Arbitration Engine ────────────────────────────────────────────────
 require_once __DIR__ . '/../../equipment-booking/core/arbitration-engine.php';

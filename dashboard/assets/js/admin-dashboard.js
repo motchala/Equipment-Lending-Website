@@ -1763,30 +1763,6 @@
         } catch (err) { console.warn('Action "' + action + '" failed:', err); }
     });
 
-    /* ── Faculty: adviser toggle show/hide ───────────────────── */
-    const facAdviserChk = document.getElementById('fac-adviser');
-    const facOrgGroup = document.getElementById('fac-org-group');
-    const facOrgSelect = document.getElementById('fac-org');
-
-    function _syncAdviserToggle() {
-        if (!facAdviserChk || !facOrgGroup) return;
-        const on = facAdviserChk.checked;
-        facOrgGroup.style.display = on ? '' : 'none';
-        if (facOrgSelect) {
-            if (on) {
-                facOrgSelect.setAttribute('required', 'required');
-            } else {
-                facOrgSelect.removeAttribute('required');
-                facOrgSelect.value = '';
-            }
-        }
-    }
-
-    if (facAdviserChk) {
-        facAdviserChk.addEventListener('change', _syncAdviserToggle);
-        _syncAdviserToggle(); // run once on page load to sync initial state
-    }
-
     /* ── Faculty: XSS helper and row builder ─────────────────── */
     function _esc(str) {
         const d = document.createElement('div');
@@ -1799,7 +1775,6 @@
        An id starting with NOTSET- is the internal placeholder for "no Faculty ID yet"
        (see shared/core/faculty-id.php) and is shown as "Not set yet". */
     window.psFacRender = function (tr, d) {
-        const isAdviser = d.role === 'Organization Adviser';
         const idUnset = !d.faculty_id || String(d.faculty_id).indexOf('NOTSET-') === 0;
         const init = ((d.fullname || 'F').trim().charAt(0) || 'F').toUpperCase();
 
@@ -1807,9 +1782,6 @@
         tr.dataset.email = d.email || '';
         tr.dataset.backupEmail = d.backup_email || '';
         tr.dataset.facultyId = d.faculty_id || '';
-        tr.dataset.role = d.role || '';
-        tr.dataset.org = d.org_name || '';
-        tr.dataset.orgId = String(d.org_id || '0');
         tr.dataset.init = init;
 
         tr.innerHTML =
@@ -1822,10 +1794,6 @@
             '<td>' + (idUnset
                 ? '<span class="fac-id-pending">Not set yet</span>'
                 : '<span class="fac-id">' + _esc(d.faculty_id) + '</span>') + '</td>' +
-            '<td>' + (isAdviser
-                ? '<span class="fac-role fac-role--adviser">Org Adviser</span>' +
-                (d.org_name ? '<div class="fac-person-sub">' + _esc(d.org_name) + '</div>' : '')
-                : '<span class="fac-role">Faculty</span>') + '</td>' +
             '<td class="fac-actions"><button class="ps-btn ps-btn--ghost ps-btn--sm fac-edit-btn" aria-label="Edit account">' +
             '<span class="material-symbols-outlined">edit</span></button></td>';
         return tr;
@@ -2130,8 +2098,6 @@
                 const el = document.getElementById(id);
                 if (el) el.value = '';
             });
-        if (facAdviserChk) facAdviserChk.checked = false;
-        _syncAdviserToggle();
         _clearFacAlert();
         _clearRegistryPreview();
 
@@ -2178,8 +2144,6 @@
             const lastName = _nm.last;
             const password = document.getElementById('fac-password')?.value || '';
             const confirm = document.getElementById('fac-confirm')?.value || '';
-            const isAdviser = facAdviserChk?.checked ? '1' : '0';
-            const orgId = facOrgSelect?.value || '';
 
             // Client-side pre-checks
             if (!_facRegistryMatch) {
@@ -2204,10 +2168,6 @@
             if (password !== confirm) {
                 _showFacAlert('Passwords do not match.', true); return;
             }
-            if (isAdviser === '1' && !orgId) {
-                _showFacAlert('An organization must be selected for an adviser.', true);
-                return;
-            }
             if (_facEmailEdited && email && !/^[^\s@]+@pupsync\.edu$/i.test(email)) {
                 _showFacAlert('The PUPSync email must be a valid address ending in @pupsync.edu.', true);
                 return;
@@ -2221,9 +2181,7 @@
                 first_name: firstName,
                 last_name: lastName,
                 password: password,
-                confirm_password: confirm,
-                is_org_adviser: isAdviser,
-                organization_id: orgId
+                confirm_password: confirm
             });
             // Only an email the admin changed by hand is sent; otherwise the server derives it.
             if (_facEmailEdited && email) body.append('pupsync_email', email);
@@ -4802,10 +4760,9 @@ function psSelectFmt(btn) {
    ROOMS — reservation details drawer (Rooms > Reservations table)
    Additive block. "Cancel reservation" in the drawer clicks the row's
    own Cancel button, so the existing cancel modal + API are reused.
-   Waiting requests (later-date reservations, and Org Adviser requests with an
-   attached letter) show a reason box and Approve / Decline buttons; the
-   decision goes to room-reservation/api/review-adviser-reservation.php (any
-   admin for later-date requests, Super Admin only for the adviser letters).
+   Waiting requests (reservations for a later date, with or without an attached
+   request letter) show a reason box and Approve / Decline buttons; the decision
+   goes to room-reservation/api/review-room-reservation.php (any admin).
    ═══════════════════════════════════════════════════════════════ */
 (function () {
     var drawer = document.getElementById('ps-room-drawer');
@@ -5004,7 +4961,7 @@ function psSelectFmt(btn) {
         decideBtns.forEach(function (b) { b.disabled = true; });
         btn.textContent = decision === 'Approved' ? 'Approving\u2026' : 'Declining\u2026';
 
-        fetch('room-reservation/api/review-adviser-reservation.php', {
+        fetch('room-reservation/api/review-room-reservation.php', {
             method: 'POST',
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },

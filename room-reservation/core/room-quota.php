@@ -18,10 +18,9 @@
  *        not count, so a slot is freed by cancelling or simply by waiting for it to end.
  *        Reservations made by students through the faculty member's code count
  *        toward the same faculty account limit.
- *   3. Only Organization Advisers may attach a supporting document (JPG, PNG or
- *      PDF, max 5 MB). It is optional. Attaching one files the reservation as
- *      submitted_as = adviser and stores the path in document_path, which the
- *      arbitration engine already reads for priority.
+ *   3. A request letter (JPG, PNG or PDF, max 5 MB) may be attached to a reservation for a
+ *      LATER DATE. It is optional but recommended, and its path is stored in document_path
+ *      for the reviewing admin. Same-day reservations never need one.
  */
 
 require_once __DIR__ . '/room-expiry.php';   // 12:01 AM auto-decline of undecided Waiting reservations
@@ -82,20 +81,6 @@ function fcty_active_room_reservations(mysqli $conn, string $faculty_id): array
     }
     $stmt->close();
     return $rows;
-}
-
-/** True when the account is an Organization Adviser (read fresh from the DB). */
-function fcty_is_org_adviser(mysqli $conn, string $faculty_id): bool
-{
-    $stmt = $conn->prepare('SELECT role FROM tbl_users WHERE faculty_id = ? LIMIT 1');
-    if ($stmt === false) {
-        return false;
-    }
-    $stmt->bind_param('s', $faculty_id);
-    $stmt->execute();
-    $row = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
-    return ($row['role'] ?? '') === 'Organization Adviser';
 }
 
 /** Per-faculty advisory lock so two simultaneous submissions cannot both slip past the limit. */
@@ -287,7 +272,7 @@ function fact_load_rooms(mysqli $conn, string $faculty_id): array
                         $out['upcoming'][] = $item;
                     }
                 } elseif ($status === 'Waiting') {
-                    // Waiting for an admin (later date, or an adviser letter). Holds no slot yet, so it can be
+                    // Waiting for an admin (a reservation for a later date). Holds no slot yet, so it can be
                     // withdrawn at any time; it is never shown as Declined.
                     $item['state']      = 'pending';
                     $item['can_cancel'] = true;

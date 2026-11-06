@@ -74,29 +74,25 @@
                     <div class="ps-drawer-note" id="ps-rr-notes">—</div>
                 </section>
 
-                <?php if (!empty($ps_rooms_can_view_sensitive_adviser_requests)): ?>
-                    <!-- Super Admin only: shown for Waiting requests. Open the attached letter above, then decide. -->
-                    <section class="ps-drawer-sec" id="ps-rr-review-sec" hidden>
-                        <h4>Your decision</h4>
-                        <label class="ps-drawer-muted" for="ps-rr-review-reason">Reason (at least 5 characters). It is saved with the decision.</label>
-                        <textarea class="ps-rr-reason" id="ps-rr-review-reason" rows="3" maxlength="500"></textarea>
-                        <div class="ps-rr-review-err" id="ps-rr-review-err" role="alert" hidden></div>
-                    </section>
-                <?php endif; ?>
+                <!-- Shown for Waiting requests. Open the attached request letter (if any) above, then decide. -->
+                <section class="ps-drawer-sec" id="ps-rr-review-sec" hidden>
+                    <h4>Your decision</h4>
+                    <label class="ps-drawer-muted" for="ps-rr-review-reason">Reason (at least 5 characters). It is saved with the decision.</label>
+                    <textarea class="ps-rr-reason" id="ps-rr-review-reason" rows="3" maxlength="500"></textarea>
+                    <div class="ps-rr-review-err" id="ps-rr-review-err" role="alert" hidden></div>
+                </section>
             </div>
             <div class="ps-drawer-foot">
                 <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-room-drawer">Close</button>
                 <button class="ps-btn ps-btn--danger" type="button" id="ps-rr-cancel-btn" data-rr-cancel hidden>
                     <span class="material-symbols-outlined">cancel</span> Cancel reservation
                 </button>
-                <?php if (!empty($ps_rooms_can_view_sensitive_adviser_requests)): ?>
-                    <button class="ps-btn ps-btn--danger" type="button" data-rr-decide="Declined" hidden>
-                        <span class="material-symbols-outlined">close</span> Decline
-                    </button>
-                    <button class="ps-btn ps-btn--success" type="button" data-rr-decide="Approved" hidden>
-                        <span class="material-symbols-outlined">check</span> Approve
-                    </button>
-                <?php endif; ?>
+                <button class="ps-btn ps-btn--danger" type="button" data-rr-decide="Declined" hidden>
+                    <span class="material-symbols-outlined">close</span> Decline
+                </button>
+                <button class="ps-btn ps-btn--success" type="button" data-rr-decide="Approved" hidden>
+                    <span class="material-symbols-outlined">check</span> Approve
+                </button>
             </div>
         </aside>
     </div>

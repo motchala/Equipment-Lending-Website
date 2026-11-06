@@ -5781,12 +5781,6 @@ input[type="range"] {
     margin-top: 4px;
 }
 
-/* Wrapper that holds the adviser toggle label + track together */
-.faculty-adviser-toggle-wrap {
-    display: flex;
-    align-items: center;
-}
-
 /* Clickable label that wraps checkbox + track + text */
 .faculty-toggle-label {
     display: flex;
@@ -5863,8 +5857,7 @@ input[type="range"] {
 
 /* .form-group label (used for every other field label) sets display:block,
    uppercase text, and a bottom margin — and it wins over .faculty-toggle-label
-   on specificity when a toggle sits inside a .form-group (e.g. the
-   Organization Adviser toggle in Create Faculty Account), breaking the
+   on specificity when a toggle sits inside a .form-group, breaking the
    switch/text alignment. Restore the intended flex layout here. */
 .form-group label.faculty-toggle-label {
     display: flex;
@@ -8562,59 +8555,6 @@ body:has(#roomDeleteConfirm:not(.hidden)) {
     color: var(--text-light);
 }
 
-/* Switch rows (adviser / org borrowing) */
-.fac-opt-card {
-    border: 1px solid var(--khaki-border);
-    border-radius: 12px;
-    padding: 0 0.9rem;
-    margin-top: 1.1rem;
-}
-
-.fac-opt-row {
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 0.7rem 0;
-    cursor: pointer;
-    user-select: none;
-}
-
-.fac-opt-text {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-}
-
-.fac-opt-title {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-dark);
-}
-
-.fac-opt-sub {
-    font-size: 11.5px;
-    color: var(--text-light);
-}
-
-.fac-opt-row:hover .faculty-toggle-track {
-    box-shadow: 0 0 0 3px var(--accent-light);
-}
-
-.fac-opt-extra {
-    border-top: 1px solid var(--khaki-border);
-    padding-top: 0.8rem;
-}
-
-.fac-opt-extra .fac-opt-row {
-    border-top: 1px solid var(--khaki-border);
-}
-
-.fac-opt-extra .form-group {
-    margin-bottom: 0.6rem;
-}
-
 /* Footer: Delete on the left, Cancel + Save on the right */
 .ps-modal-foot.fac-foot-split {
     justify-content: space-between;
@@ -8834,12 +8774,6 @@ body:has(#roomDeleteConfirm:not(.hidden)) {
     color: var(--text-light);
     background: var(--secondary-cream);
     border: 1px solid var(--khaki-border);
-}
-
-.fac-role--adviser {
-    color: var(--accent-maroon);
-    background: var(--accent-light);
-    border-color: transparent;
 }
 
 @media (max-width: 520px) {
@@ -9508,7 +9442,6 @@ body.sidebar-collapsed .nav-user {
     color: var(--text-light);
 }
 
-
 /* ════════════════════════════════════════════════════════════════════
    APPROVALS — redesigned Waiting table, document chips, review drawer
    (additive block: nothing above this line is modified)
@@ -10059,7 +9992,6 @@ a.ps-doc-chip:hover {
     }
 }
 
-
 /* Rooms reservations table: document-bearing rows get the same gold edge as Approvals */
 .ps-rr-row.has-doc td:first-child {
     box-shadow: inset 3px 0 0 var(--accent-gold);
@@ -10072,7 +10004,6 @@ a.ps-doc-chip:hover {
 .ps-drawer-foot .ps-btn[hidden] {
     display: none;
 }
-
 
 /* ════════════════════════════════════════════════════════════════════
    SIDEBAR — roomier, easier-to-hit tabs
@@ -10270,7 +10201,6 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
      § 7  Adaptive layout (container queries)
 ================================================================ */
 
-
 /* ── § 1  TOKENS + SHELL ─────────────────────────────────────── */
 .dash {
     --dash-ok: #1e8e57;
@@ -10358,7 +10288,6 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
         transition: none !important;
     }
 }
-
 
 /* ── § 2  HEADER ─────────────────────────────────────────────── */
 .dash-head {
@@ -10506,7 +10435,6 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.32);
 }
 
-
 /* ── § 3  OVERVIEW (one card, two groups) ───────────────────── */
 .dash-kpis {
     display: grid;
@@ -10627,7 +10555,6 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     font-weight: 600;
 }
 
-
 /* ── § 4  GRID + CARDS ───────────────────────────────────────── */
 .dash-grid {
     display: grid;
@@ -10724,7 +10651,6 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     font-size: 11.5px;
     font-weight: 700;
 }
-
 
 /* ── § 5  CHART ──────────────────────────────────────────────── */
 .dash-controls {
@@ -11275,7 +11201,6 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     stroke-dasharray: 3 4;
 }
 
-
 /* ── § 6  LISTS, BARS, BADGES ────────────────────────────────── */
 .dash-list,
 .dash-attn {
@@ -11712,7 +11637,6 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     padding: 1.5rem !important;
 }
 
-
 /* ── § 7  ADAPTIVE LAYOUT (container queries) ────────────────── */
 
 /* Medium: the dashboard is ~700–1000px wide (sidebar open on a small laptop, or icon-rail tablet) */
@@ -11861,7 +11785,6 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     }
 }
 
-
 /* Phones: the shared responsive sheet turns .ps-table rows into stacked cards at <= 768px.
    Keep the requester name + id/time as two clean left-aligned lines in the card header. */
 @media (max-width: 768px) {
@@ -11886,7 +11809,6 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
         white-space: normal;
     }
 }
-
 
 /* ══════════════════════════════════════════════════════════════
    ROOMS PANEL -- calm layout (tiles + pills)
@@ -13212,7 +13134,6 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     animation: fac-reg-ellipsis 1.2s steps(1) infinite;
 }
 
-
 /* ════════════════════════════════════════════════════════════════════
    FACULTY TAB — Create Faculty Account card refinement
    (additive block — every rule is scoped to .faculty-form-card, so the
@@ -13397,30 +13318,7 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     line-height: 1.4;
 }
 
-/* Organization adviser — a soft maroon tint so the switch stands out
-   a tiny bit from the rest of the form (and responds when switched on) */
-.faculty-form-card .fac-opt-card {
-    margin-top: 1.4rem;
-    padding: 0 1rem;
-    background: rgba(96, 3, 2, 0.035);
-    background: color-mix(in srgb, var(--accent-maroon) 4%, var(--card-bg));
-    border: 1px solid color-mix(in srgb, var(--accent-maroon) 22%, var(--khaki-border));
-    transition: background 0.2s, border-color 0.2s;
-}
-
-.faculty-form-card .fac-opt-card:has(.faculty-toggle-input:checked) {
-    background: color-mix(in srgb, var(--accent-maroon) 7%, var(--card-bg));
-    border-color: color-mix(in srgb, var(--accent-maroon) 45%, var(--khaki-border));
-}
-
-.faculty-form-card .fac-opt-row {
-    padding: 0.8rem 0;
-}
-
 /* Off-state track a touch darker so the switch itself is easier to spot */
-.faculty-form-card .fac-opt-card .faculty-toggle-input:not(:checked)+.faculty-toggle-track {
-    background: color-mix(in srgb, var(--text-light) 40%, var(--khaki-border));
-}
 
 /* Create Account — full-width, centred, a little more presence */
 .faculty-form-card .fac-submit-btn {
@@ -13598,7 +13496,6 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
         min-width: 0;
     }
 }
-
 
 /* ════════════════════════════════════════════════════════════════════
    FACULTY REGISTRY — "View registry list" (button row + 2 modals)

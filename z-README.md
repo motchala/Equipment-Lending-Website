@@ -12,7 +12,6 @@ This guide has two parts: **[Set it up](#set-it-up-on-a-computer)** (no coding n
 |---|---|---|
 | **Student** | No account. They enter a code from their faculty on the Student Portal. | Borrow equipment or reserve a facility |
 | **Faculty** | Account created by a Super Admin | Borrow equipment, reserve rooms, track everything in My Activity, give codes to students |
-| **Organization Adviser** | A faculty account marked as an adviser | Same as faculty, with longer booking limits and an optional request letter |
 | **Admin** | Account created by a Super Admin | Review requests, scan QR codes, manage equipment and facilities |
 | **Super Admin** | Seed account or created by another Super Admin | Everything an Admin does, plus faculty and admin accounts, imports and rules |
 
@@ -22,7 +21,7 @@ Everyone signs in on the same page (`landing-page.php`). The system works out wh
 
 **Equipment**
 - Faculty pick items, a room (or "Outside") and a time: today for 1, 2, 3 or 5 hours, or a later date up to 3 weeks ahead.
-- Every request waits for an admin to **approve or decline** it.
+- A **same-day** request is decided by the system straight away, based on availability and the borrowing rules. A **later-date** request waits for an admin to **approve or decline** it, and can carry a request letter (recommended, never required).
 - Once approved, the faculty gets a **Claim QR** in *My Activity*. The admin scans it at the Admin Office and the item becomes *On Loan*.
 - On return, the faculty shows a **Return QR** and the admin scans it. The stock goes back automatically. Admins can also record a manual return without a QR.
 - Late items become *Overdue*. The faculty cannot borrow more until it is returned, but can *Extend* up to 2 times if nobody else needs the item.
@@ -30,8 +29,8 @@ Everyone signs in on the same page (`landing-page.php`). The system works out wh
 
 **Rooms (Facilities)**
 - Rooms are organised by campus, building and floor. Booking hours are 7:00 AM to 8:00 PM, Monday to Saturday.
-- A **same-day** booking is confirmed straight away if the slot is free. A **later-date** booking waits for an admin, and is declined automatically at 12:01 AM on that date if nobody decides.
-- Each faculty can hold up to 2 active reservations. Organization Advisers can attach a supporting document, which a Super Admin then reviews.
+- A **same-day** booking is confirmed straight away if the slot is free. A **later-date** booking waits for an admin, and is declined automatically at 12:01 AM on that date if nobody decides. A request letter can be attached to a later-date booking (recommended, never required).
+- Each faculty can hold up to 2 active reservations.
 - Faculty can report room problems, join a waitlist for taken slots, and ask the built-in **room assistant** (an AI chat limited to 20 messages per hour).
 
 **For admins**
@@ -180,12 +179,14 @@ Without a key, the room assistant will not answer.
 Each feature folder follows the same shape: `api/` (small endpoints that return JSON), `core/` (logic, include-only), `views/` (page pieces, include-only) and `assets/` (that module's CSS/JS). `core/` and `views/` are blocked from direct web access by a `.htaccess`.
 
 ### How decisions are made
-- **Equipment requests** are stored as *Waiting* and decided by an admin (`admin-override.php`, `approve-borrow-bundle.php`). Student borrows made with a code are stored as *Approved* straight away. Status flow: Waiting → Approved → On Loan → Returned, with Overdue, Declined and Cancelled as side paths.
-- **Room reservations** use `equipment-booking/core/arbitration-engine.php`: same-day bookings are checked and confirmed on the spot, later dates and adviser documents are held as *Waiting* for an admin (`room-expiry.php` declines undecided ones).
+- **Equipment requests**: a same-day request from the faculty form is run through `arbitration-engine.php` as soon as it is saved and is approved or declined on the spot. A later-date request is stored as *Waiting* and decided by an admin (`admin-override.php`, `approve-borrow-bundle.php`). Student borrows made with a code are stored as *Approved* straight away. Status flow: Waiting → Approved → On Loan → Returned, with Overdue, Declined and Cancelled as side paths.
+- **Room reservations** use `equipment-booking/core/arbitration-engine.php`: same-day bookings are checked and confirmed on the spot, later dates are held as *Waiting* for an admin (`room-expiry.php` declines undecided ones).
 - Booking limits (hours, advance days, extension counts) live in `equipment-booking/core/booking-schedule.php` and `borrow-extension.php`. Room limits live in `room-reservation/core/room-quota.php`.
 - Notifications are computed from the current data on each load; only read/deleted state is saved.
 
 ### Database changes
+The Organization Adviser role was removed. A database imported before that change should run `database/migration_remove_org_adviser.sql` once (back up first). A fresh import of `lending_db.sql` already has the new structure.
+
 Several files check for missing columns/tables on first use and add them (`ensureSchema()` and similar), so an older database catches up by itself. Keep schema changes additive and guarded the same way, and don't assume the SQL file was freshly imported.
 
 When you export a new `lending_db.sql` from phpMyAdmin, make sure these lines are at the very top so it imports cleanly on another computer:

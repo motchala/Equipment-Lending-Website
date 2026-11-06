@@ -2610,16 +2610,15 @@ body {
 /* ── Borrow Modal specifics ────────────────────────────────── */
 .borrow-modal-box {
     max-width: 560px;
-    /* Allow the box to scroll when dual-mode adviser content is taller
-       than the viewport — without this the adviser tab panel is clipped
-       by the parent .modal-box overflow:hidden rule.               */
+    /* Allow the box to scroll when the form is taller than the viewport
+       (parent .modal-box has overflow:hidden).                       */
     overflow-y: auto;
     max-height: 92vh;
 }
 
 .borrow-modal-box .modal-body {
     padding: 24px 24px 20px;
-    /* Prevent modal-body itself from hiding overflowing adviser content */
+    /* Prevent modal-body itself from hiding overflowing content */
     overflow: visible;
 }
 
@@ -4169,10 +4168,6 @@ body {
     box-shadow: none;
 }
 
-
-
-
-
 /* ── Catalog wrapper: white card with border ─────────────────── */
 #panel-lending .catalog-card {
     background: rgba(255, 255, 255, 0.75);
@@ -4526,7 +4521,6 @@ body {
     color: #ffffff;
 }
 
-
 [data-theme="dark"] #panel-lending .btn-borrow:not(:disabled) {
     background: var(--color-primary-container);
 }
@@ -4724,7 +4718,6 @@ body {
 [data-theme="dark"] .act-ai-fab-popover::after {
     background: var(--color-surface-container);
 }
-
 
 /* ── AI Chat Window ────────────────────────────────────────────── */
 .act-ai-chat {
@@ -5423,8 +5416,6 @@ body {
 [data-theme="dark"] .act-mini-dropdown {
     background: var(--color-surface-container);
 }
-
-
 
 /* ── Dark mode overrides ─────────────────────────────────────────── */
 [data-theme="dark"] .act-chat-bubble-ai,
@@ -9267,7 +9258,6 @@ body .side-nav .side-nav-links::-webkit-scrollbar-thumb {
     }
 }
 
-
 /* ================================================================
    CURVED GOLD ACCENT — top of every card / table container
    ----------------------------------------------------------------
@@ -9313,7 +9303,6 @@ body .side-nav .side-nav-links::-webkit-scrollbar-thumb {
     border-top-right-radius: inherit;
     z-index: 1;
 }
-
 
 /* ================================================================
    FACULTY TYPOGRAPHY — one scale for every faculty screen
@@ -9417,7 +9406,6 @@ html body .table-toolbar {
         justify-content: stretch;
     }
 }
-
 
 /* ================================================================
    THEME CONTRAST LAYER — Light · Dark · High Contrast
@@ -9816,7 +9804,6 @@ html body #panel-lending .feat-hero-desc {
     border-color: #ffffff;
 }
 
-
 /* ── 10. Equipment cards: stock badges, unavailable look, borders ─
    The page's inline styles hard-wire the stock badges to light-mode
    colours with !important, so they are re-pointed at tokens here. */
@@ -9870,7 +9857,6 @@ html body #panel-lending .catalog-search-wrap input {
     --toast-success-bg: #007a36;
 }
 
-
 /* ── 11. Browse / My Requests / My Reservations tab buttons ──────
    High Contrast had no rule for these, so the inactive tab kept its
    white fill with near-white text. Mirrors the Dark Mode treatment
@@ -9900,7 +9886,6 @@ html body #panel-lending .catalog-search-wrap input {
     background: #ffffff;
     color: #000000;
 }
-
 
 /* ================================================================
    BORROW REQUEST MODAL
@@ -10201,114 +10186,6 @@ html body #panel-lending .catalog-search-wrap input {
     font-size: 18px;
 }
 
-/* Dual-mode: segmented tab control */
-.borrow-subtab-bar {
-    display: flex;
-    gap: 4px;
-    margin-bottom: 16px;
-    padding: 4px;
-    border: 0;
-    border-radius: 12px;
-    background: var(--color-surface-container);
-}
-
-.borrow-subtab-btn {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    margin: 0;
-    padding: 8px 12px;
-    border: 0;
-    border-radius: 9px;
-    background: transparent;
-    color: var(--color-on-surface-variant);
-    font-family: var(--font-sans);
-    font-size: 0.8125rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.18s, color 0.18s, box-shadow 0.18s;
-}
-
-.borrow-subtab-btn .material-symbols-outlined {
-    font-size: 18px;
-}
-
-.borrow-subtab-btn:hover {
-    color: var(--color-on-surface);
-}
-
-.borrow-subtab-btn.active {
-    background: var(--color-surface-lowest);
-    color: var(--color-primary);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14), inset 0 -2px 0 var(--accent-gold-deep);
-}
-
-/* Dual-mode: equipment checklist */
-.adv-checklist-wrap {
-    max-height: 220px;
-    overflow-y: auto;
-    padding: 6px;
-    border: 1px solid var(--color-outline-variant);
-    border-radius: 12px;
-    background: var(--color-surface-lowest);
-}
-
-.adv-checklist-category {
-    margin: 10px 8px 4px;
-    font-size: 0.68rem;
-    font-weight: 700;
-    letter-spacing: 0.6px;
-    text-transform: uppercase;
-    color: var(--color-on-surface-variant);
-}
-
-.adv-checklist-category:first-child {
-    margin-top: 4px;
-}
-
-.adv-checklist-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 10px;
-    border-radius: 8px;
-    font-size: 0.875rem;
-    color: var(--color-on-surface);
-    cursor: pointer;
-    transition: background 0.15s;
-}
-
-.adv-checklist-item:hover {
-    background: var(--color-surface-container);
-}
-
-.adv-checklist-item:has(input:checked) {
-    background: color-mix(in srgb, var(--color-primary-container) 8%, transparent);
-}
-
-.adv-checklist-item input[type="checkbox"] {
-    flex-shrink: 0;
-    width: 16px;
-    height: 16px;
-    accent-color: var(--color-primary-container);
-    cursor: pointer;
-}
-
-.adv-checklist-qty {
-    margin-left: auto;
-    font-size: 0.75rem;
-    color: var(--color-on-surface-variant);
-}
-
-.adv-validation-msg {
-    display: none;
-    margin: 0 0 4px;
-    font-size: 0.75rem;
-    color: var(--color-error);
-}
-
 /* -- Faculty ID (set once, permanent) ---------------------------------- */
 .fid-confirm-id {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -10338,7 +10215,6 @@ html body #panel-lending .catalog-search-wrap input {
     font-weight: 600;
     color: var(--color-on-surface-variant);
 }
-
 
 /* ================================================================
    12. SETTINGS SCREEN — replaces the screen it was opened from
@@ -10390,7 +10266,6 @@ body:has(#settingsOverlay.active) #appMain {
         margin-bottom: 8px;
     }
 }
-
 
 /* ── 13. Account banner: name / ID line at full strength ─────────
    It was white at 82% opacity over a gradient whose middle turns bright
@@ -10542,7 +10417,6 @@ body .side-nav .side-nav-user .side-nav-user-name {
         justify-content: flex-end;
     }
 }
-
 
 /* ================================================================
    BORROW REQUEST MODAL — schedule (Today / Later), rooms, quantity
@@ -10842,26 +10716,6 @@ body .side-nav .side-nav-user .side-nav-user-name {
     outline-offset: 2px;
 }
 
-.bm-custom {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 8px;
-    font-size: 0.8125rem;
-    color: var(--color-on-surface-variant);
-}
-
-.bm-custom input {
-    width: 76px;
-    min-height: 36px;
-    padding: 0 10px;
-    border: 1px solid var(--color-outline-variant);
-    border-radius: 10px;
-    background: var(--color-surface-lowest);
-    color: var(--color-on-surface);
-    font: inherit;
-}
-
 /* Quantity stepper */
 .bm-stepper {
     display: inline-flex;
@@ -10964,82 +10818,6 @@ body .side-nav .side-nav-user .side-nav-user-name {
     font-weight: 500;
 }
 
-/* Adviser checklist extras */
-.adv-checklist-item .adv-checklist-name {
-    flex: 1;
-    min-width: 0;
-}
-
-.adv-checklist-item .adv-checklist-qty {
-    margin-left: 0;
-    white-space: nowrap;
-}
-
-.adv-checklist-item.is-out {
-    opacity: 0.55;
-    cursor: not-allowed;
-}
-
-.adv-checklist-item.is-out input {
-    cursor: not-allowed;
-}
-
-.bm-mini-stepper {
-    display: inline-flex;
-    align-items: stretch;
-    height: 28px;
-    border: 1px solid var(--color-outline-variant);
-    border-radius: 8px;
-    background: var(--color-surface-lowest);
-    overflow: hidden;
-}
-
-.bm-mini-stepper[hidden] {
-    display: none;
-}
-
-.bm-mini-stepper button {
-    width: 26px;
-    display: grid;
-    place-items: center;
-    border: 0;
-    background: transparent;
-    color: var(--color-on-surface);
-    cursor: pointer;
-}
-
-.bm-mini-stepper .material-symbols-outlined {
-    font-size: 16px;
-}
-
-.bm-mini-stepper input {
-    width: 34px;
-    border: 0;
-    border-left: 1px solid var(--color-outline-variant);
-    border-right: 1px solid var(--color-outline-variant);
-    background: transparent;
-    color: var(--color-on-surface);
-    text-align: center;
-    font: inherit;
-    font-size: 0.8125rem;
-    font-weight: 700;
-    -moz-appearance: textfield;
-    appearance: textfield;
-}
-
-.bm-item-status {
-    min-width: 14px;
-    font-weight: 800;
-}
-
-.bm-item-status.ok {
-    color: var(--color-success);
-}
-
-.bm-item-status.bad {
-    color: var(--color-error);
-}
-
 [data-theme="dark"] .bm-form input[type="date"],
 [data-theme="dark"] .bm-form select {
     color-scheme: dark;
@@ -11050,11 +10828,8 @@ body .side-nav .side-nav-user .side-nav-user-name {
         padding: 0 13px;
     }
 
-    .adv-checklist-item {
-        flex-wrap: wrap;
-    }
+    
 }
-
 
 /* ── MY ACTIVITY (faculty) ─────────────────────────────────────────────
    Layout, top to bottom:
@@ -12016,7 +11791,6 @@ body .side-nav .side-nav-user .side-nav-user-name {
     cursor: not-allowed;
 }
 
-
 /* ── Extend dialog (My Activity) ─────────────────────────────────
    Opened by the Extend button on a loan whose return time has been reached. Lives on <body> (the
    script moves it there), so its rules are not scoped to #panel-activity. Theme tokens only. */
@@ -12256,7 +12030,6 @@ body .side-nav .side-nav-user .side-nav-user-name {
     border: 1px solid color-mix(in srgb, var(--color-error) 30%, var(--color-outline-variant));
     background: color-mix(in srgb, var(--color-error) 7%, transparent);
 }
-
 
 /* ================================================================
    ROOM FIELD + "CHOOSE A ROOM" MODAL  (Borrow Request modal)

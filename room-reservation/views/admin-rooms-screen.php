@@ -308,9 +308,8 @@
                         $tb = !empty($b['request_date']) ? (int)strtotime($b['request_date']) : 0;
                         return ($tb <=> $ta) ?: ((int)$b['id'] <=> (int)$a['id']);
                     });
-                    // Waiting = reservations for a later date (any admin decides them) plus adviser requests with an
-                    // attached letter (Super Admin only - the query above never sends those to other admins).
-                    $rr_is_super = !empty($ps_rooms_can_view_sensitive_adviser_requests);
+                    // Waiting = reservations for a later date. Any admin decides them; a request letter, when one
+                    // was attached, opens from the row's details.
                     ?>
                     <div class="pr-card">
                         <div class="pr-card-header">
@@ -376,8 +375,7 @@
                                             if ($ar['status'] === 'Declined')  $ar_badge = 'ps-badge--overdue';
                                             if ($ar['status'] === 'Cancelled') $ar_badge = 'ps-badge--returned';
                                             if ($ar['status'] === 'Waiting')   $ar_badge = 'ps-badge--waiting';
-                                            // Every Waiting row this admin can see is theirs to decide: letter-based adviser
-                                            // requests are only ever loaded for a Super Admin, and the API enforces the same rule.
+                                            // Every Waiting row is the admin's to decide.
                                             $ar_reviewable = $ar['status'] === 'Waiting';
 
                                             $ar_type    = ps_submitted_as_label($ar['submitted_as']);

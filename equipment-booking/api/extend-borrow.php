@@ -48,21 +48,13 @@ require_once __DIR__ . '/../../activity/core/faculty-data.php';   // also loads 
 $conn       = getDB();
 $faculty_id = (string)$_SESSION['faculty_id'];
 
-// Limits follow the account's role, read from the DB, never from the request
-$stmt = $conn->prepare('SELECT role FROM tbl_users WHERE faculty_id = ? LIMIT 1');
-$stmt->bind_param('s', $faculty_id);
-$stmt->execute();
-$role = (string)($stmt->get_result()->fetch_assoc()['role'] ?? '');
-$stmt->close();
-$adviser = BookingSchedule::isAdviserRole($role);
-
 // Bring statuses up to date first (a loan that just reached its return time becomes Overdue)
 fact_eq_housekeeping($conn);
 
 if ($method === 'GET') {
     $id = (int)($_GET['id'] ?? 0);
     echo json_encode(
-        BorrowExtension::preview($conn, $faculty_id, $id, $adviser),
+        BorrowExtension::preview($conn, $faculty_id, $id),
         JSON_INVALID_UTF8_SUBSTITUTE
     );
     $conn->close();
@@ -81,7 +73,7 @@ if ($id <= 0 || $length <= 0) {
 }
 
 echo json_encode(
-    BorrowExtension::extend($conn, $faculty_id, $id, $length, $adviser),
+    BorrowExtension::extend($conn, $faculty_id, $id, $length),
     JSON_INVALID_UTF8_SUBSTITUTE
 );
 $conn->close();

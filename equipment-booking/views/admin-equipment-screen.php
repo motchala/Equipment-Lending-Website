@@ -66,15 +66,11 @@
                         }
                     }
                     $eq_ret_total  = count($eq_ret_rows);
-                    // Waiting (Pending Review) rows — supporting-letter requests from
-                    // Organization Advisers are visible to a Super Admin only. Rows with a document come first.
+                    // Waiting (Pending Review) rows. Rows that came with a request letter come first.
                     $eq_wait_sql = "SELECT tbl_requests.*,
                             (SELECT i.`condition` FROM tbl_inventory i WHERE i.item_name = tbl_requests.equipment_name LIMIT 1) AS item_condition
                         FROM tbl_requests
                         WHERE tbl_requests.status = 'Waiting'";
-                    if (empty($can_view_sensitive_adviser_requests)) {
-                        $eq_wait_sql .= " AND NOT {$sensitive_adviser_request_sql}";
-                    }
                     $eq_wait_sql .= " ORDER BY tbl_requests.request_date DESC";
                     $eq_wait_with = [];
                     $eq_wait_without = [];
@@ -565,10 +561,6 @@
                                                 $lrt   = !empty($r['return_time']) ? date('g:i A', strtotime($r['return_time'])) : '';
                                                 $lstart_lbl = date('M d, Y', strtotime($r['borrow_date'])) . ($lbt !== '' ? ' · ' . $lbt : '');
                                                 $ldue_lbl   = date('M d, Y', strtotime($r['return_date'])) . ($lrt !== '' ? ' · ' . $lrt : '');
-                                                // Same confidentiality rule as admin-override.php: adviser requests with a supporting
-                                                // document can only be changed by a Super Admin.
-                                                $lsens = (string)($r['submitted_as'] ?? '') === 'adviser' && trim((string)($r['document_path'] ?? '')) !== '';
-                                                $lcan_cancel = !$lsens || !empty($can_view_sensitive_adviser_requests);
                                                 $lstudent = (string)($r['submitted_as'] ?? '') === 'student' && trim((string)($r['submitted_by_name'] ?? '')) !== '';
                                         ?>
                                                 <tr class="eq-loan-row is-<?php echo $lst; ?>"
@@ -660,9 +652,7 @@
                                                                 <button type="button" class="ps-btn ps-btn--danger ps-btn--sm" data-action="ps-open-modal" data-modal="ps-decline-modal"><span class="material-symbols-outlined">close</span> Decline</button>
                                                             <?php elseif ($lst === 'scheduled'): ?>
                                                                 <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-action="eq-open-loan-detail">View</button>
-                                                                <?php if ($lcan_cancel): ?><button type="button" class="ps-btn ps-btn--danger ps-btn--sm" data-action="ps-open-modal" data-modal="ps-cancel-booking-modal"><span class="material-symbols-outlined">event_busy</span> Cancel</button>
-                                                                <?php else: ?><span class="eq-cell-sub" title="Only a Super Admin can change this">Super Admin only</span>
-                                                                <?php endif; ?>
+                                                                <button type="button" class="ps-btn ps-btn--danger ps-btn--sm" data-action="ps-open-modal" data-modal="ps-cancel-booking-modal"><span class="material-symbols-outlined">event_busy</span> Cancel</button>
                                                             <?php elseif ($lst === 'pickup'): ?>
                                                                 <span class="eq-cell-sub">Awaiting Claim QR</span>
                                                             <?php elseif ($lst === 'returned'): ?>

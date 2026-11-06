@@ -9,7 +9,7 @@ declare(strict_types=1);
  *
  * This endpoint reuses the same validation rules as submit-faculty-reserve.php
  * but accepts JSON only (no file upload — AI-assisted reservations are always
- * 'personal' or 'adviser' based on the faculty's role, no document attached).
+ * filed as 'personal' with no request letter; one can be attached from the Reserve form).
  *
  * POST body (JSON):
  *   csrf_token, room_id, reservation_date, start_time, end_time,
@@ -147,9 +147,8 @@ if (count($active_now) >= FCTY_MAX_ACTIVE_ROOM_RESERVATIONS) {
     );
 }
 
-// ── Determine submitted_as based on faculty role ──────────────────────────────
-// Organisation Advisers file as 'adviser' (no document attached via AI flow).
-$submitted_as = fcty_is_org_adviser($conn, $faculty_id) ? 'adviser' : 'personal';
+// ── Filed as the faculty member's own reservation ─────────────────────────────
+$submitted_as = 'personal';
 
 // ── Insert reservation ────────────────────────────────────────────────────────
 // Same-day: Approved at once. A LATER DATE waits for an admin's decision.

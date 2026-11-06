@@ -18,7 +18,7 @@ declare(strict_types=1);
  *  2.  Fetch request + borrower data
  *  3.  Pre-flight: overdue block
  *  4.  Pre-flight: duplicate block
- *  5.  Document check (missing doc for Adviser → hold as Waiting)
+ *  5.  Document check (a request letter is optional, so nothing is held for it)
  *  6.  Archived item check
  *  7.  Stock check (quantity = 0 → Declined)
  *  8.  Acquire stock lock (BEGIN + SELECT FOR UPDATE)
@@ -573,7 +573,7 @@ class ArbitrationEngine
 
     /**
      * Return a hold-note string if a document is required but absent,
-     * or null if no document hold applies.
+     * or null if no document hold applies (a request letter is never required).
      *
      * @param  array<string, mixed> $request Full request row (includes borrower role)
      * @param  array<string, string> $config  Loaded arbitration config map
@@ -581,10 +581,11 @@ class ArbitrationEngine
      */
     private static function checkMissingDocument(array $request, array $config): ?string
     {
-        // A supporting / request letter is OPTIONAL for organization requests.
-        // Attaching one can still raise a request's priority (see validateDocument()),
-        // but a missing letter never puts a request on hold. The old
-        // rule_missing_doc_block_enabled setting is therefore no longer applied.
+        // A request letter is OPTIONAL for every request (it is only recommended for
+        // reservations / borrowings on a later date). Attaching one can still raise a
+        // request's priority (see validateDocument()), but a missing letter never puts a
+        // request on hold. The old rule_missing_doc_block_enabled setting is therefore
+        // no longer applied.
         return null;
     }
 
@@ -677,9 +678,7 @@ class ArbitrationEngine
 
         if ($submitted_as !== null) {
             // submitted_as-first branch (Requirements 6.1, 6.2, 6.4, 6.6)
-            if ($submitted_as === 'adviser') {
-                $role = (int)($config['role_priority_adviser'] ?? 3);
-            } elseif ($submitted_as === 'personal' || $submitted_as === 'student') {
+            if ($submitted_as === 'personal' || $submitted_as === 'student') {
                 $role = (int)($config['role_priority_faculty'] ?? 2);
             } else {
                 // Unknown value — treat as personal and log for investigation.
@@ -694,9 +693,6 @@ class ArbitrationEngine
             switch ($role_name) {
                 case 'Director':
                     $role = (int)($config['role_priority_director'] ?? 4);
-                    break;
-                case 'Organization Adviser':
-                    $role = (int)($config['role_priority_adviser'] ?? 3);
                     break;
                 case 'Regular Faculty':
                     $role = (int)($config['role_priority_faculty'] ?? 2);
@@ -1083,8 +1079,7 @@ class ArbitrationEngine
      *  2.  Fetch reservation + room + borrower data
      *  3.  Pre-flight: overdue block (checks tbl_requests for equipment overdue)
      *  4.  Pre-flight: room status check (Maintenance / Not Bookable → Declined)
-     *  5.  Document check (Adviser without doc → Declined immediately for rooms,
-     *      unlike equipment where it holds as Waiting — rooms have no stock queue)
+     *  5.  Document check (a request letter is optional, so nothing is declined for it)
      *  6.  Time conflict check + FIFO/priority scoring
      *  7.  Write decision + log
      *
@@ -1221,7 +1216,7 @@ class ArbitrationEngine
             }
 
             // ── Step 5: Missing document check ───────────────────────────────
-            // Rooms have no stock queue — Adviser without document → Declined immediately            // (unlike equipment, which holds as Waiting until the document arrives).
+            // A request letter is optional, so checkMissingDocument() currently never holds a room.
             $hold_note = self::checkMissingDocument($reservation, $config);
             if ($hold_note !== null) {
                 self::writeRoomDecision(

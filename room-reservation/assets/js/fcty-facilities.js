@@ -872,7 +872,7 @@
             chipRow('fcty-purpose-chips', PURPOSES) +
             '<input type="text" id="fcty-res-purpose" class="fcty-input" placeholder="Or type your own\u2026" maxlength="200"></div>' +
             '<div class="fcty-sub" id="fcty-doc-block" hidden>' +
-            '<span class="fcty-sublabel">Supporting letter <small>(optional)</small></span>' +
+            '<span class="fcty-sublabel">Request letter <small>(recommended)</small></span>' +
             '<label class="fcty-drop" id="fcty-drop" for="fcty-res-doc">' + icon('upload_file') +
             '<span><strong>Upload a file</strong><small>JPG, PNG or PDF \u00b7 max 5 MB</small></span></label>' +
             '<input type="file" id="fcty-res-doc" class="fcty-sr-only" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf">' +
@@ -904,14 +904,13 @@
 
         function renderQuota() {
             if (!quota) return;
-            var chip = $('fcty-quota'), lim = $('fcty-res-limit'), docBlock = $('fcty-doc-block');
+            var chip = $('fcty-quota'), lim = $('fcty-res-limit');
             if (chip) {
                 chip.innerHTML = icon('meeting_room') + quota.active + ' of ' + quota.max + ' rooms reserved' +
                     (quota.student_active ? ' (' + quota.student_active + ' student reservation' +
                         (quota.student_active === 1 ? '' : 's') + ')' : '');
                 chip.hidden = false;
             }
-            if (docBlock) docBlock.hidden = !quota.is_adviser;
             if (!lim) return;
 
             if (!isFull()) { lim.hidden = true; btnSubmit.disabled = false; btnSubmit.title = ''; return; }
@@ -936,11 +935,12 @@
                 .catch(function () { /* informational only — the server enforces the limit */ });
         }
 
-        /* ── Optional supporting letter (Organization Advisers) ── */
+        /* ── Request letter: recommended for a LATER date, never needed for same-day ── */
         var docFile = null;
         var DOC_TYPES = ['image/jpeg', 'image/png', 'application/pdf'];
         var DOC_MAX = 5 * 1024 * 1024;
-        var DOC_HINT = '';
+        var DOC_HINT = 'Recommended for reservations on a later date. You can still submit without one.';
+        function isLaterDate() { return st.date > ymd(now); }
         var elDoc = $('fcty-res-doc'), elDrop = $('fcty-drop'), elFile = $('fcty-file'), elDocHint = $('fcty-doc-hint');
 
         function fileKind(f) {
@@ -975,6 +975,14 @@
             $('fcty-file-remove').addEventListener('click', function () { setDoc(null); });
         }
         docMessage('');
+        /* Show the letter field only for a later date; a same-day request is decided on availability alone. */
+        function syncDocBlock() {
+            var block = $('fcty-doc-block');
+            if (!block) return;
+            var later = isLaterDate();
+            block.hidden = !later;
+            if (!later && docFile) setDoc(null);   /* never send a letter with a same-day request */
+        }
         elDoc.addEventListener('change', function () { setDoc(elDoc.files && elDoc.files[0] ? elDoc.files[0] : null); });
         ['dragenter', 'dragover'].forEach(function (ev) {
             elDrop.addEventListener(ev, function (e) { e.preventDefault(); elDrop.classList.add('is-drag'); });
@@ -1074,7 +1082,7 @@
             }
         }
 
-        function refresh() { syncControls(); renderSummary(); }
+        function refresh() { syncControls(); renderSummary(); syncDocBlock(); }
 
         function loadWeek() {
             weekData = null;
@@ -1175,7 +1183,7 @@
             fd.append('end_time', minToHHMM(st.end));
             fd.append('purpose', purpose);
             fd.append('csrf_token', csrf());
-            if (docFile && quota && quota.is_adviser) fd.append('document', docFile, docFile.name);
+            if (docFile && isLaterDate()) fd.append('document', docFile, docFile.name);
 
             fetch(apiBase() + 'room-reservation/api/submit-faculty-reserve.php', {
                 method: 'POST',
@@ -1212,8 +1220,8 @@
         });
 
         function showDone(data) {
-            /* Same-day reservations are accepted immediately. A reservation for a later date (or one with an
-               adviser letter) is "Waiting" until an admin decides it. */
+            /* Same-day reservations are accepted immediately. A reservation for a later date is "Waiting"
+               until an admin decides it. */
             var pending = data.status === 'Waiting';
             $('fcty-tl-pick').classList.remove('is-clash');
             $('fcty-tl-note').className = 'fcty-tl-note';
@@ -1226,7 +1234,7 @@
                 minToLabel(st.start) + ' \u2013 ' + minToLabel(st.end) + '</p>' +
                 (pending ? '<p>An admin will review this reservation. You\u2019ll see the decision in My Activity. If it isn\u2019t reviewed in time, it is automatically declined at 12:01 AM on the reservation day.</p>' : '') +
                 (!pending && data.reason ? '<p>' + esc(data.reason) + '</p>' : '') +
-                (data.attached ? '<p class="fcty-done-note">' + icon('attach_file') + 'Supporting letter attached</p>' : '') +
+                (data.attached ? '<p class="fcty-done-note">' + icon('attach_file') + 'Request letter attached</p>' : '') +
                 (data.max ? '<p class="fcty-done-note">' + icon('meeting_room') + data.active + ' of ' + data.max + ' rooms reserved</p>' : '') +
                 '<div class="fcty-done-actions">' +
                 '<button type="button" class="fcty-btn fcty-btn-primary" id="fcty-done-close">Done</button>' +

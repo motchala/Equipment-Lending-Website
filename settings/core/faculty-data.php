@@ -29,23 +29,9 @@ $db_landline          = $profile_row['landline']          ?? '';
 $db_emergency_name    = $profile_row['emergency_name']        ?? '';
 $db_emergency_rel     = $profile_row['emergency_relationship'] ?? '';
 $db_emergency_phone   = $profile_row['emergency_phone']       ?? '';
-$is_org_adviser       = ($profile_row['role'] ?? '') === 'Organization Adviser';
-
-// Dual-mode (personal + organization) borrowing is automatic for Organization Advisers.
-$is_dual_mode = $is_org_adviser;
 
 // Faculty ID: set by the faculty member themselves (once). Until then the account is stored
 // under an internal placeholder that must never be shown (see shared/core/faculty-id.php).
 $fid_unset = faculty_id_is_unset((string)$_SESSION['faculty_id']);
 $fid_label = faculty_id_display((string)$_SESSION['faculty_id'], 'Not set');
 
-// ── Adviser-mode inventory checklist — only loaded if dual mode active ────
-$avail_items = [];
-if ($is_dual_mode) {
-    $avail_result = $conn->query(
-        "SELECT item_id, item_name, category, quantity FROM tbl_inventory WHERE is_archived = 0 ORDER BY category, item_name"
-    );
-    if ($avail_result) {
-        while ($av_row = $avail_result->fetch_assoc()) $avail_items[] = $av_row;
-    }
-}
