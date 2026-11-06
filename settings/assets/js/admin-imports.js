@@ -8,8 +8,9 @@
      UI is never the only protection.
    - While locked the page holds placeholders only. Counts, lists and files are
      fetched after unlock and dropped again when the tab locks.
-   - Equipment Inventory: placeholder card. It is clickable (opens the file chooser, shows the picked
-     file's name and size) but never reads, uploads or imports anything (see initPlaceholderCard).
+   - Equipment Inventory and Rooms Assigned: placeholder cards. They are clickable (open the file
+     chooser, show the picked file's name and size) but never read, upload or import anything
+     (see initPlaceholderCard).
      Faculty Registry: Faculty Identification Records, PDF (PDF.js) or XLSX
      (read by parse-faculty-registry-xlsx.php).
    - Every import first stores the ORIGINAL file, then the rows read from it. Only the
@@ -33,6 +34,12 @@
             label: 'Equipment Inventory', icon: 'inventory_2', exts: ['xlsx', 'csv'], noun: ['item', 'items'],
             cols: ['#', 'Item name', 'Category', 'Quantity', 'Condition'],
             search: 'Search by item name or category\u2026'
+        },
+        rooms: {
+            pending: true,   // placeholder: interactive, but no endpoints and no file reading
+            label: 'Rooms Assigned', icon: 'meeting_room', exts: ['xlsx', 'csv'], noun: ['assignment', 'assignments'],
+            cols: ['#', 'Room', 'Building', 'Assigned to'],
+            search: 'Search by room or faculty\u2026'
         },
         faculty: {
             label: 'Faculty Registry', icon: 'badge', exts: ['pdf', 'xlsx'], noun: ['entry', 'entries'],
@@ -529,7 +536,7 @@
             return { reset: reset };
         }
 
-        /* Equipment Inventory: a clickable placeholder.
+        /* Equipment Inventory / Rooms Assigned: a clickable placeholder.
            It opens the file chooser and shows the picked file's NAME and SIZE only. The file is never
            read (no FileReader, no parsing), never uploaded, and nothing is imported or saved: every
            button just explains that this import is not available yet. */
@@ -537,6 +544,7 @@
             var drop = role(card, 'drop'), input = role(card, 'input');
             var picked = role(card, 'picked'), alertEl = role(card, 'alert');
             var importBtn = role(card, 'import');
+            var what = (KINDS[card.dataset.kind] && KINDS[card.dataset.kind].label) || 'This';
 
             function note(msg) {
                 alertEl.className = 'imp-alert imp-alert--info';
@@ -562,7 +570,7 @@
                 picked.classList.remove('hidden');
                 drop.classList.add('hidden');
                 importBtn.disabled = false;
-                note('Equipment import is not available yet. The file was not read or uploaded.');
+                note(what + ' import is not available yet. The file was not read or uploaded.');
             }
 
             input.addEventListener('click', function (e) { e.stopPropagation(); });
@@ -580,13 +588,13 @@
             });
             role(card, 'clear').addEventListener('click', reset);
             importBtn.addEventListener('click', function () {
-                note('Equipment import is not available yet. Nothing was uploaded or changed.');
+                note(what + ' import is not available yet. Nothing was uploaded or changed.');
             });
             role(card, 'view-list').addEventListener('click', function () {
-                note('Nothing to show yet. Equipment import is not available yet.');
+                note('Nothing to show yet. ' + what + ' import is not available yet.');
             });
             role(card, 'view-files').addEventListener('click', function () {
-                note('Nothing to show yet. Equipment import is not available yet.');
+                note('Nothing to show yet. ' + what + ' import is not available yet.');
             });
 
             return { reset: reset };

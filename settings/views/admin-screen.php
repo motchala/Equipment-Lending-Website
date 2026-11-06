@@ -369,8 +369,8 @@
     <?php endif; ?>
 
     <!-- ── IMPORTS (Super Admin only) ─────────────────────────────
-                     Equipment Inventory (placeholder: the import is not built yet) + Faculty Registry
-                     imports behind ONE password unlock.
+                     Equipment Inventory + Rooms Assigned (placeholders: those imports are not built yet) +
+                     Faculty Registry imports behind ONE password unlock.
                      The page only ever contains placeholders: real numbers, lists and
                      files are fetched after unlock (equipment-booking/api/imports.php).
                      Script: equipment-booking/assets/js/admin-imports.js
@@ -387,7 +387,7 @@
                 'accept'  => '.xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                 'stats'   => ['Items', 'Categories', 'Rows in file'],
                 'cols'    => ['#', 'Item name', 'Category', 'Quantity', 'Condition'],
-                'what'    => 'Registers listed items into the active equipment borrowing inventory.',
+                'what'    => 'Items on this list are added to the equipment inventory that students and faculty can borrow.',
                 'replace' => 'Remove the current items first',
             ],
             'faculty' => [
@@ -401,6 +401,18 @@
                 'what'   => 'Used to confirm a faculty member when their account is created.',
                 'replace' => 'Remove everyone listed first',
             ],
+            'rooms' => [
+                'pending' => true,   // clickable, but nothing is read, uploaded or imported (see initPlaceholderCard)
+                'title'   => 'Rooms Assigned',
+                'icon'    => 'meeting_room',
+                'sub'     => 'Rooms assigned to faculty and classes',
+                'types'   => 'XLSX or CSV',
+                'accept'  => '.xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'stats'   => ['Rooms', 'Faculty', 'Rows in file'],
+                'cols'    => ['#', 'Room', 'Building', 'Assigned to'],
+                'what'    => 'Each room on this list is assigned to the faculty or class that uses it.',
+                'replace' => 'Remove the current assignments first',
+            ],
         ];
         ?>
         <div class="rq-sub-panel" id="sett-imports">
@@ -412,7 +424,7 @@
                     <div class="imp-topbar">
                         <div class="imp-topbar-text">
                             <h3>Data imports</h3>
-                            <p>Bring in the equipment inventory and the official faculty list. The original file of the latest import is kept on record.</p>
+                            <p>Bring in the equipment inventory, the room assignments and the official faculty list. The original file of the latest import is kept on record.</p>
                         </div>
                         <div class="imp-session" id="imp-session">
                             <span class="imp-session-dot"></span>
@@ -704,6 +716,7 @@
                                     <div class="hc-faq-a">
                                         <strong>Settings → Imports</strong> is locked behind your password. Use it to bring in:<br>
                                         <strong>Equipment Inventory</strong> (XLSX or CSV): for importing equipment lists. This card is a placeholder and is not available yet.<br>
+                                        <strong>Rooms Assigned</strong> (XLSX or CSV): for importing which rooms are assigned to which faculty or class. This card is a placeholder and is not available yet.<br>
                                         <strong>Faculty Registry</strong> (PDF or XLSX): used to confirm a faculty member when you create their account.<br><br>
                                         Choose <strong>Merge</strong> to add new entries and update existing ones, or <strong>Replace</strong> to remove everyone listed first. Files can be up to 10 MB, and the original file of the latest import is kept.
                                     </div>
