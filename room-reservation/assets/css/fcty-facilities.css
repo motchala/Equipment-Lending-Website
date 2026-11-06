@@ -2309,7 +2309,9 @@ textarea.fcty-input {
 #rooms-browse .fcs {
     container-type: inline-size;
     container-name: fcs;
-    margin-top: 40px;
+    /* margin around the timetable: space above and below it, and at the sides so the list and
+       the calendar are not pushed against the panel edges */
+    margin: 44px clamp(12px, 2.5vw, 32px) 48px;
     --fcs-line: color-mix(in srgb, var(--fcty-line) 55%, transparent);
     --fcs-maroon: #800000;
     /* day row */
@@ -2317,7 +2319,7 @@ textarea.fcty-input {
     /* text on the yellow */
     --fcs-yellow: #f5cc4a;
     /* time column */
-    --fcs-time-w: 76px;
+    --fcs-time-w: 62px;
 }
 
 #rooms-browse .fcs-head {
@@ -2400,6 +2402,11 @@ textarea.fcty-input {
 /* card */
 #rooms-browse .fcs-card {
     position: relative;
+}
+
+#rooms-browse .fcs-body {
+    min-height: 120px;
+    transition: opacity .2s;
     background: var(--fcty-card);
     border: 1px solid var(--fcty-line);
     border-radius: 20px;
@@ -2407,14 +2414,228 @@ textarea.fcty-input {
     box-shadow: var(--shadow-sm);
 }
 
-#rooms-browse .fcs-body {
-    min-height: 120px;
-    transition: opacity .2s;
-}
-
 #rooms-browse .fcs-body.is-busy {
     opacity: .5;
     pointer-events: none;
+}
+
+/* ── Two-column layout: semester class list (left) + weekly calendar (right) ── */
+#rooms-browse .fcs-layout {
+    display: grid;
+    grid-template-columns: 252px minmax(0, 1fr);
+    align-items: stretch;
+    gap: 16px;   /* space between the class list and the calendar */
+}
+
+/* The list never makes the card taller than the calendar: its content is laid over the cell
+   and scrolls inside it. */
+#rooms-browse .fcs-list {
+    position: relative;
+    min-height: 260px;
+    border: 1px solid var(--fcty-line);
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+    background: color-mix(in srgb, var(--fcty-soft) 55%, var(--fcty-card));
+}
+
+#rooms-browse .fcs-list-in {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+#rooms-browse .fcs-list-head {
+    display: grid;
+    gap: 1px;
+    min-height: 54px;
+    padding: 8px 14px 8px;
+    align-content: center;
+    background: var(--fcs-maroon);
+    color: #fff;
+}
+
+#rooms-browse .fcs-list-kicker {
+    font-size: .64rem;
+    font-weight: 800;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--fcs-yellow);
+}
+
+#rooms-browse .fcs-list-sem {
+    font-size: .92rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+#rooms-browse .fcs-list-ay {
+    font-size: .72rem;
+    color: rgba(255, 255, 255, .78);
+}
+
+#rooms-browse .fcs-list-scroll {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+
+#rooms-browse .fcs-cls {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    width: 100%;
+    padding: 6px 9px 6px 10px;
+    border: 1px solid color-mix(in srgb, var(--ev, var(--fcty-static)) 24%, transparent);
+    border-left: 3px solid var(--ev, var(--fcty-static));
+    border-radius: 9px;
+    background: var(--fcty-card);
+    color: var(--fcty-ink);
+    font: inherit;
+    font-size: .72rem;
+    line-height: 1.3;
+    text-align: left;
+    cursor: pointer;
+    transition: background .15s, box-shadow .15s, opacity .15s;
+}
+
+#rooms-browse .fcs-cls:hover {
+    background: color-mix(in srgb, var(--ev, var(--fcty-static)) 9%, var(--fcty-card));
+}
+
+#rooms-browse .fcs-cls:focus-visible {
+    outline: 2px solid var(--fcty-brand);
+    outline-offset: 2px;
+}
+
+/* a class that has a session in the week shown on the right */
+#rooms-browse .fcs-cls.is-week {
+    background: color-mix(in srgb, var(--ev, var(--fcty-static)) 13%, var(--fcty-card));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--ev, var(--fcty-static)) 38%, transparent);
+}
+
+#rooms-browse .fcs-cls.is-done {
+    opacity: .62;
+}
+
+#rooms-browse .fcs-cls.is-done:hover {
+    opacity: 1;
+}
+
+#rooms-browse .fcs-cls-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    min-width: 0;
+}
+
+#rooms-browse .fcs-cls-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: .8rem;
+    font-weight: 700;
+    color: color-mix(in srgb, var(--ev, var(--fcty-static)) 60%, var(--fcty-ink));
+}
+
+#rooms-browse .fcs-cls-dur {
+    flex-shrink: 0;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ev, var(--fcty-static)) 16%, transparent);
+    color: color-mix(in srgb, var(--ev, var(--fcty-static)) 60%, var(--fcty-ink));
+    font-size: .64rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+#rooms-browse .fcs-cls-when {
+    color: var(--fcty-ink);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+#rooms-browse .fcs-cls-where {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    min-width: 0;
+    color: var(--fcty-muted);
+}
+
+#rooms-browse .fcs-cls-where>span:last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#rooms-browse .fcs-cls-where .material-symbols-outlined {
+    font-size: 13px;
+}
+
+#rooms-browse .fcs-cls-meta {
+    color: var(--fcty-muted);
+    font-size: .68rem;
+}
+
+#rooms-browse .fcs-list-foot {
+    margin: 0;
+    padding: 7px 14px;
+    border-top: 1px solid var(--fcs-line);
+    color: var(--fcty-muted);
+    font-size: .7rem;
+    font-weight: 600;
+}
+
+#rooms-browse .fcs-list-none {
+    margin: 14px 6px;
+    color: var(--fcty-muted);
+    font-size: .8rem;
+    text-align: center;
+}
+
+#rooms-browse .fcs-list-skel {
+    display: grid;
+    gap: 8px;
+    padding: 62px 8px 8px;
+}
+
+#rooms-browse .fcs-list-skel span {
+    height: 58px;
+    border-radius: 9px;
+    background: var(--fcty-soft);
+    animation: fcsPulse 1.4s ease-in-out infinite;
+}
+
+/* not enough room for two columns: the list sits above the calendar */
+@container fcs (max-width: 1060px) {
+    #rooms-browse .fcs-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    #rooms-browse .fcs-list {
+        min-height: 0;
+    }
+
+    #rooms-browse .fcs-list-in {
+        position: static;
+    }
+
+    #rooms-browse .fcs-list-scroll {
+        max-height: 210px;
+    }
+
+    #rooms-browse .fcs-list-skel {
+        padding-top: 8px;
+    }
 }
 
 /* ── Calendar grid ─────────────────────────────────────────── */
@@ -2447,8 +2668,8 @@ textarea.fcty-input {
     align-items: center;
     justify-content: center;
     gap: 2px;
-    min-height: 68px;
-    padding: 10px 6px;
+    min-height: 54px;
+    padding: 6px 4px;
     text-align: center;
     background: var(--fcs-maroon);
     border-left: 1px solid rgba(255, 255, 255, .16);
@@ -2467,11 +2688,11 @@ textarea.fcty-input {
 #rooms-browse .fcs-dom {
     display: inline-grid;
     place-items: center;
-    min-width: 32px;
-    height: 32px;
+    min-width: 28px;
+    height: 28px;
     padding: 0 4px;
-    border-radius: 16px;
-    font-size: 1.05rem;
+    border-radius: 14px;
+    font-size: 1rem;
     font-weight: 700;
     line-height: 1;
     color: var(--fcty-ink);
@@ -2586,7 +2807,7 @@ textarea.fcty-input {
 
 #rooms-browse .fcs-ev {
     position: absolute;
-    padding: 5px 8px 4px 9px;
+    padding: 3px 7px 3px 8px;
     border-radius: 9px;
     transition: box-shadow .15s, opacity .15s;
 }
@@ -2759,7 +2980,7 @@ textarea.fcty-input {
     position: absolute;
     left: var(--fcs-time-w);
     right: 0;
-    top: 68px;
+    top: 54px;
     bottom: 0;
     display: grid;
     place-items: center;

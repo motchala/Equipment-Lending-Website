@@ -21,8 +21,15 @@
  *   days: [ { key: "mon", date: "2026-11-02", items: [
  *            { id, start: "09:30", end: "12:30", minutes: 180,
  *              purpose, room, floor, building }, ... ] }, ... 6 days ... ],
- *   total: 4
+ *   total: 4,
+ *   semester: { name: "1st Semester", ay: "A.Y. 2026-2027", start, end, classes: 3, sessions: 9 },
+ *   classes: [ { purpose, room, floor, building, dow (1=Mon..7), start, end, minutes,
+ *                sessions, upcoming, next_date|null, last_date, dates: [Y-m-d, ...], student }, ... ]
  * }
+ *
+ * "classes": this system has no subject / semester tables, so the semester list is this faculty
+ * member's APPROVED bookings in the current semester, grouped by purpose + room + weekday + time.
+ * The semester window is chosen by month (see $sem_* below); edit it if the campus calendar differs.
  */
 
 ini_set('display_errors', '0');
@@ -143,6 +150,97 @@ try {
 $now   = new DateTime('now');
 $today = $now->format('Y-m-d');
 
+//  Semester class list (left side of the schedule) 
+// Aug-Dec = 1st Semester, Jan-May = 2nd Semester, Jun-Jul = Summer.
+$cur_m = (int)$now->format('n');
+$cur_y = (int)$now->format('Y');
+if ($cur_m >= 8) {
+    $sem_name = '1st Semester'; $sem_from = $cur_y . '-08-01'; $sem_to = $cur_y . '-12-31';
+    $sem_ay = $cur_y . "\u{2013}" . ($cur_y + 1);
+} elseif ($cur_m >= 6) {
+    $sem_name = 'Summer'; $sem_from = $cur_y . '-06-01'; $sem_to = $cur_y . '-07-31';
+    $sem_ay = ($cur_y - 1) . "\u{2013}" . $cur_y;
+} else {
+    $sem_name = '2nd Semester'; $sem_from = $cur_y . '-01-01'; $sem_to = $cur_y . '-05-31';
+    $sem_ay = ($cur_y - 1) . "\u{2013}" . $cur_y;
+}
+
+$classes  = [];
+$sessions = 0;
+try {
+    $now_hm = $now->format('H:i');
+    $stmt = $conn->prepare(
+        "SELECT r.reservation_date,
+                TIME_FORMAT(r.start_time, '%H:%i') AS start_hm,
+                TIME_FORMAT(r.end_time,   '%H:%i') AS end_hm,
+                TIME_TO_SEC(TIMEDIFF(r.end_time, r.start_time)) AS span_sec,
+                r.purpose, r.submitted_as,
+                rm.room_id, rm.room_name, rm.floor_label,
+                b.name AS building_name
+           FROM tbl_room_reservations r
+           JOIN tbl_rooms rm      ON rm.room_id = r.room_id
+           LEFT JOIN tbl_buildings b ON b.building_id = rm.building_id
+          WHERE r.faculty_id = ?
+            AND r.status = 'Approved'
+            AND r.reservation_date BETWEEN ? AND ?
+          ORDER BY r.reservation_date ASC, r.start_time ASC"
+    );
+    $stmt->bind_param('sss', $faculty_id, $sem_from, $sem_to);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    while ($row = $res->fetch_assoc()) {
+        $minutes = (int)round(((int)$row['span_sec']) / 60);
+        if ($minutes <= 0) {
+            continue;
+        }
+        $date = $row['reservation_date'];
+        $dow  = (int)(new DateTime($date))->format('N');
+        $key  = mb_strtolower($row['purpose']) . '|' . $row['room_id'] . '|' . $dow . '|' . $row['start_hm'] . '|' . $row['end_hm'];
+        if (!isset($classes[$key])) {
+            $classes[$key] = [
+                'purpose'   => (string)$row['purpose'],
+                'room'      => (string)$row['room_name'],
+                'floor'     => (string)($row['floor_label'] ?? ''),
+                'building'  => (string)($row['building_name'] ?? ''),
+                'dow'       => $dow,
+                'start'     => $row['start_hm'],
+                'end'       => $row['end_hm'],
+                'minutes'   => $minutes,
+                'sessions'  => 0,
+                'upcoming'  => 0,
+                'next_date' => null,
+                'last_date' => $date,
+                'dates'     => [],
+                'student'   => false,
+            ];
+        }
+        $c = &$classes[$key];
+        $c['sessions']++;
+        $c['dates'][]   = $date;
+        $c['last_date'] = $date;
+        if ((string)($row['submitted_as'] ?? '') === 'student') {
+            $c['student'] = true;
+        }
+        if ($date > $today || ($date === $today && $row['end_hm'] > $now_hm)) {
+            $c['upcoming']++;
+            if ($c['next_date'] === null) {
+                $c['next_date'] = $date;
+            }
+        }
+        unset($c);
+        $sessions++;
+    }
+    $stmt->close();
+    $classes = array_values($classes);
+    usort($classes, static function ($a, $b) {
+        return [$a['dow'], $a['start'], $a['purpose']] <=> [$b['dow'], $b['start'], $b['purpose']];
+    });
+} catch (Throwable $e) {
+    error_log('[get-faculty-schedule] classes: ' . $e->getMessage());
+    $classes  = [];
+    $sessions = 0;
+}
+
 echo json_encode([
     'week_start'      => $week_start,
     'week_end'        => $week_end,
@@ -152,4 +250,13 @@ echo json_encode([
     'is_current_week' => ($week_start === $default_monday->format('Y-m-d')),
     'days'            => array_values($days),
     'total'           => $total,
+    'semester'        => [
+        'name'     => $sem_name,
+        'ay'       => 'A.Y. ' . $sem_ay,
+        'start'    => $sem_from,
+        'end'      => $sem_to,
+        'classes'  => count($classes),
+        'sessions' => $sessions,
+    ],
+    'classes'         => $classes,
 ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES);

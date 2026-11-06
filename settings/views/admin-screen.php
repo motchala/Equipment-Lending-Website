@@ -551,7 +551,7 @@
                                             </summary>
                                             <div class="hc-faq-a">
                                                 Go to <strong>Equipment → Loans → Waiting</strong>, then click <strong>Approve</strong> or <strong>Decline</strong>. Both ask for a short note (at least 5 characters). When a faculty member requested several items at once, <strong>Approve all</strong> approves the whole bundle and gives them one Claim QR. Faculty see the result in their Notifications and My Activity.<br><br>
-                                                <strong>Same-day</strong> borrow requests are decided by the system straight away, based on availability and the borrowing rules, so nothing waits for you. <strong>Later-date</strong> requests wait here. If the faculty attached a request letter (recommended, not required), open it from the document chip before deciding. A request nobody decides before its borrow date has passed is declined automatically.<br><br>
+                                                A <strong>same-day</strong> request for a single item is decided by the system straight away, based on availability and the borrowing rules, so nothing waits for you. <strong>Later-date</strong> requests, and <strong>Borrow All</strong> requests for several items, wait here. If the faculty attached a request letter (recommended, not required), open it from the document chip before deciding. A request nobody decides before its borrow date has passed is declined automatically.<br><br>
                                                 Students who borrow with a faculty code or item code do not need approval. Those loans go straight to <strong>Pickup</strong>.
                                             </div>
                                         </details>
@@ -708,6 +708,17 @@
                                                     Choose <strong>Merge</strong> to add new entries and update existing ones, or <strong>Replace</strong> to remove everyone listed first. Files can be up to 10 MB, and the original file of the latest import is kept.
                                                 </div>
                                             </details>
+
+                                        <details class="hc-faq-item">
+                                            <summary class="hc-faq-q">
+                                                <span class="hc-faq-q-text">How do I clear all loans or reservations? (Super Admin)</span>
+                                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
+                                            </summary>
+                                            <div class="hc-faq-a">
+                                                Use <strong>Delete All</strong> in <strong>Equipment → Loans</strong> (the loans list) or in <strong>Facilities → Reservations</strong> (the reservations list). Each one first shows exactly how many records it will remove, then asks you to confirm with your own password. Too many wrong passwords lock the confirmation for 5 minutes.<br><br>
+                                                This <strong>permanently deletes</strong> every record in that list and cannot be undone. For loans that means the Waiting, Approved (including scheduled), Overdue and Returned ones, along with their uploaded request letters. Declined and cancelled leftovers are not touched.
+                                            </div>
+                                        </details>
 
                                             <details class="hc-faq-item">
                                                 <summary class="hc-faq-q">

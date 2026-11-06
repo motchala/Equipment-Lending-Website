@@ -4,8 +4,11 @@ declare(strict_types=1);
  * submit-cart-borrow.php
  *
  * Multi-item personal borrow for the faculty equipment cart.
- * Accepts JSON, processes each item through BookingSchedule + ArbitrationEngine,
- * returns JSON — no page redirect, enabling live UI updates.
+ * Accepts JSON, checks each item against BookingSchedule (time window, availability, room
+ * conflicts) and files it as 'Waiting'. The ArbitrationEngine is NOT run here: a Borrow All
+ * request is always left for an admin to approve or decline (unlike the single-item same-day
+ * request in faculty-equipment-handlers.php, which the engine decides on the spot).
+ * Returns JSON — no page redirect, enabling live UI updates.
  *
  * POST JSON fields:
  *   csrf_token  string

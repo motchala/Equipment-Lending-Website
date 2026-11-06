@@ -1,9 +1,12 @@
 /* ================================================================
    PUPSYNC — FACILITIES TAB · "MY CLASS SCHEDULE"  (fcty-class-schedule.js)
 
-   A Monday–Saturday week calendar under the three building panels,
-   showing the signed-in faculty member's own approved room bookings:
-   what it is (Lecture, Lab session …), when, for how long, and where.
+   Under the three building panels: on the left, the faculty member's
+   classes for the whole semester (their approved bookings, grouped by
+   purpose + room + weekday + time); on the right, a Monday to Saturday
+   week calendar of the same bookings: what it is (Lecture, Lab session
+   etc.), when, for how long, and where. Clicking a class on the left
+   jumps the calendar to the week of its next (or last) session.
 
    Data:  room-reservation/api/get-faculty-schedule.php  (one week per call)
    Markup: room-reservation/views/faculty-rooms-screen.php  (#fcty-class-schedule)
@@ -21,7 +24,7 @@
     var root = document.getElementById('fcty-class-schedule');
     if (!root) return;
 
-    var HOUR_H = 60;                 /* px per hour in the grid                              */
+    var HOUR_H = 40;                 /* px per hour in the grid (compact)                    */
     var PAD = 14;                    /* breathing room above 7 AM / below 9 PM (first and last
                                         hour labels sit centred on their lines)                */
     var CORE_START = 7 * 60;         /* the grid always covers 7 AM – 9 PM, and grows to fit */
@@ -32,6 +35,7 @@
     var TYPE = { 'lecture': 'lecture', 'lab session': 'lab', 'exam': 'exam', 'seminar': 'seminar', 'meeting': 'meeting' };
 
     var body = document.getElementById('fcs-body');
+    var elList = document.getElementById('fcs-list');
     var elLabel = document.getElementById('fcs-range');
     var btnPrev = document.getElementById('fcs-prev');
     var btnNext = document.getElementById('fcs-next');
@@ -199,7 +203,7 @@
         var h = Math.max((l.e - l.s) / 60 * HOUR_H, 24);
         var cls = 'fcs-ev ' + typeClass(it.purpose) +
             (l.lanes > 1 ? ' is-lane' : '') +
-            (h < 58 ? ' is-short' : '') + (h < 38 ? ' is-tiny' : '') +
+            (h < 60 ? ' is-short' : '') + (h < 44 ? ' is-tiny' : '') +
             (isPast(date, l.e) ? ' is-past' : '') +
             (it.student_name ? ' is-student' : '');
         var where = whereOf(it);
@@ -294,6 +298,53 @@
         return out + '</div>';
     }
 
+    /*  Semester class list (left)  */
+    function mondayOf(ymd) {
+        var dow = (parseYmd(ymd).getUTCDay() + 6) % 7;   /* Mon = 0, Sun = 6 */
+        return addDays(ymd, -dow);
+    }
+
+    function shortDate(ymd) {
+        var d = parseYmd(ymd);
+        return MONTHS[d.getUTCMonth()] + ' ' + d.getUTCDate();
+    }
+
+    function classHtml(c, d) {
+        var s = toMin(c.start), e = toMin(c.end);
+        var inWeek = (c.dates || []).some(function (x) { return x >= d.week_start && x <= d.week_end; });
+        var target = c.next_date || c.last_date;
+        var where = whereShort({ room: c.room, building: c.building });
+        var count = c.sessions + (c.sessions === 1 ? ' session' : ' sessions');
+        var state = c.next_date ? 'Next: ' + shortDate(c.next_date) : 'Done';
+        var tip = c.purpose + ', ' + DOW[c.dow - 1] + ' ' + range(s, e) + ', ' + [c.room, c.building].filter(Boolean).join(', ') +
+            ', ' + count + (c.student ? ', includes student bookings' : '');
+        return '<button type="button" class="fcs-cls ' + typeClass(c.purpose) + (inWeek ? ' is-week' : '') +
+            (c.next_date ? '' : ' is-done') + '" data-date="' + esc(target) + '" title="' + esc(tip) + '">' +
+            '<span class="fcs-cls-top"><span class="fcs-cls-title">' + esc(c.purpose) + '</span>' +
+            '<span class="fcs-cls-dur">' + esc(duration(c.minutes)) + '</span></span>' +
+            '<span class="fcs-cls-when">' + esc(DOW[c.dow - 1] || '') + ' &middot; ' + esc(range(s, e)) + '</span>' +
+            (where ? '<span class="fcs-cls-where">' + icon('location_on') + '<span>' + esc(where) + '</span></span>' : '') +
+            '<span class="fcs-cls-meta">' + esc(count) + ' &middot; ' + esc(state) + '</span>' +
+            '</button>';
+    }
+
+    function renderList() {
+        if (!elList || !data || !data.semester) return;
+        var sem = data.semester, list = data.classes || [];
+        var items = list.length
+            ? list.map(function (c) { return classHtml(c, data); }).join('')
+            : '<p class="fcs-list-none">No approved bookings yet this semester.</p>';
+        var foot = list.length
+            ? '<p class="fcs-list-foot">' + sem.classes + (sem.classes === 1 ? ' class' : ' classes') + ' &middot; ' +
+              sem.sessions + (sem.sessions === 1 ? ' session' : ' sessions') + '</p>'
+            : '';
+        elList.innerHTML = '<div class="fcs-list-in">' +
+            '<div class="fcs-list-head"><span class="fcs-list-kicker">Semester classes</span>' +
+            '<strong class="fcs-list-sem">' + esc(sem.name) + '</strong>' +
+            '<span class="fcs-list-ay">' + esc(sem.ay) + '</span></div>' +
+            '<div class="fcs-list-scroll">' + items + '</div>' + foot + '</div>';
+    }
+
     function skeletonHtml() {
         return '<div class="fcs-skeleton" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div>';
     }
@@ -311,6 +362,7 @@
         body.removeAttribute('aria-busy');
         if (!data) return;
         body.innerHTML = gridHtml(data) + agendaHtml(data);
+        renderList();
         setNav();
     }
 
@@ -385,6 +437,15 @@
     }
 
     /* ── Init ──────────────────────────────────────────────── */
+    /* A class on the left: show the week of its next (or last) session */
+    if (elList) {
+        elList.addEventListener('click', function (e) {
+            var btn = e.target.closest ? e.target.closest('.fcs-cls') : null;
+            if (!btn) return;
+            var date = btn.getAttribute('data-date');
+            if (date) load(mondayOf(date), false);
+        });
+    }
     btnPrev.addEventListener('click', function () { shift(-1); });
     btnNext.addEventListener('click', function () { shift(1); });
     btnToday.addEventListener('click', function () { load(data ? data.default_week : null, false); });
