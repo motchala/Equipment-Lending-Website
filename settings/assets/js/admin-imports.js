@@ -8,7 +8,8 @@
      UI is never the only protection.
    - While locked the page holds placeholders only. Counts, lists and files are
      fetched after unlock and dropped again when the tab locks.
-   - Equipment Inventory: placeholder card only (the import is not built yet; the card is inert).
+   - Equipment Inventory: placeholder card. It is clickable (opens the file chooser, shows the picked
+     file's name and size) but never reads, uploads or imports anything (see initPlaceholderCard).
      Faculty Registry: Faculty Identification Records, PDF (PDF.js) or XLSX
      (read by parse-faculty-registry-xlsx.php).
    - Every import first stores the ORIGINAL file, then the rows read from it. Only the
@@ -28,7 +29,7 @@
 
     var KINDS = {
         equipment: {
-            pending: true,   // placeholder: no endpoints, the card is inert
+            pending: true,   // placeholder: interactive, but no endpoints and no file reading
             label: 'Equipment Inventory', icon: 'inventory_2', exts: ['xlsx', 'csv'], noun: ['item', 'items'],
             cols: ['#', 'Item name', 'Category', 'Quantity', 'Condition'],
             search: 'Search by item name or category\u2026'
@@ -326,8 +327,8 @@
         var controllers = {};
         cards.forEach(function (card) {
             var k = card.dataset.kind;
-            /* placeholder cards (Equipment Inventory) stay exactly as the page drew them */
-            controllers[k] = (KINDS[k] && KINDS[k].pending) ? { reset: function () { } } : initCard(card);
+            /* placeholder cards (Equipment Inventory) are interactive but do no real work */
+            controllers[k] = (KINDS[k] && KINDS[k].pending) ? initPlaceholderCard(card) : initCard(card);
         });
         function resetAll() {
             Object.keys(controllers).forEach(function (k) { controllers[k].reset(true); });
@@ -524,6 +525,69 @@
 
             role(card, 'view-list').addEventListener('click', function () { openList(kind); });
             role(card, 'view-files').addEventListener('click', function () { openFiles(kind); });
+
+            return { reset: reset };
+        }
+
+        /* Equipment Inventory: a clickable placeholder.
+           It opens the file chooser and shows the picked file's NAME and SIZE only. The file is never
+           read (no FileReader, no parsing), never uploaded, and nothing is imported or saved: every
+           button just explains that this import is not available yet. */
+        function initPlaceholderCard(card) {
+            var drop = role(card, 'drop'), input = role(card, 'input');
+            var picked = role(card, 'picked'), alertEl = role(card, 'alert');
+            var importBtn = role(card, 'import');
+
+            function note(msg) {
+                alertEl.className = 'imp-alert imp-alert--info';
+                alertEl.textContent = '';
+                alertEl.appendChild(el('span', 'material-symbols-outlined', 'info'));
+                var box = el('div', 'imp-alert-text');
+                box.appendChild(el('span', null, msg));
+                alertEl.appendChild(box);
+            }
+            function reset() {
+                input.value = '';
+                picked.classList.add('hidden');
+                drop.classList.remove('hidden', 'is-over');
+                importBtn.disabled = true;
+                alertEl.className = 'imp-alert hidden';
+                alertEl.textContent = '';
+            }
+            function pick(f) {
+                if (!f) return;
+                role(card, 'picked-name').textContent = f.name;
+                role(card, 'picked-size').textContent = fmtSize(f.size);
+                role(card, 'picked-icon').textContent = /\.(xlsx|csv)$/i.test(f.name) ? 'table_chart' : 'description';
+                picked.classList.remove('hidden');
+                drop.classList.add('hidden');
+                importBtn.disabled = false;
+                note('Equipment import is not available yet. The file was not read or uploaded.');
+            }
+
+            input.addEventListener('click', function (e) { e.stopPropagation(); });
+            drop.addEventListener('click', function () { input.click(); });
+            drop.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } });
+            input.addEventListener('change', function () { pick(this.files && this.files[0]); });
+            ['dragenter', 'dragover'].forEach(function (t) {
+                drop.addEventListener(t, function (e) { e.preventDefault(); drop.classList.add('is-over'); });
+            });
+            ['dragleave', 'drop'].forEach(function (t) {
+                drop.addEventListener(t, function (e) { e.preventDefault(); drop.classList.remove('is-over'); });
+            });
+            drop.addEventListener('drop', function (e) {
+                pick(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
+            });
+            role(card, 'clear').addEventListener('click', reset);
+            importBtn.addEventListener('click', function () {
+                note('Equipment import is not available yet. Nothing was uploaded or changed.');
+            });
+            role(card, 'view-list').addEventListener('click', function () {
+                note('Nothing to show yet. Equipment import is not available yet.');
+            });
+            role(card, 'view-files').addEventListener('click', function () {
+                note('Nothing to show yet. Equipment import is not available yet.');
+            });
 
             return { reset: reset };
         }
