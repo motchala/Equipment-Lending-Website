@@ -38,7 +38,7 @@
         rooms: {
             pending: true,   // placeholder: interactive, but no endpoints and no file reading
             label: 'Rooms Assigned', icon: 'meeting_room', exts: ['xlsx', 'csv'], noun: ['assignment', 'assignments'],
-            cols: ['#', 'Room', 'Building', 'Assigned to'],
+            cols: ['#', 'Room', 'Building', 'Floor', 'Assigned to'],
             search: 'Search by room or faculty\u2026'
         },
         faculty: {
@@ -337,6 +337,7 @@
             /* placeholder cards (Equipment Inventory) are interactive but do no real work */
             controllers[k] = (KINDS[k] && KINDS[k].pending) ? initPlaceholderCard(card) : initCard(card);
         });
+        initGuide();
         function resetAll() {
             Object.keys(controllers).forEach(function (k) { controllers[k].reset(true); });
         }
@@ -534,6 +535,40 @@
             role(card, 'view-files').addEventListener('click', function () { openFiles(kind); });
 
             return { reset: reset };
+        }
+
+        /* Import guide: the tabs, and the "How to prepare this file" link on each card. */
+        function initGuide() {
+            var guide = $('imp-guide');
+            if (!guide) return;
+            var tabs = Array.prototype.slice.call(guide.querySelectorAll('[role="tab"]'));
+            var panels = Array.prototype.slice.call(guide.querySelectorAll('[role="tabpanel"]'));
+
+            function select(kind, focus) {
+                tabs.forEach(function (tab) {
+                    var on = tab.dataset.kind === kind;
+                    tab.setAttribute('aria-selected', on ? 'true' : 'false');
+                    tab.tabIndex = on ? 0 : -1;
+                    if (on && focus) tab.focus();
+                });
+                panels.forEach(function (panel) { panel.hidden = panel.dataset.kind !== kind; });
+            }
+            tabs.forEach(function (tab, i) {
+                tab.addEventListener('click', function () { select(tab.dataset.kind); });
+                tab.addEventListener('keydown', function (e) {
+                    var n = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1
+                        : e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : -1;
+                    if (n < 0) return;
+                    e.preventDefault();
+                    select(tabs[(n + tabs.length) % tabs.length].dataset.kind, true);
+                });
+            });
+            Array.prototype.forEach.call(document.querySelectorAll('.imp-guide-link'), function (link) {
+                link.addEventListener('click', function () {
+                    select(link.dataset.guide);
+                    guide.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                });
+            });
         }
 
         /* Equipment Inventory / Rooms Assigned: a clickable placeholder.

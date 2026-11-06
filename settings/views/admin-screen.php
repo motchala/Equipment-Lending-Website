@@ -387,7 +387,7 @@
                 'accept'  => '.xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                 'stats'   => ['Items', 'Categories', 'Rows in file'],
                 'cols'    => ['#', 'Item name', 'Category', 'Quantity', 'Condition'],
-                'what'    => 'Items on this list are added to the equipment inventory that students and faculty can borrow.',
+                'what'    => 'Items added to equipment inventory for loan.',
                 'replace' => 'Remove the current items first',
             ],
             'faculty' => [
@@ -409,7 +409,7 @@
                 'types'   => 'XLSX or CSV',
                 'accept'  => '.xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                 'stats'   => ['Rooms', 'Faculty', 'Rows in file'],
-                'cols'    => ['#', 'Room', 'Building', 'Assigned to'],
+                'cols'    => ['#', 'Room', 'Building', 'Floor', 'Assigned to'],
                 'what'    => 'Each room on this list is assigned to the faculty or class that uses it.',
                 'replace' => 'Remove the current assignments first',
             ],
@@ -449,6 +449,7 @@
 
                                 <div class="imp-card-body">
                                     <p class="imp-what"><?= htmlspecialchars($c['what']) ?></p>
+                                    <button type="button" class="imp-guide-link" data-guide="<?= $kind ?>"><span class="material-symbols-outlined">menu_book</span>How to prepare this file</button>
 
                                     <div class="imp-stats">
                                         <div class="imp-stat"><span class="imp-stat-num" data-role="stat-count"><?= $soon ? '—' : '•••' ?></span><span class="imp-stat-label"><?= $c['stats'][0] ?></span></div>
@@ -522,6 +523,171 @@
                                 </footer>
                             </section>
                         <?php endforeach; ?>
+
+                        <?php
+                        // ── Import guide: what each file has to look like, column by column ──
+                        // Faculty Registry is the real, working import (rules below come from its parser).
+                        // Equipment Inventory and Rooms Assigned are the planned layouts for when those imports are built.
+                        $gh = function ($s) {
+                            return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+                        };
+                        $imp_guide_default = 'rooms';
+                        $imp_guide = [
+                            'equipment' => [
+                                'label'   => 'Equipment Inventory',
+                                'planned' => true,
+                                'formats' => [['XLSX', 'Best choice', 'ok'], ['CSV', 'Works too', 'alt'], ['PDF', 'Not for this list', 'no']],
+                                'why'     => 'Excel keeps every value in its own cell, so quantities stay numbers and a comma in a description never shifts the columns. If you use CSV, save it as "CSV UTF-8" so special characters survive.',
+                                'cols'    => [
+                                    ['Item name',   true,  'The name students see when they borrow it. One row for each kind of item.', 'HDMI Cable'],
+                                    ['Category',    true,  'Pick one: Audio/Visual, Cables & Connectors, Computing, Lab Equipment, Networking, Power, Tools or Others.', 'Cables & Connectors'],
+                                    ['Quantity',    true,  'Total units you own. A whole number, 0 or more.', '5'],
+                                    ['Condition',   false, 'Good, Fair or For Repair. Leave it blank for Good.', 'Good'],
+                                    ['Description', false, 'A short note, up to 500 characters.', '1.5 m, braided'],
+                                ],
+                                'rows'    => [['HDMI Cable', 'Cables & Connectors', '5', 'Good', '1.5 m, braided'], ['Projector', 'Audio/Visual', '2', 'Fair', 'Acer, HDMI + VGA']],
+                                'tips'    => [
+                                    'Put the column names in row 1 and start your data in row 2. Nothing above the headers, no blank rows, no merged cells, no totals row.',
+                                    'One row per kind of item. Put the total in Quantity instead of repeating the row for every unit.',
+                                    'Spell each item the same way every time, because Merge will match items by name.',
+                                    'Photos cannot come from the file. Add them afterwards on the Equipment page (JPG or PNG, up to 2 MB each).',
+                                    'Keep each file under 5,000 rows and 10 MB, the same limits as the faculty import.',
+                                ],
+                            ],
+                            'rooms' => [
+                                'label'   => 'Rooms Assigned',
+                                'planned' => true,
+                                'formats' => [['XLSX', 'Best choice', 'ok'], ['CSV', 'Works too', 'alt'], ['PDF', 'Not for this list', 'no']],
+                                'why'     => 'A spreadsheet keeps room names, floors and faculty names in separate cells, so nothing is guessed from a layout. If you use CSV, save it as "CSV UTF-8".',
+                                'cols'    => [
+                                    ['Room',            true,  'Exactly as it is named under Facilities.', 'Room 203'],
+                                    ['Building',        true,  'Building A (Old), Building B (New) or Building C (CITE).', 'Building B (New)'],
+                                    ['Floor',           true,  'The floor label, or just the floor number.', '2nd Floor'],
+                                    ['Assigned to',     true,  'The faculty member, as written in the Faculty Registry (Faculty ID or full name).', 'Santos, Maria'],
+                                    ['Section / class', false, 'The class or section that uses the room.', 'BSIT 3-1'],
+                                ],
+                                'rows'    => [['Room 203', 'Building B (New)', '2nd Floor', 'Santos, Maria', 'BSIT 3-1'], ['Audiovisual Room', 'Building C (CITE)', '1st Floor', 'Reyes, Jose', '']],
+                                'tips'    => [
+                                    'Room and building names must match Facilities exactly, spaces and spelling included ("Room 203", not "203"). A name that does not match cannot be linked to a room.',
+                                    'Import the Faculty Registry first, so every name in "Assigned to" already exists.',
+                                    'One assignment per row. If two faculty share a room, give each of them their own row.',
+                                    'Put the column names in row 1 and start your data in row 2. No blank rows or merged cells.',
+                                    'Keep each file under 5,000 rows and 10 MB.',
+                                ],
+                            ],
+                            'faculty' => [
+                                'label'   => 'Faculty Registry',
+                                'planned' => false,
+                                'formats' => [['XLSX', 'Best choice', 'ok'], ['PDF', 'Official document only', 'alt'], ['CSV', 'Not accepted', 'no']],
+                                'why'     => 'XLSX is read exactly as typed. The PDF must be the official Faculty Identification Records document, and it has to be a text PDF (you can select the words), not a scan or a photo. For a CSV, open it in Excel and save it as .xlsx first.',
+                                'cols'    => [
+                                    ['Faculty ID',      true,  'Leave it blank or type NEWLY HIRED if the person has no ID yet. Otherwise 5 to 30 letters and numbers (hyphens allowed) with at least one digit.', 'FA104BN021'],
+                                    ['Professor Name',  true,  'Full name. A row with no name is skipped.', 'Santos, Maria'],
+                                    ['Programs Handled', false, 'The programs or departments, separated by commas.', 'BSIT, DIT'],
+                                ],
+                                'rows'    => [['FA104BN021', 'Santos, Maria', 'BSIT, DIT'], ['NEWLY HIRED', 'Cruz, Ana', 'BSBA']],
+                                'tips'    => [
+                                    'Only the first worksheet is read. Extra sheets are ignored.',
+                                    'A header row is optional. If you add one, make it row 1 and use Faculty ID, Professor Name and Programs Handled (ID, Name and Program also work). No title or logo rows above it.',
+                                    'Without a header row, the columns are read in this order: A = ID, B = name, C = programs.',
+                                    'Format the ID column as Text so Excel does not change the IDs, and avoid merged cells.',
+                                    'Up to 5,000 rows and 10 MB per file. Rows with an invalid ID are skipped, and you are shown which ones after the import.',
+                                    'Merge updates the people already listed (matched by Faculty ID, new hires by name) and adds the rest. Replace removes everyone first.',
+                                ],
+                            ],
+                        ];
+                        $imp_guide_order = ['equipment', 'faculty', 'rooms'];
+                        ?>
+                        <aside class="imp-guide" id="imp-guide" aria-labelledby="imp-guide-title">
+                            <header class="imp-guide-head">
+                                <span class="imp-card-icon"><span class="material-symbols-outlined">menu_book</span></span>
+                                <div class="imp-card-titles">
+                                    <h4 id="imp-guide-title">Import guide</h4>
+                                    <p>How to prepare each file before you import it</p>
+                                </div>
+                            </header>
+
+                            <div class="imp-guide-tabs" role="tablist" aria-label="Choose an import">
+                                <?php foreach ($imp_guide_order as $gk): $g = $imp_guide[$gk];
+                                    $on = ($gk === $imp_guide_default); ?>
+                                    <button type="button" class="imp-gtab" role="tab" id="imp-gtab-<?= $gk ?>" aria-controls="imp-gpanel-<?= $gk ?>" aria-selected="<?= $on ? 'true' : 'false' ?>" tabindex="<?= $on ? '0' : '-1' ?>" data-kind="<?= $gk ?>">
+                                        <span class="imp-gdot"></span><?= $gh($g['label']) ?>
+                                    </button>
+                                <?php endforeach; ?>
+                            </div>
+
+                            <?php foreach ($imp_guide_order as $gk): $g = $imp_guide[$gk]; ?>
+                                <div class="imp-guide-panel" role="tabpanel" id="imp-gpanel-<?= $gk ?>" aria-labelledby="imp-gtab-<?= $gk ?>" data-kind="<?= $gk ?>" <?= $gk === $imp_guide_default ? '' : ' hidden' ?>>
+                                    <?php if (!empty($g['planned'])): ?>
+                                        <div class="imp-g-planned">
+                                            <span class="material-symbols-outlined">construction</span>
+                                            <span><strong>Planned layout.</strong> This import is not built yet. Prepare your file this way so it is ready when the import is switched on.</span>
+                                        </div>
+                                    <?php endif; ?>
+
+                                    <section class="imp-g-sec">
+                                        <h5>Best file type</h5>
+                                        <div class="imp-g-formats">
+                                            <?php foreach ($g['formats'] as $f): ?>
+                                                <span class="imp-fmt imp-fmt--<?= $gh($f[2]) ?>"><span class="material-symbols-outlined"><?= $f[2] === 'no' ? 'close' : 'check' ?></span><b><?= $gh($f[0]) ?></b><?= $gh($f[1]) ?></span>
+                                            <?php endforeach; ?>
+                                        </div>
+                                        <p class="imp-g-why"><?= $gh($g['why']) ?></p>
+                                    </section>
+
+                                    <section class="imp-g-sec">
+                                        <h5>Columns, left to right</h5>
+                                        <ol class="imp-g-cols">
+                                            <?php foreach ($g['cols'] as $ci => $col): ?>
+                                                <li>
+                                                    <span class="imp-g-letter" aria-hidden="true"><?= chr(65 + $ci) ?></span>
+                                                    <div class="imp-g-col">
+                                                        <div class="imp-g-colhead">
+                                                            <strong><?= $gh($col[0]) ?></strong>
+                                                            <span class="imp-req imp-req--<?= $col[1] ? 'yes' : 'no' ?>"><?= $col[1] ? 'Required' : 'Optional' ?></span>
+                                                        </div>
+                                                        <p><?= $gh($col[2]) ?></p>
+                                                        <p class="imp-g-ex">e.g. <code><?= $gh($col[3]) ?></code></p>
+                                                    </div>
+                                                </li>
+                                            <?php endforeach; ?>
+                                        </ol>
+                                    </section>
+
+                                    <section class="imp-g-sec">
+                                        <h5>What your sheet should look like</h5>
+                                        <div class="imp-sheet-wrap">
+                                            <table class="imp-sheet">
+                                                <thead>
+                                                    <tr class="is-letters">
+                                                        <th></th><?php foreach ($g['cols'] as $ci => $col): ?><th><?= chr(65 + $ci) ?></th><?php endforeach; ?>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr class="is-head">
+                                                        <td class="is-gutter">1</td><?php foreach ($g['cols'] as $col): ?><td><?= $gh($col[0]) ?></td><?php endforeach; ?>
+                                                    </tr>
+                                                    <?php foreach ($g['rows'] as $ri => $row): ?>
+                                                        <tr>
+                                                            <td class="is-gutter"><?= $ri + 2 ?></td><?php foreach ($row as $cell): ?><td><?= $gh($cell) ?></td><?php endforeach; ?>
+                                                        </tr>
+                                                    <?php endforeach; ?>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </section>
+
+                                    <section class="imp-g-sec">
+                                        <h5>Before you import</h5>
+                                        <ul class="imp-g-tips">
+                                            <?php foreach ($g['tips'] as $tip): ?>
+                                                <li><span class="material-symbols-outlined">task_alt</span><span><?= $gh($tip) ?></span></li>
+                                            <?php endforeach; ?>
+                                        </ul>
+                                    </section>
+                                </div>
+                            <?php endforeach; ?>
+                        </aside>
                     </div>
                 </div>
 
