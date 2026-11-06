@@ -5738,10 +5738,12 @@ function psSelectFmt(btn) {
             if (chip) openPanel(chip.getAttribute('data-eq-panel'));
         });
 
-        /* On Loan: status tabs + live search + pagination (20 per page) */
+        /* On Loan: status tabs + live search + sort + pagination (20 per page) */
         var table = document.getElementById('eq-loan-table');
         var search = document.getElementById('eq-loan-search');
         var tabBar = document.getElementById('eqLoanFilter');
+        var sortSel = document.getElementById('eqLoanSort');
+        var sortDir = document.getElementById('eqLoanSortDir');
         var titleEl = document.getElementById('eqLoanTitle');
         var pager = document.getElementById('eq-loan-pager');
         var pgInfo = document.getElementById('eq-loan-pager-info');
@@ -5765,7 +5767,48 @@ function psSelectFmt(btn) {
         var mode = 'all';
         var query = '';
         var page = 1;
+        var dir = 'desc'; // desc = newest first, asc = oldest first
         var removedAny = false;   /* a row was removed this session (e.g. a cancelled booking) */
+
+        /* ── Sort ──────────────────────────────────────────────────────────
+           recent : request_date (data-submitted-ts on the row)
+           due    : due date / return date (data-due-ts)                   */
+        function sortComparator() {
+            var sign = dir === 'asc' ? 1 : -1;
+            var byDue = sortSel && sortSel.value === 'due';
+            return function (a, b) {
+                var ax = a.dataset, bx = b.dataset;
+                var av = byDue ? (+ax.dueTs || 0) : (+ax.submittedTs || 0);
+                var bv = byDue ? (+bx.dueTs || 0) : (+bx.submittedTs || 0);
+                var r = av - bv;
+                if (!r) r = (+ax.id || 0) - (+bx.id || 0);
+                return r * sign;
+            };
+        }
+
+        function sortRows() {
+            var tbody = table.tBodies[0];
+            if (!tbody) return;
+            rows.sort(sortComparator());
+            var frag = document.createDocumentFragment();
+            rows.forEach(function (r) { frag.appendChild(r); });
+            if (noMatch) frag.appendChild(noMatch);
+            tbody.appendChild(frag);
+        }
+
+        function syncSortDir() {
+            if (!sortDir) return;
+            var asc = dir === 'asc';
+            var byDue = sortSel && sortSel.value === 'due';
+            var label = byDue
+                ? (asc ? 'Earliest due first' : 'Latest due first')
+                : (asc ? 'Oldest requests first' : 'Newest requests first');
+            sortDir.setAttribute('data-dir', dir);
+            sortDir.title = label + ' (click to reverse)';
+            sortDir.setAttribute('aria-label', 'Sort direction: ' + label.toLowerCase() + '. Click to reverse.');
+            var ico = sortDir.querySelector('.material-symbols-outlined');
+            if (ico) ico.textContent = asc ? 'arrow_upward' : 'arrow_downward';
+        }
 
         function groupRows(sourceRows) {
             var groups = [];
@@ -5796,6 +5839,7 @@ function psSelectFmt(btn) {
                 });
             });
             if (noMatch) tbody.appendChild(noMatch);
+            sortRows();
         }
 
         function matchesMode(state) {
@@ -5944,6 +5988,16 @@ function psSelectFmt(btn) {
                     t.setAttribute('aria-selected', on ? 'true' : 'false');
                 });
                 if (titleEl) titleEl.textContent = TITLES[mode] || TITLES.all;
+                // Swap the visible thead to match the active tab
+                table.querySelectorAll('thead[data-loan-head]').forEach(function (h) {
+                    h.hidden = h.getAttribute('data-loan-head') !== mode;
+                });
+                // Update colspan on empty/nomatch rows to match the active thead column count
+                var activeCols = (table.querySelector('thead[data-loan-head="' + mode + '"] tr') || {}).cells;
+                var colCount = activeCols ? activeCols.length : 7;
+                table.querySelectorAll('.eq-loan-empty-cell, .eq-loan-nomatch-cell').forEach(function (td) {
+                    td.colSpan = colCount;
+                });
                 page = 1;
                 render();
             });
@@ -5952,6 +6006,23 @@ function psSelectFmt(btn) {
             search.addEventListener('input', function () {
                 query = this.value.trim().toLowerCase();
                 page = 1;
+                render();
+            });
+        }
+        if (sortSel) {
+            sortSel.addEventListener('change', function () {
+                page = 1;
+                syncSortDir();
+                sortRows();
+                render();
+            });
+        }
+        if (sortDir) {
+            sortDir.addEventListener('click', function () {
+                dir = dir === 'asc' ? 'desc' : 'asc';
+                page = 1;
+                syncSortDir();
+                sortRows();
                 render();
             });
         }
@@ -6165,6 +6236,7 @@ function psSelectFmt(btn) {
             });
         }
 
+        syncSortDir();
         window.psRefreshEquipmentLoans();
         try {
             if (sessionStorage.getItem('openManualReturnLoanTab') === '1' || sessionStorage.getItem('openOverdueLoanTab') === '1') {
