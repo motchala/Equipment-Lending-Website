@@ -349,7 +349,7 @@
             var preview = role(card, 'preview'), previewBody = role(card, 'preview-body'), previewCount = role(card, 'preview-count');
             var importBtn = role(card, 'import');
             var importHtml = importBtn.innerHTML;
-            var rows = [], file = null, busy = false;
+            var rows = [], file = null, busy = false, schedule = null;
 
             function alertShow(msg, kind2, details) {
                 alertEl.className = 'imp-alert imp-alert--' + kind2;
@@ -367,7 +367,7 @@
             function alertHide() { alertEl.className = 'imp-alert hidden'; alertEl.textContent = ''; }
 
             function reset(full) {
-                rows = []; file = null; input.value = '';
+                rows = []; file = null; schedule = null; input.value = '';
                 picked.classList.add('hidden');
                 preview.classList.add('hidden'); previewBody.textContent = '';
                 drop.classList.remove('hidden', 'is-over');
@@ -414,6 +414,44 @@
                 drop.classList.add('hidden');
             }
 
+            /* Class-schedule workbooks (Faculty Rooms / Room Timetables): what was found, what to know, what happened */
+            function scheduleSummary(s) {
+                if (s.kind === 'faculty_schedule') {
+                    return num(s.meetings) + ' weekly class meetings \u00b7 ' + num(s.rooms) + ' rooms \u00b7 ' + num(s.hours) + ' class hours a week';
+                }
+                return 'Room timetable: ' + num(s.rooms) + ' rooms \u00b7 ' + num(s.unassigned) + ' classes with no instructor yet' + (s.term ? ' \u00b7 ' + s.term : '');
+            }
+            function scheduleNotes(s) {
+                var n = [];
+                if (s.kind === 'faculty_schedule') {
+                    n.push('This file also carries each faculty member\u2019s weekly classes. They are saved with the faculty list, shown in each faculty member\u2019s class schedule, and block those rooms for reservations.');
+                    if (s.no_id) n.push(num(s.no_id) + ' faculty have no ID yet. Their classes are kept and attach as soon as their account is created.');
+                } else {
+                    n.push('These classes have no instructor yet, but they still block their rooms for reservations.');
+                }
+                (s.warnings || []).slice(0, 5).forEach(function (w) { n.push(w); });
+                return n;
+            }
+            function scheduleOutcome(s, details) {
+                if (s.error) { details.unshift(s.error); return ''; }
+                var line;
+                if (s.kind === 'faculty_schedule') {
+                    line = ' Class schedule: ' + num(s.meetings) + ' weekly meetings saved for ' + num(s.faculty) + ' faculty (' + num(s.accounts_linked) + ' faculty accounts already have their classes).';
+                } else {
+                    line = ' ' + num(s.unassigned_classes) + ' classes with no instructor yet now block their rooms.';
+                }
+                var made = s.rooms_created || [];
+                if (made.length) details.push(num(made.length) + ' rooms were not in the system yet and were added: ' + made.slice(0, 6).join(', ') + (made.length > 6 ? ', \u2026' : '') + '.');
+                if ((s.rooms_unresolved || []).length) details.push('These rooms could not be placed in a building: ' + s.rooms_unresolved.join(', ') + '.');
+                var ov = s.reservations_overlapping || [];
+                if (ov.length) {
+                    var ex = ov.slice(0, 3).map(function (o) { return o.room_name + ' on ' + o.reservation_date + ' ' + String(o.start_time).slice(0, 5) + '\u2013' + String(o.end_time).slice(0, 5); }).join('; ');
+                    details.push(num(ov.length) + ' approved reservation(s) now overlap a class (' + ex + (ov.length > 3 ? '; \u2026' : '') + '). They were left as they are. Please review them.');
+                }
+                (s.file_overlaps || []).slice(0, 3).forEach(function (w) { details.push(w); });
+                return line;
+            }
+
             function parseXlsx(f) {
                 var form = new FormData();
                 form.append('csrf_token', csrf());
@@ -422,7 +460,7 @@
                     return r.json().catch(function () { throw new Error('Unexpected response from the server. Please try again.'); }).then(function (d) {
                         if (guard(d)) throw new Error('');
                         if (!r.ok || !d || d.status !== 'success' || !Array.isArray(d.rows)) throw new Error((d && d.error) || 'Could not read the XLSX file. Please try again.');
-                        return d.rows;
+                        return { rows: d.rows, schedule: d.schedule || null };
                     });
                 });
             }
@@ -449,13 +487,21 @@
                         }
                         return res;
                     })
-                    : parseXlsx(f).then(function (r) { return { rows: r, unreadable: 0, duplicates: 0 }; });
+                    : parseXlsx(f).then(function (r) { return { rows: r.rows, schedule: r.schedule, unreadable: 0, duplicates: 0 }; });
 
                 job.then(function (res) {
-                    if (!res.rows.length) throw new Error('No rows were found in this file.');
+                    var sched = res.schedule || null;
+                    var timetableOnly = !!(sched && sched.kind === 'room_timetable');   // no faculty rows, only rooms + classes
+                    if (!res.rows.length && !timetableOnly) throw new Error('No rows were found in this file.');
                     rows = res.rows;
+                    schedule = sched;
                     renderPreview(rows);
                     var notes = [];
+                    if (sched) {
+                        previewCount.textContent = timetableOnly ? scheduleSummary(sched) : previewCount.textContent + ' \u00b7 ' + scheduleSummary(sched);
+                        if (timetableOnly) importBtn.disabled = false;
+                        scheduleNotes(sched).forEach(function (n) { notes.push(n); });
+                    }
                     if (res.unreadable) notes.push(res.unreadable + ' row(s) could not be read and were left out.');
                     if (notes.length) alertShow('Check the preview before importing.', 'info', notes); else alertHide();
                 }).catch(function (err) {
@@ -485,9 +531,10 @@
 
             /* import: 1) keep the ORIGINAL file, 2) import the rows read from it */
             importBtn.addEventListener('click', function () {
-                if (!rows.length || !file || busy) return;
+                var timetableOnly = !!(schedule && schedule.kind === 'room_timetable');
+                if ((!rows.length && !timetableOnly) || !file || busy) return;
                 var mode = card.querySelector('input[name="imp-mode-' + kind + '"]:checked');
-                var replaceAll = !!(mode && mode.value === 'replace');
+                var replaceAll = !!(mode && mode.value === 'replace') && !timetableOnly;
                 if (replaceAll && !window.confirm('Replace the whole ' + cfg.label + '? Everyone currently listed will be removed first.')) return;
                 var token = csrf();
                 if (!token) { alertShow('Session expired. Please refresh the page.', 'err'); return; }
@@ -517,10 +564,14 @@
                     .then(function (d) {
                         if (guard(d)) throw { handled: true };
                         if (!d || d.status !== 'success') throw { message: (d && d.error) || 'Import failed. Please try again.', details: d && d.errors };
-                        var msg = 'Import complete: ' + num(d.inserted) + ' added, ' + num(d.updated) + ' updated' + (d.skipped ? ', ' + num(d.skipped) + ' skipped' : '') + '.';
-                        var details = d.errors || [];
+                        var s = d.schedule || null;
+                        var msg = (s && s.kind === 'room_timetable')
+                            ? 'Room timetable saved.'
+                            : 'Import complete: ' + num(d.inserted) + ' added, ' + num(d.updated) + ' updated' + (d.skipped ? ', ' + num(d.skipped) + ' skipped' : '') + '.';
+                        var details = (d.errors || []).slice();
+                        if (s) msg += scheduleOutcome(s, details);
                         reset(false);
-                        alertShow(msg, 'ok', details);
+                        alertShow(msg, s && s.error ? 'info' : 'ok', details);
                         loadOverview();
                     })
                     .catch(function (err) {

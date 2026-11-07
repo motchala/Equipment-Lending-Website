@@ -159,10 +159,20 @@ $result = $stmt->get_result();
 $count  = (int)$result->fetch_row()[0];
 
 $stmt->close();
+
+// A class meeting (imported timetable) in that room at that time also makes it unavailable.
+$class_hits = [];
+try {
+    require_once __DIR__ . '/../core/class-schedule.php';
+    $class_hits = cs_room_conflicts($conn, $room_id, $res_date, $start_time, $end_time);
+} catch (Throwable $e) {
+    error_log('check-room-availability.php: class check failed - ' . $e->getMessage());
+}
 $conn->close();
 
-if ($count === 0) {
+if ($count === 0 && empty($class_hits)) {
     echo json_encode(['available' => true,  'conflict' => false]);
 } else {
-    echo json_encode(['available' => false, 'conflict' => true]);
+    echo json_encode(['available' => false, 'conflict' => true]
+        + (!empty($class_hits) ? ['reason' => 'class', 'class_label' => cs_class_label($class_hits[0])] : []));
 }

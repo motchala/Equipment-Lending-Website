@@ -5,7 +5,9 @@
  * The logged-in faculty member's own and student-authorized schedule for ONE week, Monday to Saturday
  * (Sunday is closed), for the "My class schedule" calendar on the Facilities tab.
  *
- * Source: APPROVED room reservations associated with the faculty account (tbl_room_reservations).
+ * Source: APPROVED room reservations associated with the faculty account (tbl_room_reservations),
+ * plus the faculty member's weekly CLASS meetings (tbl_class_schedule, from the imported timetable),
+ * which repeat every week and carry "kind": "class".
  * Student-submitted reservations are included and labeled with the student.
  * Declined / cancelled reservations never show.
  *
@@ -140,6 +142,43 @@ try {
         $total++;
     }
     $stmt->close();
+
+    // Weekly class meetings (imported timetable): one item per meeting on its weekday of this week
+    require_once __DIR__ . '/../core/class-schedule.php';
+    $day_dates = array_keys($days);                 // Monday .. Saturday
+    foreach (cs_faculty_week_rows($conn, $faculty_id) as $c) {
+        $date = $day_dates[((int)$c['day_of_week']) - 1] ?? null;
+        $minutes = (int)round(((int)$c['span_sec']) / 60);
+        if ($date === null || !isset($days[$date]) || $minutes <= 0) {
+            continue;
+        }
+        $code = trim((string)$c['subject_code']);
+        $sect = trim((string)$c['section']);
+        $days[$date]['items'][] = [
+            'id'        => 'class-' . (int)$c['id'],
+            'kind'      => 'class',
+            'start'     => $c['start_hm'],
+            'end'       => $c['end_hm'],
+            'minutes'   => $minutes,
+            'purpose'   => trim($code . ' · ' . $sect, ' ·') ?: 'Class',
+            'subject'   => (string)$c['subject_name'],
+            'section'   => $sect,
+            'component' => (string)$c['component'],
+            'group'     => (string)($c['group_label'] ?? ''),
+            'student_name' => '',
+            'student_id'   => '',
+            'room'      => (string)($c['room_name'] ?? $c['room_code']),
+            'floor'     => (string)($c['floor_label'] ?? ''),
+            'building'  => (string)($c['building_name'] ?? ''),
+        ];
+        $total++;
+    }
+    foreach ($days as &$dayRef) {
+        usort($dayRef['items'], static function (array $a, array $b): int {
+            return strcmp($a['start'], $b['start']) ?: strcmp($a['end'], $b['end']);
+        });
+    }
+    unset($dayRef);
 } catch (Throwable $e) {
     error_log('[get-faculty-schedule] ' . $e->getMessage());
     http_response_code(500);
@@ -231,6 +270,62 @@ try {
         $sessions++;
     }
     $stmt->close();
+
+    // Weekly class meetings (imported timetable): each one repeats every week of the semester
+    try {
+        require_once __DIR__ . '/../core/class-schedule.php';
+        $sem_end_dt = new DateTime($sem_to);
+        foreach (cs_faculty_week_rows($conn, $faculty_id) as $cm) {
+            $cm_minutes = (int)round(((int)$cm['span_sec']) / 60);
+            if ($cm_minutes <= 0) {
+                continue;
+            }
+            $cm_dow = (int)$cm['day_of_week'];
+            $cm_d = new DateTime($sem_from);
+            $cm_d->modify('+' . (($cm_dow - (int)$cm_d->format('N') + 7) % 7) . ' days');
+            $cm_dates = [];
+            while ($cm_d <= $sem_end_dt) {
+                $cm_dates[] = $cm_d->format('Y-m-d');
+                $cm_d->modify('+7 days');
+            }
+            if (!$cm_dates) {
+                continue;
+            }
+            $cm_upcoming = 0;
+            $cm_next = null;
+            foreach ($cm_dates as $cm_date) {
+                if ($cm_date > $today || ($cm_date === $today && $cm['end_hm'] > $now_hm)) {
+                    $cm_upcoming++;
+                    if ($cm_next === null) {
+                        $cm_next = $cm_date;
+                    }
+                }
+            }
+            $classes[] = [
+                'kind'      => 'class',
+                'purpose'   => trim(trim((string)$cm['subject_code']) . ' · ' . trim((string)$cm['section']), ' ·') ?: 'Class',
+                'subject'   => (string)$cm['subject_name'],
+                'component' => (string)$cm['component'],
+                'room'      => (string)($cm['room_name'] ?? $cm['room_code']),
+                'floor'     => (string)($cm['floor_label'] ?? ''),
+                'building'  => (string)($cm['building_name'] ?? ''),
+                'dow'       => $cm_dow,
+                'start'     => $cm['start_hm'],
+                'end'       => $cm['end_hm'],
+                'minutes'   => $cm_minutes,
+                'sessions'  => count($cm_dates),
+                'upcoming'  => $cm_upcoming,
+                'next_date' => $cm_next,
+                'last_date' => end($cm_dates),
+                'dates'     => $cm_dates,
+                'student'   => false,
+            ];
+            $sessions += count($cm_dates);
+        }
+    } catch (Throwable $e) {
+        error_log('[get-faculty-schedule] class meetings in semester list: ' . $e->getMessage());
+    }
+
     $classes = array_values($classes);
     usort($classes, static function ($a, $b) {
         return [$a['dow'], $a['start'], $a['purpose']] <=> [$b['dow'], $b['start'], $b['purpose']];

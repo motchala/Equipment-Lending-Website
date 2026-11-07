@@ -1233,6 +1233,34 @@ class ArbitrationEngine
                 return;
             }
 
+            // ── Step 5b: Class meeting check ─────────────────────────────────
+            // A room that has a class (imported timetable) at this time is not free, whoever asks.
+            // A class is never bumped by priority and never approved over. Applies on every route,
+            // including hold-for-review (later-date) reservations.
+            try {
+                require_once __DIR__ . '/../../room-reservation/core/class-schedule.php';
+                $class_hits = cs_room_conflicts($conn, $room_id, $res_date, $start_time, $end_time);
+            } catch (Throwable $e) {
+                error_log('ArbitrationEngine::processRoomReservation class check - ' . $e->getMessage());
+                $class_hits = [];
+            }
+            if (!empty($class_hits)) {
+                $class_row = $class_hits[0];
+                self::writeRoomDecision(
+                    $conn,
+                    $reservation_id,
+                    $room_id,
+                    $room_name,
+                    $faculty_id,
+                    (string)$reservation['faculty_name'],
+                    'Declined',
+                    self::RULE_SCHEDULE_CONFLICT,
+                    'This facility is assigned to a class at that time (' . cs_class_label($class_row) . ', '
+                        . $class_row['start_hm'] . '-' . $class_row['end_hm'] . '). Please choose another time.'
+                );
+                return;
+            }
+
             // ── Step 6: Time conflict check + FIFO/priority scoring ──────────
             // Fetch all Approved reservations for this room/date that overlap
             // the requested time window (strict inequality — adjacency is allowed).

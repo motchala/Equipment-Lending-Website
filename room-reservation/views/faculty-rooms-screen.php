@@ -43,7 +43,7 @@
         <div class="fcty-head-row fcty-landing-head fcs-head">
             <div class="fcs-heading">
                 <h2 class="fcty-title fcs-title" id="fcs-title">My class schedule</h2>
-                <p class="fcs-sub">Your approved bookings this semester, and week by week.</p>
+                <p class="fcs-sub">Your classes and approved bookings this semester, and week by week.</p>
             </div>
             <div class="fcs-nav">
                 <button type="button" class="fcty-icon-btn" id="fcs-prev" aria-label="Previous week" disabled>

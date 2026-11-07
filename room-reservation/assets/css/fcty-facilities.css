@@ -2975,6 +2975,35 @@ textarea.fcty-input {
     --ev: #ff9d9d;
 }
 
+/* weekly class meetings (imported timetable): their own colour, so classes read differently from bookings */
+#rooms-browse .fcs-t-class {
+    --ev: #2a7f7a;
+}
+
+[data-theme="dark"] #rooms-browse .fcs-t-class {
+    --ev: #6fc7c0;
+}
+
+[data-theme="high-contrast"] #rooms-browse .fcs-t-class {
+    --ev: #7ce0d8;
+}
+
+/* a class's length is already in its time range; the room for the title is worth more (the section is what matters) */
+#rooms-browse .fcs-ev.fcs-t-class .fcs-ev-dur {
+    display: none;
+}
+
+/* on blocks tall enough, let the class title wrap so the section (BSIT 2-2) is never cut off */
+#rooms-browse .fcs-ev.fcs-t-class:not(.is-short) .fcs-ev-title {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+/* the subject name lives in the semester list, the tooltip and the mobile agenda; the grid stays uncluttered */
+#rooms-browse .fcs-ev.fcs-t-class .fcs-ev-student {
+    display: none;
+}
+
 /* nothing booked this week */
 #rooms-browse .fcs-empty {
     position: absolute;

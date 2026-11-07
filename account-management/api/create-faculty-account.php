@@ -291,13 +291,34 @@ try {
     send_json(500, 'error', 'Could not create account. Please try again.');
 }
 
+// -- Class schedule ------------------------------------------------------------------
+// If this person's weekly classes were imported (Faculty Rooms workbook), attach them to the new account
+// now, by Faculty ID or, failing that, by name. They then show up in their own class schedule.
+// Never blocks account creation.
+$class_meetings = 0;
+try {
+    require_once __DIR__ . '/../../room-reservation/core/class-schedule.php';
+    cs_link_accounts($conn, $faculty_id, $fullname);
+    if (cs_table_ready($conn) && ($cst = $conn->prepare('SELECT COUNT(*) FROM tbl_class_schedule WHERE account_faculty_id = ?'))) {
+        $cst->bind_param('s', $faculty_id);
+        $cst->execute();
+        $cst->bind_result($class_meetings);
+        $cst->fetch();
+        $cst->close();
+    }
+} catch (Throwable $e) {
+    error_log('[create-faculty-account] class schedule link: ' . $e->getMessage());
+}
+$class_meetings = (int)$class_meetings;
+
 // -- Success ------------------------------------------------------------------------
 require_once __DIR__ . '/../../shared/core/activity-logger.php';
-admin_log_activity($conn, 'faculty', 'Created faculty account for ' . $fullname);
+admin_log_activity($conn, 'faculty', 'Created faculty account for ' . $fullname . ($class_meetings > 0 ? ' (' . $class_meetings . ' weekly class meetings added to their schedule)' : ''));
 http_response_code(201);
 echo json_encode([
     'status' => 'success',
     'faculty_id' => $faculty_id,
-    'message' => 'Faculty account created successfully.'
+    'class_meetings' => $class_meetings,
+    'message' => 'Faculty account created successfully.' . ($class_meetings > 0 ? ' ' . $class_meetings . ' weekly class meetings were added to their class schedule.' : '')
 ]);
 exit;

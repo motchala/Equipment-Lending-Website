@@ -398,7 +398,7 @@
                 'accept' => '.pdf,.xlsx,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                 'stats'  => ['Faculty', 'Newly hired', 'Rows in file'],
                 'cols'   => ['#', 'Faculty ID', 'Name', 'Programs'],
-                'what'   => 'Used to confirm a faculty member when their account is created.',
+                'what'   => 'Used to confirm a faculty member when their account is created. A Faculty Rooms workbook also brings in each faculty member\'s weekly classes and rooms, and a Room Timetables workbook adds the classes that have no instructor yet. Both block those rooms for reservations.',
                 'replace' => 'Remove everyone listed first',
             ],
             'rooms' => [

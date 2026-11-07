@@ -131,6 +131,11 @@
         return 'fcs-t-' + (TYPE[String(purpose).trim().toLowerCase()] || 'other');
     }
 
+    /* A weekly class meeting (from the imported timetable) has its own colour; bookings keep theirs by purpose. */
+    function itemClass(it) {
+        return it.kind === 'class' ? 'fcs-t-class' : typeClass(it.purpose);
+    }
+
     /* Server clock moved forward by the time since the response arrived */
     function nowMinutes() {
         if (!data) return 0;
@@ -201,16 +206,19 @@
         var it = l.it;
         var top = PAD + (l.s - win.start) / 60 * HOUR_H;
         var h = Math.max((l.e - l.s) / 60 * HOUR_H, 24);
-        var cls = 'fcs-ev ' + typeClass(it.purpose) +
+        var isClass = it.kind === 'class';
+        var cls = 'fcs-ev ' + itemClass(it) +
             (l.lanes > 1 ? ' is-lane' : '') +
             (h < 60 ? ' is-short' : '') + (h < 44 ? ' is-tiny' : '') +
             (isPast(date, l.e) ? ' is-past' : '') +
             (it.student_name ? ' is-student' : '');
         var where = whereOf(it);
-        var student = it.student_name
-            ? 'Student: ' + it.student_name + (it.student_id ? ' (' + it.student_id + ')' : '')
-            : '';
-        var text = it.purpose + ', ' + range(l.s, l.e) + ', ' + duration(it.minutes) +
+        var student = isClass
+            ? (it.subject || '') + (it.component === 'Laboratory' ? ' (Lab)' : '')
+            : (it.student_name
+                ? 'Student: ' + it.student_name + (it.student_id ? ' (' + it.student_id + ')' : '')
+                : '');
+        var text = it.purpose + (isClass ? ' (class)' : '') + ', ' + range(l.s, l.e) + ', ' + duration(it.minutes) +
             (student ? ', ' + student : '') + (where ? ', ' + where : '');
         var style = 'top:' + top + 'px;height:' + (h - 2) + 'px;' +
             'left:calc(' + (l.lane * 100 / l.lanes) + '% + 3px);' +
@@ -224,7 +232,7 @@
             '<span class="fcs-ev-dur">' + esc(duration(it.minutes)) + '</span>' +
             '</span>' +
             '<span class="fcs-ev-time">' + esc(range(l.s, l.e)) + '</span>' +
-            (student ? '<span class="fcs-ev-student">' + icon('school') + esc(student) + '</span>' : '') +
+            (student ? '<span class="fcs-ev-student">' + icon(isClass ? 'menu_book' : 'school') + esc(student) + '</span>' : '') +
             (where ? '<span class="fcs-ev-where">' + icon('location_on') + '<span>' + esc(whereShort(it)) + '</span></span>' : '') +
             '</div>';
     }
@@ -285,10 +293,11 @@
             } else {
                 day.items.forEach(function (it) {
                     var s = toMin(it.start), e = toMin(it.end), where = whereOf(it);
-                    out += '<div class="fcs-ag-ev ' + typeClass(it.purpose) + (isPast(day.date, e) ? ' is-past' : '') + '">' +
+                    out += '<div class="fcs-ag-ev ' + itemClass(it) + (isPast(day.date, e) ? ' is-past' : '') + '">' +
                         '<span class="fcs-ev-top"><span class="fcs-ev-title">' + esc(it.purpose) + '</span>' +
                         '<span class="fcs-ev-dur">' + esc(duration(it.minutes)) + '</span></span>' +
                         '<span class="fcs-ev-time">' + esc(range(s, e)) + '</span>' +
+                        (it.kind === 'class' && it.subject ? '<span class="fcs-ev-student">' + icon('menu_book') + esc(it.subject + (it.component === 'Laboratory' ? ' (Lab)' : '')) + '</span>' : '') +
                         (where ? '<span class="fcs-ev-where">' + icon('location_on') + '<span>' + esc(where) + '</span></span>' : '') +
                         '</div>';
                 });
@@ -316,13 +325,16 @@
         var where = whereShort({ room: c.room, building: c.building });
         var count = c.sessions + (c.sessions === 1 ? ' session' : ' sessions');
         var state = c.next_date ? 'Next: ' + shortDate(c.next_date) : 'Done';
-        var tip = c.purpose + ', ' + DOW[c.dow - 1] + ' ' + range(s, e) + ', ' + [c.room, c.building].filter(Boolean).join(', ') +
+        var isClass = c.kind === 'class';
+        var subject = isClass && c.subject ? c.subject + (c.component === 'Laboratory' ? ' (Lab)' : '') : '';
+        var tip = c.purpose + (isClass ? ' (class)' : '') + ', ' + DOW[c.dow - 1] + ' ' + range(s, e) + (subject ? ', ' + subject : '') + ', ' + [c.room, c.building].filter(Boolean).join(', ') +
             ', ' + count + (c.student ? ', includes student bookings' : '');
-        return '<button type="button" class="fcs-cls ' + typeClass(c.purpose) + (inWeek ? ' is-week' : '') +
+        return '<button type="button" class="fcs-cls ' + itemClass(c) + (inWeek ? ' is-week' : '') +
             (c.next_date ? '' : ' is-done') + '" data-date="' + esc(target) + '" title="' + esc(tip) + '">' +
             '<span class="fcs-cls-top"><span class="fcs-cls-title">' + esc(c.purpose) + '</span>' +
             '<span class="fcs-cls-dur">' + esc(duration(c.minutes)) + '</span></span>' +
             '<span class="fcs-cls-when">' + esc(DOW[c.dow - 1] || '') + ' &middot; ' + esc(range(s, e)) + '</span>' +
+            (subject ? '<span class="fcs-cls-where">' + icon('menu_book') + '<span>' + esc(subject) + '</span></span>' : '') +
             (where ? '<span class="fcs-cls-where">' + icon('location_on') + '<span>' + esc(where) + '</span></span>' : '') +
             '<span class="fcs-cls-meta">' + esc(count) + ' &middot; ' + esc(state) + '</span>' +
             '</button>';
@@ -333,7 +345,7 @@
         var sem = data.semester, list = data.classes || [];
         var items = list.length
             ? list.map(function (c) { return classHtml(c, data); }).join('')
-            : '<p class="fcs-list-none">No approved bookings yet this semester.</p>';
+            : '<p class="fcs-list-none">No classes or approved bookings yet this semester.</p>';
         var foot = list.length
             ? '<p class="fcs-list-foot">' + sem.classes + (sem.classes === 1 ? ' class' : ' classes') + ' &middot; ' +
               sem.sessions + (sem.sessions === 1 ? ' session' : ' sessions') + '</p>'
