@@ -511,6 +511,39 @@ INSERT INTO `tbl_inventory` (`item_id`, `campus_id`, `item_name`, `category`, `q
 -- --------------------------------------------------------
 
 --
+--
+-- Table structure for table `tbl_equipment_categories`
+--
+
+CREATE TABLE `tbl_equipment_categories` (
+  `category_id` int(11) NOT NULL AUTO_INCREMENT,
+  `campus_id`   int(11) NOT NULL DEFAULT 1,
+  `name`        varchar(100) NOT NULL,
+  `sort_order`  int(11) NOT NULL DEFAULT 0,
+  `created_at`  datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`category_id`),
+  UNIQUE KEY `uq_campus_category` (`campus_id`, `name`),
+  KEY `fk_cat_campus` (`campus_id`),
+  CONSTRAINT `fk_cat_campus` FOREIGN KEY (`campus_id`) REFERENCES `tbl_campuses` (`campus_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+INSERT INTO `tbl_equipment_categories` (`campus_id`, `name`, `sort_order`) VALUES
+(1, 'Electronics and Accessories', 1),
+(1, 'Audio/Visual',                2),
+(1, 'Power',                       3),
+(1, 'Others',                      99),
+(2, 'Audio/Visual',                1),
+(2, 'Cables & Connectors',         2),
+(2, 'Computing',                   3),
+(2, 'Lab Equipment',               4),
+(2, 'Networking',                  5),
+(2, 'Power',                       6),
+(2, 'Test & Measurement',          7),
+(2, 'Tools',                       8),
+(2, 'Others',                      99);
+
+-- --------------------------------------------------------
+
 -- Table structure for table `tbl_ip_login_attempts`
 --
 

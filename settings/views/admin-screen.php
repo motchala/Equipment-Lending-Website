@@ -18,6 +18,7 @@
         <button class="rq-sub-tab" data-sett-panel="sett-prefs">Preferences</button>
         <?php if ($is_super_admin): ?>
             <button class="rq-sub-tab" data-sett-panel="sett-rules">Borrowing Rules</button>
+            <button class="rq-sub-tab" data-sett-panel="sett-equipment">Equipment</button>
             <button class="rq-sub-tab" data-sett-panel="sett-imports">Imports</button>
         <?php endif; ?>
         <button class="rq-sub-tab" data-sett-panel="sett-help">Help &amp; FAQ</button>
@@ -705,6 +706,51 @@
 
             </div>
         </div><!-- /sett-imports -->
+
+        <!-- ── EQUIPMENT SETTINGS (Super Admin only) ─────────────────── -->
+        <div class="rq-sub-panel" id="sett-equipment">
+            <div class="ps-card" style="max-width:720px;">
+                <div class="ps-card-header">
+                    <h3><span class="material-symbols-outlined">category</span> Equipment Categories</h3>
+                </div>
+                <div class="ps-card-body">
+                    <p style="margin-bottom:16px;font-size:.875rem;color:var(--text-light);">
+                        Categories are shown when adding or editing equipment. Each campus has its own list.
+                        Items already assigned to a category are not affected when you add or delete categories here.
+                    </p>
+
+                    <!-- Campus selector -->
+                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:20px;">
+                        <label for="catMgrCampus" style="font-size:.875rem;font-weight:600;white-space:nowrap;">Campus</label>
+                        <select id="catMgrCampus" class="form-control-custom" style="width:220px;">
+                            <?php
+                            $cat_campuses = $conn->query("SELECT campus_id, campus_name FROM tbl_campuses ORDER BY campus_id ASC");
+                            while ($cat_campuses && ($cc = $cat_campuses->fetch_assoc())):
+                            ?>
+                                <option value="<?php echo (int)$cc['campus_id']; ?>"><?php echo htmlspecialchars($cc['campus_name']); ?></option>
+                            <?php endwhile; ?>
+                        </select>
+                    </div>
+
+                    <!-- Category list -->
+                    <div id="catMgrList" style="margin-bottom:20px;min-height:40px;">
+                        <span style="color:var(--text-light);font-size:.875rem;">Loading…</span>
+                    </div>
+
+                    <!-- Add new category -->
+                    <div style="display:flex;gap:8px;align-items:flex-start;">
+                        <input type="text" id="catMgrInput" class="form-control-custom"
+                            placeholder="New category name" maxlength="100"
+                            style="flex:1;" autocomplete="off">
+                        <button type="button" class="ps-btn ps-btn--primary" id="catMgrAdd">
+                            <span class="material-symbols-outlined">add</span> Add
+                        </button>
+                    </div>
+                    <p id="catMgrMsg" style="margin-top:8px;font-size:.8rem;display:none;"></p>
+                </div>
+            </div>
+        </div><!-- /sett-equipment -->
+
     <?php endif; ?>
 
     <!-- ── HELP & FAQ (was the standalone Help Center overlay) ─── -->

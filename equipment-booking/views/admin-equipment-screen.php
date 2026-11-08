@@ -214,15 +214,18 @@
                                                 class="form-control-custom inv-category-select" required>
                                                 <option value="">Select category...</option>
                                                 <?php
-                                                // Categories are per-campus. JS dynamically filters the list
-                                                // based on the campus selected above. PHP emits all options
-                                                // grouped so JS can show/hide without a round trip.
-                                                $admin_cats = [
-                                                    1 => ['General Equipment', 'Others'],  // PUP Main
-                                                    2 => ['Audio/Visual', 'Cables & Connectors', 'ChemLab', 'Computing', 'Lab Equipment', 'Networking', 'Power', 'Tools', 'Others'],  // CITE
-                                                ];
-                                                $edit_campus_id = (int)($edit_item['campus_id'] ?? 1);
-                                                foreach ($admin_cats as $cid => $cats) {
+                                                // Categories loaded from tbl_equipment_categories, grouped by campus.
+                                                // Super Admin manages this list in Settings → Equipment Categories.
+                                                $cats_q = $conn->query(
+                                                    "SELECT ec.category_id, ec.campus_id, ec.name
+                                                       FROM tbl_equipment_categories ec
+                                                      ORDER BY ec.campus_id ASC, ec.sort_order ASC, ec.name ASC"
+                                                );
+                                                $cats_by_campus = [];
+                                                while ($cats_q && ($cr2 = $cats_q->fetch_assoc())) {
+                                                    $cats_by_campus[(int)$cr2['campus_id']][] = $cr2['name'];
+                                                }
+                                                foreach ($cats_by_campus as $cid => $cats) {
                                                     echo '<optgroup label="" data-campus-id="' . $cid . '">';
                                                     foreach ($cats as $c) {
                                                         $sel = ($edit_item && $edit_item['category'] === $c) ? 'selected' : '';

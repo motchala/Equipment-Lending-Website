@@ -6445,4 +6445,110 @@ function psSelectFmt(btn) {
         campusSel.addEventListener('change', syncCategoryOptions);
         syncCategoryOptions(); // run once on page load for the edit form
     }());
+
+        /* ── Equipment Category Manager (Settings → Equipment tab) ──────────── */
+    (function () {
+        var campusSel = document.getElementById('catMgrCampus');
+        var listEl    = document.getElementById('catMgrList');
+        var input     = document.getElementById('catMgrInput');
+        var addBtn    = document.getElementById('catMgrAdd');
+        var msgEl     = document.getElementById('catMgrMsg');
+        if (!campusSel || !listEl) return;
+
+        var csrfToken = (function () {
+            var m = document.querySelector('meta[name="csrf-token"]');
+            if (m) return m.content;
+            var i = document.querySelector('input[name="csrf_token"]');
+            return i ? i.value : '';
+        }());
+
+        function showMsg(text, isError) {
+            if (!msgEl) return;
+            msgEl.textContent = text;
+            msgEl.style.color = isError ? 'var(--color-error, #c62828)' : 'var(--color-success, #2e7d32)';
+            msgEl.style.display = '';
+            setTimeout(function () { msgEl.style.display = 'none'; }, 4000);
+        }
+
+        function loadCategories() {
+            var campusId = campusSel.value;
+            listEl.innerHTML = '<span style="color:var(--text-light);font-size:.875rem;">Loading…</span>';
+            fetch('equipment-booking/api/manage-categories.php?action=list&campus_id=' + encodeURIComponent(campusId), {
+                credentials: 'same-origin'
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (!data.categories || !data.categories.length) {
+                    listEl.innerHTML = '<span style="color:var(--text-light);font-size:.875rem;">No categories yet. Add one below.</span>';
+                    return;
+                }
+                listEl.innerHTML = '';
+                var ul = document.createElement('ul');
+                ul.style.cssText = 'list-style:none;padding:0;margin:0;display:flex;flex-wrap:wrap;gap:8px;';
+                data.categories.forEach(function (cat) {
+                    var li = document.createElement('li');
+                    li.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:5px 10px 5px 14px;background:var(--color-surface-container,#f5f0f0);border-radius:20px;font-size:.82rem;';
+                    li.innerHTML = '<span>' + cat.name.replace(/&/g,'&').replace(/</g,'<').replace(/>/g,'>') + '</span>'
+                        + '<button type="button" title="Delete this category" data-cat-id="' + cat.category_id + '" style="background:none;border:none;cursor:pointer;padding:0;line-height:1;color:var(--text-light);">'
+                        + '<span class="material-symbols-outlined" style="font-size:15px;">close</span></button>';
+                    ul.appendChild(li);
+                });
+                listEl.appendChild(ul);
+
+                listEl.querySelectorAll('[data-cat-id]').forEach(function (btn) {
+                    btn.addEventListener('click', function () {
+                        if (!confirm('Delete this category? Items already assigned to it are not affected.')) return;
+                        var fd = new FormData();
+                        fd.append('action', 'delete');
+                        fd.append('csrf_token', csrfToken);
+                        fd.append('category_id', btn.dataset.catId);
+                        fetch('equipment-booking/api/manage-categories.php', {
+                            method: 'POST', credentials: 'same-origin', body: fd
+                        })
+                        .then(function (r) { return r.json(); })
+                        .then(function (d) {
+                            if (d.status === 'success') { loadCategories(); showMsg('Deleted.', false); }
+                            else showMsg(d.error || 'Could not delete.', true);
+                        });
+                    });
+                });
+            })
+            .catch(function () { listEl.innerHTML = '<span style="color:var(--color-error,#c62828);font-size:.875rem;">Could not load categories.</span>'; });
+        }
+
+        campusSel.addEventListener('change', loadCategories);
+        loadCategories();
+
+        if (addBtn) {
+            addBtn.addEventListener('click', function () {
+                var name = input ? input.value.trim() : '';
+                if (!name) { showMsg('Enter a category name.', true); return; }
+                var fd = new FormData();
+                fd.append('action', 'add');
+                fd.append('csrf_token', csrfToken);
+                fd.append('campus_id', campusSel.value);
+                fd.append('name', name);
+                fetch('equipment-booking/api/manage-categories.php', {
+                    method: 'POST', credentials: 'same-origin', body: fd
+                })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (d.status === 'success') {
+                        if (input) input.value = '';
+                        loadCategories();
+                        showMsg('Category added.', false);
+                    } else {
+                        showMsg(d.error || 'Could not add.', true);
+                    }
+                });
+            });
+
+            if (input) {
+                input.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter') { e.preventDefault(); addBtn.click(); }
+                });
+            }
+        }
+    }());
+
 })();
