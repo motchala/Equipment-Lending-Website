@@ -195,15 +195,40 @@
                                         </div>
 
                                         <div class="form-group">
+                                            <label for="inv-campus">Campus <span class="req-star">*</span></label>
+                                            <select id="inv-campus" name="campus_id"
+                                                class="form-control-custom" required>
+                                                <?php
+                                                $campuses_q = $conn->query("SELECT campus_id, campus_name FROM tbl_campuses ORDER BY campus_id ASC");
+                                                while ($campuses_q && ($cr = $campuses_q->fetch_assoc())):
+                                                    $sel = ($edit_item && (int)($edit_item['campus_id'] ?? 1) === (int)$cr['campus_id']) ? 'selected' : '';
+                                                ?>
+                                                    <option value="<?php echo (int)$cr['campus_id']; ?>" <?php echo $sel; ?>><?php echo htmlspecialchars($cr['campus_name']); ?></option>
+                                                <?php endwhile; ?>
+                                            </select>
+                                        </div>
+
+                                        <div class="form-group">
                                             <label for="inv-category">Category <span class="req-star">*</span></label>
                                             <select id="inv-category" name="category"
                                                 class="form-control-custom inv-category-select" required>
                                                 <option value="">Select category...</option>
                                                 <?php
-                                                $cats = ['Audio/Visual', 'Cables & Connectors', 'Computing', 'Lab Equipment', 'Networking', 'Power', 'Tools', 'Others'];
-                                                foreach ($cats as $c) {
-                                                    $sel = ($edit_item && $edit_item['category'] === $c) ? 'selected' : '';
-                                                    echo '<option value="' . htmlspecialchars($c) . '" ' . $sel . '>' . htmlspecialchars($c) . '</option>';
+                                                // Categories are per-campus. JS dynamically filters the list
+                                                // based on the campus selected above. PHP emits all options
+                                                // grouped so JS can show/hide without a round trip.
+                                                $admin_cats = [
+                                                    1 => ['General Equipment', 'Others'],  // PUP Main
+                                                    2 => ['Audio/Visual', 'Cables & Connectors', 'ChemLab', 'Computing', 'Lab Equipment', 'Networking', 'Power', 'Tools', 'Others'],  // CITE
+                                                ];
+                                                $edit_campus_id = (int)($edit_item['campus_id'] ?? 1);
+                                                foreach ($admin_cats as $cid => $cats) {
+                                                    echo '<optgroup label="" data-campus-id="' . $cid . '">';
+                                                    foreach ($cats as $c) {
+                                                        $sel = ($edit_item && $edit_item['category'] === $c) ? 'selected' : '';
+                                                        echo '<option value="' . htmlspecialchars($c) . '" data-campus-id="' . $cid . '" ' . $sel . '>' . htmlspecialchars($c) . '</option>';
+                                                    }
+                                                    echo '</optgroup>';
                                                 }
                                                 ?>
                                             </select>

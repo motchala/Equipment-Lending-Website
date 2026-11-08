@@ -1,7 +1,13 @@
 <?php
 // ── Inventory & Requests ───────────────────────────────────────────────────
-$category_result  = mysqli_query($conn, "SELECT DISTINCT category FROM tbl_inventory WHERE is_archived = 0 ORDER BY category ASC");
-$inventory_result = mysqli_query($conn, "SELECT * FROM tbl_inventory WHERE is_archived = 0 ORDER BY item_name ASC");
+// Campus list for the equipment browser tabs
+$campuses_result = mysqli_query($conn, "SELECT campus_id, campus_name FROM tbl_campuses ORDER BY campus_id ASC");
+$campuses_list   = [];
+while ($row = mysqli_fetch_assoc($campuses_result)) $campuses_list[] = $row;
+
+// Category list scoped to the selected campus tab (JS switches which are shown; PHP loads all)
+$category_result  = mysqli_query($conn, "SELECT DISTINCT i.category, i.campus_id FROM tbl_inventory i WHERE i.is_archived = 0 ORDER BY i.campus_id ASC, i.category ASC");
+$inventory_result = mysqli_query($conn, "SELECT i.*, c.campus_name FROM tbl_inventory i LEFT JOIN tbl_campuses c ON c.campus_id = i.campus_id WHERE i.is_archived = 0 ORDER BY i.item_name ASC");
 $uid_safe = mysqli_real_escape_string($conn, $_SESSION['faculty_id']);
 
 // ── Stats ──────────────────────────────────────────────────────────────────

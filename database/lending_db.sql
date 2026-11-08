@@ -484,6 +484,7 @@ INSERT INTO `tbl_faculty_registry_files` (`id`, `original_name`, `stored_name`, 
 
 CREATE TABLE `tbl_inventory` (
   `item_id` int(11) NOT NULL,
+  `campus_id` int(11) NOT NULL DEFAULT 1,
   `item_name` varchar(255) NOT NULL,
   `category` varchar(100) NOT NULL,
   `quantity` int(11) NOT NULL,
@@ -499,13 +500,13 @@ CREATE TABLE `tbl_inventory` (
 -- Dumping data for table `tbl_inventory`
 --
 
-INSERT INTO `tbl_inventory` (`item_id`, `item_name`, `category`, `quantity`, `condition`, `description`, `image_path`, `created_at`, `is_archived`, `is_high_value`) VALUES
-(8, 'HDMI Cable', 'Electronics and Accessories', 3, 'Good', NULL, 'uploads/1768426958_item_hdmicable.webp', '2026-01-15 05:42:38', 0, 0),
-(9, 'AC Remote', 'Electronics and Accessories', 0, 'Good', NULL, 'uploads/1768427004_item_remoteAc.jpg', '2026-01-15 05:43:24', 0, 0),
-(10, 'Extension', 'Electronics and Accessories', 6, 'Good', NULL, 'uploads/1768427033_item_extension.webp', '2026-01-15 05:43:53', 0, 0),
-(30, 'Table', 'Others', 4, 'Good', NULL, 'uploads/1790901156_item_table2.jpg', '2026-10-02 08:32:36', 0, 0),
-(31, 'Projector', 'Audio/Visual', 2, 'Good', NULL, 'uploads/1790901270_images.jpg', '2026-10-02 08:34:30', 0, 0),
-(32, 'Double A Batter', 'Power', 15, 'Fair', NULL, 'uploads/1790910199_batteryAA.jpg', '2026-10-02 11:03:19', 0, 0);
+INSERT INTO `tbl_inventory` (`item_id`, `campus_id`, `item_name`, `category`, `quantity`, `condition`, `description`, `image_path`, `created_at`, `is_archived`, `is_high_value`) VALUES
+(8, 1, 'HDMI Cable', 'Electronics and Accessories', 3, 'Good', NULL, 'uploads/1768426958_item_hdmicable.webp', '2026-01-15 05:42:38', 0, 0),
+(9, 1, 'AC Remote', 'Electronics and Accessories', 0, 'Good', NULL, 'uploads/1768427004_item_remoteAc.jpg', '2026-01-15 05:43:24', 0, 0),
+(10, 1, 'Extension', 'Electronics and Accessories', 6, 'Good', NULL, 'uploads/1768427033_item_extension.webp', '2026-01-15 05:43:53', 0, 0),
+(30, 1, 'Table', 'Others', 4, 'Good', NULL, 'uploads/1790901156_item_table2.jpg', '2026-10-02 08:32:36', 0, 0),
+(31, 1, 'Projector', 'Audio/Visual', 2, 'Good', NULL, 'uploads/1790901270_images.jpg', '2026-10-02 08:34:30', 0, 0),
+(32, 1, 'Double A Batter', 'Power', 15, 'Fair', NULL, 'uploads/1790910199_batteryAA.jpg', '2026-10-02 11:03:19', 0, 0);
 
 -- --------------------------------------------------------
 
@@ -1081,7 +1082,9 @@ ALTER TABLE `tbl_faculty_registry_files`
 -- Indexes for table `tbl_inventory`
 --
 ALTER TABLE `tbl_inventory`
-  ADD PRIMARY KEY (`item_id`);
+  ADD PRIMARY KEY (`item_id`),
+  ADD KEY `fk_inventory_campus` (`campus_id`);
+
 
 --
 -- Indexes for table `tbl_ip_login_attempts`
@@ -1349,6 +1352,9 @@ ALTER TABLE `tbl_room_waitlist`
 --
 ALTER TABLE `tbl_buildings`
   ADD CONSTRAINT `fk_buildings_campus` FOREIGN KEY (`campus_id`) REFERENCES `tbl_campuses` (`campus_id`);
+
+ALTER TABLE `tbl_inventory`
+  ADD CONSTRAINT `fk_inventory_campus` FOREIGN KEY (`campus_id`) REFERENCES `tbl_campuses` (`campus_id`);
 
 --
 -- Constraints for table `tbl_rooms`

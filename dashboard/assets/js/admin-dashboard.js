@@ -6420,4 +6420,29 @@ function psSelectFmt(btn) {
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
     else init();
+
+    /* ── Admin inventory form: filter category options by selected campus ── */
+    (function () {
+        var campusSel   = document.getElementById('inv-campus');
+        var categorySel = document.getElementById('inv-category');
+        if (!campusSel || !categorySel) return;
+
+        function syncCategoryOptions() {
+            var cid = campusSel.value;
+            var firstVisible = null;
+            Array.from(categorySel.querySelectorAll('optgroup')).forEach(function (grp) {
+                var show = !cid || String(grp.dataset.campusId) === cid;
+                grp.hidden = !show;
+                if (show && !firstVisible) firstVisible = grp.querySelector('option');
+            });
+            // If current selection belongs to a hidden group, reset
+            var selected = categorySel.querySelector('option:checked');
+            if (selected && selected.value && selected.dataset.campusId && String(selected.dataset.campusId) !== cid) {
+                categorySel.value = '';
+            }
+        }
+
+        campusSel.addEventListener('change', syncCategoryOptions);
+        syncCategoryOptions(); // run once on page load for the edit form
+    }());
 })();

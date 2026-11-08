@@ -443,13 +443,17 @@
 
     function getMatchingEquipment() {
         const searchEl = document.getElementById('equipmentSearch');
-        const catEl = document.getElementById('categoryFilter');
-        const search = (searchEl ? searchEl.value : '').toLowerCase();
+        const catEl    = document.getElementById('categoryFilter');
+        const search   = (searchEl ? searchEl.value : '').toLowerCase();
         const category = (catEl ? catEl.value : '').toLowerCase();
+        const activeCampusBtn = document.querySelector('.eq-campus-tab.active');
+        const campus = activeCampusBtn ? (activeCampusBtn.dataset.campus || '') : '';
+
         return Array.from(document.querySelectorAll('.item-node')).filter(item => {
-            const nameMatch = (item.dataset.name || '').includes(search);
-            const catMatch = !category || item.dataset.category === category;
-            return nameMatch && catMatch;
+            const nameMatch   = (item.dataset.name || '').includes(search);
+            const catMatch    = !category || item.dataset.category === category;
+            const campusMatch = !campus   || String(item.dataset.campus) === campus;
+            return nameMatch && catMatch && campusMatch;
         });
     }
 
@@ -461,17 +465,39 @@
         if (eqCurrentPage < 1) eqCurrentPage = 1;
 
         // Hide everything, then reveal only this page's slice
-        document.querySelectorAll('.item-node').forEach(el => { el.style.display = 'none'; });
-        const start = (eqCurrentPage - 1) * EQ_PER_PAGE;
-        matches.slice(start, start + EQ_PER_PAGE).forEach(el => { el.style.display = ''; });
+        var grid = document.getElementById('equipmentList');
+        document.querySelectorAll('.item-node').forEach(function (el) { el.style.display = 'none'; });
+        // Force reflow so the browser paints the hidden state before revealing matches
+        if (grid) void grid.offsetHeight;
+        var start = (eqCurrentPage - 1) * EQ_PER_PAGE;
+        matches.slice(start, start + EQ_PER_PAGE).forEach(function (el) { el.style.display = ''; });
 
         // Count chip reflects the filtered total, not the page size
         const chip = document.getElementById('equipCountChip');
         if (chip) chip.textContent = total + (total === 1 ? ' item' : ' items');
 
-        // Empty state
+        // Empty state — message depends on context
         const noRes = document.getElementById('equipNoResults');
-        if (noRes) noRes.style.display = total === 0 ? '' : 'none';
+        if (noRes) {
+            noRes.style.display = total === 0 ? '' : 'none';
+            if (total === 0) {
+                const activeCampusTabBtn = document.querySelector('.eq-campus-tab.active');
+                const activeCampus = activeCampusTabBtn ? (activeCampusTabBtn.dataset.campus || '') : '';
+                const searchEl2 = document.getElementById('equipmentSearch');
+                const catEl2    = document.getElementById('categoryFilter');
+                const hasSearch = searchEl2 && searchEl2.value.trim() !== '';
+                const hasCat    = catEl2 && catEl2.value !== '';
+                const msgEl  = document.getElementById('equipNoResultsMsg');
+                const iconEl = document.getElementById('equipNoResultsIcon');
+                if (activeCampus && !hasSearch && !hasCat) {
+                    if (msgEl)  msgEl.textContent  = 'No equipment available in this campus yet.';
+                    if (iconEl) iconEl.textContent = 'location_off';
+                } else {
+                    if (msgEl)  msgEl.textContent  = 'No equipment matches your search.';
+                    if (iconEl) iconEl.textContent = 'search_off';
+                }
+            }
+        }
 
         // Pagination bar — hidden when everything fits on one page
         const pager = document.getElementById('equipPagination');
@@ -3357,6 +3383,56 @@
     document.querySelectorAll('.notif-tab').forEach(btn => {
         btn.addEventListener('click', function () {
             filterNotifs(this.dataset.notifFilter);
+        });
+    });
+
+    /* ── Equipment campus tabs ────────────────────────────────────────── */
+    document.querySelectorAll('.eq-campus-tab').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            document.querySelectorAll('.eq-campus-tab').forEach(function (b) {
+                b.classList.remove('active');
+                b.setAttribute('aria-selected', 'false');
+            });
+            btn.classList.add('active');
+            btn.setAttribute('aria-selected', 'true');
+
+            // Narrow the category dropdown to only show this campus's options
+            const campus = btn.dataset.campus || '';
+
+            // Hide featured cards that don't belong to the selected campus
+            var featHero = document.querySelector('.feat-hero[data-campus]');
+            var featSec  = document.querySelector('.feat-secondary[data-campus]');
+            var featSection = document.getElementById('featuredSection');
+            if (featSection) {
+                featSection.style.display = '';
+                if (featHero) featHero.style.display = '';
+                if (featSec)  featSec.style.display  = '';
+
+                if (!campus) {
+                    featSection.classList.remove('eq-campus-hidden');
+                    if (featHero) featHero.classList.remove('eq-campus-hidden');
+                    if (featSec)  featSec.classList.remove('eq-campus-hidden');
+                } else {
+                    var heroMatch = featHero && String(featHero.dataset.campus) === campus;
+                    var secMatch  = featSec  && String(featSec.dataset.campus)  === campus;
+                    if (featHero) featHero.classList.toggle('eq-campus-hidden', !heroMatch);
+                    if (featSec)  featSec.classList.toggle('eq-campus-hidden', !secMatch);
+                    featSection.classList.toggle('eq-campus-hidden', !heroMatch && !secMatch);
+                }
+            }
+
+            const catEl  = document.getElementById('categoryFilter');
+            if (catEl) {
+                catEl.value = ''; // reset selection when switching campus
+                Array.from(catEl.options).forEach(function (opt) {
+                    if (!opt.value) { opt.hidden = false; return; } // "All Categories"
+                    opt.hidden = campus !== '' && String(opt.dataset.campusId || '') !== campus;
+                });
+                Array.from(catEl.querySelectorAll('optgroup')).forEach(function (grp) {
+                    grp.hidden = campus !== '' && String(grp.dataset.campusId || '') !== campus;
+                });
+            }
+            filterEquipment();
         });
     });
 

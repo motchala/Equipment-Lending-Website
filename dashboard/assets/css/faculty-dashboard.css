@@ -950,6 +950,65 @@ body {
     box-shadow: var(--shadow-md);
 }
 
+
+/* Campus filter: JS sets display:none inline on hidden item cards.
+   These rules guarantee that inline style wins over any !important display rules
+   elsewhere in the stylesheet by using attribute selector specificity. */
+#panel-lending .eq-item-card[style*="display: none"],
+#panel-lending .item-node[style*="display: none"],
+#panel-lending .eq-item-card[style*="display:none"],
+#panel-lending .item-node[style*="display:none"] {
+    display: none !important;
+}
+
+/* ── Campus filter tabs ─────────────────────────────────────────────────── */
+.eq-campus-tabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 0 16px 12px;
+}
+
+.eq-campus-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1.5px solid var(--color-outline-variant);
+    background: transparent;
+    color: var(--color-on-surface-variant);
+    font-size: .8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background .15s, border-color .15s, color .15s;
+}
+
+.eq-campus-tab .material-symbols-outlined {
+    font-size: 15px;
+}
+
+.eq-campus-tab:hover {
+    background: var(--color-surface-container-high);
+    border-color: var(--color-outline);
+}
+
+.eq-campus-tab.active {
+    background: var(--accent-maroon, #600302);
+    border-color: var(--accent-maroon, #600302);
+    color: #fff;
+}
+
+#panel-lending #featuredSection.eq-campus-hidden {
+    display: none !important;
+}
+#panel-lending #featuredSection.eq-campus-hidden .feat-hero,
+#panel-lending #featuredSection.eq-campus-hidden .feat-secondary {
+    display: none !important;
+}
+
+
+
 .catalog-filters {
     display: flex;
     gap: 12px;
@@ -9840,7 +9899,7 @@ html body #panel-lending .item-node:has(.stock-unavail) :is(img, .eq-item-img-pl
 /* search and category filter on the Equipment page */
 html body #panel-lending .catalog-search-wrap:not(:focus-within),
 html body #panel-lending .catalog-filter-select:not(:focus) {
-    border-color: var(--control-border) !important;
+    border-color: var(--color-outline-variant) !important;
 }
 
 html body #panel-lending .catalog-search-wrap:focus-within,

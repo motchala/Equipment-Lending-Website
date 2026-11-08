@@ -48,7 +48,7 @@
                     $featured_sec  = $featured_avail[1] ?? null;
                     if ($featured_hero || $featured_sec):
                     ?>
-                        <div class="featured-section">
+                        <div class="featured-section" id="featuredSection">
                             <div class="featured-label">
                                 <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1">local_fire_department</span>
                                 Most Borrowed
@@ -56,7 +56,7 @@
                             <div class="featured-grid">
                                 <!-- Hero Featured -->
                                 <?php if ($featured_hero): ?>
-                                    <div class="feat-hero">
+                                    <div class="feat-hero" data-campus="<?php echo (int)($featured_hero['campus_id'] ?? 1); ?>">
                                         <div class="feat-hero-body">
                                             <div>
                                                 <div class="feat-hero-meta">
@@ -104,7 +104,7 @@
 
                                 <!-- Secondary Featured -->
                                 <?php if ($featured_sec): ?>
-                                    <div class="feat-secondary">
+                                    <div class="feat-secondary" data-campus="<?php echo (int)($featured_sec['campus_id'] ?? 1); ?>">
                                         <div class="feat-secondary-img" style="position:relative;">
                                             <?php if (!empty($featured_sec['image_path'])): ?>
                                                 <img src="<?php echo $root_url . htmlspecialchars($featured_sec['image_path']); ?>"
@@ -160,6 +160,20 @@
                                 <?php echo count($all_items); ?> items
                             </span>
                         </div>
+
+                        <!-- Campus tabs -->
+                        <div class="eq-campus-tabs" role="tablist" aria-label="Filter by campus">
+                            <button type="button" class="eq-campus-tab active" data-campus="" role="tab" aria-selected="true">
+                                <span class="material-symbols-outlined">layers</span> All Campuses
+                            </button>
+                            <?php foreach ($campuses_list as $campus): ?>
+                                <button type="button" class="eq-campus-tab" data-campus="<?php echo (int)$campus['campus_id']; ?>" role="tab" aria-selected="false">
+                                    <span class="material-symbols-outlined">location_city</span>
+                                    <?php echo htmlspecialchars($campus['campus_name']); ?>
+                                </button>
+                            <?php endforeach; ?>
+                        </div>
+
                         <div class="catalog-filters">
                             <div class="catalog-search-wrap">
                                 <span class="material-symbols-outlined">search</span>
@@ -171,13 +185,29 @@
                             <select id="categoryFilter" class="catalog-filter-select" aria-label="Filter by category">
                                 <option value="">All Categories</option>
                                 <?php
+                                // Build campus-scoped category options so JS can show/hide them when a campus tab is selected
+                                $cat_by_campus = [];
                                 mysqli_data_seek($category_result, 0);
                                 while ($cat = mysqli_fetch_assoc($category_result)) {
-                                    if (strtolower($cat['category']) === 'others') continue;
-                                    echo '<option value="' . htmlspecialchars($cat['category']) . '">' . htmlspecialchars($cat['category']) . '</option>';
+                                    $cat_by_campus[(int)$cat['campus_id']][] = $cat['category'];
                                 }
+                                // Emit one optgroup per campus so the JS filter can target data-campus-id
+                                foreach ($campuses_list as $campus):
+                                    $cid = (int)$campus['campus_id'];
+                                    $cats_for_campus = $cat_by_campus[$cid] ?? [];
+                                    if (empty($cats_for_campus)) continue;
+                                    echo '<optgroup label="' . htmlspecialchars($campus['campus_name']) . '" data-campus-id="' . $cid . '">';
+                                    foreach ($cats_for_campus as $cat_name) {
+                                        if (strtolower($cat_name) === 'others') continue;
+                                        echo '<option value="' . htmlspecialchars($cat_name) . '" data-campus-id="' . $cid . '">' . htmlspecialchars($cat_name) . '</option>';
+                                    }
+                                    // Others at the end of each campus group
+                                    if (in_array('Others', $cats_for_campus, true)) {
+                                        echo '<option value="Others" data-campus-id="' . $cid . '">Others</option>';
+                                    }
+                                    echo '</optgroup>';
+                                endforeach;
                                 ?>
-                                <option value="Others">Others</option>
                             </select>
                         </div>
                         <div class="eq-grid" id="equipmentList">
@@ -191,6 +221,7 @@
                                     <div class="eq-item-card item-node"
                                         data-name="<?php echo strtolower(htmlspecialchars($item['item_name'])); ?>"
                                         data-category="<?php echo strtolower(htmlspecialchars($item['category'])); ?>"
+                                        data-campus="<?php echo (int)$item['campus_id']; ?>"
                                         data-item-id="<?php echo (int)$item['item_id']; ?>">
                                         <div class="eq-item-img-wrap">
                                             <?php if (!empty($item['image_path'])): ?>
@@ -327,8 +358,8 @@
 
                         <!-- No results (search/filter matched nothing) -->
                         <div class="eq-empty" id="equipNoResults" style="display:none;">
-                            <span class="material-symbols-outlined">search_off</span>
-                            <p>No equipment matches your search.</p>
+                            <span class="material-symbols-outlined" id="equipNoResultsIcon">search_off</span>
+                            <p id="equipNoResultsMsg">No equipment matches your search.</p>
                         </div>
 
                         <!-- ── Pagination (12 items per page; featured cards above are not counted) ── -->
