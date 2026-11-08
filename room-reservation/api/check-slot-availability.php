@@ -194,6 +194,16 @@ $conflict_stmt->close();
 $conflicted_ids = array_column($conflict_rows, 'room_id');
 $conflicted_set = array_flip($conflicted_ids); // O(1) lookup
 
+// Rooms that have a class (imported timetable) in that slot are not free either
+try {
+    require_once __DIR__ . '/../core/class-schedule.php';
+    foreach (cs_rooms_with_conflict($conn, array_map('intval', $room_ids), $res_date, $start_time, $end_time) as $class_room_id) {
+        $conflicted_set[$class_room_id] = true;
+    }
+} catch (Throwable $e) {
+    error_log('[check-slot-availability] class check failed: ' . $e->getMessage());
+}
+
 // ── Filter out conflicted rooms ───────────────────────────────────────────────
 $available_rooms = array_values(array_filter($all_rooms, function ($r) use ($conflicted_set) {
     return !isset($conflicted_set[$r['room_id']]);

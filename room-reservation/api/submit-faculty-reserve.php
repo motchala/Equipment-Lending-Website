@@ -19,11 +19,11 @@
  * Rules (see core/faculty-room-quota.php):
  *   • Equipment never blocks a room — overdue / outstanding equipment is fine.
  *   • A faculty account may hold at most 2 active room reservations at once.
- *   • Only Organization Advisers may attach a document (JPG, PNG, PDF; 5 MB).
- *     It is optional. Attaching one files the reservation as 'adviser' and
- *     stores document_path so the arbitration engine can use it for priority.
- *     Without one the reservation is filed as 'personal'.
- *     (The posted submitted_as value is ignored — the server decides.)
+ *   • A request letter (JPG, PNG, PDF; 5 MB) may be attached to a reservation for a
+ *     LATER DATE. It is optional but recommended, and is stored in document_path for the
+ *     reviewing admin. A same-day reservation never needs one: an attached file is ignored
+ *     and the request is decided on availability alone.
+ *   • Every reservation from this endpoint is filed as 'personal'.
  */
 
 ini_set('display_errors', '0');
@@ -134,11 +134,15 @@ if (!$room_row) {
 }
 $room_name = $room_row['room_name'];
 
-// ── Optional supporting document (Organization Advisers only) ────────────
+// A reservation for a LATER DATE waits for an admin's decision and may carry a request letter;
+// a same-day one is decided on availability alone and needs no letter.
+$is_future_day = ps_room_is_future_date($res_date);
+
+// ── Optional request letter (later-date reservations only) ───────────────
 // Validated first so a bad file is rejected before anything is saved.
 $doc_tmp  = null;   // temp path of a validated upload
 $doc_ext  = '';
-if ($is_multipart && isset($_FILES['document']) && $_FILES['document']['error'] !== UPLOAD_ERR_NO_FILE) {
+if ($is_future_day && $is_multipart && isset($_FILES['document']) && $_FILES['document']['error'] !== UPLOAD_ERR_NO_FILE) {
     $f = $_FILES['document'];
 
     if ($f['error'] === UPLOAD_ERR_INI_SIZE || $f['error'] === UPLOAD_ERR_FORM_SIZE) {
@@ -147,10 +151,6 @@ if ($is_multipart && isset($_FILES['document']) && $_FILES['document']['error'] 
     }
     if ($f['error'] !== UPLOAD_ERR_OK || !is_uploaded_file($f['tmp_name'])) {
         echo json_encode(['error' => 'The file could not be uploaded. Please try again.']);
-        exit();
-    }
-    if (!fcty_is_org_adviser($conn, $faculty_id)) {
-        echo json_encode(['error' => 'Only organization advisers can attach a supporting document.']);
         exit();
     }
     if ($f['size'] > FCTY_ROOM_DOC_MAX_BYTES) {
@@ -230,20 +230,18 @@ if ($doc_tmp !== null) {
         exit();
     }
     $document_path = 'uploads/room_documents/' . $dest_name;
-    $submitted_as  = 'adviser';   // an attached letter files this as an organization request
 }
 
 // ── Insert reservation ────────────────────────────────────────────────────
 $notes_val = $notes !== '' ? $notes : null;
-// A reservation for a LATER DATE always waits for an admin's decision (same-day ones keep the instant flow);
-// an attached adviser letter also waits, for the Super Admin. See core/room-expiry.php for the 12:01 AM rule.
-$is_future_day   = ps_room_is_future_date($res_date);
-$hold_for_review = ($document_path === null && $is_future_day);   // validated by the engine, never auto-approved
-$initial_status  = ($document_path !== null || $is_future_day) ? 'Waiting' : 'Approved';
+// A reservation for a LATER DATE always waits for an admin's decision, with or without a letter
+// (same-day ones keep the instant flow). See core/room-expiry.php for the 12:01 AM rule.
+$hold_for_review = $is_future_day;   // validated by the engine, never auto-approved
+$initial_status  = $is_future_day ? 'Waiting' : 'Approved';
 
 // The legacy schema used an ENUM without Waiting even though the application
 // already recognises pending room reservations. Add the value once when a
-// supporting-letter review is first submitted.
+// later-date request is first submitted.
 if ($initial_status === 'Waiting') {
     $status_col = $conn->query("SHOW COLUMNS FROM tbl_room_reservations LIKE 'status'");
     $status_def = $status_col ? (string)(($status_col->fetch_assoc()['Type'] ?? '')) : '';
@@ -288,17 +286,12 @@ $reservation_id = $conn->insert_id;
 $ins->close();
 
 // ── Run Arbitration Engine ────────────────────────────────────────────────
-$run_engine = ($initial_status !== 'Waiting') || $hold_for_review;
-if ($run_engine) {
-    require_once __DIR__ . '/../../equipment-booking/core/arbitration-engine.php';
-    ArbitrationEngine::processRoomReservation($conn, $reservation_id, $hold_for_review);
-}
+// Same-day: decided on the spot. Later date: validated now, then held for an admin.
+require_once __DIR__ . '/../../equipment-booking/core/arbitration-engine.php';
+ArbitrationEngine::processRoomReservation($conn, $reservation_id, $hold_for_review);
 
 // ── A declined reservation is never kept: tell the user on the spot ───────
-$declined_reason = null;
-if ($run_engine) {
-    $declined_reason = ArbitrationEngine::discardRoomIfDeclined($conn, $reservation_id);
-}
+$declined_reason = ArbitrationEngine::discardRoomIfDeclined($conn, $reservation_id);
 if ($declined_reason !== null) {
     fcty_quota_unlock($conn, $faculty_id);
     echo json_encode(['error' => $declined_reason]);

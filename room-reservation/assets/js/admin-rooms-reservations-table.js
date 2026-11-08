@@ -18,7 +18,6 @@
                             var tab = 'all'; // all | active | Waiting | Approved | Cancelled | Declined
                             var dir = 'desc'; // desc = newest / latest first, asc = oldest / earliest first
                             var page = 1;
-
                             function manilaNow() {
                                 try {
                                     var parts = new Intl.DateTimeFormat('en-CA', {
@@ -47,7 +46,6 @@
                                     };
                                 }
                             }
-
                             function parseMin(v) {
                                 var m = /^\s*(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])?\s*$/.exec(v || '');
                                 if (!m) return null;
@@ -58,11 +56,9 @@
                                 if (ap === 'AM' && h === 12) h = 0;
                                 return h * 60 + mi;
                             }
-
                             function rows() {
                                 return Array.prototype.slice.call(tbody.querySelectorAll('tr.ps-rr-row'));
                             }
-
                             function isActiveNow(d, now) {
                                 var sMin = parseMin(d.startTime);
                                 var eMin = parseMin(d.endTime);
@@ -70,7 +66,6 @@
                                     sMin !== null && eMin !== null &&
                                     sMin <= now.min && eMin > now.min;
                             }
-
                             /* ── Sorting ─────────────────────────────────────────
                                Dropdown picks WHAT to sort by, the arrow button picks the direction:
                                recent : submission time of the request
@@ -78,7 +73,6 @@
                             function startKey(d) {
                                 return (d.isoDate || '') + ' ' + (d.startTime || '');
                             }
-
                             function comparator() {
                                 var sign = dir === 'asc' ? 1 : -1;
                                 var byDate = sortSel.value === 'date';
@@ -97,7 +91,6 @@
                                     return r * sign;
                                 };
                             }
-
                             function sortRows() {
                                 var list = rows().sort(comparator());
                                 var frag = document.createDocumentFragment();
@@ -106,7 +99,6 @@
                                 });
                                 tbody.insertBefore(frag, none || null);
                             }
-
                             function syncDirBtn() {
                                 var asc = dir === 'asc';
                                 var label = sortSel.value === 'date' ?
@@ -118,7 +110,6 @@
                                 var ico = dirBtn.querySelector('.material-symbols-outlined');
                                 if (ico) ico.textContent = asc ? 'arrow_upward' : 'arrow_downward';
                             }
-
                             /* ── Tab counts (independent of the search box) ─────── */
                             function updateCounts() {
                                 var now = manilaNow();
@@ -145,7 +136,6 @@
                                     span.classList.toggle('has', key === 'Waiting' && c[key] > 0);
                                 });
                             }
-
                             /* ── 1 … 4 5 6 … 12 : first, last and the current page ±1 ── */
                             function pageList(total, current) {
                                 var keep = [1, total, current - 1, current, current + 1];
@@ -164,7 +154,6 @@
                                     });
                                 return list;
                             }
-
                             function renderPager(total, pages, start, end) {
                                 pager.hidden = false;
                                 pgInfo.textContent = total ? 'Showing ' + (start + 1) + '\u2013' + end + ' of ' + total : 'No results';
@@ -193,7 +182,6 @@
                                     pgNums.appendChild(btn);
                                 });
                             }
-
                             /* ── Filtering (active tab + search), then 20 rows per page ── */
                             function applyFilter() {
                                 var s = (q.value || '').trim().toLowerCase();
@@ -222,7 +210,6 @@
                                 }
                                 renderPager(total, pages, start, end);
                             }
-
                             function goToPage(n) {
                                 page = n;
                                 applyFilter();
@@ -233,7 +220,6 @@
                                     behavior: 'smooth'
                                 });
                             }
-
                             tabsWrap.addEventListener('click', function(e) {
                                 var b = e.target.closest('[data-rr-tab]');
                                 if (!b) return;
@@ -277,7 +263,6 @@
                                 updateCounts();
                                 applyFilter();
                             });
-
                             syncDirBtn();
                             sortRows(); // also honours a sort value the browser restored on refresh
                             updateCounts();

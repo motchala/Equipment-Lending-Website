@@ -9,8 +9,7 @@
  *   student_active int   active reservations submitted by authorized students
  *   remaining    int    max - active (never below 0)
  *   reservations array  the active ones: id, room_name, date, start, end
- *   is_adviser   bool   Organization Adviser → may attach a supporting document
- *   doc          object accepted document types / size (for the UI)
+ *   doc          object accepted request-letter types / size (for the UI)
  *
  * This is informational only. The faculty and student submission endpoints
  * enforce the limit again on the server.
@@ -52,7 +51,6 @@ echo json_encode([
     })),
     'remaining'    => max(0, $max - count($active)),
     'reservations' => $active,
-    'is_adviser'   => fcty_is_org_adviser($conn, $faculty_id),
     'doc'          => [
         'types'     => ['image/jpeg', 'image/png', 'application/pdf'],
         'extensions'=> ['jpg', 'jpeg', 'png', 'pdf'],

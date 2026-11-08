@@ -8,14 +8,16 @@
      UI is never the only protection.
    - While locked the page holds placeholders only. Counts, lists and files are
      fetched after unlock and dropped again when the tab locks.
-   - Student List: AIMS "Class List" PDF (read in the browser with PDF.js).
+   - Equipment Inventory and Rooms Assigned: placeholder cards. They are clickable (open the file
+     chooser, show the picked file's name and size) but never read, upload or import anything
+     (see initPlaceholderCard).
      Faculty Registry: Faculty Identification Records, PDF (PDF.js) or XLSX
      (read by parse-faculty-registry-xlsx.php).
    - Every import first stores the ORIGINAL file, then the rows read from it. Only the
      file of the latest import is kept (a new import replaces it).
 
-   No inline handlers / styles (CSP). The two PDF parsers are exposed on
-   window.PUPSyncImports so they can be tested without a browser.
+   No inline handlers / styles (CSP). The PDF parser is exposed on
+   window.PUPSyncImports so it can be tested without a browser.
 ================================================================ */
 (function () {
     'use strict';
@@ -27,12 +29,17 @@
     var KEEPALIVE_MS = 30000;      // at most one "still here" ping per 30 s of activity
 
     var KINDS = {
-        students: {
-            label: 'Student List', icon: 'school', exts: ['pdf'], noun: ['student', 'students'],
-            fileEp: 'account-management/api/upload-student-registry-file.php',
-            rowsEp: 'account-management/api/upload-student-registry.php',
-            cols: ['#', 'Student No.', 'Name', 'Section', 'Year level'],
-            search: 'Search by name or student number…'
+        equipment: {
+            pending: true,   // placeholder: interactive, but no endpoints and no file reading
+            label: 'Equipment Inventory', icon: 'inventory_2', exts: ['xlsx', 'csv'], noun: ['item', 'items'],
+            cols: ['#', 'Item name', 'Category', 'Quantity', 'Condition'],
+            search: 'Search by item name or category\u2026'
+        },
+        rooms: {
+            pending: true,   // placeholder: interactive, but no endpoints and no file reading
+            label: 'Rooms Assigned', icon: 'meeting_room', exts: ['xlsx', 'csv'], noun: ['assignment', 'assignments'],
+            cols: ['#', 'Room', 'Building', 'Floor', 'Assigned to'],
+            search: 'Search by room or faculty\u2026'
         },
         faculty: {
             label: 'Faculty Registry', icon: 'badge', exts: ['pdf', 'xlsx'], noun: ['entry', 'entries'],
@@ -48,75 +55,6 @@
        PARSERS (pure)  -  pages: array of pages, each an array of
        { x, y, text } text items as PDF.js returns them.
     ================================================================ */
-
-    /* ── Student List: AIMS "Class List" ───────────────────────────── */
-    var STUDENT_NO_RE = /^\d{4}-\d{5}-[A-Z]{2}-\d$/;
-    var YEAR_LEVEL_RE = /^(.+)\s+(\S+)\s+((?:First|Second|Third|Fourth|Fifth|Sixth)\s+Year)$/i;
-    var LINE_TOLERANCE = 3;        // PDF points: items this close in y belong to one line
-
-    function clusterLines(items) {
-        var sorted = items.filter(function (it) { return it.text && it.text.trim(); })
-            .sort(function (a, b) { return (b.y - a.y) || (a.x - b.x); });
-        var lines = [];
-        sorted.forEach(function (it) {
-            var last = lines[lines.length - 1];
-            if (last && Math.abs(last.y - it.y) <= LINE_TOLERANCE) last.cells.push(it);
-            else lines.push({ y: it.y, cells: [it] });
-        });
-        lines.forEach(function (l) { l.cells.sort(function (a, b) { return a.x - b.x; }); });
-        return lines;
-    }
-    function lineText(line) {
-        return line.cells.map(function (c) { return c.text.trim(); }).join(' ').replace(/\s+/g, ' ').trim();
-    }
-    function formatSchoolYear(raw) {                 // "2627" -> "2026-2027"
-        var m = /^(\d{2})(\d{2})$/.exec(raw);
-        return m ? '20' + m[1] + '-20' + m[2] : raw;
-    }
-    function formatSection(raw) {                    // "BSIT-BN - BACHELOR OF ..." -> "BSIT-BN"
-        return raw.split(/\s+-\s+/)[0].trim();
-    }
-
-    function parseStudentPages(pages) {
-        var rows = [], byNo = {}, unreadable = 0, duplicates = 0;
-        var section = '', schoolYear = '', semester = '';
-
-        pages.forEach(function (items) {
-            clusterLines(items).forEach(function (line) {
-                var text = lineText(line), m;
-                if ((m = /^Section\s+(.+)$/i.exec(text))) { section = formatSection(m[1]); return; }
-                if (/^School Year\b/i.test(text)) {
-                    if ((m = /School Year\s+(\d{4})/i.exec(text))) schoolYear = formatSchoolYear(m[1]);
-                    if ((m = /Semester\s+([A-Za-z]+)/i.exec(text))) semester = m[1];
-                    return;
-                }
-
-                var idx = -1;
-                for (var i = 0; i < line.cells.length; i++) {
-                    if (STUDENT_NO_RE.test(line.cells[i].text.replace(/\s/g, '').toUpperCase())) { idx = i; break; }
-                }
-                if (idx === -1) return;
-
-                var no = line.cells[idx].text.replace(/\s/g, '').toUpperCase();
-                var rest = line.cells.slice(idx + 1).map(function (c) { return c.text.trim(); }).join(' ').replace(/\s+/g, ' ').trim();
-                var name = '', course = '', year = '';
-
-                if ((m = YEAR_LEVEL_RE.exec(rest))) {
-                    name = m[1].trim(); course = m[2].trim(); year = m[3].trim();
-                } else if (line.cells.length >= idx + 3) {
-                    name = line.cells[idx + 1].text.trim();
-                    course = line.cells[idx + 2].text.trim();
-                    year = line.cells.slice(idx + 3).map(function (c) { return c.text.trim(); }).join(' ');
-                }
-                if (!name || name.indexOf(',') === -1) { unreadable++; return; }
-
-                var row = { student_no: no, full_name: name, section: section, course: course, year_level: year, school_year: schoolYear, semester: semester };
-                if (byNo[no] !== undefined) { rows[byNo[no]] = row; duplicates++; }
-                else { byNo[no] = rows.length; rows.push(row); }
-            });
-        });
-        return { rows: rows, unreadable: unreadable, duplicates: duplicates };
-    }
 
     /* ── Faculty Registry: Faculty Identification Records ───────────
        Col 0 Faculty ID (or "NEWLY HIRED"), col 1 Professor Name, rest = Programs.
@@ -155,7 +93,7 @@
         return { rows: allRows, unreadable: 0, duplicates: 0 };
     }
 
-    window.PUPSyncImports = { parseStudentPages: parseStudentPages, parseFacultyPages: parseFacultyPages };
+    window.PUPSyncImports = { parseFacultyPages: parseFacultyPages };
 
     /* ================================================================
        UI
@@ -388,14 +326,18 @@
                 if (guard(d)) return;
                 if (!d || d.status !== 'success') return;
                 sync(d);
-                paintOverview('students', d.students);
                 paintOverview('faculty', d.faculty);
             });
         }
 
         /* ── Import cards ─────────────────────────────────────────── */
         var controllers = {};
-        cards.forEach(function (card) { controllers[card.dataset.kind] = initCard(card); });
+        cards.forEach(function (card) {
+            var k = card.dataset.kind;
+            /* placeholder cards (Equipment Inventory) are interactive but do no real work */
+            controllers[k] = (KINDS[k] && KINDS[k].pending) ? initPlaceholderCard(card) : initCard(card);
+        });
+        initGuide();
         function resetAll() {
             Object.keys(controllers).forEach(function (k) { controllers[k].reset(true); });
         }
@@ -407,7 +349,7 @@
             var preview = role(card, 'preview'), previewBody = role(card, 'preview-body'), previewCount = role(card, 'preview-count');
             var importBtn = role(card, 'import');
             var importHtml = importBtn.innerHTML;
-            var rows = [], file = null, busy = false;
+            var rows = [], file = null, busy = false, schedule = null;
 
             function alertShow(msg, kind2, details) {
                 alertEl.className = 'imp-alert imp-alert--' + kind2;
@@ -425,7 +367,7 @@
             function alertHide() { alertEl.className = 'imp-alert hidden'; alertEl.textContent = ''; }
 
             function reset(full) {
-                rows = []; file = null; input.value = '';
+                rows = []; file = null; schedule = null; input.value = '';
                 picked.classList.add('hidden');
                 preview.classList.add('hidden'); previewBody.textContent = '';
                 drop.classList.remove('hidden', 'is-over');
@@ -447,32 +389,17 @@
                     if (i >= PREVIEW_LIMIT) return;
                     var tr = document.createElement('tr');
                     tr.appendChild(el('td', 'imp-td-n', String(i + 1)));
-                    if (kind === 'students') {
-                        tr.appendChild(el('td', 'imp-td-mono', r.student_no));
-                        tr.appendChild(el('td', null, r.full_name));
-                        tr.appendChild(el('td', 'imp-td-nw', r.section));
-                        tr.appendChild(el('td', 'imp-td-nw', r.year_level));
-                    } else {
-                        var isNew = r.faculty_id === '' || String(r.faculty_id).toUpperCase() === 'NEWLY HIRED';
-                        var idTd = el('td', 'imp-td-mono');
-                        if (isNew) idTd.appendChild(el('span', 'imp-pill imp-pill--gold', 'Newly hired'));
-                        else idTd.textContent = r.faculty_id;
-                        tr.appendChild(idTd);
-                        tr.appendChild(el('td', null, r.full_name));
-                        tr.appendChild(el('td', null, r.department));
-                    }
+                    var isNew = r.faculty_id === '' || String(r.faculty_id).toUpperCase() === 'NEWLY HIRED';
+                    var idTd = el('td', 'imp-td-mono');
+                    if (isNew) idTd.appendChild(el('span', 'imp-pill imp-pill--gold', 'Newly hired'));
+                    else idTd.textContent = r.faculty_id;
+                    tr.appendChild(idTd);
+                    tr.appendChild(el('td', null, r.full_name));
+                    tr.appendChild(el('td', null, r.department));
                     previewBody.appendChild(tr);
                 });
                 list.forEach(function (r) { if (kind === 'faculty' && (r.faculty_id === '' || String(r.faculty_id).toUpperCase() === 'NEWLY HIRED')) newly++; });
-                var txt;
-                if (kind === 'students') {
-                    var secs = {};
-                    list.forEach(function (r) { secs[r.section || '-'] = true; });
-                    var n = Object.keys(secs).length;
-                    txt = num(list.length) + ' students \u00b7 ' + n + ' section' + (n === 1 ? '' : 's');
-                } else {
-                    txt = num(list.length) + ' rows read' + (newly ? ' \u00b7 ' + newly + ' newly hired' : '');
-                }
+                var txt = num(list.length) + ' rows read' + (newly ? ' \u00b7 ' + newly + ' newly hired' : '');
                 if (list.length > PREVIEW_LIMIT) txt += ' \u00b7 showing the first ' + PREVIEW_LIMIT;
                 previewCount.textContent = txt;
                 preview.classList.remove('hidden');
@@ -487,6 +414,44 @@
                 drop.classList.add('hidden');
             }
 
+            /* Class-schedule workbooks (Faculty Rooms / Room Timetables): what was found, what to know, what happened */
+            function scheduleSummary(s) {
+                if (s.kind === 'faculty_schedule') {
+                    return num(s.meetings) + ' weekly class meetings \u00b7 ' + num(s.rooms) + ' rooms \u00b7 ' + num(s.hours) + ' class hours a week';
+                }
+                return 'Room timetable: ' + num(s.rooms) + ' rooms \u00b7 ' + num(s.unassigned) + ' classes with no instructor yet' + (s.term ? ' \u00b7 ' + s.term : '');
+            }
+            function scheduleNotes(s) {
+                var n = [];
+                if (s.kind === 'faculty_schedule') {
+                    n.push('This file also carries each faculty member\u2019s weekly classes. They are saved with the faculty list, shown in each faculty member\u2019s class schedule, and block those rooms for reservations.');
+                    if (s.no_id) n.push(num(s.no_id) + ' faculty have no ID yet. Their classes are kept and attach as soon as their account is created.');
+                } else {
+                    n.push('These classes have no instructor yet, but they still block their rooms for reservations.');
+                }
+                (s.warnings || []).slice(0, 5).forEach(function (w) { n.push(w); });
+                return n;
+            }
+            function scheduleOutcome(s, details) {
+                if (s.error) { details.unshift(s.error); return ''; }
+                var line;
+                if (s.kind === 'faculty_schedule') {
+                    line = ' Class schedule: ' + num(s.meetings) + ' weekly meetings saved for ' + num(s.faculty) + ' faculty (' + num(s.accounts_linked) + ' faculty accounts already have their classes).';
+                } else {
+                    line = ' ' + num(s.unassigned_classes) + ' classes with no instructor yet now block their rooms.';
+                }
+                var made = s.rooms_created || [];
+                if (made.length) details.push(num(made.length) + ' rooms were not in the system yet and were added: ' + made.slice(0, 6).join(', ') + (made.length > 6 ? ', \u2026' : '') + '.');
+                if ((s.rooms_unresolved || []).length) details.push('These rooms could not be placed in a building: ' + s.rooms_unresolved.join(', ') + '.');
+                var ov = s.reservations_overlapping || [];
+                if (ov.length) {
+                    var ex = ov.slice(0, 3).map(function (o) { return o.room_name + ' on ' + o.reservation_date + ' ' + String(o.start_time).slice(0, 5) + '\u2013' + String(o.end_time).slice(0, 5); }).join('; ');
+                    details.push(num(ov.length) + ' approved reservation(s) now overlap a class (' + ex + (ov.length > 3 ? '; \u2026' : '') + '). They were left as they are. Please review them.');
+                }
+                (s.file_overlaps || []).slice(0, 3).forEach(function (w) { details.push(w); });
+                return line;
+            }
+
             function parseXlsx(f) {
                 var form = new FormData();
                 form.append('csrf_token', csrf());
@@ -495,7 +460,7 @@
                     return r.json().catch(function () { throw new Error('Unexpected response from the server. Please try again.'); }).then(function (d) {
                         if (guard(d)) throw new Error('');
                         if (!r.ok || !d || d.status !== 'success' || !Array.isArray(d.rows)) throw new Error((d && d.error) || 'Could not read the XLSX file. Please try again.');
-                        return d.rows;
+                        return { rows: d.rows, schedule: d.schedule || null };
                     });
                 });
             }
@@ -516,23 +481,28 @@
 
                 var job = ext === 'pdf'
                     ? readPdfPages(f).then(function (pages) {
-                        var res = kind === 'students' ? parseStudentPages(pages) : parseFacultyPages(pages);
+                        var res = parseFacultyPages(pages);
                         if (!res.rows.length) {
-                            throw new Error(kind === 'students'
-                                ? 'No students were found. Make sure this is a class list PDF exported from AIMS (not a scanned image).'
-                                : 'No faculty rows were found in this PDF. Make sure it is the Faculty Identification Records document and not a scanned image.');
+                            throw new Error('No faculty rows were found in this PDF. Make sure it is the Faculty Identification Records document and not a scanned image.');
                         }
                         return res;
                     })
-                    : parseXlsx(f).then(function (r) { return { rows: r, unreadable: 0, duplicates: 0 }; });
+                    : parseXlsx(f).then(function (r) { return { rows: r.rows, schedule: r.schedule, unreadable: 0, duplicates: 0 }; });
 
                 job.then(function (res) {
-                    if (!res.rows.length) throw new Error('No rows were found in this file.');
+                    var sched = res.schedule || null;
+                    var timetableOnly = !!(sched && sched.kind === 'room_timetable');   // no faculty rows, only rooms + classes
+                    if (!res.rows.length && !timetableOnly) throw new Error('No rows were found in this file.');
                     rows = res.rows;
+                    schedule = sched;
                     renderPreview(rows);
                     var notes = [];
+                    if (sched) {
+                        previewCount.textContent = timetableOnly ? scheduleSummary(sched) : previewCount.textContent + ' \u00b7 ' + scheduleSummary(sched);
+                        if (timetableOnly) importBtn.disabled = false;
+                        scheduleNotes(sched).forEach(function (n) { notes.push(n); });
+                    }
                     if (res.unreadable) notes.push(res.unreadable + ' row(s) could not be read and were left out.');
-                    if (res.duplicates) notes.push(res.duplicates + ' repeated Student No. found; the later entry was kept.');
                     if (notes.length) alertShow('Check the preview before importing.', 'info', notes); else alertHide();
                 }).catch(function (err) {
                     var keep = !unlocked;                        // locked while reading: reset() already ran
@@ -561,9 +531,10 @@
 
             /* import: 1) keep the ORIGINAL file, 2) import the rows read from it */
             importBtn.addEventListener('click', function () {
-                if (!rows.length || !file || busy) return;
+                var timetableOnly = !!(schedule && schedule.kind === 'room_timetable');
+                if ((!rows.length && !timetableOnly) || !file || busy) return;
                 var mode = card.querySelector('input[name="imp-mode-' + kind + '"]:checked');
-                var replaceAll = !!(mode && mode.value === 'replace');
+                var replaceAll = !!(mode && mode.value === 'replace') && !timetableOnly;
                 if (replaceAll && !window.confirm('Replace the whole ' + cfg.label + '? Everyone currently listed will be removed first.')) return;
                 var token = csrf();
                 if (!token) { alertShow('Session expired. Please refresh the page.', 'err'); return; }
@@ -593,10 +564,14 @@
                     .then(function (d) {
                         if (guard(d)) throw { handled: true };
                         if (!d || d.status !== 'success') throw { message: (d && d.error) || 'Import failed. Please try again.', details: d && d.errors };
-                        var msg = 'Import complete: ' + num(d.inserted) + ' added, ' + num(d.updated) + ' updated' + (d.skipped ? ', ' + num(d.skipped) + ' skipped' : '') + '.';
-                        var details = d.errors || [];
+                        var s = d.schedule || null;
+                        var msg = (s && s.kind === 'room_timetable')
+                            ? 'Room timetable saved.'
+                            : 'Import complete: ' + num(d.inserted) + ' added, ' + num(d.updated) + ' updated' + (d.skipped ? ', ' + num(d.skipped) + ' skipped' : '') + '.';
+                        var details = (d.errors || []).slice();
+                        if (s) msg += scheduleOutcome(s, details);
                         reset(false);
-                        alertShow(msg, 'ok', details);
+                        alertShow(msg, s && s.error ? 'info' : 'ok', details);
                         loadOverview();
                     })
                     .catch(function (err) {
@@ -613,13 +588,110 @@
             return { reset: reset };
         }
 
+        /* Import guide: the tabs, and the "How to prepare this file" link on each card. */
+        function initGuide() {
+            var guide = $('imp-guide');
+            if (!guide) return;
+            var tabs = Array.prototype.slice.call(guide.querySelectorAll('[role="tab"]'));
+            var panels = Array.prototype.slice.call(guide.querySelectorAll('[role="tabpanel"]'));
+
+            function select(kind, focus) {
+                tabs.forEach(function (tab) {
+                    var on = tab.dataset.kind === kind;
+                    tab.setAttribute('aria-selected', on ? 'true' : 'false');
+                    tab.tabIndex = on ? 0 : -1;
+                    if (on && focus) tab.focus();
+                });
+                panels.forEach(function (panel) { panel.hidden = panel.dataset.kind !== kind; });
+            }
+            tabs.forEach(function (tab, i) {
+                tab.addEventListener('click', function () { select(tab.dataset.kind); });
+                tab.addEventListener('keydown', function (e) {
+                    var n = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1
+                        : e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : -1;
+                    if (n < 0) return;
+                    e.preventDefault();
+                    select(tabs[(n + tabs.length) % tabs.length].dataset.kind, true);
+                });
+            });
+            Array.prototype.forEach.call(document.querySelectorAll('.imp-guide-link'), function (link) {
+                link.addEventListener('click', function () {
+                    select(link.dataset.guide);
+                    guide.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                });
+            });
+        }
+
+        /* Equipment Inventory / Rooms Assigned: a clickable placeholder.
+           It opens the file chooser and shows the picked file's NAME and SIZE only. The file is never
+           read (no FileReader, no parsing), never uploaded, and nothing is imported or saved: every
+           button just explains that this import is not available yet. */
+        function initPlaceholderCard(card) {
+            var drop = role(card, 'drop'), input = role(card, 'input');
+            var picked = role(card, 'picked'), alertEl = role(card, 'alert');
+            var importBtn = role(card, 'import');
+            var what = (KINDS[card.dataset.kind] && KINDS[card.dataset.kind].label) || 'This';
+
+            function note(msg) {
+                alertEl.className = 'imp-alert imp-alert--info';
+                alertEl.textContent = '';
+                alertEl.appendChild(el('span', 'material-symbols-outlined', 'info'));
+                var box = el('div', 'imp-alert-text');
+                box.appendChild(el('span', null, msg));
+                alertEl.appendChild(box);
+            }
+            function reset() {
+                input.value = '';
+                picked.classList.add('hidden');
+                drop.classList.remove('hidden', 'is-over');
+                importBtn.disabled = true;
+                alertEl.className = 'imp-alert hidden';
+                alertEl.textContent = '';
+            }
+            function pick(f) {
+                if (!f) return;
+                role(card, 'picked-name').textContent = f.name;
+                role(card, 'picked-size').textContent = fmtSize(f.size);
+                role(card, 'picked-icon').textContent = /\.(xlsx|csv)$/i.test(f.name) ? 'table_chart' : 'description';
+                picked.classList.remove('hidden');
+                drop.classList.add('hidden');
+                importBtn.disabled = false;
+                note(what + ' import is not available yet. The file was not read or uploaded.');
+            }
+
+            input.addEventListener('click', function (e) { e.stopPropagation(); });
+            drop.addEventListener('click', function () { input.click(); });
+            drop.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } });
+            input.addEventListener('change', function () { pick(this.files && this.files[0]); });
+            ['dragenter', 'dragover'].forEach(function (t) {
+                drop.addEventListener(t, function (e) { e.preventDefault(); drop.classList.add('is-over'); });
+            });
+            ['dragleave', 'drop'].forEach(function (t) {
+                drop.addEventListener(t, function (e) { e.preventDefault(); drop.classList.remove('is-over'); });
+            });
+            drop.addEventListener('drop', function (e) {
+                pick(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
+            });
+            role(card, 'clear').addEventListener('click', reset);
+            importBtn.addEventListener('click', function () {
+                note(what + ' import is not available yet. Nothing was uploaded or changed.');
+            });
+            role(card, 'view-list').addEventListener('click', function () {
+                note('Nothing to show yet. ' + what + ' import is not available yet.');
+            });
+            role(card, 'view-files').addEventListener('click', function () {
+                note('Nothing to show yet. ' + what + ' import is not available yet.');
+            });
+
+            return { reset: reset };
+        }
+
         /* ── Imported list modal ──────────────────────────────────── */
         var listRows = [], listKind = '';
         var listBody = $('imp-list-tbody'), listEmpty = $('imp-list-empty'), listMeta = $('imp-list-meta');
         var listSearch = $('imp-list-search');
 
         function listCells(kind, r, i) {
-            if (kind === 'students') return [String(i + 1), r.student_no, r.full_name, r.section, r.year_level];
             return [String(i + 1), r.is_newly_hired ? 'Newly hired' : r.faculty_id, r.full_name, r.department];
         }
         function drawList() {
@@ -635,7 +707,7 @@
                 if (shown >= LIST_LIMIT) return;
                 var tr = document.createElement('tr');
                 listCells(listKind, r, matched - 1).forEach(function (t, ci) {
-                    var td = el('td', ci === 0 ? 'imp-td-n' : (ci === 1 ? 'imp-td-mono' : (listKind === 'students' && ci >= 3 ? 'imp-td-nw' : null)));
+                    var td = el('td', ci === 0 ? 'imp-td-n' : (ci === 1 ? 'imp-td-mono' : null));
                     if (listKind === 'faculty' && ci === 1 && r.is_newly_hired) td.appendChild(el('span', 'imp-pill imp-pill--gold', t));
                     else td.textContent = t;
                     tr.appendChild(td);

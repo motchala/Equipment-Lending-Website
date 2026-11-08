@@ -98,11 +98,6 @@ foreach ($rooms_list as $r) {
 // Archived rooms (for the Archived sub-panel)
 $rooms_archived = ps_load_archived_rooms($conn);
 
-// Attached Organization Adviser reservations are confidential review items.
-// Other admins must not receive them in the Reservations table at all.
-$ps_rooms_can_view_sensitive_adviser_requests = admin_is_super_admin($conn);
-$ps_rooms_sensitive_reservation_sql = "(rr.submitted_as = 'adviser' AND COALESCE(rr.document_path, '') <> '')";
-
 // ── All room reservations (admin read-only view) ──────────────────────────
 require_once __DIR__ . '/room-expiry.php';
 ps_room_expire_unreviewed($conn);   // undecided Waiting reservations past 12:01 AM of their day become Declined
@@ -134,7 +129,6 @@ $admin_room_reservations_result = $conn->query(
             ORDER BY latest.id DESC
             LIMIT 1
        )
-      " . ($ps_rooms_can_view_sensitive_adviser_requests ? '' : "WHERE NOT {$ps_rooms_sensitive_reservation_sql}") . "
       ORDER BY rr.reservation_date DESC, rr.start_time ASC"
 );
 $admin_room_reservations = [];

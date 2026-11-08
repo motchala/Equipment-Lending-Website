@@ -65,6 +65,56 @@ function send_json(int $code, string $status, string $message): void
     exit;
 }
 
+// ── Credential rules for NEW admin accounts ──────────────────────────────────
+// Keep in sync with admEmailError() / admPasswordInfo() in admin-dashboard.js (the dialog's live checks).
+const ADMIN_EMAIL_DOMAIN = '@admin.edu';
+
+/** Returns an error message, or null when the email is acceptable. $email is already trimmed + lower-cased. */
+function admin_email_error(string $email): ?string
+{
+    if ($email === '') {
+        return 'A valid admin email is required.';
+    }
+    if (!str_ends_with($email, ADMIN_EMAIL_DOMAIN)) {
+        return 'Admin emails must end in ' . ADMIN_EMAIL_DOMAIN . ' (e.g. name' . ADMIN_EMAIL_DOMAIN . ').';
+    }
+    $local = substr($email, 0, -strlen(ADMIN_EMAIL_DOMAIN));
+    if ($local === '') {
+        return 'Add a name before ' . ADMIN_EMAIL_DOMAIN . ' (e.g. name' . ADMIN_EMAIL_DOMAIN . ').';
+    }
+    if (strlen($local) > 64) {
+        return 'The part before ' . ADMIN_EMAIL_DOMAIN . ' can be at most 64 characters.';
+    }
+    // Letters, numbers, dot, hyphen, underscore; must start and end with a letter or number; no "..".
+    if (!preg_match('/^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$/', $local) || strpos($local, '..') !== false) {
+        return 'Before ' . ADMIN_EMAIL_DOMAIN . ', use only letters, numbers, dots, hyphens or underscores (start and end with a letter or number).';
+    }
+    return null;
+}
+
+/** Returns an error message, or null when the password is acceptable. */
+function admin_password_error(string $pw): ?string
+{
+    if ($pw === '') {
+        return 'Password is required.';
+    }
+    if (strlen($pw) < 8) {
+        return 'Password must be at least 8 characters.';
+    }
+    if (strlen($pw) > 72) { // bcrypt silently ignores anything past 72 bytes
+        return 'Password can be at most 72 characters.';
+    }
+    $missing = [];
+    if (!preg_match('/[A-Z]/', $pw))          $missing[] = 'an uppercase letter';
+    if (!preg_match('/[a-z]/', $pw))          $missing[] = 'a lowercase letter';
+    if (!preg_match('/[0-9]/', $pw))          $missing[] = 'a number';
+    if (!preg_match('/[^A-Za-z0-9\s]/', $pw)) $missing[] = 'a special character (for example ! @ # $ %)';
+    if ($missing) {
+        return 'Password must include ' . implode(', ', $missing) . '.';
+    }
+    return null;
+}
+
 // ── Inputs ───────────────────────────────────────────────────────────────────
 $full_name      = trim($_POST['full_name'] ?? '');
 $email          = strtolower(trim($_POST['email'] ?? ''));
@@ -84,20 +134,16 @@ if ($full_name === '' || strlen($full_name) > 255) {
 }
 
 // ── Validate email ────────────────────────────────────────────────────────────
-if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-    send_json(422, 'error', 'A valid admin email is required.');
+if (($email_err = admin_email_error($email)) !== null) {
+    send_json(422, 'error', $email_err);
 }
-// Enforce @admin.edu convention
-if (!str_ends_with($email, '@admin.edu')) {
-    send_json(422, 'error', 'Admin emails must use the @admin.edu convention (e.g. name@admin.edu).');
+if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    send_json(422, 'error', 'A valid admin email is required.');
 }
 
 // ── Validate password ─────────────────────────────────────────────────────────
-if ($password_raw === '') {
-    send_json(422, 'error', 'Password is required.');
-}
-if (strlen($password_raw) < 8) {
-    send_json(422, 'error', 'Password must be at least 8 characters.');
+if (($pw_err = admin_password_error($password_raw)) !== null) {
+    send_json(422, 'error', $pw_err);
 }
 if ($password_raw !== $confirm_raw) {
     send_json(422, 'error', 'Passwords do not match.');

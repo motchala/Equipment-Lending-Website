@@ -389,9 +389,6 @@ if (!function_exists('fnotif_build_list')) {
                     $d('Return Date', $returnStr),
                     $d('Room / Instructor', (($r['room'] ?? '') !== '' ? $r['room'] : '—') . ' / ' . (($r['instructor'] ?? '') !== '' ? $r['instructor'] : '—')),
                 ];
-                $submittedBy = (($r['submitted_as'] ?? '') === 'adviser' && !empty($r['submitted_by_name']))
-                    ? $d('Submitted By', $r['submitted_by_name'] . ' (organization adviser)') : null;
-
                 switch ($status) {
                     case 'Waiting':
                         $add([
@@ -403,7 +400,6 @@ if (!function_exists('fnotif_build_list')) {
                             'body'  => 'Your request for <strong>' . $e($equip) . '</strong> is awaiting admin approval.',
                             'ts'    => $reqTs,
                             'detail' => array_merge([$d('Status', 'Waiting for approval')], $common, [
-                                $submittedBy,
                                 $d('Submitted On', date('M j, Y g:i A', $reqTs)),
                             ]),
                             'link' => $lendingLink,
@@ -422,7 +418,6 @@ if (!function_exists('fnotif_build_list')) {
                                 . $e(date('M j', strtotime($r['return_date']))) . '</strong>.',
                             'ts'    => $decidedTs,
                             'detail' => array_merge([$d('Status', 'Approved')], $common, [
-                                $submittedBy,
                                 $d('Decision Rule', fnotif_rule_label($r['log_rule'] ?? $r['arbitration_rule'] ?? null)),
                                 $d('Admin Note', $r['log_override_reason'] ?? ''),
                                 $d('Return QR', !empty($r['return_token']) ? 'Available in My Requests' : ''),
@@ -670,8 +665,6 @@ if (!function_exists('fnotif_build_list')) {
                                 'body'  => 'Your reservation for <strong>' . $e($room) . '</strong> on <strong>' . $e($slot) . '</strong> is confirmed.',
                                 'ts'    => $reqTs,
                                 'detail' => array_merge([$d('Status', 'Confirmed')], $common, [
-                                    (($r['submitted_as'] ?? '') === 'adviser' && !empty($r['submitted_by_name']))
-                                        ? $d('Submitted By', $r['submitted_by_name'] . ' (organization adviser)') : null,
                                     $d('Decision Rule', fnotif_rule_label($r['log_rule'] ?? null)),
                                     $d('Reserved On', date('M j, Y g:i A', $reqTs)),
                                 ]),

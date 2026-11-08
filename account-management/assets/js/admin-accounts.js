@@ -62,24 +62,6 @@
                so Save Changes can identify + update it after a successful save. */
             var _facEditRow = null;
 
-            function _syncFacEditOrgVisibility() {
-                var chk = document.getElementById('fac-edit-adviser');
-                var grp = document.getElementById('fac-edit-org-group');
-                var sel = document.getElementById('fac-edit-org');
-                if (!chk || !grp) return;
-                grp.style.display = chk.checked ? '' : 'none';
-
-                /* The organization picker only exists for advisers. Hiding it also
-                   clears it, so a regular faculty account is never saved with an
-                   organization. (Org borrowing itself is automatic for advisers.) */
-                if (!chk.checked && sel) sel.value = '';
-            }
-
-            var _facEditAdviserChk = document.getElementById('fac-edit-adviser');
-            if (_facEditAdviserChk) {
-                _facEditAdviserChk.addEventListener('change', _syncFacEditOrgVisibility);
-            }
-
             function _showFacEditAlert(msg, isError) {
                 var box = document.getElementById('fac-edit-alert');
                 if (!box) return;
@@ -93,42 +75,6 @@
                 if (!box) return;
                 box.classList.add('hidden');
                 box.textContent = '';
-            }
-
-            /* One adviser per organization. Which organization has which adviser
-               (organization id -> {faculty_id, name}) is seeded by the server and kept in
-               step with the edits and deletes made on this page. It only drives the UI:
-               the server re-checks every save, so a stale page can never break the rule. */
-            var _facAdvisers = {};
-            (function() {
-                var s = document.getElementById('fac-edit-org');
-                if (!s) return;
-                try {
-                    _facAdvisers = JSON.parse(s.getAttribute('data-advisers') || '{}') || {};
-                } catch (e) {
-                    _facAdvisers = {};
-                }
-            })();
-
-            /* Disable the organizations that already have an adviser (except the one belonging
-               to exceptFacultyId, so an adviser can keep their own organization). */
-            function _facApplyOrgAvailability(sel, exceptFacultyId) {
-                if (!sel) return;
-                Array.prototype.forEach.call(sel.options, function(opt) {
-                    if (!opt.value) return;
-                    var holder = _facAdvisers[opt.value];
-                    var taken = !!holder && holder.faculty_id !== exceptFacultyId;
-                    var name = opt.getAttribute('data-name') || opt.textContent;
-                    opt.disabled = taken;
-                    opt.textContent = taken ? name + ' (taken)' : name;
-                });
-            }
-
-            function _facAdvisersForget(facultyId) {
-                Object.keys(_facAdvisers).forEach(function(k) {
-                    if (_facAdvisers[k].faculty_id === facultyId) delete _facAdvisers[k];
-                });
-                _facApplyOrgAvailability(document.getElementById('fac-org'), '');
             }
 
             /* Edit modal: open on row edit-button click */
@@ -145,13 +91,9 @@
                 var email = row.dataset.email || '';
                 var backupEmail = row.dataset.backupEmail || '';
                 var facId = row.dataset.facultyId || '';
-                var role = row.dataset.role || '';
-                var org = row.dataset.org || '';
-                var orgId = row.dataset.orgId || '';
                 var init = row.dataset.init || (fullname.charAt(0).toUpperCase()) || 'F';
-                var isAdviser = role === 'Organization Adviser';
                 var idUnset = !facId || facId.indexOf('NOTSET-') === 0;
-                var subLine = (idUnset ? 'Faculty ID not set yet' : facId) + ' \u00B7 ' + (isAdviser && org ? 'Org Adviser' : 'Active Faculty');
+                var subLine = (idUnset ? 'Faculty ID not set yet' : facId) + ' \u00B7 Active Faculty';
 
                 var parts = fullname.trim().split(' ');
                 var lastName = parts.length > 1 ? parts[parts.length - 1] : '';
@@ -164,13 +106,8 @@
                 document.getElementById('fac-edit-last').value = lastName;
                 document.getElementById('fac-edit-email').value = email;
                 document.getElementById('fac-edit-backup').value = backupEmail;
-                document.getElementById('fac-edit-adviser').checked = isAdviser;
-                var orgSel = document.getElementById('fac-edit-org');
-                _facApplyOrgAvailability(orgSel, facId);
-                if (orgSel) orgSel.value = (isAdviser && orgId) ? orgId : '';
                 document.getElementById('fac-delete-name').textContent = fullname;
 
-                _syncFacEditOrgVisibility();
                 openFacModal('fac-edit-modal');
             });
 
@@ -376,8 +313,6 @@
                     var lastName = (document.getElementById('fac-edit-last').value || '').trim();
                     var email = (document.getElementById('fac-edit-email').value || '').trim();
                     var backup = (document.getElementById('fac-edit-backup').value || '').trim();
-                    var isAdviser = document.getElementById('fac-edit-adviser').checked ? '1' : '0';
-                    var orgId = document.getElementById('fac-edit-org') ? document.getElementById('fac-edit-org').value : '';
 
                     if (!firstName) {
                         _showFacEditAlert('First name is required.', true);
@@ -391,27 +326,12 @@
                         _showFacEditAlert('PUPSync email is required.', true);
                         return;
                     }
-                    if (isAdviser === '1' && !orgId) {
-                        _showFacEditAlert('An organization must be selected for an adviser.', true);
-                        return;
-                    }
                     /* A new or changed email must end in @pupsync.edu (an unchanged older email is left alone). */
                     var originalEmail = (_facEditRow.dataset.email || '').toLowerCase();
                     if (email.toLowerCase() !== originalEmail && !/^[^\s@]+@pupsync\.edu$/i.test(email)) {
                         _showFacEditAlert('Use a PUPSync email ending in @pupsync.edu.', true);
                         return;
                     }
-                    /* One adviser per organization (only when the organization is new for this person). */
-                    var holder = (isAdviser === '1') ? _facAdvisers[orgId] : null;
-                    var orgUnchanged = _facEditRow.dataset.role === 'Organization Adviser' &&
-                        String(_facEditRow.dataset.orgId || '') === String(orgId);
-                    if (holder && holder.faculty_id !== facultyId && !orgUnchanged) {
-                        var heldOpt = document.getElementById('fac-edit-org').querySelector('option[value="' + orgId + '"]');
-                        _showFacEditAlert(((heldOpt && heldOpt.getAttribute('data-name')) || 'That organization') +
-                            ' already has an adviser: ' + holder.name + '.', true);
-                        return;
-                    }
-
                     var savedLabel = facEditSaveBtn.innerHTML;
                     facEditSaveBtn.disabled = true;
                     facEditSaveBtn.innerHTML = '<span class="material-symbols-outlined" style="animation:spin 0.8s linear infinite">progress_activity</span> Saving...';
@@ -423,9 +343,7 @@
                         pupsync_email: email,
                         backup_email: backup,
                         first_name: firstName,
-                        last_name: lastName,
-                        is_org_adviser: isAdviser,
-                        organization_id: orgId
+                        last_name: lastName
                     });
 
                     fetch('account-management/api/update-faculty-account.php', {
@@ -441,33 +359,12 @@
                         .then(function(data) {
                             if (data.status === 'success') {
                                 var fullname = [firstName, lastName].join(' ').trim();
-                                var role = isAdviser === '1' ? 'Organization Adviser' : 'Regular Faculty';
-                                var orgSelEl = document.getElementById('fac-edit-org');
-                                var selOpt = orgSelEl ? orgSelEl.options[orgSelEl.selectedIndex] : null;
-                                var orgName = (isAdviser === '1' && selOpt) ?
-                                    (selOpt.getAttribute('data-name') || selOpt.text || '') :
-                                    '';
-                                var orgNameSafe = (orgId && isAdviser === '1') ? orgName : '';
-
-                                // Keep the "who advises what" map in step with this save
-                                _facAdvisersForget(facultyId);
-                                if (isAdviser === '1' && orgId) {
-                                    _facAdvisers[orgId] = {
-                                        faculty_id: facultyId,
-                                        name: fullname
-                                    };
-                                    _facApplyOrgAvailability(document.getElementById('fac-org'), '');
-                                }
-
-                                // Re-render the row (name, email, role, organization) from the saved values
+                                // Re-render the row (name, email) from the saved values
                                 if (typeof window.psFacRender === 'function') {
                                     window.psFacRender(_facEditRow, {
                                         fullname: fullname,
                                         email: email,
                                         backup_email: backup,
-                                        role: role,
-                                        org_name: orgNameSafe,
-                                        org_id: isAdviser === '1' ? orgId : '0',
                                         faculty_id: facultyId
                                     });
                                 }
@@ -545,13 +442,12 @@
                         if (data.status === 'success') {
                             rowToRemove.remove();
                             _facEditRow = null;
-                            _facAdvisersForget(params.faculty_id);
 
                             /* Table is now empty -> show the empty state again */
                             if (_facTbody && !_facTbody.querySelector('tr[data-faculty-id]')) {
                                 var tr = document.createElement('tr');
                                 tr.id = 'fac-empty-row';
-                                tr.innerHTML = '<td colspan="4" style="text-align:center;padding:3rem;color:var(--text-light)">' +
+                                tr.innerHTML = '<td colspan="3" style="text-align:center;padding:3rem;color:var(--text-light)">' +
                                     '<span class="material-symbols-outlined" style="font-size:40px;display:block;margin:0 auto 10px;opacity:0.3">group</span>' +
                                     'No faculty accounts yet.</td>';
                                 _facTbody.appendChild(tr);

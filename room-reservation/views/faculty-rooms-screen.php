@@ -43,7 +43,7 @@
         <div class="fcty-head-row fcty-landing-head fcs-head">
             <div class="fcs-heading">
                 <h2 class="fcty-title fcs-title" id="fcs-title">My class schedule</h2>
-                <p class="fcs-sub">Your approved room bookings, Monday to Saturday.</p>
+                <p class="fcs-sub">Your classes and approved bookings this semester, and week by week.</p>
             </div>
             <div class="fcs-nav">
                 <button type="button" class="fcty-icon-btn" id="fcs-prev" aria-label="Previous week" disabled>
@@ -58,8 +58,15 @@
         </div>
 
         <div class="fcs-card">
-            <div class="fcs-body" id="fcs-body" aria-live="polite">
-                <div class="fcs-skeleton" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+            <div class="fcs-layout">
+                <!-- Left: classes for the whole semester (drawn by fcty-class-schedule.js) -->
+                <aside class="fcs-list" id="fcs-list" aria-label="Classes this semester">
+                    <div class="fcs-list-skel" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+                </aside>
+                <!-- Right: the weekly calendar -->
+                <div class="fcs-body" id="fcs-body" aria-live="polite">
+                    <div class="fcs-skeleton" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+                </div>
             </div>
         </div>
     </section>

@@ -51,7 +51,6 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/../auth/core/remember-me.php';
 require_once __DIR__ . '/../auth/core/admin-auth.php';
 require_once __DIR__ . '/../shared/core/faculty-id.php';
-require_once __DIR__ . '/../shared/core/organizations.php';
 
 if (!empty($_COOKIE[REMEMBER_ME_COOKIE]) && empty($_SESSION['admin']) && empty($_SESSION['faculty_id'])) {
     require_once __DIR__ . '/db.php';

@@ -968,3 +968,409 @@
         animation: none;
     }
 }
+
+/* ================================================================
+   VISUAL SEPARATION: every import has its own colour
+   The colour shows up as a spine on the card, on its icon tile, and again
+   on the matching tab / panel of the import guide, so each card and its
+   instructions are easy to tell apart and to connect.
+================================================================ */
+.imp-card[data-kind="equipment"],
+.imp-gtab[data-kind="equipment"],
+.imp-guide-panel[data-kind="equipment"] {
+    --imp-a: var(--accent-maroon);
+    --imp-b: var(--accent-dark);
+}
+
+.imp-card[data-kind="faculty"],
+.imp-gtab[data-kind="faculty"],
+.imp-guide-panel[data-kind="faculty"] {
+    --imp-a: #a8761a;
+    --imp-b: #6b4607;
+}
+
+.imp-card[data-kind="rooms"],
+.imp-gtab[data-kind="rooms"],
+.imp-guide-panel[data-kind="rooms"] {
+    --imp-a: #1f7a62;
+    --imp-b: #0f4a3b;
+}
+
+.imp-grid {
+    gap: 1.9rem 1.75rem;
+}
+
+.imp-card {
+    position: relative;
+}
+
+.imp-card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 6px;
+    z-index: 2;
+    background: linear-gradient(180deg, var(--imp-a), var(--imp-b));
+    pointer-events: none;
+}
+
+.imp-card .imp-card-icon {
+    background: linear-gradient(145deg, var(--imp-a), var(--imp-b));
+}
+
+.imp-guide-link {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    margin: .6rem 0 0;
+    padding: 0;
+    background: none;
+    border: 0;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    color: color-mix(in srgb, var(--imp-a) 70%, var(--text-dark));
+    cursor: pointer;
+}
+
+.imp-guide-link .material-symbols-outlined {
+    font-size: 16px;
+}
+
+.imp-guide-link:hover {
+    text-decoration: underline;
+}
+
+/* ================================================================
+   IMPORT GUIDE (sits to the right of Rooms Assigned)
+================================================================ */
+.imp-guide {
+    align-self: start;
+    min-width: 0;
+    padding: 1.15rem 1.25rem 1.3rem;
+    background: var(--card-bg);
+    border: 1.5px dashed var(--khaki-border);
+    border-radius: var(--radius);
+}
+
+.imp-guide-head {
+    display: flex;
+    align-items: center;
+    gap: .9rem;
+}
+
+.imp-guide-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .3rem;
+    margin: 1rem 0 .25rem;
+    padding: .3rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--text-dark) 6%, var(--card-bg));
+}
+
+.imp-gtab {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    padding: .45rem .85rem;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-light);
+    cursor: pointer;
+    transition: background .15s, color .15s;
+}
+
+.imp-gtab:hover {
+    color: var(--text-dark);
+}
+
+.imp-gtab[aria-selected="true"] {
+    background: var(--card-bg);
+    color: var(--text-dark);
+    box-shadow: 0 1px 5px rgba(0, 0, 0, .14);
+}
+
+.imp-gdot {
+    width: 9px;
+    height: 9px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--imp-a);
+}
+
+.imp-guide-panel {
+    animation: imp-guide-in .25s ease;
+}
+
+.imp-guide-panel[hidden] {
+    display: none;
+}
+
+@keyframes imp-guide-in {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+.imp-g-planned {
+    display: flex;
+    align-items: flex-start;
+    gap: .55rem;
+    margin-top: .85rem;
+    padding: .65rem .8rem;
+    border-radius: 10px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-dark);
+    background: color-mix(in srgb, var(--accent-gold) 20%, var(--card-bg));
+    border: 1px solid color-mix(in srgb, var(--accent-gold-deep) 45%, transparent);
+}
+
+.imp-g-planned .material-symbols-outlined {
+    flex: none;
+    font-size: 18px;
+    color: var(--accent-gold-deep);
+}
+
+.imp-g-sec {
+    margin-top: 1.1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--khaki-border);
+}
+
+.imp-g-sec:first-of-type {
+    border-top: 0;
+    padding-top: 0;
+}
+
+.imp-g-planned+.imp-g-sec {
+    border-top: 0;
+    padding-top: 0;
+}
+
+.imp-g-sec h5 {
+    margin: 0 0 .6rem;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text-light);
+}
+
+.imp-g-formats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .45rem;
+}
+
+.imp-fmt {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .35rem .7rem .35rem .55rem;
+    border-radius: 10px;
+    font-size: 12px;
+    color: var(--text-dark);
+    background: var(--card-bg);
+    border: 1px solid var(--khaki-border);
+}
+
+.imp-fmt b {
+    font-size: 13px;
+    margin-right: .15rem;
+}
+
+.imp-fmt .material-symbols-outlined {
+    font-size: 16px;
+}
+
+.imp-fmt--ok {
+    color: #fff;
+    background: linear-gradient(145deg, var(--imp-a), var(--imp-b));
+    border-color: transparent;
+}
+
+.imp-fmt--no {
+    color: var(--text-light);
+    border-style: dashed;
+}
+
+.imp-g-why {
+    margin: .7rem 0 0;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--text-light);
+}
+
+.imp-g-cols {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: .7rem;
+}
+
+.imp-g-cols li {
+    display: grid;
+    grid-template-columns: 30px minmax(0, 1fr);
+    gap: .75rem;
+    align-items: start;
+}
+
+.imp-g-letter {
+    width: 30px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(145deg, var(--imp-a), var(--imp-b));
+}
+
+.imp-g-colhead {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .5rem;
+}
+
+.imp-g-colhead strong {
+    font-size: 13px;
+    color: var(--text-dark);
+}
+
+.imp-req {
+    padding: .1rem .5rem;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .02em;
+}
+
+.imp-req--yes {
+    color: color-mix(in srgb, var(--imp-a) 70%, var(--text-dark));
+    background: color-mix(in srgb, var(--imp-a) 15%, var(--card-bg));
+}
+
+.imp-req--no {
+    color: var(--text-light);
+    background: color-mix(in srgb, var(--text-dark) 7%, var(--card-bg));
+}
+
+.imp-g-col p {
+    margin: .2rem 0 0;
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--text-light);
+}
+
+.imp-g-col .imp-g-ex {
+    font-size: 12px;
+}
+
+.imp-g-ex code {
+    padding: .08rem .4rem;
+    border-radius: 5px;
+    font-size: 11.5px;
+    color: var(--text-dark);
+    background: color-mix(in srgb, var(--text-dark) 7%, var(--card-bg));
+}
+
+.imp-sheet-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--khaki-border);
+    border-radius: 10px;
+}
+
+.imp-sheet {
+    width: 100%;
+    min-width: 440px;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.imp-sheet th,
+.imp-sheet td {
+    padding: .4rem .65rem;
+    text-align: left;
+    vertical-align: top;
+    color: var(--text-dark);
+    border-right: 1px solid var(--khaki-border);
+    border-bottom: 1px solid var(--khaki-border);
+}
+
+.imp-sheet th:last-child,
+.imp-sheet td:last-child {
+    border-right: 0;
+}
+
+.imp-sheet tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.imp-sheet .is-letters th {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-light);
+    background: color-mix(in srgb, var(--text-dark) 6%, var(--card-bg));
+}
+
+.imp-sheet .is-gutter {
+    width: 1%;
+    white-space: nowrap;
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-light);
+    background: color-mix(in srgb, var(--text-dark) 6%, var(--card-bg));
+}
+
+.imp-sheet .is-head td:not(.is-gutter) {
+    font-weight: 700;
+    background: color-mix(in srgb, var(--imp-a) 15%, var(--card-bg));
+}
+
+.imp-g-tips {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: .55rem;
+}
+
+.imp-g-tips li {
+    display: flex;
+    align-items: flex-start;
+    gap: .55rem;
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--text-dark);
+}
+
+.imp-g-tips .material-symbols-outlined {
+    flex: none;
+    margin-top: 1px;
+    font-size: 17px;
+    color: var(--imp-a);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .imp-guide-panel {
+        animation: none;
+    }
+}

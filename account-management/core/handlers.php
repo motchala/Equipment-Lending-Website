@@ -8,11 +8,8 @@ if (($_GET['fragment'] ?? '') === 'faculty-tbody') {
 
     $fac_rows = [];
     $fac_result = $conn->query(
-        "SELECT u.fullname, u.email, u.backup_email, u.role,"
-            . " u.faculty_id, u.organization_id,"
-            . " o.name AS org_name"
+        "SELECT u.fullname, u.email, u.backup_email, u.faculty_id"
             . " FROM tbl_users u"
-            . " LEFT JOIN tbl_organizations o ON u.organization_id = o.id"
             . " ORDER BY u.fullname ASC"
     );
     if ($fac_result) {
@@ -22,14 +19,13 @@ if (($_GET['fragment'] ?? '') === 'faculty-tbody') {
     ob_start();
     if (empty($fac_rows)): ?>
         <tr id="fac-empty-row">
-            <td colspan="4" style="text-align:center;padding:3rem;color:var(--text-light)">
+            <td colspan="3" style="text-align:center;padding:3rem;color:var(--text-light)">
                 <span class="material-symbols-outlined" style="font-size:40px;display:block;margin:0 auto 10px;opacity:0.3">group</span>
                 No faculty accounts yet.
             </td>
         </tr>
         <?php else:
         foreach ($fac_rows as $frow):
-            $isAdviser = ($frow['role'] === 'Organization Adviser');
             $idUnset   = faculty_id_is_unset($frow['faculty_id']);
             $initFac   = strtoupper(substr(trim($frow['fullname'] ?? '') ?: 'F', 0, 1));
         ?>
@@ -38,9 +34,6 @@ if (($_GET['fragment'] ?? '') === 'faculty-tbody') {
                 data-email="<?= htmlspecialchars($frow['email']) ?>"
                 data-backup-email="<?= htmlspecialchars($frow['backup_email'] ?? '') ?>"
                 data-faculty-id="<?= htmlspecialchars($frow['faculty_id']) ?>"
-                data-role="<?= htmlspecialchars($frow['role']) ?>"
-                data-org="<?= htmlspecialchars($frow['org_name'] ?? '') ?>"
-                data-org-id="<?= (int)($frow['organization_id'] ?? 0) ?>"
                 data-init="<?= htmlspecialchars($initFac) ?>">
                 <td>
                     <div class="fac-person">
@@ -56,16 +49,6 @@ if (($_GET['fragment'] ?? '') === 'faculty-tbody') {
                         <span class="fac-id-pending">Not set yet</span>
                     <?php else: ?>
                         <span class="fac-id"><?= htmlspecialchars($frow['faculty_id']) ?></span>
-                    <?php endif; ?>
-                </td>
-                <td>
-                    <?php if ($isAdviser): ?>
-                        <span class="fac-role fac-role--adviser">Org Adviser</span>
-                        <?php if (!empty($frow['org_name'])): ?>
-                            <div class="fac-person-sub"><?= htmlspecialchars($frow['org_name']) ?></div>
-                        <?php endif; ?>
-                    <?php else: ?>
-                        <span class="fac-role">Faculty</span>
                     <?php endif; ?>
                 </td>
                 <td class="fac-actions">

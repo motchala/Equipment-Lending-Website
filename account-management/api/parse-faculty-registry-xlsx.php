@@ -66,10 +66,56 @@ if (frf_detect_type($path, $extension) === null) {
     frf_respond(422, ['status' => 'error', 'error' => 'That does not look like a valid XLSX workbook.']);
 }
 
+// A class-schedule workbook ("Faculty Rooms" or "Room Timetables") is read by the class-schedule reader.
+// Any other workbook is an ordinary faculty list and is read exactly as before.
+require_once __DIR__ . '/../../room-reservation/core/class-schedule.php';
+$schedule      = null;
+$schedule_kind = cs_detect_file($path);
+
 try {
-    $rows = faculty_registry_parse_xlsx($path);
+    if ($schedule_kind === 'faculty_schedule') {
+        // One registry row per faculty member (their ID, or NEWLY HIRED, and the programs they teach),
+        // plus a summary of the weekly class meetings that will be stored with them.
+        $parsed = cs_parse_faculty_workbook($path);
+        $rows = [];
+        $hours = 0;
+        $roomCodes = [];
+        foreach ($parsed['faculty'] as $f) {
+            $rows[] = [
+                'faculty_id' => $f['id'] ?? 'NEWLY HIRED',
+                'full_name'  => $f['name'],
+                'department' => mb_strimwidth(implode(', ', $f['programs']), 0, 250, ''),
+            ];
+        }
+        foreach ($parsed['meetings'] as $m) {
+            $hours += ($m['end'] - $m['start']) / 60;
+            $roomCodes[$m['room_code']] = true;
+        }
+        $schedule = [
+            'kind'     => 'faculty_schedule',
+            'meetings' => count($parsed['meetings']),
+            'faculty'  => count($parsed['faculty']),
+            'no_id'    => count(array_filter($parsed['faculty'], static fn($f) => $f['id'] === null)),
+            'rooms'    => count($roomCodes),
+            'hours'    => $hours,
+            'warnings' => array_slice($parsed['warnings'], 0, 20),
+        ];
+    } elseif ($schedule_kind === 'room_timetable') {
+        // No faculty rows: this workbook supplies room details and the classes that have no instructor yet.
+        $parsed = cs_parse_timetable_workbook($path);
+        $rows = [];
+        $tba = array_filter($parsed['meetings'], static fn($m) => $m['is_tba'] === 1);
+        $schedule = [
+            'kind'       => 'room_timetable',
+            'rooms'      => count($parsed['rooms']),
+            'unassigned' => count($tba),
+            'term'       => $parsed['term'],
+        ];
+    } else {
+        $rows = faculty_registry_parse_xlsx($path);
+    }
 } catch (RuntimeException $e) {
     frf_respond(422, ['status' => 'error', 'error' => $e->getMessage()]);
 }
 
-frf_respond(200, ['status' => 'success', 'rows' => $rows]);
+frf_respond(200, ['status' => 'success', 'rows' => $rows] + ($schedule !== null ? ['schedule' => $schedule] : []));

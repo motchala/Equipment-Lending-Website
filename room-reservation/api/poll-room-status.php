@@ -81,6 +81,19 @@ if (!empty($statuses)) {
         }
     }
     $booked_stmt->close();
+
+    // Rooms with a class in session right now (imported timetable)
+    try {
+        require_once __DIR__ . '/../core/class-schedule.php';
+        foreach (cs_rooms_in_class_now($conn, $today, $now_time) as $class_room_id) {
+            $rid = (string)$class_room_id;
+            if (isset($statuses[$rid]) && $statuses[$rid] === 'Available') {
+                $statuses[$rid] = 'Booked';
+            }
+        }
+    } catch (Throwable $e) {
+        error_log('poll-room-status.php: class check failed - ' . $e->getMessage());
+    }
 }
 
 echo json_encode($statuses);

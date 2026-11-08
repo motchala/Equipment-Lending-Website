@@ -5,9 +5,9 @@
  *
  * "Decide before the day" rule for room reservations that are waiting for an admin.
  *
- * A reservation can be Waiting because it is for a LATER DATE (every future-dated
- * reservation now waits for an admin's decision instead of being auto-approved) or
- * because an Organization Adviser attached a supporting letter (Super Admin review).
+ * A reservation is Waiting because it is for a LATER DATE: every future-dated
+ * reservation waits for an admin's decision instead of being auto-approved (a request
+ * letter may be attached to help the admin decide, but it is never required).
  *
  * If nobody has decided by the deadline, it is declined automatically:
  *
@@ -18,8 +18,8 @@
  * make other arrangements, instead of at the moment they needed the room.
  *
  * One exception keeps the rule sensible: a request that was only SUBMITTED after
- * 12:01 AM of its own reservation day (a same-day letter review) has no "before the
- * day" left, so its deadline is its start time.
+ * 12:01 AM of its own reservation day has no "before the day" left, so its deadline is
+ * its start time.
  *
  * There is no cron job in this project, so this runs lazily - at the top of every
  * read that depends on it (admin Reservations list, the review endpoint, the faculty

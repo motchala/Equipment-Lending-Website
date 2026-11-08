@@ -7,7 +7,7 @@
                 <div class="pr-page-header-row admin-screen-header">
                     <div>
                         <h1 class="pr-page-title">Facilities Management</h1>
-                        <p class="pr-page-subtitle">Browse facilities, reservations and reported issues.</p>
+                        <p class="pr-page-subtitle">Browse facilities and reservations.</p>
                     </div>
                     <?php if ($is_super_admin): ?>
                         <button type="button" class="pr-btn pr-btn-primary" data-action="show-room-form" id="addRoomBtn">
@@ -185,7 +185,7 @@
                     </div><!-- /.eq-card.form-card -->
                 </div><!-- /#room-form-wrap -->
 
-                <!-- Tabs: main tabs on the left, Archived in its own container on the far right -->
+                <!-- Tabs -->
                 <div class="rm-tabbar">
                     <div class="pr-sub-tabs" id="rooms-toggle-wrap">
                         <button type="button" class="pr-sub-tab active" data-rooms-tab="rooms-active">
@@ -200,18 +200,6 @@
                             if ($rm_resv_approved > 0): ?>
                                 <span class="pr-tab-badge" style="background:var(--text-light);"><?php echo $rm_resv_approved; ?></span>
                             <?php endif; ?>
-                        </button>
-                        <button type="button" class="pr-sub-tab" data-rooms-tab="rooms-issues">
-                            <span class="material-symbols-outlined rm-tab-ico" aria-hidden="true">report_problem</span> Issues
-                            <?php if (!empty($admin_room_issues_open)): ?>
-                                <span class="pr-tab-badge"><?php echo (int)$admin_room_issues_open; ?></span>
-                            <?php endif; ?>
-                        </button>
-                    </div>
-                    <div class="pr-sub-tabs rm-tabs-solo" id="rooms-archived-tab-wrap">
-                        <button type="button" class="pr-sub-tab" data-rooms-tab="rooms-archived">
-                            <span class="material-symbols-outlined rm-tab-ico" aria-hidden="true">inventory_2</span> Archived
-                            <span class="pr-tab-badge" id="roomsArchivedBadge" style="background:var(--text-light);<?php echo empty($rooms_archived) ? 'display:none;' : ''; ?>"><?php echo count($rooms_archived); ?></span>
                         </button>
                     </div>
                 </div>
@@ -320,16 +308,17 @@
                         $tb = !empty($b['request_date']) ? (int)strtotime($b['request_date']) : 0;
                         return ($tb <=> $ta) ?: ((int)$b['id'] <=> (int)$a['id']);
                     });
-                    // Waiting = reservations for a later date (any admin decides them) plus adviser requests with an
-                    // attached letter (Super Admin only - the query above never sends those to other admins).
-                    $rr_is_super = !empty($ps_rooms_can_view_sensitive_adviser_requests);
+                    // Waiting = reservations for a later date. Any admin decides them; a request letter, when one
+                    // was attached, opens from the row's details.
                     ?>
                     <div class="pr-card">
                         <div class="pr-card-header">
                             <h3><span class="material-symbols-outlined">calendar_month</span> Reservations</h3>
-                            <div class="pr-search-wrap">
-                                <span class="material-symbols-outlined">search</span>
-                                <input type="text" id="rrSearch" placeholder="Search facility or name" autocomplete="off" aria-label="Search reservations">
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <div class="pr-search-wrap">
+                                    <span class="material-symbols-outlined">search</span>
+                                    <input type="text" id="rrSearch" placeholder="Search facility or name" autocomplete="off" aria-label="Search reservations">
+                                </div><?php if ($is_super_admin): ?><button type="button" class="ps-btn ps-btn--danger" id="rr-wipe-btn" title="Permanently delete every reservation record"<?php echo empty($rr_rows) ? ' disabled' : ''; ?>><span class="material-symbols-outlined">delete_forever</span> Delete All</button><?php endif; ?>
                             </div>
                         </div>
                         <div class="rr-status-bar">
@@ -386,8 +375,7 @@
                                             if ($ar['status'] === 'Declined')  $ar_badge = 'ps-badge--overdue';
                                             if ($ar['status'] === 'Cancelled') $ar_badge = 'ps-badge--returned';
                                             if ($ar['status'] === 'Waiting')   $ar_badge = 'ps-badge--waiting';
-                                            // Every Waiting row this admin can see is theirs to decide: letter-based adviser
-                                            // requests are only ever loaded for a Super Admin, and the API enforces the same rule.
+                                            // Every Waiting row is the admin's to decide.
                                             $ar_reviewable = $ar['status'] === 'Waiting';
 
                                             $ar_type    = ps_submitted_as_label($ar['submitted_as']);
@@ -429,36 +417,43 @@
                                                 data-submitted-ts="<?php echo !empty($ar['request_date']) ? (int)strtotime($ar['request_date']) : 0; ?>"
                                                 data-can-review="<?php echo $ar_reviewable ? '1' : '0'; ?>"
                                                 data-cancellable="<?php echo $ar_cancellable ? '1' : '0'; ?>">
-                                                <td>
-                                                    <div class="rm-main"><?php echo htmlspecialchars($ar['room_name']); ?></div>
-                                                    <div class="rm-subline"><?php echo htmlspecialchars($ar_where); ?></div>
+                                                <td data-col="facility">
+                                                    <div class="eq-cell-name"><?php echo htmlspecialchars($ar['room_name']); ?></div>
+                                                    <div class="eq-cell-sub"><?php echo htmlspecialchars($ar_where); ?></div>
                                                 </td>
-                                                <td>
-                                                    <div class="rm-main"><?php echo date('M d, Y', strtotime($ar['reservation_date'])); ?></div>
-                                                    <div class="rm-subline rm-nowrap"><?php echo htmlspecialchars($ar_time); ?></div>
+                                                <td data-col="datetime">
+                                                    <div class="eq-cell-name"><?php echo date('M d, Y', strtotime($ar['reservation_date'])); ?></div>
+                                                    <div class="eq-cell-sub rm-nowrap"><?php echo htmlspecialchars($ar_time); ?></div>
                                                 </td>
-                                                <td>
-                                                    <div class="rm-main">
-                                                        <?php echo htmlspecialchars($ar_name); ?>
+                                                <td data-col="who">
+                                                    <div class="eq-cell-name"><?php echo htmlspecialchars($ar_name); ?><?php if ($ar_doc && $ar['status'] === 'Waiting'): ?><a class="rm-clip" href="<?php echo htmlspecialchars($ar_doc['open_url']); ?>" target="_blank" rel="noopener noreferrer" title="<?php echo htmlspecialchars($ar_doc['name']); ?>"><span class="material-symbols-outlined">attach_file</span></a><?php endif; ?></div>
+                                                    <div class="eq-cell-sub"><?php echo htmlspecialchars($ar_sub); ?></div>
+                                                </td>
+                                                <td data-col="col4">
+                                                    <?php if ($ar['status'] === 'Waiting'): ?>
                                                         <?php if ($ar_doc): ?>
-                                                            <a class="rm-clip" href="<?php echo htmlspecialchars($ar_doc['open_url']); ?>" target="_blank" rel="noopener noreferrer"
-                                                                title="Open attachment: <?php echo htmlspecialchars($ar_doc['name']); ?>">
-                                                                <span class="material-symbols-outlined">attach_file</span>
-                                                            </a>
+                                                            <a class="ps-doc-chip ps-doc-chip--<?php echo $ar_doc['kind']; ?>" href="<?php echo htmlspecialchars($ar_doc['open_url']); ?>" target="_blank" rel="noopener noreferrer" title="<?php echo htmlspecialchars($ar_doc['name']); ?>"><span class="material-symbols-outlined"><?php echo ps_doc_icon($ar_doc['kind']); ?></span><span class="ps-doc-chip__name"><?php echo htmlspecialchars($ar_doc['name']); ?></span><span class="material-symbols-outlined ps-doc-chip__open">open_in_new</span></a>
+                                                        <?php else: ?>
+                                                            <span class="ps-doc-chip ps-doc-chip--none"><span class="material-symbols-outlined">block</span> None</span>
                                                         <?php endif; ?>
-                                                    </div>
-                                                    <div class="rm-subline"><?php echo htmlspecialchars($ar_sub); ?></div>
+                                                    <?php elseif ($ar['status'] === 'Declined'): ?>
+                                                        <div class="eq-cell-sub" style="color:var(--danger)"><?php echo htmlspecialchars($ar['reason'] ?? '—'); ?></div>
+                                                    <?php elseif ($ar['status'] === 'Approved'): ?>
+                                                        <div class="eq-cell-sub"><?php echo htmlspecialchars($ar['notes'] ?? '—'); ?></div>
+                                                    <?php elseif ($ar['status'] === 'Cancelled'): ?>
+                                                        <div class="eq-cell-sub"><?php echo htmlspecialchars($ar['reason'] ?? '—'); ?></div>
+                                                    <?php else: ?>
+                                                        <div class="eq-cell-sub"><?php echo htmlspecialchars($ar['purpose'] ?? '—'); ?></div>
+                                                    <?php endif; ?>
                                                 </td>
-                                                <td><span class="ps-badge ps-badge--dot <?php echo $ar_badge; ?>"><?php echo htmlspecialchars($ar['status']); ?></span></td>
-                                                <td>
-                                                    <div class="rm-actions">
+                                                <td data-col="actions">
+                                                    <div class="eq-act-wrap">
                                                         <?php if ($ar_cancellable): ?>
                                                             <button type="button" class="pr-tbl-btn cancel-r btn-cancel-rr-admin"
                                                                 data-action="admin-cancel-reservation"
                                                                 data-rr-id="<?php echo (int)$ar['id']; ?>"
                                                                 data-room-name="<?php echo htmlspecialchars($ar['room_name']); ?>"
-                                                                data-faculty-name="<?php echo htmlspecialchars($ar['faculty_name']); ?>"
-                                                                title="Cancel this reservation">Cancel</button>
+                                                                data-faculty-name="<?php echo htmlspecialchars($ar['faculty_name']); ?>">Cancel</button>
                                                         <?php endif; ?>
                                                         <button type="button" class="pr-tbl-btn review" data-rr-detail><?php echo $ar_reviewable ? 'Review' : 'View'; ?></button>
                                                     </div>
@@ -488,90 +483,7 @@
                     <script src="room-reservation/assets/js/admin-rooms-reservations-table.js?v=<?php echo @filemtime(PS_ROOT . '/room-reservation/assets/js/admin-rooms-reservations-table.js'); ?>"></script>
                 </div><!-- /#rooms-reservations-panel -->
 
-                <!-- ISSUES -->
-                <div class="rooms-sub-panel" id="rooms-issues-panel">
-                    <div class="pr-card">
-                        <div class="pr-card-header">
-                            <h3><span class="material-symbols-outlined">report_problem</span> Facility Issues</h3>
-                        </div>
-                        <div class="pr-tbl-wrap">
-                            <table class="pr-table rm-table">
-                                <thead>
-                                    <tr>
-                                        <th>Facility</th>
-                                        <th>Report</th>
-                                        <th>Status</th>
-                                        <th><span class="rm-sr">Actions</span></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php if (empty($admin_room_issues)): ?>
-                                        <tr>
-                                            <td colspan="4" class="rm-empty-cell">No issue reports yet.</td>
-                                        </tr>
-                                        <?php else: foreach ($admin_room_issues as $issue):
-                                            $iss_pill = 'pr-pill-open';
-                                            if ($issue['status'] === 'Resolved')  $iss_pill = 'pr-pill-resolved';
-                                            if ($issue['status'] === 'Dismissed') $iss_pill = 'pr-pill-dismissed';
-                                        ?>
-                                            <tr>
-                                                <td>
-                                                    <div class="rm-main"><?php echo htmlspecialchars($issue['room_name']); ?></div>
-                                                    <div class="rm-subline"><?php echo htmlspecialchars($issue['floor_label'] . ', ' . $issue['building_name']); ?></div>
-                                                </td>
-                                                <td>
-                                                    <div class="rm-clamp" title="<?php echo htmlspecialchars($issue['description']); ?>"><?php echo htmlspecialchars($issue['description']); ?></div>
-                                                    <div class="rm-subline"><?php echo htmlspecialchars($issue['reported_by_name']); ?> &middot; <?php echo date('M d, Y', strtotime($issue['created_at'])); ?></div>
-                                                    <?php if (!empty($issue['admin_notes'])): ?>
-                                                        <div class="rm-subline rm-note" title="<?php echo htmlspecialchars($issue['admin_notes']); ?>">Note: <?php echo htmlspecialchars(mb_substr($issue['admin_notes'], 0, 60)); ?><?php echo mb_strlen($issue['admin_notes']) > 60 ? '&hellip;' : ''; ?></div>
-                                                    <?php endif; ?>
-                                                </td>
-                                                <td><span class="pr-pill <?php echo $iss_pill; ?>"><?php echo htmlspecialchars($issue['status']); ?></span></td>
-                                                <td>
-                                                    <?php if ($issue['status'] === 'Open'): ?>
-                                                        <div class="rm-actions">
-                                                            <button type="button" class="pr-tbl-btn review"
-                                                                data-action="open-issue-review"
-                                                                data-issue-id="<?php echo (int)$issue['id']; ?>"
-                                                                data-room-name="<?php echo htmlspecialchars($issue['room_name']); ?>"
-                                                                data-reporter="<?php echo htmlspecialchars($issue['reported_by_name']); ?>"
-                                                                data-description="<?php echo htmlspecialchars($issue['description']); ?>"
-                                                                title="Review this issue report">Review</button>
-                                                        </div>
-                                                    <?php endif; ?>
-                                                </td>
-                                            </tr>
-                                    <?php endforeach;
-                                    endif; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div><!-- /#rooms-issues-panel -->
-
-                <!-- ARCHIVED -->
-                <div class="rooms-sub-panel" id="rooms-archived-panel">
-                    <div class="pr-card">
-                        <div class="pr-card-header">
-                            <h3><span class="material-symbols-outlined">archive</span> Archived Facilities</h3>
-                        </div>
-                        <div class="pr-tbl-wrap">
-                            <table class="pr-table rm-table">
-                                <thead>
-                                    <tr>
-                                        <th>Facility</th>
-                                        <th><span class="rm-sr">Actions</span></th>
-                                    </tr>
-                                </thead>
-                                <tbody id="rooms-archived-body">
-                                    <?php echo ps_render_archived_tbody($rooms_archived, $is_super_admin); ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div><!-- /#rooms-archived-panel -->
-
-                <!-- /#rooms-issues-panel (end of sub-panels) -->
+                
 
 
 

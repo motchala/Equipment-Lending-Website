@@ -1,4 +1,5 @@
 <?php
+
 /**
  * room-reservation/api/verify-room-code.php
  * Validates a faculty code for the room reservation student flow.
@@ -13,8 +14,8 @@
  *
  * Success response:
  *   { valid: true, faculty_id, faculty_name, code_db_id, rooms: [...] }
- *   rooms[] = { campus_key, campus_name, building_name, room_id, room_name,
- *               floor_label, seating_capacity, status }
+ *   rooms[] = { campus_key, campus_name, building_name, building_key, building_image,
+ *               room_id, room_name, floor_number, floor_label, seating_capacity, status }
  */
 
 ini_set('display_errors', '0');
@@ -62,20 +63,14 @@ if ($row['is_used']) {
     exit();
 }
 
-// ── Student must be on the official student list (Settings → Student List) ──
-// Runs after the code is known to be valid and BEFORE anything is sent to the faculty.
-require_once __DIR__ . '/../../shared/core/student-registry.php';
+// ── Course must be one of the Student Portal's courses ──
+// (The Student No. itself is not validated.)
+require_once __DIR__ . '/../../shared/core/student-courses.php';
 $student_course = trim((string)($body['student_course'] ?? ''));
-if (!student_registry_valid_course($student_course)) {
+if (!student_course_valid($student_course)) {
     echo json_encode(['error' => 'Please select your course.']);
     exit();
 }
-$sv = student_registry_validate($conn, $student_id);
-if (!$sv['ok']) {
-    echo json_encode(['error' => $sv['error']]);
-    exit();
-}
-$student_id = $sv['student_no'];
 
 // ── Overdue block (equipment overdue blocks room reservations too) ─────────
 $overdue = $conn->prepare(
@@ -152,7 +147,7 @@ if ($fac_row && !empty($fac_row['email'])) {
 $rooms_stmt = $conn->prepare(
     "SELECT r.room_id, r.room_name, r.floor_number, r.floor_label,
             r.seating_capacity, r.status,
-            b.name AS building_name, b.building_key,
+            b.name AS building_name, b.building_key, b.image_path AS building_image,
             c.campus_key, c.campus_name
        FROM tbl_rooms r
        JOIN tbl_buildings b ON b.building_id = r.building_id
@@ -171,6 +166,9 @@ while ($r = $rooms_result->fetch_assoc()) {
         'room_name'        => $r['room_name'],
         'floor_label'      => $fl,
         'building_name'    => $r['building_name'],
+        'building_key'     => $r['building_key'],
+        'building_image'   => $r['building_image'] ?? '',
+        'floor_number'     => (int)$r['floor_number'],
         'campus_key'       => $r['campus_key'],
         'campus_name'      => $r['campus_name'],
         'seating_capacity' => $r['seating_capacity'] !== null ? (int)$r['seating_capacity'] : null,
@@ -179,7 +177,8 @@ while ($r = $rooms_result->fetch_assoc()) {
 }
 $rooms_stmt->close();
 
-function _ordinal_floor_rr(int $n): string {
+function _ordinal_floor_rr(int $n): string
+{
     if ($n === 1) return '1st Floor';
     if ($n === 2) return '2nd Floor';
     if ($n === 3) return '3rd Floor';

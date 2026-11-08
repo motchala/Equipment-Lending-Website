@@ -49,6 +49,7 @@ if (($_GET['view'] ?? '') === 'activity') {
     $activity = fact_load_rooms($conn, is_scalar($faculty_id) ? (string)$faculty_id : '');
     header('Cache-Control: no-store');
     echo json_encode([
+        'status' => fact_render_rooms_status($activity),
         'body'  => fact_render_rooms_body($activity),
         'rows'  => fact_render_room_history_rows($activity),
         'stats' => fact_room_stats($activity),

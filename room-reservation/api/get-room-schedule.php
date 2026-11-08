@@ -123,6 +123,29 @@ while ($row = $res_result->fetch_assoc()) {
 }
 $res_stmt->close();
 
+// Weekly class meetings (imported timetable) occupy the room on the same weekday every week
+try {
+    require_once __DIR__ . '/../core/class-schedule.php';
+    $class_day_keys = [1 => 'mon', 2 => 'tue', 3 => 'wed', 4 => 'thu', 5 => 'fri', 6 => 'sat'];
+    foreach (cs_room_week_rows($conn, $room_id) as $c) {
+        $k = $class_day_keys[(int)$c['day_of_week']] ?? null;
+        if ($k === null) continue;
+        $who = trim((string)($c['faculty_name'] ?? ''));
+        $week[$k][] = [
+            'start' => $c['start_hm'],
+            'end'   => $c['end_hm'],
+            'label' => htmlspecialchars(cs_class_label($c)) . ' &mdash; ' . ($who !== '' ? htmlspecialchars($who) : 'no instructor yet'),
+            'kind'  => 'class',
+        ];
+    }
+    foreach ($week as &$day_list) {
+        usort($day_list, static function (array $a, array $b): int { return strcmp($a['start'], $b['start']); });
+    }
+    unset($day_list);
+} catch (Throwable $e) {
+    error_log('get-room-schedule.php: class meetings failed - ' . $e->getMessage());
+}
+
 echo json_encode([
     'room_id'          => $room_id,
     'room_name'        => $room_info['room_name'],

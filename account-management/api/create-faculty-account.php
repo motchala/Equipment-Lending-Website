@@ -85,8 +85,6 @@ $first_name          = trim($_POST['first_name'] ?? '');
 $last_name           = trim($_POST['last_name'] ?? '');
 $password_raw        = $_POST['password'] ?? '';
 $confirm_raw         = $_POST['confirm_password'] ?? '';
-$is_org_adviser      = (($_POST['is_org_adviser'] ?? '0') === '1') ? 1 : 0;
-$organization_id_raw = intval($_POST['organization_id'] ?? 0);
 
 // -- Validation: first_name ---------------------------------------------------
 if ($first_name === '' || strlen($first_name) > 100) {
@@ -224,17 +222,6 @@ if ($dup_stmt->num_rows > 0) {
 }
 $dup_stmt->close();
 
-// -- Adviser + organization -----------------------------------------------------
-// The organization must exist and (checked below, under a lock) must not already have an adviser.
-$organization_id = null;
-if ($is_org_adviser === 1) {
-    if ($organization_id_raw <= 0) {
-        send_json(422, 'error', 'An organization must be selected for an adviser.');
-    }
-    $organization_id = $organization_id_raw;
-}
-// If is_org_adviser is 0, organization_id remains NULL.
-
 // -- Full name (first + last) ---------------------------------------------------
 // Stored with a capital first letter on every word ("juan dela cruz" -> "Juan Dela Cruz").
 // Done after the registry lookup, which ignores letter case, so matching is unaffected.
@@ -244,39 +231,20 @@ $fullname = $first_name . ' ' . $last_name;
 
 // -- Password & role --------------------------------------------------------------
 $password_hash = password_hash($password_raw, PASSWORD_BCRYPT);
-$role = ($is_org_adviser === 1) ? 'Organization Adviser' : 'Regular Faculty';
-// Org privileges are automatic, and identical for every organization: being an
-// Organization Adviser is what grants them.
-$allow_org_borrowing = $is_org_adviser;
+$role = 'Regular Faculty';
 $backup_val = null;   // the backup email is no longer collected here
 
 // -- Insert -----------------------------------------------------------------------
 $in_tx = false;
 try {
-    if ($is_org_adviser === 1) {
-        // One adviser per organization. Lock the organization row first so two admins cannot
-        // both pass the check and give the same organization two advisers.
-        $conn->begin_transaction();
-        $in_tx = true;
-        if (!orgs_lock($conn, $organization_id)) {
-            $conn->rollback();
-            send_json(422, 'error', 'An organization must be selected for an adviser.');
-        }
-        $conflict = orgs_adviser_conflict($conn, $organization_id, '');
-        if ($conflict) {
-            $conn->rollback();
-            send_json(409, 'error', orgs_adviser_conflict_message($conflict));
-        }
-    }
-
     $inserted = false;
     $errno = 0;
     $errmsg = '';
-    $ins_stmt = $conn->prepare("INSERT INTO tbl_users (fullname, faculty_id, email, backup_email, password, role, is_org_adviser, organization_id, allow_org_borrowing) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $ins_stmt = $conn->prepare("INSERT INTO tbl_users (fullname, faculty_id, email, backup_email, password, role) VALUES (?, ?, ?, ?, ?, ?)");
     if (!$ins_stmt) {
         throw new RuntimeException('INSERT prepare failed: ' . $conn->error);
     }
-    $ins_stmt->bind_param('ssssssiii', $fullname, $faculty_id, $pupsync_email, $backup_val, $password_hash, $role, $is_org_adviser, $organization_id, $allow_org_borrowing);
+    $ins_stmt->bind_param('ssssss', $fullname, $faculty_id, $pupsync_email, $backup_val, $password_hash, $role);
     if ($ins_stmt->execute()) {
         $inserted = true;
     } else {
@@ -323,13 +291,34 @@ try {
     send_json(500, 'error', 'Could not create account. Please try again.');
 }
 
+// -- Class schedule ------------------------------------------------------------------
+// If this person's weekly classes were imported (Faculty Rooms workbook), attach them to the new account
+// now, by Faculty ID or, failing that, by name. They then show up in their own class schedule.
+// Never blocks account creation.
+$class_meetings = 0;
+try {
+    require_once __DIR__ . '/../../room-reservation/core/class-schedule.php';
+    cs_link_accounts($conn, $faculty_id, $fullname);
+    if (cs_table_ready($conn) && ($cst = $conn->prepare('SELECT COUNT(*) FROM tbl_class_schedule WHERE account_faculty_id = ?'))) {
+        $cst->bind_param('s', $faculty_id);
+        $cst->execute();
+        $cst->bind_result($class_meetings);
+        $cst->fetch();
+        $cst->close();
+    }
+} catch (Throwable $e) {
+    error_log('[create-faculty-account] class schedule link: ' . $e->getMessage());
+}
+$class_meetings = (int)$class_meetings;
+
 // -- Success ------------------------------------------------------------------------
 require_once __DIR__ . '/../../shared/core/activity-logger.php';
-admin_log_activity($conn, 'faculty', 'Created faculty account for ' . $fullname);
+admin_log_activity($conn, 'faculty', 'Created faculty account for ' . $fullname . ($class_meetings > 0 ? ' (' . $class_meetings . ' weekly class meetings added to their schedule)' : ''));
 http_response_code(201);
 echo json_encode([
     'status' => 'success',
     'faculty_id' => $faculty_id,
-    'message' => 'Faculty account created successfully.'
+    'class_meetings' => $class_meetings,
+    'message' => 'Faculty account created successfully.' . ($class_meetings > 0 ? ' ' . $class_meetings . ' weekly class meetings were added to their class schedule.' : '')
 ]);
 exit;

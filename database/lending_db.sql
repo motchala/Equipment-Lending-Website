@@ -3,14 +3,17 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Oct 25, 2026 at 03:47 AM
+-- Generation Time: Nov 06, 2026 at 03:52 AM
 -- Server version: 10.4.32-MariaDB
--- PHP Version: 8.4.27
+-- PHP Version: 8.2.12
+
+
 DROP DATABASE IF EXISTS `lending_db`;
 CREATE DATABASE `lending_db`
   CHARACTER SET utf8mb4
   COLLATE utf8mb4_general_ci;
 USE `lending_db`;
+
 
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
@@ -51,30 +54,9 @@ CREATE TABLE `tbl_accounts` (
 -- Dumping data for table `tbl_accounts`
 --
 
-INSERT INTO `tbl_accounts` (`id`, `fullName`, `email`, `password`, `role`, `created_at`, `last_login`, `dormant_until`, `session_epoch`, `last_password_change`) VALUES
-(1, 'Redg Admin', 'main@admin.edu', '$2y$10$dLNCtd5IGqTMf7VUHFYyEOPI00YWyd9h9n4uj6dTptlcKwFNcw57e', 'Super Admin', '2026-01-01 00:00:00', '2026-10-24 17:33:45', NULL, 0, NULL),
-(2, 'Chico Ramos', 'chico@admin.edu', '$2y$10$w.G7jIE6r6iSsVyn/T/G2OAhoqpyxgu4kkWKbHIhOky/CJk94xLGC', 'Admin', '2026-10-02 11:05:03', '2026-10-04 05:50:19', NULL, 0, NULL);
-
--- --------------------------------------------------------
-
---
--- Table structure for table `tbl_remember_tokens`
---
-
-CREATE TABLE `tbl_remember_tokens` (
-  `selector` char(32) NOT NULL,
-  `validator_hash` char(64) NOT NULL,
-  `account_type` enum('admin','faculty') NOT NULL,
-  `account_email` varchar(255) NOT NULL,
-  `credential_hash` char(64) NOT NULL,
-  `auth_time` bigint(20) unsigned NOT NULL,
-  `expires_at` datetime NOT NULL,
-  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
-  `last_used_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`selector`),
-  KEY `idx_remember_expiry` (`expires_at`),
-  KEY `idx_remember_account` (`account_type`,`account_email`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+INSERT INTO `tbl_accounts` (`id`, `fullName`, `email`, `password`, `role`, `created_at`, `last_login`, `dormant_until`, `session_epoch`, `last_password_change`, `backup_email`) VALUES
+(1, 'Redg Admin', 'main@admin.edu', '$2y$10$dLNCtd5IGqTMf7VUHFYyEOPI00YWyd9h9n4uj6dTptlcKwFNcw57e', 'Super Admin', '2026-01-01 00:00:00', '2026-11-06 08:08:18', NULL, 0, NULL, NULL),
+(2, 'Chico Ramos', 'chico@admin.edu', '$2y$10$w.G7jIE6r6iSsVyn/T/G2OAhoqpyxgu4kkWKbHIhOky/CJk94xLGC', 'Admin', '2026-10-02 11:05:03', '2026-10-04 05:50:19', NULL, 0, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -118,7 +100,20 @@ INSERT INTO `tbl_admin_activity` (`id`, `admin_id`, `admin_name`, `category`, `a
 (16, 1, 'Redg Admin', 'login', NULL, 'Signed in', NULL, NULL, NULL, '2026-10-22 20:24:22'),
 (17, 1, 'Redg Admin', 'faculty', NULL, 'Uploaded faculty registry: 92 inserted, 0 updated, 0 skipped', NULL, NULL, NULL, '2026-10-22 20:26:14'),
 (18, 1, 'Redg Admin', 'login', NULL, 'Signed in', NULL, NULL, NULL, '2026-10-24 17:33:45'),
-(19, 1, 'Redg Admin', 'request', 'request_returned', 'Marked Double A Batter as returned (Edmundo Dela Cruz)', 'request', 25, NULL, '2026-10-24 17:35:45');
+(19, 1, 'Redg Admin', 'request', 'request_returned', 'Marked Double A Batter as returned (Edmundo Dela Cruz)', 'request', 25, NULL, '2026-10-24 17:35:45'),
+(20, 1, 'Redg Admin', 'login', NULL, 'Signed in', NULL, NULL, NULL, '2026-11-06 07:40:24'),
+(21, 1, 'Redg Admin', 'faculty', NULL, 'Deleted faculty account of Stephen Perez', NULL, NULL, NULL, '2026-11-06 07:41:11'),
+(22, 1, 'Redg Admin', 'faculty', NULL, 'Deleted faculty account of Michael Anjelo Miguel', NULL, NULL, NULL, '2026-11-06 07:41:17'),
+(23, 1, 'Redg Admin', 'faculty', NULL, 'Deleted faculty account of Indaleen Quinsayas', NULL, NULL, NULL, '2026-11-06 07:41:23'),
+(24, 1, 'Redg Admin', 'faculty', NULL, 'Deleted faculty account of Edmundo Dela Cruz', NULL, NULL, NULL, '2026-11-06 07:41:27'),
+(25, 1, 'Redg Admin', 'settings', NULL, 'Unlocked the Imports tab', NULL, NULL, NULL, '2026-11-06 07:44:00'),
+(26, 1, 'Redg Admin', 'faculty', NULL, 'Uploaded faculty registry: 92 inserted, 0 updated, 0 skipped (file: Faculty Identification Records - Sheet1.pdf, replaced the previous file)', NULL, NULL, NULL, '2026-11-06 07:57:30'),
+(27, 1, 'Redg Admin', 'faculty', NULL, 'Created faculty account for Michael Anjelo Miguel', NULL, NULL, NULL, '2026-11-06 07:58:19'),
+(28, 1, 'Redg Admin', 'faculty', NULL, 'Created faculty account for Edmundo Dela Cruz', NULL, NULL, NULL, '2026-11-06 07:59:19'),
+(29, 1, 'Redg Admin', 'faculty', NULL, 'Created faculty account for Indaleen Quinsayas', NULL, NULL, NULL, '2026-11-06 07:59:50'),
+(30, 1, 'Redg Admin', 'faculty', NULL, 'Created faculty account for Aaron Atienza', NULL, NULL, NULL, '2026-11-06 08:00:20'),
+(31, 1, 'Redg Admin', 'faculty', NULL, 'Created faculty account for Stephen Perez', NULL, NULL, NULL, '2026-11-06 08:06:16'),
+(32, 1, 'Redg Admin', 'login', NULL, 'Signed in', NULL, NULL, NULL, '2026-11-06 08:08:18');
 
 -- --------------------------------------------------------
 
@@ -167,7 +162,6 @@ CREATE TABLE `tbl_arbitration_config` (
 INSERT INTO `tbl_arbitration_config` (`id`, `config_key`, `config_value`, `updated_at`) VALUES
 (1, 'tie_break_window_seconds', '5', '2026-06-04 05:42:29'),
 (2, 'role_priority_director', '4', '2026-06-04 05:42:29'),
-(3, 'role_priority_adviser', '3', '2026-06-04 05:42:29'),
 (4, 'role_priority_faculty', '2', '2026-06-04 05:42:29'),
 (5, 'role_priority_student', '1', '2026-06-04 05:42:29'),
 (6, 'rule_overdue_block_enabled', '1', '2026-06-04 05:42:29'),
@@ -302,15 +296,6 @@ CREATE TABLE `tbl_faculty_codes` (
   `used_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `tbl_faculty_codes`
---
-
-INSERT INTO `tbl_faculty_codes` (`id`, `faculty_id`, `faculty_name`, `code`, `is_used`, `used_by_name`, `used_by_id`, `created_at`, `used_at`) VALUES
-(1, '2023-00004-BN-0', 'Sandy Napiza', '7v4-48t-8u9', 1, 'sandy', '2023-00004-BN-0', '2026-06-04 13:46:31', '2026-06-04 13:46:58'),
-(3, '2023-00251-BN-0', 'Frederick Rosales', 'nk5-m6x-w2k', 1, 'Kiloman', '2023-00250-BN-0', '2026-06-06 22:07:38', '2026-06-06 22:09:27'),
-(12, 'NOTSET-275A970376E5', 'Edmundo Dela Cruz', 'thk-d84-fxk', 0, NULL, NULL, '2026-10-24 18:50:49', NULL);
-
 -- --------------------------------------------------------
 
 --
@@ -331,17 +316,6 @@ CREATE TABLE `tbl_faculty_item_codes` (
   `created_at` datetime NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `tbl_faculty_item_codes`
---
-
-INSERT INTO `tbl_faculty_item_codes` (`id`, `faculty_id`, `faculty_name`, `item_name`, `item_id`, `code`, `is_used`, `used_by_name`, `used_by_id`, `used_at`, `created_at`) VALUES
-(21, 'NOTSET-275A970376E5', 'Edmundo Dela Cruz', 'Double A Batter', 32, 'GSnT6qmAmeGw', 0, NULL, NULL, NULL, '2026-10-24 17:31:00'),
-(22, 'NOTSET-275A970376E5', 'Edmundo Dela Cruz', 'Extension', 10, 'WVaYWSrU6cmA', 0, NULL, NULL, NULL, '2026-10-24 16:48:27'),
-(23, 'NOTSET-275A970376E5', 'Edmundo Dela Cruz', 'HDMI Cable', 8, '9zvCYBhL8nW3', 0, NULL, NULL, NULL, '2026-10-24 16:48:42'),
-(24, 'NOTSET-275A970376E5', 'Edmundo Dela Cruz', 'Projector', 31, 'mzMyXjRee2YG', 0, NULL, NULL, NULL, '2026-10-24 16:48:52'),
-(25, 'NOTSET-275A970376E5', 'Edmundo Dela Cruz', 'Table', 30, '7ddrx92XefNr', 0, NULL, NULL, NULL, '2026-10-24 16:48:52');
-
 -- --------------------------------------------------------
 
 --
@@ -356,13 +330,6 @@ CREATE TABLE `tbl_faculty_notif_state` (
   `is_deleted` tinyint(1) NOT NULL DEFAULT 0,
   `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `tbl_faculty_notif_state`
---
-
-INSERT INTO `tbl_faculty_notif_state` (`id`, `faculty_id`, `notif_key`, `is_read`, `is_deleted`, `updated_at`) VALUES
-(7, 'NOTSET-F15E038389ED', 'sysnotice-1', 1, 0, '2026-10-06 09:25:29');
 
 -- --------------------------------------------------------
 
@@ -379,6 +346,104 @@ CREATE TABLE `tbl_faculty_registry` (
   `uploaded_at` datetime NOT NULL DEFAULT current_timestamp(),
   `uploaded_by` varchar(255) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `tbl_faculty_registry`
+--
+
+INSERT INTO `tbl_faculty_registry` (`id`, `faculty_id`, `full_name`, `department`, `is_newly_hired`, `uploaded_at`, `uploaded_by`) VALUES
+(558, 'FA0006BN2024', 'Aaron A. Atienza', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(559, 'FA0003BN2021', 'Abigail T. Verterra', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(560, NULL, 'Aleli Joy A. Prestado', '', 1, '2026-11-06 07:57:30', 'Redg Admin'),
+(561, 'FA0006BN2026', 'Alonica Mae M. Ebo', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(562, NULL, 'Andrea Mhe Abarca', '', 1, '2026-11-06 07:57:30', 'Redg Admin'),
+(563, 'FA0012ST2009', 'Angelita E. Nocon', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(564, 'FA0004BN2022', 'Annabelle V. Molina', 'BEED', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(565, 'FA0001SP2014', 'Antonio D. Noel', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(566, NULL, 'April L. Villaverde', 'BSEDEN', 1, '2026-11-06 07:57:30', 'Redg Admin'),
+(567, 'FA0021BN2011', 'Araceli C. Amoranto', 'BSEDSS', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(568, 'FA0143MN2016', 'Archie C. Arevalo', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(569, NULL, 'Ariel S. Ponce', '', 1, '2026-11-06 07:57:30', 'Redg Admin'),
+(570, 'FA0005BN2026', 'Arvin M. Nuñez', 'BEED', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(571, 'FA0005SP2012', 'Benjamin A. Abarquez Jr.', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(572, 'FA0010BN2026', 'Benjamin Hernandez', 'BSIT', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(573, 'FA0053SP2012', 'Bonifacio Umaclap', 'BSBAHRM', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(574, NULL, 'Carissa C. Morano', '', 1, '2026-11-06 07:57:30', 'Redg Admin'),
+(575, 'FA0002BN2022', 'Carmen L. Yupangco', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(576, NULL, 'Celine N. Ocfemia', 'BSCPE', 1, '2026-11-06 07:57:30', 'Redg Admin'),
+(577, NULL, 'Charisse A. Nethercott', '', 1, '2026-11-06 07:57:30', 'Redg Admin'),
+(578, 'FA0161MN2010', 'Cheryl Joyce D. Jurado', 'BSEDEN', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(579, 'FA0005BN2019', 'Dennis R. Estocado', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(580, 'FA0008BN2023', 'Edmundo S. Dela Cruz', 'DIT', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(581, NULL, 'Edward Francis Gabor', '', 1, '2026-11-06 07:57:30', 'Redg Admin'),
+(582, 'FA0003BN2024', 'Elena de Torres Teh', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(583, 'FA0011BN2025', 'Elvira R. Yambot', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(584, 'FA0007BN2023', 'Federick C. Macarubbo', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(585, NULL, 'Francesca T. Chavenia', 'BSEDEN', 1, '2026-11-06 07:57:30', 'Redg Admin'),
+(586, 'FA0009BN2023', 'Gatsby Aparejado Valdemoro', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(587, 'FA0013BN2011', 'Gerino P. Abelida Jr.', 'DCPET', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(588, NULL, 'Gian Carlo C. Villagracia', 'BSBAHRM', 1, '2026-11-06 07:57:30', 'Redg Admin'),
+(589, 'FA0006BN2025', 'Gio M. Marcos', 'BSCPE', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(590, 'FA0001BN2020', 'Glorina Divina P. Orozco', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(591, 'FA0002BN2026', 'Gracel Eliza Ching Greta', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(592, 'FA0004BN2016', 'Hannah Ledda B. Ferrer', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(593, 'FA0014BN2022', 'Hardly D. Abellano', 'BSCPE', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(594, 'FA0003ST2012', 'Herdino Cañeja', 'BSCPE', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(595, 'FA0002BN2016', 'Indaleen P. Quinsayas', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(596, 'FA0008TG2012', 'Israel G. Ortega', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(597, 'FA0004BN2026', 'Jan Martin Resureccion', 'BEED', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(598, 'FA0002BN2023', 'Jayson M. Capistrano', 'BSIT', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(599, NULL, 'Jayvee John Louie de Guzman', '', 1, '2026-11-06 07:57:30', 'Redg Admin'),
+(600, 'FA0003BN2018', 'Jean J. Tolentino', 'BSIE', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(601, 'FA0003BN2026', 'Jexter Magsino', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(602, 'FA0009BN2022', 'Jhun Jhun B. Maravilla', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(603, 'FA0015BN2023', 'Jobert D. Cadiz', 'DCPET', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(604, NULL, 'John O. Conanan', '', 1, '2026-11-06 07:57:30', 'Redg Admin'),
+(605, 'FA0011BN2023', 'John Rafael D. Risos', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(606, 'FA0011BN2021', 'John Robby O. Robiños', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(607, 'FA0012BN2022', 'Jose Cardama Delgado', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(608, 'FA0021MN2009', 'Josefina B. Macarubbo', 'BSBAHRM', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(609, 'FA0783MN2008', 'Juan C. Birion', 'BSPSY', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(610, 'FA0002BN2020', 'Kris Rommel R. Ramos', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(611, 'FA0007BN2026', 'Kurt Kurt Leinard D. Balbuena', 'BSCPE', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(612, 'FA0001BN2024', 'Lawrence Lucis Bucayu', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(613, 'FA0010BN2025', 'BSPSY', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(614, NULL, 'Luke Garcia', '', 1, '2026-11-06 07:57:30', 'Redg Admin'),
+(615, 'FA0008MN2009', 'Ma. Gemalyn S. Austria', 'BSIT', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(616, 'FA0002BN2012', 'Manolo David B. Rivera', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(617, NULL, 'Marco M. Badion', '', 1, '2026-11-06 07:57:30', 'Redg Admin'),
+(618, 'FA0004TG2009', 'Margarita T. Sevilla', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(619, 'FA0003BN2022', 'Marichu L. Camposano', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(620, 'FA0010BN2023', 'Mark Anthony P. Lagumen', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(621, 'FA0008BN2025', 'Marte D. Nipas', 'DIT', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(622, NULL, 'Mary Anne Legarda', '', 1, '2026-11-06 07:57:30', 'Redg Admin'),
+(623, NULL, 'Mathew Ives L. Yupangco', 'BSPSY', 1, '2026-11-06 07:57:30', 'Redg Admin'),
+(624, 'FA0054SP2012', 'Maura Umaclap', 'BEED', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(625, 'FA0004BN2018', 'May L. Borjal', 'BSEDSS', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(626, 'FA0015SP2021', 'Mc Joben R. Reyes', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(627, 'FA0038MN2017', 'McLougin Mislan', 'BSCPE', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(628, 'FA0004BN2025', 'Melanie Matilla Lalim', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(629, 'FA0010BN2022', 'Melanny E. Rivera', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(630, 'FA0005BN2016', 'Michael Anjelo O. Miguel', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(631, NULL, 'Muhammad A. Lambas', 'DCPET', 1, '2026-11-06 07:57:30', 'Redg Admin'),
+(632, 'FA0012BN2024', 'Nancy M. Cabaluna', 'BSEDSS', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(633, 'FA0047SP2012', 'Nelissa B. Perey', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(634, 'FA0009BN2026', 'Neribeth Charm G. Agripa', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(635, 'FA0001BN2025', 'Nestleson H. Alagon', 'BSCPE', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(636, 'FA0007BN2025', 'Nikki Crystel A. Elic', 'BSIE', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(637, 'FA0001BN2011', 'Noemi Apostol', 'DIT', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(638, 'FA0001PQ2019', 'Paul John J. Capote', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(639, 'FA0008BN2026', 'Paul Vincent A. Vierneza', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(640, NULL, 'Rafael Lloyd Domingo', 'BSIT', 1, '2026-11-06 07:57:30', 'Redg Admin'),
+(641, 'FA0060MN2012', 'DCPET', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(642, 'FA0001BN2026', 'Rafael M. Bungualan', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(643, 'FA0002TG2012', 'Reginald G. Raquiza', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(644, 'FA0013BN2022', 'Rochelle Hanna C. Nopueto', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(645, 'FA0005BN2023', 'Rod Phillip M. Corro', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(646, NULL, 'Ronnel P. Virtucio', 'DCPET', 1, '2026-11-06 07:57:30', 'Redg Admin'),
+(647, 'FA0002BN2025', 'Sarah Ethel T. Jasmin', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(648, 'FA0011BN2026', 'Stephen Mathew C. Perez', '', 0, '2026-11-06 07:57:30', 'Redg Admin'),
+(649, 'FA0002BN2019', 'Widonna B. Cuenca', 'BSEDEN', 0, '2026-11-06 07:57:30', 'Redg Admin');
 
 -- --------------------------------------------------------
 
@@ -403,6 +468,13 @@ CREATE TABLE `tbl_faculty_registry_files` (
   `uploaded_at` datetime NOT NULL DEFAULT current_timestamp(),
   `imported_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `tbl_faculty_registry_files`
+--
+
+INSERT INTO `tbl_faculty_registry_files` (`id`, `original_name`, `stored_name`, `mime_type`, `file_size`, `sha256`, `import_mode`, `row_count`, `inserted_count`, `updated_count`, `skipped_count`, `status`, `uploaded_by`, `uploaded_at`, `imported_at`) VALUES
+(1, 'Faculty Identification Records - Sheet1.pdf', 'c7d47e11d20e940331e7ac9e502e3345.pdf', 'application/pdf', 65772, '7d697dbb0c0c55e296ba28ca4768bd4b443d16e890b58fad486f376a187cb2d7', 'merge', 92, 92, 0, 0, 'imported', 'Redg Admin', '2026-11-06 07:57:29', '2026-11-06 07:57:30');
 
 -- --------------------------------------------------------
 
@@ -454,8 +526,7 @@ CREATE TABLE `tbl_ip_login_attempts` (
 --
 
 INSERT INTO `tbl_ip_login_attempts` (`id`, `ip_address`, `fail_count`, `window_start`, `locked_until`) VALUES
-(1, '::1', 0, '2026-10-06 11:08:03', NULL),
-(16, '127.0.0.1', 0, '2026-10-25 09:23:45', NULL);
+(1, '::1', 0, '2026-11-06 08:06:36', NULL);
 
 -- --------------------------------------------------------
 
@@ -493,16 +564,6 @@ CREATE TABLE `tbl_login_attempts` (
 --
 
 INSERT INTO `tbl_login_attempts` (`id`, `identifier`, `ip_address`, `attempt_count`, `lockout_level`, `locked_until`, `last_attempt`, `login_ok`) VALUES
-(1, 'stephenperez@gmail.com', '::1', 2, 0, NULL, '2026-10-05 20:13:15', 0),
-(2, 'chico@admin.edu', '::1', 0, 0, NULL, '2026-10-02 13:12:58', 1),
-(3, 'mendza@gmil.com', '::1', 2, 0, NULL, '2026-10-02 13:11:52', 0),
-(5, 'mendoza@gmail.com', '::1', 2, 0, NULL, '2026-10-02 13:16:50', 0),
-(7, 'iamfrederickr@gmail.com', '::1', 0, 0, NULL, '2026-10-03 22:50:16', 1),
-(8, 'iamfrederick@gmail.com', '::1', 1, 0, NULL, '2026-10-03 11:04:52', 0),
-(9, 'dawdad@gmail.com', '::1', 0, 1, '2026-10-03 22:54:44', '2026-10-03 22:49:44', 0),
-(12, 'dawda@gmail.com', '::1', 1, 0, NULL, '2026-10-03 22:49:58', 0),
-(14, 'stephenperez@pupsync.edu', '::1', 0, 0, NULL, '2026-10-06 08:19:45', 1),
-(18, 'main@admin.edu', '::1', 0, 0, NULL, '2026-10-06 03:05:35', 1),
 (19, 'juandelacruz@pup.edu.ph', '127.0.0.1', 0, 1, '2026-10-18 10:18:53', '2026-10-18 10:13:53', 0);
 
 -- --------------------------------------------------------
@@ -530,31 +591,20 @@ INSERT INTO `tbl_notif_state` (`id`, `notif_key`, `is_read`, `is_deleted`, `upda
 -- --------------------------------------------------------
 
 --
--- Table structure for table `tbl_organizations`
+-- Table structure for table `tbl_remember_tokens`
 --
 
-CREATE TABLE `tbl_organizations` (
-  `id` int(11) NOT NULL,
-  `name` varchar(100) NOT NULL,
-  `created_at` datetime DEFAULT current_timestamp(),
-  `category` varchar(30) DEFAULT NULL
+CREATE TABLE `tbl_remember_tokens` (
+  `selector` char(32) NOT NULL,
+  `validator_hash` char(64) NOT NULL,
+  `account_type` enum('admin','faculty') NOT NULL,
+  `account_email` varchar(255) NOT NULL,
+  `credential_hash` char(64) NOT NULL,
+  `auth_time` bigint(20) UNSIGNED NOT NULL,
+  `expires_at` datetime NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `last_used_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `tbl_organizations`
---
-
-INSERT INTO `tbl_organizations` (`id`, `name`, `created_at`, `category`) VALUES
-(1, 'IBITS', '2026-10-01 13:05:15', 'Academic'),
-(2, 'YES', '2026-10-01 13:05:15', 'Academic'),
-(3, 'ACES', '2026-10-01 13:05:15', 'Academic'),
-(5, 'HRSS', '2026-10-06 04:16:02', 'Academic'),
-(6, 'PIIE', '2026-10-06 04:16:02', 'Academic'),
-(7, 'SMS', '2026-10-06 04:16:02', 'Academic'),
-(8, 'LENS', '2026-10-06 04:16:02', 'Non-academic'),
-(9, 'AWS', '2026-10-06 04:16:02', 'Non-academic'),
-(10, 'NXTGEN', '2026-10-06 04:16:02', 'Non-academic'),
-(11, 'CSC', '2026-10-06 04:16:02', NULL);
 
 -- --------------------------------------------------------
 
@@ -590,39 +640,60 @@ CREATE TABLE `tbl_requests` (
   `borrow_qty` int(11) NOT NULL DEFAULT 1,
   `room_id` int(11) DEFAULT NULL,
   `booking_mode` varchar(10) DEFAULT NULL,
-  `stock_applied` tinyint(1) NOT NULL DEFAULT 1
+  `stock_applied` tinyint(1) NOT NULL DEFAULT 1,
+  `extension_count` int(11) NOT NULL DEFAULT 0,
+  `original_return_date` date DEFAULT NULL,
+  `original_return_time` time DEFAULT NULL,
+  `extension_late_seconds` int(10) UNSIGNED NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `tbl_requests`
 --
 
-INSERT INTO `tbl_requests` (`id`, `faculty_name`, `faculty_id`, `equipment_name`, `instructor`, `room`, `borrow_date`, `return_date`, `return_token`, `returned_at`, `status`, `request_date`, `reason`, `document_path`, `arbitration_rule`, `submitted_by_name`, `submitted_by_id`, `submitted_as`, `batch_id`, `borrow_time`, `return_time`, `borrow_qty`, `room_id`, `booking_mode`, `stock_applied`) VALUES
-(1, 'Mendoza', '2023-00230-BN-0', 'AC Remote', 'Sir Migs', 'A305', '2026-01-15', '2026-01-16', NULL, NULL, 'Overdue', '2026-01-15 11:04:23', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1),
-(2, 'Mendoza', '2023-00230-BN-0', 'AC Remote', 'elaine', 'B403', '2026-01-15', '2026-01-15', NULL, NULL, 'Declined', '2026-01-15 11:08:29', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1),
-(3, 'Frederick Rosales', '2023-00251-BN-0', 'Extension', 'Sir Migs', 'B203', '2026-01-23', '2026-01-24', NULL, NULL, 'Returned', '2026-01-15 12:28:40', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1),
-(4, 'Frederick Rosales', '2023-00251-BN-0', 'Projector', 'Ma\'am Donna', 'E031', '2026-02-05', '2026-02-12', NULL, NULL, 'Returned', '2026-01-15 12:30:25', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1),
-(5, 'John Jr.', '2030-00071-BN-0', 'AC Remote', 'Sir Migs', 'B203', '2026-01-15', '2026-01-16', NULL, NULL, 'Overdue', '2026-01-15 13:51:29', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1),
-(6, 'Frederick Rosales', '2023-00251-BN-0', 'HDMI Cable', 'Ma\'am Donna', 'B205', '2026-02-19', '2026-02-22', NULL, NULL, 'Returned', '2026-02-18 00:27:57', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1),
-(7, 'Aiello Gabriel B. Lastrella', '2023-00294-BN-0', 'HDMI Cable', 'Sir Migs', 'Room A304', '2026-02-20', '2026-02-20', NULL, NULL, 'Overdue', '2026-02-19 15:07:14', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1),
-(8, 'Frederick Rosales', '2023-00251-BN-0', 'Projector', 'sir noy', 'B304', '2026-02-23', '2026-02-25', NULL, NULL, 'Declined', '2026-02-22 17:29:16', 'Out of stock – maximum approved requests reached', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1),
-(9, 'Derick Ramsey', '2023-00651-BN-0', 'Projector', 'ma\'am JJ', 'A901', '2026-03-01', '2026-03-09', NULL, NULL, 'Declined', '2026-02-22 17:31:37', 'Out of stock – maximum approved requests reached', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1),
-(10, 'Frederick Rosales', '2023-00251-BN-0', 'AC Remote', 'Sir ajon', 'B207', '2026-02-25', '2026-02-26', NULL, NULL, 'Declined', '2026-02-22 17:38:07', 'Out of stock – maximum approved requests reached', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1),
-(11, 'Derick Ramsey', '2023-00651-BN-0', 'AC Remote', 'jojo', 'b703', '2026-03-12', '2026-03-21', NULL, NULL, 'Returned', '2026-02-22 17:38:52', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1),
-(12, 'Frederick Rosales', '2023-00251-BN-0', 'Projector', 'joyce', 'b203', '2026-02-23', '2026-02-24', NULL, NULL, 'Declined', '2026-02-22 17:52:27', 'Out of stock – maximum approved requests reached', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1),
-(13, 'Derick Ramsey', '2023-00651-BN-0', 'Projector', 'noy', 'j012', '2026-03-12', '2026-03-13', NULL, NULL, 'Overdue', '2026-02-22 17:53:09', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1),
-(14, 'Frederick Rosales', '2023-00251-BN-0', 'HDMI Cable', 'sir redg', 'b201', '2026-02-24', '2026-02-25', NULL, NULL, 'Declined', '2026-02-23 17:46:05', 'Request expired – borrow date has already passed', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1),
-(15, 'Frederick Rosales', '2023-00251-BN-0', 'AC Remote', 'sir aaron', 'B301', '2026-03-13', '2026-03-20', NULL, NULL, 'Returned', '2026-03-12 11:45:02', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1),
-(16, 'Frederick Rosales', '2023-00251-BN-0', 'Extension', 'Sir Migs', 'B205', '2026-03-13', '2026-03-14', NULL, NULL, 'Returned', '2026-03-12 13:05:13', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1),
-(17, 'Sandy Napiza', '2023-00004-BN-0', 'AC Remote', 'Sandy Napiza', '210', '2026-06-04', '2026-06-05', NULL, '2026-06-04 13:47:37', 'Returned', '2026-06-04 13:46:58', NULL, NULL, NULL, 'sandy', '2023-00004-BN-0', NULL, NULL, NULL, NULL, 1, NULL, NULL, 1),
-(18, 'Sandy Napiza', '2023-00004-BN-0', 'AC Remote', 'Sandy Napiza', '278', '2026-06-06', '2026-06-06', NULL, '2026-06-06 21:43:09', 'Returned', '2026-06-06 21:37:09', 'Request approved via FIFO priority scoring.', NULL, 'rule_1_fifo', NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1),
-(19, 'Frederick Rosales', '2023-00251-BN-0', 'AC Remote', 'Frederick Rosales', '201', '2026-06-18', '2026-06-19', NULL, '2026-06-06 21:59:40', 'Returned', '2026-06-06 21:55:17', 'Request approved via FIFO priority scoring.', NULL, 'rule_1_fifo', NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1),
-(20, 'Frederick Rosales', '2023-00251-BN-0', 'AC Remote', 'Frederick Rosales', '204', '2026-06-24', '2026-06-25', NULL, '2026-06-06 22:02:11', 'Returned', '2026-06-06 22:00:39', 'Request approved via FIFO priority scoring.', NULL, 'rule_1_fifo', NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1),
-(21, 'Frederick Rosales', '2023-00251-BN-0', 'AC Remote', 'Frederick Rosales', 'B203', '2026-06-12', '2026-06-19', '476ea34754a96f645c20b907493adf7e6e8b0b585651a30ce7a4a99877b399b7', NULL, 'Overdue', '2026-06-06 22:09:27', NULL, NULL, NULL, 'Kiloman', '2023-00250-BN-0', NULL, NULL, NULL, NULL, 1, NULL, NULL, 1),
-(22, 'Michael Anjelo O. Miguel', '2026-00001-BN-0', 'AC Remote', 'Michael Anjelo O. Miguel', 'lab301', '2026-10-03', '2026-10-05', 'd4152e5b1e9d887aa60295d1e80ee84374364b232fc08b1e5cc51fd5edcda8a5', NULL, 'Overdue', '2026-10-02 08:23:50', 'Request approved via FIFO priority scoring.', 'uploads/request_letters/1790900630_2026-00001-BN-0_ROSALES_IBITS.pdf', 'rule_1_fifo', NULL, NULL, 'personal', NULL, NULL, NULL, 1, NULL, NULL, 1),
-(23, 'Michael Anjelo O. Miguel', '2026-00001-BN-0', 'HDMI Cable', 'Michael Anjelo O. Miguel', 'lab201', '2026-10-02', '2026-10-03', '0c0fe459f07c0dc4c07f660b3863d2a8f942ce124f942052981f2161093f93c4', NULL, 'Overdue', '2026-10-02 08:25:12', 'Request approved via FIFO priority scoring.', 'uploads/request_letters/1790900712_2026-00001-BN-0_TEAM_ANG_LOGO.png', 'rule_1_fifo', NULL, NULL, 'personal', NULL, NULL, NULL, 1, NULL, NULL, 1),
-(24, 'Michael Anjelo Miguel', 'NOTSET-408F953BDD2D', 'Double A Batter', 'Michael Anjelo Miguel', 'Room301', '2026-10-05', '2026-10-05', '1453570d553cd201afbff1731afec6a7e3bf5455a6104febf6667d1913a2c05d', NULL, 'Overdue', '2026-10-05 20:04:28', 'Request approved via FIFO priority scoring.', NULL, 'rule_1_fifo', NULL, NULL, 'personal', NULL, NULL, NULL, 1, NULL, NULL, 1),
-(25, 'Edmundo Dela Cruz', 'NOTSET-275A970376E5', 'Double A Batter', 'Edmundo Dela Cruz', '308', '2026-10-24', '2026-10-24', NULL, '2026-10-24 17:35:45', 'Returned', '2026-10-24 17:31:00', NULL, NULL, NULL, 'sandy', '2023-00004bn-0', 'student', NULL, NULL, '19:30:00', 1, NULL, NULL, 1);
+INSERT INTO `tbl_requests` (`id`, `faculty_name`, `faculty_id`, `equipment_name`, `instructor`, `room`, `borrow_date`, `return_date`, `return_token`, `claim_token`, `returned_at`, `claimed_at`, `status`, `request_date`, `reason`, `document_path`, `arbitration_rule`, `submitted_by_name`, `submitted_by_id`, `submitted_as`, `batch_id`, `bundle_claim_token`, `borrow_time`, `return_time`, `borrow_qty`, `room_id`, `booking_mode`, `stock_applied`, `extension_count`, `original_return_date`, `original_return_time`, `extension_late_seconds`) VALUES
+(1, 'Mendoza', '2023-00230-BN-0', 'AC Remote', 'Sir Migs', 'A305', '2026-01-15', '2026-01-16', NULL, NULL, NULL, NULL, 'Overdue', '2026-01-15 11:04:23', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0),
+(2, 'Mendoza', '2023-00230-BN-0', 'AC Remote', 'elaine', 'B403', '2026-01-15', '2026-01-15', NULL, NULL, NULL, NULL, 'Declined', '2026-01-15 11:08:29', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0),
+(3, 'Frederick Rosales', '2023-00251-BN-0', 'Extension', 'Sir Migs', 'B203', '2026-01-23', '2026-01-24', NULL, NULL, NULL, NULL, 'Returned', '2026-01-15 12:28:40', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0),
+(4, 'Frederick Rosales', '2023-00251-BN-0', 'Projector', 'Ma\'am Donna', 'E031', '2026-02-05', '2026-02-12', NULL, NULL, NULL, NULL, 'Returned', '2026-01-15 12:30:25', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0),
+(5, 'John Jr.', '2030-00071-BN-0', 'AC Remote', 'Sir Migs', 'B203', '2026-01-15', '2026-01-16', NULL, NULL, NULL, NULL, 'Overdue', '2026-01-15 13:51:29', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0),
+(6, 'Frederick Rosales', '2023-00251-BN-0', 'HDMI Cable', 'Ma\'am Donna', 'B205', '2026-02-19', '2026-02-22', NULL, NULL, NULL, NULL, 'Returned', '2026-02-18 00:27:57', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0),
+(7, 'Aiello Gabriel B. Lastrella', '2023-00294-BN-0', 'HDMI Cable', 'Sir Migs', 'Room A304', '2026-02-20', '2026-02-20', NULL, NULL, NULL, NULL, 'Overdue', '2026-02-19 15:07:14', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0),
+(8, 'Frederick Rosales', '2023-00251-BN-0', 'Projector', 'sir noy', 'B304', '2026-02-23', '2026-02-25', NULL, NULL, NULL, NULL, 'Declined', '2026-02-22 17:29:16', 'Out of stock – maximum approved requests reached', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0),
+(9, 'Derick Ramsey', '2023-00651-BN-0', 'Projector', 'ma\'am JJ', 'A901', '2026-03-01', '2026-03-09', NULL, NULL, NULL, NULL, 'Declined', '2026-02-22 17:31:37', 'Out of stock – maximum approved requests reached', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0),
+(10, 'Frederick Rosales', '2023-00251-BN-0', 'AC Remote', 'Sir ajon', 'B207', '2026-02-25', '2026-02-26', NULL, NULL, NULL, NULL, 'Declined', '2026-02-22 17:38:07', 'Out of stock – maximum approved requests reached', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0),
+(11, 'Derick Ramsey', '2023-00651-BN-0', 'AC Remote', 'jojo', 'b703', '2026-03-12', '2026-03-21', NULL, NULL, NULL, NULL, 'Returned', '2026-02-22 17:38:52', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0),
+(12, 'Frederick Rosales', '2023-00251-BN-0', 'Projector', 'joyce', 'b203', '2026-02-23', '2026-02-24', NULL, NULL, NULL, NULL, 'Declined', '2026-02-22 17:52:27', 'Out of stock – maximum approved requests reached', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0),
+(13, 'Derick Ramsey', '2023-00651-BN-0', 'Projector', 'noy', 'j012', '2026-03-12', '2026-03-13', NULL, NULL, NULL, NULL, 'Overdue', '2026-02-22 17:53:09', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0),
+(14, 'Frederick Rosales', '2023-00251-BN-0', 'HDMI Cable', 'sir redg', 'b201', '2026-02-24', '2026-02-25', NULL, NULL, NULL, NULL, 'Declined', '2026-02-23 17:46:05', 'Request expired – borrow date has already passed', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0),
+(15, 'Frederick Rosales', '2023-00251-BN-0', 'AC Remote', 'sir aaron', 'B301', '2026-03-13', '2026-03-20', NULL, NULL, NULL, NULL, 'Returned', '2026-03-12 11:45:02', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0),
+(16, 'Frederick Rosales', '2023-00251-BN-0', 'Extension', 'Sir Migs', 'B205', '2026-03-13', '2026-03-14', NULL, NULL, NULL, NULL, 'Returned', '2026-03-12 13:05:13', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0),
+(17, 'Sandy Napiza', '2023-00004-BN-0', 'AC Remote', 'Sandy Napiza', '210', '2026-06-04', '2026-06-05', NULL, NULL, '2026-06-04 13:47:37', NULL, 'Returned', '2026-06-04 13:46:58', NULL, NULL, NULL, 'sandy', '2023-00004-BN-0', NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0),
+(18, 'Sandy Napiza', '2023-00004-BN-0', 'AC Remote', 'Sandy Napiza', '278', '2026-06-06', '2026-06-06', NULL, NULL, '2026-06-06 21:43:09', NULL, 'Returned', '2026-06-06 21:37:09', 'Request approved via FIFO priority scoring.', NULL, 'rule_1_fifo', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0),
+(19, 'Frederick Rosales', '2023-00251-BN-0', 'AC Remote', 'Frederick Rosales', '201', '2026-06-18', '2026-06-19', NULL, NULL, '2026-06-06 21:59:40', NULL, 'Returned', '2026-06-06 21:55:17', 'Request approved via FIFO priority scoring.', NULL, 'rule_1_fifo', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0),
+(20, 'Frederick Rosales', '2023-00251-BN-0', 'AC Remote', 'Frederick Rosales', '204', '2026-06-24', '2026-06-25', NULL, NULL, '2026-06-06 22:02:11', NULL, 'Returned', '2026-06-06 22:00:39', 'Request approved via FIFO priority scoring.', NULL, 'rule_1_fifo', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0),
+(21, 'Frederick Rosales', '2023-00251-BN-0', 'AC Remote', 'Frederick Rosales', 'B203', '2026-06-12', '2026-06-19', '476ea34754a96f645c20b907493adf7e6e8b0b585651a30ce7a4a99877b399b7', NULL, NULL, NULL, 'Overdue', '2026-06-06 22:09:27', NULL, NULL, NULL, 'Kiloman', '2023-00250-BN-0', NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0),
+(22, 'Michael Anjelo O. Miguel', '2026-00001-BN-0', 'AC Remote', 'Michael Anjelo O. Miguel', 'lab301', '2026-10-03', '2026-10-05', 'd4152e5b1e9d887aa60295d1e80ee84374364b232fc08b1e5cc51fd5edcda8a5', NULL, NULL, NULL, 'Overdue', '2026-10-02 08:23:50', 'Request approved via FIFO priority scoring.', 'uploads/request_letters/1790900630_2026-00001-BN-0_ROSALES_IBITS.pdf', 'rule_1_fifo', NULL, NULL, 'personal', NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0),
+(23, 'Michael Anjelo O. Miguel', '2026-00001-BN-0', 'HDMI Cable', 'Michael Anjelo O. Miguel', 'lab201', '2026-10-02', '2026-10-03', '0c0fe459f07c0dc4c07f660b3863d2a8f942ce124f942052981f2161093f93c4', NULL, NULL, NULL, 'Overdue', '2026-10-02 08:25:12', 'Request approved via FIFO priority scoring.', 'uploads/request_letters/1790900712_2026-00001-BN-0_TEAM_ANG_LOGO.png', 'rule_1_fifo', NULL, NULL, 'personal', NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0),
+(24, 'Michael Anjelo Miguel', 'NOTSET-408F953BDD2D', 'Double A Batter', 'Michael Anjelo Miguel', 'Room301', '2026-10-05', '2026-10-05', '1453570d553cd201afbff1731afec6a7e3bf5455a6104febf6667d1913a2c05d', NULL, NULL, NULL, 'Overdue', '2026-10-05 20:04:28', 'Request approved via FIFO priority scoring.', NULL, 'rule_1_fifo', NULL, NULL, 'personal', NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0),
+(25, 'Edmundo Dela Cruz', 'NOTSET-275A970376E5', 'Double A Batter', 'Edmundo Dela Cruz', '308', '2026-10-24', '2026-10-24', NULL, NULL, '2026-10-24 17:35:45', NULL, 'Returned', '2026-10-24 17:31:00', NULL, NULL, NULL, 'sandy', '2023-00004bn-0', 'student', NULL, NULL, NULL, '19:30:00', 1, NULL, NULL, 1, 0, NULL, NULL, 0);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tbl_request_events`
+--
+
+CREATE TABLE `tbl_request_events` (
+  `id` int(11) NOT NULL,
+  `request_id` int(11) NOT NULL,
+  `borrower_id` varchar(50) NOT NULL,
+  `borrower_name` varchar(100) NOT NULL DEFAULT '',
+  `equipment_name` varchar(100) NOT NULL DEFAULT '',
+  `event` varchar(30) NOT NULL,
+  `detail` varchar(255) NOT NULL DEFAULT '',
+  `created_at` datetime NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -829,7 +900,7 @@ CREATE TABLE `tbl_room_reservations` (
 --
 
 INSERT INTO `tbl_room_reservations` (`id`, `room_id`, `faculty_id`, `faculty_name`, `submitted_as`, `submitted_by_name`, `submitted_by_id`, `purpose`, `attendees`, `reservation_date`, `start_time`, `end_time`, `notes`, `document_path`, `status`, `reason`, `request_date`, `cancelled_at`) VALUES
-(1, 8, '2026-00001-BN-0', 'Michael Anjelo O. Miguel', 'adviser', NULL, NULL, 'Lab session', 50, '2026-10-02', '09:30:00', '12:30:00', NULL, 'uploads/room_documents/20261002_081929_2026-00001-BN-0_7d5d175a.pdf', 'Approved', 'Room reservation approved — no time conflict.', '2026-10-02 08:19:29', NULL),
+(1, 8, '2026-00001-BN-0', 'Michael Anjelo O. Miguel', 'personal', NULL, NULL, 'Lab session', 50, '2026-10-02', '09:30:00', '12:30:00', NULL, 'uploads/room_documents/20261002_081929_2026-00001-BN-0_7d5d175a.pdf', 'Approved', 'Room reservation approved — no time conflict.', '2026-10-02 08:19:29', NULL),
 (2, 7, '2026-00001-BN-0', 'Michael Anjelo O. Miguel', 'personal', NULL, NULL, 'Lecture', 40, '2026-10-03', '08:30:00', '10:30:00', NULL, NULL, 'Approved', 'Room reservation approved — no time conflict.', '2026-10-02 08:21:22', NULL),
 (3, 67, '2026-00002-BN-0', 'Stephen Perez', 'personal', NULL, NULL, 'Lab session', 32767, '2026-10-03', '17:00:00', '20:00:00', NULL, NULL, 'Approved', 'Room reservation approved — no time conflict.', '2026-10-03 16:43:55', NULL),
 (4, 67, '2026-00002-BN-0', 'Stephen Perez', 'personal', NULL, NULL, 'Meeting', 30, '2026-10-03', '17:00:00', '18:00:00', NULL, NULL, 'Declined', 'This time slot is already reserved by a higher-priority request.', '2026-10-03 16:44:38', NULL),
@@ -888,21 +959,19 @@ CREATE TABLE `tbl_users` (
   `emergency_name` varchar(120) DEFAULT NULL,
   `emergency_relationship` varchar(50) DEFAULT NULL,
   `emergency_phone` varchar(20) DEFAULT NULL,
-  `role` varchar(50) DEFAULT 'Regular Faculty',
-  `is_org_adviser` tinyint(1) DEFAULT 0,
-  `organization_id` int(11) DEFAULT NULL,
-  `allow_org_borrowing` tinyint(1) NOT NULL DEFAULT 0
+  `role` varchar(50) DEFAULT 'Regular Faculty'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `tbl_users`
 --
 
-INSERT INTO `tbl_users` (`fullname`, `faculty_id`, `email`, `backup_email`, `password`, `last_password_change`, `dob`, `gender`, `nationality`, `profile_picture`, `department`, `faculty_rank`, `phone`, `present_address`, `permanent_address`, `landline`, `emergency_name`, `emergency_relationship`, `emergency_phone`, `role`, `is_org_adviser`, `organization_id`, `allow_org_borrowing`) VALUES
-('Edmundo Dela Cruz', 'NOTSET-275A970376E5', 'edmundodelacruz@pupsync.edu', NULL, '$2y$10$C4byb8lLTyY/5YbcfLjzV.1rCSK6.rx93EzyG6LGrP7IAkyt1oGWO', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Regular Faculty', 0, NULL, 0),
-('Michael Anjelo Miguel', 'NOTSET-408F953BDD2D', 'michaelanjelomiguel@pupsync.edu', NULL, '$2y$10$fNYBe9j/ocdqv1rC2sizmu9Vn6GKjolJxXn0AbFhl0qU.wmH63W.y', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Organization Adviser', 1, 1, 1),
-('Indaleen Quinsayas', 'NOTSET-B9DEB33EB03E', 'indaleenquinsayas@pupsync.edu', NULL, '$2y$10$xTwnSJMIhXQHi6hJT5MUOunMIMwBA5wsxep3Gnx5ER2krqel9aAOu', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Regular Faculty', 0, NULL, 0),
-('Stephen Perez', 'NOTSET-F15E038389ED', 'stephenperez@pupsync.edu', NULL, '$2y$10$r9wvt4o7CHvR2LXMjOK/oeNSGPT1gvjs8ochesyL5S2unNRf/kUYi', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Regular Faculty', 0, NULL, 0);
+INSERT INTO `tbl_users` (`fullname`, `faculty_id`, `email`, `backup_email`, `password`, `last_password_change`, `dob`, `gender`, `nationality`, `profile_picture`, `department`, `faculty_rank`, `phone`, `present_address`, `permanent_address`, `landline`, `emergency_name`, `emergency_relationship`, `emergency_phone`, `role`) VALUES
+('Indaleen Quinsayas', 'FA0002BN2016', 'indaleen.quinsayas@pupsync.edu', NULL, '$2y$10$oUbLCC9dtNYPFxcvkvcbtOrmsdae1iiw1IGenLcfrWZo5CSyvlf1C', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Regular Faculty'),
+('Michael Anjelo Miguel', 'FA0005BN2016', 'michael.miguel@pupsync.edu', NULL, '$2y$10$cDg6QolF.l2mGo3v43go3e/fpglvD0WfWTxv3ifoAJ95wtEH4FGpC', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Regular Faculty'),
+('Aaron Atienza', 'FA0006BN2024', 'aaron.atienza@pupsync.edu', NULL, '$2y$10$jhe4/CMvTgDYHbnB1XKaC.6NVO.di7gcuIk8cyQ8osmDIV.9uNs1.', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Regular Faculty'),
+('Edmundo Dela Cruz', 'FA0008BN2023', 'edmundo.delacruz@pupsync.edu', NULL, '$2y$10$XdcZ7CBLZ6CvgSQtQ.oh0.S9VH91QWzR08IJLQexx4SMvgR5Bzl3S', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Regular Faculty'),
+('Stephen Perez', 'FA0011BN2026', 'stephen.perez@pupsync.edu', NULL, '$2y$10$YjDFkqM4Ap0nQguCXFhcAOcUmLbEiEVLxE18CItSQEiBolMyVTunK', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Regular Faculty');
 
 --
 -- Indexes for dumped tables
@@ -1046,11 +1115,12 @@ ALTER TABLE `tbl_notif_state`
   ADD UNIQUE KEY `uq_notif_key` (`notif_key`);
 
 --
--- Indexes for table `tbl_organizations`
+-- Indexes for table `tbl_remember_tokens`
 --
-ALTER TABLE `tbl_organizations`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uq_org_name` (`name`);
+ALTER TABLE `tbl_remember_tokens`
+  ADD PRIMARY KEY (`selector`),
+  ADD KEY `idx_remember_expiry` (`expires_at`),
+  ADD KEY `idx_remember_account` (`account_type`,`account_email`);
 
 --
 -- Indexes for table `tbl_requests`
@@ -1063,6 +1133,14 @@ ALTER TABLE `tbl_requests`
   ADD KEY `idx_claim_token` (`claim_token`),
   ADD KEY `idx_batch_id` (`batch_id`),
   ADD KEY `idx_bundle_claim_token` (`bundle_claim_token`);
+
+--
+-- Indexes for table `tbl_request_events`
+--
+ALTER TABLE `tbl_request_events`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_request` (`request_id`),
+  ADD KEY `idx_time` (`created_at`);
 
 --
 -- Indexes for table `tbl_rooms`
@@ -1106,8 +1184,7 @@ ALTER TABLE `tbl_room_waitlist`
 --
 ALTER TABLE `tbl_users`
   ADD PRIMARY KEY (`faculty_id`),
-  ADD UNIQUE KEY `email` (`email`),
-  ADD KEY `fk_users_org` (`organization_id`);
+  ADD UNIQUE KEY `email` (`email`);
 
 --
 -- AUTO_INCREMENT for dumped tables
@@ -1123,7 +1200,7 @@ ALTER TABLE `tbl_accounts`
 -- AUTO_INCREMENT for table `tbl_admin_activity`
 --
 ALTER TABLE `tbl_admin_activity`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=33;
 
 --
 -- AUTO_INCREMENT for table `tbl_ai_chat_log`
@@ -1183,13 +1260,13 @@ ALTER TABLE `tbl_faculty_notif_state`
 -- AUTO_INCREMENT for table `tbl_faculty_registry`
 --
 ALTER TABLE `tbl_faculty_registry`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=558;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=650;
 
 --
 -- AUTO_INCREMENT for table `tbl_faculty_registry_files`
 --
 ALTER TABLE `tbl_faculty_registry_files`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `tbl_inventory`
@@ -1222,16 +1299,16 @@ ALTER TABLE `tbl_notif_state`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
--- AUTO_INCREMENT for table `tbl_organizations`
---
-ALTER TABLE `tbl_organizations`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
-
---
 -- AUTO_INCREMENT for table `tbl_requests`
 --
 ALTER TABLE `tbl_requests`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=26;
+
+--
+-- AUTO_INCREMENT for table `tbl_request_events`
+--
+ALTER TABLE `tbl_request_events`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `tbl_rooms`
@@ -1296,12 +1373,6 @@ ALTER TABLE `tbl_room_reservations`
 --
 ALTER TABLE `tbl_room_waitlist`
   ADD CONSTRAINT `fk_wl_room` FOREIGN KEY (`room_id`) REFERENCES `tbl_rooms` (`room_id`);
-
---
--- Constraints for table `tbl_users`
---
-ALTER TABLE `tbl_users`
-  ADD CONSTRAINT `fk_users_org` FOREIGN KEY (`organization_id`) REFERENCES `tbl_organizations` (`id`);
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

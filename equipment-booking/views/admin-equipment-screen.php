@@ -66,15 +66,11 @@
                         }
                     }
                     $eq_ret_total  = count($eq_ret_rows);
-                    // Waiting (Pending Review) rows — supporting-letter requests from
-                    // Organization Advisers are visible to a Super Admin only. Rows with a document come first.
+                    // Waiting (Pending Review) rows. Rows that came with a request letter come first.
                     $eq_wait_sql = "SELECT tbl_requests.*,
                             (SELECT i.`condition` FROM tbl_inventory i WHERE i.item_name = tbl_requests.equipment_name LIMIT 1) AS item_condition
                         FROM tbl_requests
                         WHERE tbl_requests.status = 'Waiting'";
-                    if (empty($can_view_sensitive_adviser_requests)) {
-                        $eq_wait_sql .= " AND NOT {$sensitive_adviser_request_sql}";
-                    }
                     $eq_wait_sql .= " ORDER BY tbl_requests.request_date DESC";
                     $eq_wait_with = [];
                     $eq_wait_without = [];
@@ -495,15 +491,6 @@
                             <div class="ps-card-header eq-loan-head">
                                 <!-- Table title: text changes with the selected tab (see TITLES in admin-dashboard.js) -->
                                 <h2 class="eq-loan-title" id="eqLoanTitle">All Loans</h2>
-                                <!-- Loan status tabs live inside the table header -->
-                                <div class="eq-loan-tabs" id="eqLoanFilter" role="tablist" aria-label="Filter loans by status">
-                                    <button type="button" class="eq-loan-tab active" data-loan-filter="all" role="tab" aria-selected="true">All</button>
-                                    <button type="button" class="eq-loan-tab" data-loan-filter="waiting" role="tab" aria-selected="false">Waiting <span class="eq-loan-tab-count<?php echo $eq_pend_total > 0 ? ' has' : ''; ?>"><?php echo (int)$eq_wait_total; ?></span></button>
-                                    <button type="button" class="eq-loan-tab" data-loan-filter="pickup" role="tab" aria-selected="false">Pickup <span class="eq-loan-tab-count<?php echo $eq_loan_pickup > 0 ? ' has' : ''; ?>"><?php echo (int)$eq_loan_pickup; ?></span></button>
-                                    <button type="button" class="eq-loan-tab" data-loan-filter="active" role="tab" aria-selected="false">Active <span class="eq-loan-tab-count"><?php echo (int)$eq_loan_active; ?></span></button>
-                                    <button type="button" class="eq-loan-tab" data-loan-filter="overdue" role="tab" aria-selected="false">Overdue <span class="eq-loan-tab-count<?php echo $eq_loan_overdue > 0 ? ' has' : ''; ?>"><?php echo (int)$eq_loan_overdue; ?></span></button>
-                                    <button type="button" class="eq-loan-tab" data-loan-filter="returned" role="tab" aria-selected="false">Returned</button>
-                                </div>
                                 <div class="eq-loan-tools">
                                     <input class="ps-form-control" style="width:230px" placeholder="Search borrower or item..." id="eq-loan-search" autocomplete="off">
                                     <?php if ($is_super_admin): ?>
@@ -515,18 +502,48 @@
                                     <?php endif; ?>
                                 </div>
                             </div>
+                            <!-- Status tabs + sort controls (mirrors the Reservations table layout) -->
+                            <div class="eq-loan-status-bar">
+                                <div class="eq-loan-tabs" id="eqLoanFilter" role="tablist" aria-label="Filter loans by status">
+                                    <button type="button" class="eq-loan-tab active" data-loan-filter="all" role="tab" aria-selected="true">All</button>
+                                    <button type="button" class="eq-loan-tab" data-loan-filter="waiting" role="tab" aria-selected="false">Waiting <span class="eq-loan-tab-count<?php echo $eq_pend_total > 0 ? ' has' : ''; ?>"><?php echo (int)$eq_wait_total; ?></span></button>
+                                    <button type="button" class="eq-loan-tab" data-loan-filter="pickup" role="tab" aria-selected="false">Pickup <span class="eq-loan-tab-count<?php echo $eq_loan_pickup > 0 ? ' has' : ''; ?>"><?php echo (int)$eq_loan_pickup; ?></span></button>
+                                    <button type="button" class="eq-loan-tab" data-loan-filter="active" role="tab" aria-selected="false">Active <span class="eq-loan-tab-count"><?php echo (int)$eq_loan_active; ?></span></button>
+                                    <button type="button" class="eq-loan-tab" data-loan-filter="overdue" role="tab" aria-selected="false">Overdue <span class="eq-loan-tab-count<?php echo $eq_loan_overdue > 0 ? ' has' : ''; ?>"><?php echo (int)$eq_loan_overdue; ?></span></button>
+                                    <button type="button" class="eq-loan-tab" data-loan-filter="returned" role="tab" aria-selected="false">Returned</button>
+                                </div>
+                                <div class="eq-loan-sort">
+                                    <select id="eqLoanSort" class="pr-filter-select" aria-label="Sort loans by">
+                                        <option value="recent" selected>Recent requests</option>
+                                        <option value="due">Due date</option>
+                                    </select>
+                                    <button type="button" class="eq-loan-sort-dir" id="eqLoanSortDir" data-dir="desc"
+                                        title="Newest requests first (click to reverse)"
+                                        aria-label="Sort direction: newest requests first. Click to reverse.">
+                                        <span class="material-symbols-outlined" aria-hidden="true">arrow_downward</span>
+                                    </button>
+                                </div>
+                            </div>
                             <div class="ps-table-wrap">
                                 <table class="ps-table" id="eq-loan-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Borrower</th>
-                                            <th>Equipment</th>
-                                            <th>Issued</th>
-                                            <th>Due</th>
-                                            <th>Status</th>
-                                            <th>Handled by</th>
-                                            <th>Actions</th>
-                                        </tr>
+                                    <!-- Per-tab headers: only one is visible at a time (toggled by JS) -->
+                                    <thead data-loan-head="all">
+                                        <tr><th>Borrower</th><th>Equipment</th><th>Issued</th><th>Due / Returned</th><th>Info</th><th>Actions</th></tr>
+                                    </thead>
+                                    <thead data-loan-head="waiting" hidden>
+                                        <tr><th>Borrower</th><th>Equipment</th><th>Requested</th><th>Needed By</th><th>Document</th><th>Actions</th></tr>
+                                    </thead>
+                                    <thead data-loan-head="pickup" hidden>
+                                        <tr><th>Borrower</th><th>Equipment</th><th>Issued</th><th>Due</th><th>Condition</th><th>Actions</th></tr>
+                                    </thead>
+                                    <thead data-loan-head="active" hidden>
+                                        <tr><th>Borrower</th><th>Equipment</th><th>Issued</th><th>Due</th><th>Condition</th><th>Actions</th></tr>
+                                    </thead>
+                                    <thead data-loan-head="overdue" hidden>
+                                        <tr><th>Borrower</th><th>Equipment</th><th>Issued</th><th>Overdue</th><th>Condition</th><th>Actions</th></tr>
+                                    </thead>
+                                    <thead data-loan-head="returned" hidden>
+                                        <tr><th>Borrower</th><th>Equipment</th><th>Issued</th><th>Returned</th><th>Handled by</th><th>Actions</th></tr>
                                     </thead>
                                     <tbody>
                                         <?php if ($eq_view_total > 0):
@@ -544,10 +561,6 @@
                                                 $lrt   = !empty($r['return_time']) ? date('g:i A', strtotime($r['return_time'])) : '';
                                                 $lstart_lbl = date('M d, Y', strtotime($r['borrow_date'])) . ($lbt !== '' ? ' · ' . $lbt : '');
                                                 $ldue_lbl   = date('M d, Y', strtotime($r['return_date'])) . ($lrt !== '' ? ' · ' . $lrt : '');
-                                                // Same confidentiality rule as admin-override.php: adviser requests with a supporting
-                                                // document can only be changed by a Super Admin.
-                                                $lsens = (string)($r['submitted_as'] ?? '') === 'adviser' && trim((string)($r['document_path'] ?? '')) !== '';
-                                                $lcan_cancel = !$lsens || !empty($can_view_sensitive_adviser_requests);
                                                 $lstudent = (string)($r['submitted_as'] ?? '') === 'student' && trim((string)($r['submitted_by_name'] ?? '')) !== '';
                                         ?>
                                                 <tr class="eq-loan-row is-<?php echo $lst; ?>"
@@ -555,6 +568,8 @@
                                                     data-batch-id="<?php echo htmlspecialchars((string)($r['batch_id'] ?? ''), ENT_QUOTES); ?>"
                                                     data-status="<?php echo $lst === 'scheduled' ? 'Scheduled' : htmlspecialchars($r['status']); ?>"
                                                     data-loan-state="<?php echo $lst; ?>"
+                                                    data-submitted-ts="<?php echo !empty($r['request_date']) ? strtotime($r['request_date']) : 0; ?>"
+                                                    data-due-ts="<?php echo !empty($r['return_date']) ? strtotime($r['return_date']) : 0; ?>"
                                                     data-start-label="<?php echo htmlspecialchars($lstart_lbl); ?>"
                                                     data-due-label="<?php echo htmlspecialchars($ldue_lbl); ?>"
                                                     data-days-overdue="<?php echo max(0, $ldays); ?>"
@@ -581,126 +596,70 @@
                                                     data-doc-kind="<?php echo $ldoc ? $ldoc['kind'] : ''; ?>"
                                                     data-returned-at-display="<?php echo !empty($r['returned_at']) ? date('M d, Y g:i A', strtotime($r['returned_at'])) : ''; ?>"
                                                     data-handled-by="<?php echo htmlspecialchars($ldec['by'] ?? ''); ?>">
-                                                    <td>
-                                                        <div style="font-weight:600"><?php echo htmlspecialchars($lstudent ? (string)$r['submitted_by_name'] : $r['faculty_name']); ?></div>
-                                                        <?php if ($lstudent): ?>
-                                                            <div style="font-size:11px;color:var(--text-light)">
-                                                                Student<?php if (!empty($r['submitted_by_id'])): ?> · <?php echo htmlspecialchars((string)$r['submitted_by_id']); ?><?php endif; ?>
-                                                                · authorized by <?php echo htmlspecialchars($r['faculty_name']); ?>
-                                                            </div>
-                                                        <?php else: ?>
-                                                            <div style="font-size:11px;color:var(--text-light)"><?php echo htmlspecialchars(faculty_id_display($r['faculty_id'], 'Not set')); ?></div>
-                                                        <?php endif; ?>
-                                                    </td>
-                                                    <td>
-                                                        <div class="ps-appr-item">
-                                                            <?php echo htmlspecialchars($r['equipment_name']); ?>
-                                                            <?php if ($lqty > 1): ?><span class="ps-appr-qty">&times;<?php echo $lqty; ?></span><?php endif; ?>
-                                                        </div>
-                                                        <button type="button" class="ps-appr-id" data-action="ps-open-modal" data-modal="ps-req-detail-modal" title="View request details">#<?php echo str_pad($r['id'], 4, '0', STR_PAD_LEFT); ?></button>
-                                                        <?php $lbundle = trim((string)($r['batch_id'] ?? '')); ?>
-                                                        <?php if ($lbundle !== '' && ($eq_bundle_counts[$lbundle] ?? 0) > 1): ?>
-                                                            <span class="eq-bundle-tag">
-                                                                <span class="material-symbols-outlined" aria-hidden="true">link</span>
-                                                                Bundle · <?php echo (int)$eq_bundle_counts[$lbundle]; ?> items
-                                                            </span>
-                                                        <?php endif; ?>
-                                                        <?php if ($lst === 'waiting'): ?>
-                                                            <?php if ($ldoc): ?>
-                                                                <a class="ps-doc-chip ps-doc-chip--<?php echo $ldoc['kind']; ?>"
-                                                                    href="<?php echo htmlspecialchars($ldoc['open_url']); ?>" target="_blank" rel="noopener noreferrer"
-                                                                    title="Open <?php echo htmlspecialchars($ldoc['name']); ?> in a new tab">
-                                                                    <span class="material-symbols-outlined"><?php echo ps_doc_icon($ldoc['kind']); ?></span>
-                                                                    <span class="ps-doc-chip__name"><?php echo htmlspecialchars($ldoc['name']); ?></span>
-                                                                    <span class="material-symbols-outlined ps-doc-chip__open">open_in_new</span>
-                                                                </a>
-                                                            <?php else: ?>
-                                                                <span class="ps-doc-chip ps-doc-chip--none"><span class="material-symbols-outlined">block</span> No document</span>
+                                                    <?php $lbundle = trim((string)($r['batch_id'] ?? '')); ?>
+                                                    <td data-col="borrower">
+                                                        <div class="eq-cell-name"><?php echo htmlspecialchars($lstudent ? (string)$r['submitted_by_name'] : $r['faculty_name']); ?></div>
+                                                        <div class="eq-cell-sub">
+                                                            <?php if ($lstudent): ?>Student<?php if (!empty($r['submitted_by_id'])): ?> &middot; <?php echo htmlspecialchars((string)$r['submitted_by_id']); ?><?php endif; ?> &middot; via <?php echo htmlspecialchars($r['faculty_name']); ?>
+                                                            <?php else: ?><?php echo htmlspecialchars(faculty_id_display($r['faculty_id'], 'Not set')); ?>
                                                             <?php endif; ?>
+                                                        </div>
+                                                    </td>
+                                                    <td data-col="equipment">
+                                                        <div class="eq-cell-name"><?php echo htmlspecialchars($r['equipment_name']); ?><?php if ($lqty > 1): ?> <span class="ps-appr-qty">&times;<?php echo $lqty; ?></span><?php endif; ?></div>
+                                                        <button type="button" class="ps-appr-id" data-action="ps-open-modal" data-modal="ps-req-detail-modal">#<?php echo str_pad($r['id'], 4, '0', STR_PAD_LEFT); ?></button><?php if ($lbundle !== '' && ($eq_bundle_counts[$lbundle] ?? 0) > 1): ?><span class="eq-bundle-tag"><span class="material-symbols-outlined" aria-hidden="true">link</span><?php echo (int)$eq_bundle_counts[$lbundle]; ?></span><?php endif; ?>
+                                                    </td>
+                                                    <td data-col="col3">
+                                                        <?php if ($lst === 'waiting' || $lst === 'scheduled'): ?>
+                                                            <?php echo date('M d', strtotime($r['request_date'])); ?><div class="eq-cell-sub"><?php echo date('g:i A', strtotime($r['request_date'])); ?></div>
+                                                        <?php else: ?>
+                                                            <?php echo date('M d', strtotime($r['borrow_date'])); ?><?php if ($lbt !== ''): ?><div class="eq-cell-sub"><?php echo $lbt; ?></div><?php endif; ?>
                                                         <?php endif; ?>
                                                     </td>
-                                                    <td>
-                                                        <?php echo date('M d', strtotime($r['borrow_date'])); ?>
-                                                        <?php if ($lbt !== ''): ?><div class="ps-appr-sub"><?php echo $lbt; ?></div><?php endif; ?>
-                                                    </td>
-                                                    <td style="<?php echo $lst === 'overdue' ? 'color:var(--danger);font-weight:600' : ''; ?>">
-                                                        <?php echo date('M d', strtotime($r['return_date'])); ?>
-                                                        <?php if ($lrt !== ''): ?><div class="ps-appr-sub" style="font-weight:400"><?php echo $lrt; ?></div><?php endif; ?>
-                                                        <?php if ((int)($r['extension_count'] ?? 0) > 0):
-                                                            // Extended by the faculty member after it was due (equipment-booking/core/borrow-extension.php)
-                                                            $lext  = (int)$r['extension_count'];
-                                                            $lorig = !empty($r['original_return_date'])
-                                                                ? date('M d, Y', strtotime($r['original_return_date'])) . (!empty($r['original_return_time']) ? ' · ' . date('g:i A', strtotime($r['original_return_time'])) : '')
-                                                                : '';
-                                                        ?>
-                                                            <div class="ps-appr-sub" style="font-weight:400" title="<?php echo htmlspecialchars('Extended ' . $lext . ' time' . ($lext === 1 ? '' : 's') . ($lorig !== '' ? '. Originally due ' . $lorig : '')); ?>">Extended &times;<?php echo $lext; ?><?php if (!empty($r['original_return_date'])): ?> &middot; was <?php echo htmlspecialchars(date('M d', strtotime($r['original_return_date']))); ?><?php endif; ?></div>
-                                                        <?php endif; ?>
-                                                    </td>
-                                                    <td>
+                                                    <td data-col="col4"<?php echo ($lst === 'overdue') ? ' style="color:var(--danger);font-weight:600"' : ''; ?>>
                                                         <?php if ($lst === 'waiting'): ?>
-                                                            <span class="ps-badge ps-badge--dot ps-badge--waiting">Pending Review</span>
+                                                            <?php echo date('M d', strtotime($r['borrow_date'])); ?><?php if ($lbt !== ''): ?><div class="eq-cell-sub"><?php echo $lbt; ?></div><?php endif; ?>
+                                                        <?php elseif ($lst === 'scheduled'): ?>
+                                                            <?php echo date('M d', strtotime($r['borrow_date'])); ?><div class="eq-cell-sub"><?php echo $ldays > 0 ? 'in '.$ldays.'d' : 'today'; ?></div>
+                                                        <?php elseif ($lst === 'returned'): ?>
+                                                            <?php echo date('M d', strtotime($lret)); ?><div class="eq-cell-sub"><?php echo date('g:i A', strtotime($lret)); ?></div>
+                                                        <?php elseif ($lst === 'overdue'): ?>
+                                                            <?php echo date('M d', strtotime($r['return_date'])); ?><div class="eq-cell-sub" style="font-weight:400"><?php echo max(1,$ldays); ?>d overdue</div>
+                                                        <?php else: ?>
+                                                            <?php echo date('M d', strtotime($r['return_date'])); ?><?php if ($lrt !== ''): ?><div class="eq-cell-sub"><?php echo $lrt; ?></div><?php endif; ?><?php if ((int)($r['extension_count'] ?? 0) > 0): $lext=(int)$r['extension_count']; ?><div class="eq-cell-sub" title="Extended <?php echo $lext; ?> time<?php echo $lext===1?'':'s'; ?><?php echo !empty($r['original_return_date'])? ', was '.date('M d',strtotime($r['original_return_date'])):''; ?>">+<?php echo $lext; ?> ext</div><?php endif; ?>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td data-col="col5">
+                                                        <?php if ($lst === 'waiting'): ?>
+                                                            <?php if ($ldoc): ?><a class="ps-doc-chip ps-doc-chip--<?php echo $ldoc['kind']; ?>" href="<?php echo htmlspecialchars($ldoc['open_url']); ?>" target="_blank" rel="noopener noreferrer" title="<?php echo htmlspecialchars($ldoc['name']); ?>"><span class="material-symbols-outlined"><?php echo ps_doc_icon($ldoc['kind']); ?></span><span class="ps-doc-chip__name"><?php echo htmlspecialchars($ldoc['name']); ?></span><span class="material-symbols-outlined ps-doc-chip__open">open_in_new</span></a>
+                                                            <?php else: ?><span class="ps-doc-chip ps-doc-chip--none"><span class="material-symbols-outlined">block</span> None</span>
+                                                            <?php endif; ?>
                                                         <?php elseif ($lst === 'scheduled'): ?>
                                                             <span class="ps-badge ps-badge--scheduled">Scheduled</span>
-                                                            <div class="ps-appr-sub"><?php echo $ldays > 0 ? 'Starts in ' . $ldays . ' day' . ($ldays === 1 ? '' : 's') : 'Starts today'; ?></div>
-                                                        <?php elseif ($lst === 'pickup'): ?>
-                                                            <span class="ps-badge ps-badge--waiting">Ready for pickup</span>
-                                                        <?php elseif ($lst === 'overdue'): ?>
-                                                            <span class="ps-badge ps-badge--overdue"><?php echo max(1, $ldays); ?> day<?php echo max(1, $ldays) === 1 ? '' : 's'; ?> overdue</span>
-                                                        <?php elseif ($lst === 'due'): ?>
-                                                            <span class="ps-badge ps-badge--waiting">Due today</span>
+                                                        <?php elseif ($lst === 'pickup' || $lst === 'ok' || $lst === 'due' || $lst === 'overdue'): ?>
+                                                            <?php $lcond=$r['item_condition']??'Good'; $lcondCls=$lcond==='For Repair'?'repair':($lcond==='Fair'?'fair':'good'); ?><span class="inv-pill inv-pill--<?php echo $lcondCls; ?>"><?php echo htmlspecialchars($lcond); ?></span>
                                                         <?php elseif ($lst === 'returned'): ?>
-                                                            <span class="ps-badge ps-badge--returned">Returned</span>
-                                                            <div class="ps-appr-sub"><?php echo date('M d, Y', strtotime($lret)); ?></div>
+                                                            <?php echo admin_decider_html($ldec); ?>
                                                         <?php else: ?>
-                                                            <span class="ps-badge ps-badge--active">Due in <?php echo abs($ldays); ?> day<?php echo abs($ldays) === 1 ? '' : 's'; ?></span>
+                                                            <?php echo admin_decider_html($ldec); ?>
                                                         <?php endif; ?>
                                                     </td>
-                                                    <td><?php echo admin_decider_html($ldec); ?></td>
-                                                    <td>
-                                                        <div style="display:flex;gap:6px;flex-wrap:wrap">
+                                                    <td data-col="actions">
+                                                        <div class="eq-act-wrap">
                                                             <?php if ($lst === 'waiting'): ?>
-                                                                <button type="button" class="ps-btn ps-btn--success ps-btn--sm"
-                                                                    data-action="ps-open-modal" data-modal="ps-approve-modal">
-                                                                    <span class="material-symbols-outlined">check</span> Approve
-                                                                </button>
-                                                                <?php if ($lbundle !== '' && ($eq_wait_bundle_counts[$lbundle] ?? 0) > 1 && empty($eq_bundle_approve_shown[$lbundle])):
-                                                                    $eq_bundle_approve_shown[$lbundle] = true;
-                                                                ?>
-                                                                    <button type="button" class="ps-btn ps-btn--outline ps-btn--sm"
-                                                                        data-action="eq-open-bundle-approve"
-                                                                        data-batch-id="<?php echo htmlspecialchars($lbundle, ENT_QUOTES); ?>">
-                                                                        <span class="material-symbols-outlined">done_all</span>
-                                                                        Approve all
-                                                                    </button>
-                                                                <?php endif; ?>
-                                                                <button type="button" class="ps-btn ps-btn--danger ps-btn--sm"
-                                                                    data-action="ps-open-modal" data-modal="ps-decline-modal">
-                                                                    <span class="material-symbols-outlined">close</span> Decline
-                                                                </button>
+                                                                <button type="button" class="ps-btn ps-btn--success ps-btn--sm" data-action="ps-open-modal" data-modal="ps-approve-modal"><span class="material-symbols-outlined">check</span> Approve</button>
+                                                                <?php if ($lbundle !== '' && ($eq_wait_bundle_counts[$lbundle] ?? 0) > 1 && empty($eq_bundle_approve_shown[$lbundle])): $eq_bundle_approve_shown[$lbundle] = true; ?><button type="button" class="ps-btn ps-btn--outline ps-btn--sm" data-action="eq-open-bundle-approve" data-batch-id="<?php echo htmlspecialchars($lbundle, ENT_QUOTES); ?>"><span class="material-symbols-outlined">done_all</span> All</button><?php endif; ?>
+                                                                <button type="button" class="ps-btn ps-btn--danger ps-btn--sm" data-action="ps-open-modal" data-modal="ps-decline-modal"><span class="material-symbols-outlined">close</span> Decline</button>
                                                             <?php elseif ($lst === 'scheduled'): ?>
-                                                                <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm"
-                                                                    data-action="eq-open-loan-detail">View</button>
-                                                                <?php if ($lcan_cancel): ?>
-                                                                    <button type="button" class="ps-btn ps-btn--danger ps-btn--sm"
-                                                                        data-action="ps-open-modal" data-modal="ps-cancel-booking-modal">
-                                                                        <span class="material-symbols-outlined">event_busy</span> Cancel Booking
-                                                                    </button>
-                                                                <?php else: ?>
-                                                                    <span class="ps-appr-sub" title="Organization Adviser requests with a supporting document can only be changed by a Super Admin">Super Admin only</span>
-                                                                <?php endif; ?>
+                                                                <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-action="eq-open-loan-detail">View</button>
+                                                                <button type="button" class="ps-btn ps-btn--danger ps-btn--sm" data-action="ps-open-modal" data-modal="ps-cancel-booking-modal"><span class="material-symbols-outlined">event_busy</span> Cancel</button>
                                                             <?php elseif ($lst === 'pickup'): ?>
-                                                                <!-- Item approved but not yet collected — admin waits for faculty to show Claim QR -->
-                                                                <span class="ps-appr-sub">Waiting for Claim QR scan</span>
+                                                                <span class="eq-cell-sub">Awaiting Claim QR</span>
                                                             <?php elseif ($lst === 'returned'): ?>
-                                                                <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm"
-                                                                    data-action="eq-open-loan-detail">View</button>
+                                                                <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-action="eq-open-loan-detail">View</button>
                                                             <?php else: ?>
-                                                                <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm"
-                                                                    data-action="ps-open-modal" data-modal="ps-return-modal">Manual Return</button>
-                                                                <?php if ($lst === 'overdue'): ?>
-                                                                    <button type="button" class="ps-btn ps-btn--outline ps-btn--sm"
-                                                                        data-action="ps-open-modal" data-modal="ps-notice-modal">Send Notice</button>
-                                                                <?php endif; ?>
+                                                                <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-action="ps-open-modal" data-modal="ps-return-modal">Return</button>
+                                                                <?php if ($lst === 'overdue'): ?><button type="button" class="ps-btn ps-btn--outline ps-btn--sm" data-action="ps-open-modal" data-modal="ps-notice-modal">Notice</button><?php endif; ?>
                                                             <?php endif; ?>
                                                         </div>
                                                     </td>
@@ -708,7 +667,7 @@
                                             <?php endforeach;
                                         else: ?>
                                             <tr class="eq-loan-empty">
-                                                <td colspan="7">
+                                                <td colspan="6" class="eq-loan-empty-cell">
                                                     <div class="ps-empty-state">
                                                         <span class="material-symbols-outlined">inventory_2</span>
                                                         <p>No loan records yet.</p>
@@ -717,7 +676,7 @@
                                             </tr>
                                         <?php endif; ?>
                                         <tr class="eq-loan-nomatch" hidden>
-                                            <td colspan="7">
+                                            <td colspan="6" class="eq-loan-nomatch-cell">
                                                 <div class="ps-empty-state">
                                                     <span class="material-symbols-outlined">search_off</span>
                                                     <p>No items match your filter.</p>

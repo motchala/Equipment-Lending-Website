@@ -15,7 +15,6 @@ $bk_meta_json = json_encode([
     'items'   => $bk_items,
     'rooms'   => $bk_rooms,
     'mine'    => $bk_mine,
-    'adviser' => (bool)$is_org_adviser,
     'today'   => date('Y-m-d'),
     'nowMin'  => (int)date('G') * 60 + (int)date('i'),
     'rules'   => [
@@ -24,9 +23,7 @@ $bk_meta_json = json_encode([
         'slot'       => BookingSchedule::SLOT_MINUTES,
         'maxAhead'   => BookingSchedule::MAX_ADVANCE_DAYS,
         'todayHours' => BookingSchedule::TODAY_HOURS,
-        'adviserMaxHours' => BookingSchedule::ADVISER_MAX_HOURS,
         'futureDays' => BookingSchedule::FUTURE_DAYS,
-        'adviserFutureDays' => BookingSchedule::ADVISER_FUTURE_DAYS,
         'graceMin'   => BookingSchedule::IMMEDIATE_GRACE_MIN,
     ],
 ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE);

@@ -99,6 +99,14 @@ try {
             $conn->rollback();
             adviser_review_reply(409, 'This facility is already reserved for an overlapping time. Decline it or choose another time.');
         }
+
+        // ...or assigned to a class (imported timetable) at that time
+        require_once __DIR__ . '/../core/class-schedule.php';
+        $class_hits = cs_room_conflicts($conn, (int)$reservation['room_id'], (string)$reservation['reservation_date'], (string)$reservation['start_time'], (string)$reservation['end_time']);
+        if (!empty($class_hits)) {
+            $conn->rollback();
+            adviser_review_reply(409, 'This facility is assigned to a class at that time (' . cs_class_label($class_hits[0]) . '). Decline it or choose another time.');
+        }
     }
 
     $upd = $conn->prepare("UPDATE tbl_room_reservations SET status = ?, reason = ? WHERE id = ? AND status = 'Waiting'");

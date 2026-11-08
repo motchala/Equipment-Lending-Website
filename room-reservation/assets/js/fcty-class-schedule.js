@@ -1,9 +1,12 @@
 /* ================================================================
    PUPSYNC — FACILITIES TAB · "MY CLASS SCHEDULE"  (fcty-class-schedule.js)
 
-   A Monday–Saturday week calendar under the three building panels,
-   showing the signed-in faculty member's own approved room bookings:
-   what it is (Lecture, Lab session …), when, for how long, and where.
+   Under the three building panels: on the left, the faculty member's
+   classes for the whole semester (their approved bookings, grouped by
+   purpose + room + weekday + time); on the right, a Monday to Saturday
+   week calendar of the same bookings: what it is (Lecture, Lab session
+   etc.), when, for how long, and where. Clicking a class on the left
+   jumps the calendar to the week of its next (or last) session.
 
    Data:  room-reservation/api/get-faculty-schedule.php  (one week per call)
    Markup: room-reservation/views/faculty-rooms-screen.php  (#fcty-class-schedule)
@@ -21,15 +24,18 @@
     var root = document.getElementById('fcty-class-schedule');
     if (!root) return;
 
-    var HOUR_H = 60;                 /* px per hour in the grid                              */
-    var CORE_START = 8 * 60;         /* the grid always covers 8 AM – 5 PM, and grows to fit */
-    var CORE_END = 17 * 60;          /* anything booked earlier or later                     */
+    var HOUR_H = 40;                 /* px per hour in the grid (compact)                    */
+    var PAD = 14;                    /* breathing room above 7 AM / below 9 PM (first and last
+                                        hour labels sit centred on their lines)                */
+    var CORE_START = 7 * 60;         /* the grid always covers 7 AM – 9 PM, and grows to fit */
+    var CORE_END = 21 * 60;          /* anything booked earlier or later                     */
     var REFETCH_MS = 5 * 60 * 1000;
     var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     var DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     var TYPE = { 'lecture': 'lecture', 'lab session': 'lab', 'exam': 'exam', 'seminar': 'seminar', 'meeting': 'meeting' };
 
     var body = document.getElementById('fcs-body');
+    var elList = document.getElementById('fcs-list');
     var elLabel = document.getElementById('fcs-range');
     var btnPrev = document.getElementById('fcs-prev');
     var btnNext = document.getElementById('fcs-next');
@@ -68,9 +74,13 @@
         return ((h % 12) || 12) + ':' + pad(m);
     }
 
-    function meridiem(min) { return (Math.floor(min / 60) % 24) >= 12 ? 'PM' : 'AM'; }
+    /* Philippine convention: exactly 12:00 is "NN" (noon), not "PM" */
+    function meridiem(min) {
+        if (min % (24 * 60) === 12 * 60) return 'NN';
+        return (Math.floor(min / 60) % 24) >= 12 ? 'PM' : 'AM';
+    }
 
-    /* "9:30 – 11:30 AM"  or  "9:30 AM – 12:30 PM" */
+    /* "9:30 – 11:30 AM"  or  "9:30 AM – 12:00 NN" */
     function range(a, b) {
         return meridiem(a) === meridiem(b)
             ? clock(a) + ' – ' + clock(b) + ' ' + meridiem(b)
@@ -79,6 +89,7 @@
 
     function hourLabel(min) {
         var h = Math.floor(min / 60) % 24;
+        if (h === 12) return '12 NN';
         return ((h % 12) || 12) + ' ' + (h >= 12 ? 'PM' : 'AM');
     }
 
@@ -120,6 +131,11 @@
         return 'fcs-t-' + (TYPE[String(purpose).trim().toLowerCase()] || 'other');
     }
 
+    /* A weekly class meeting (from the imported timetable) has its own colour; bookings keep theirs by purpose. */
+    function itemClass(it) {
+        return it.kind === 'class' ? 'fcs-t-class' : typeClass(it.purpose);
+    }
+
     /* Server clock moved forward by the time since the response arrived */
     function nowMinutes() {
         if (!data) return 0;
@@ -134,7 +150,7 @@
 
     /* ── Layout ────────────────────────────────────────────── */
 
-    /* Grid hours: 8 AM – 5 PM, stretched out to the hour for anything outside that */
+    /* Grid hours: 7 AM – 9 PM, stretched out to the hour for anything outside that */
     function hourWindow(days) {
         var lo = CORE_START, hi = CORE_END;
         days.forEach(function (d) {
@@ -188,18 +204,21 @@
 
     function eventHtml(l, win, date) {
         var it = l.it;
-        var top = (l.s - win.start) / 60 * HOUR_H;
+        var top = PAD + (l.s - win.start) / 60 * HOUR_H;
         var h = Math.max((l.e - l.s) / 60 * HOUR_H, 24);
-        var cls = 'fcs-ev ' + typeClass(it.purpose) +
+        var isClass = it.kind === 'class';
+        var cls = 'fcs-ev ' + itemClass(it) +
             (l.lanes > 1 ? ' is-lane' : '') +
-            (h < 58 ? ' is-short' : '') + (h < 38 ? ' is-tiny' : '') +
+            (h < 60 ? ' is-short' : '') + (h < 44 ? ' is-tiny' : '') +
             (isPast(date, l.e) ? ' is-past' : '') +
             (it.student_name ? ' is-student' : '');
         var where = whereOf(it);
-        var student = it.student_name
-            ? 'Student: ' + it.student_name + (it.student_id ? ' (' + it.student_id + ')' : '')
-            : '';
-        var text = it.purpose + ', ' + range(l.s, l.e) + ', ' + duration(it.minutes) +
+        var student = isClass
+            ? (it.subject || '') + (it.component === 'Laboratory' ? ' (Lab)' : '')
+            : (it.student_name
+                ? 'Student: ' + it.student_name + (it.student_id ? ' (' + it.student_id + ')' : '')
+                : '');
+        var text = it.purpose + (isClass ? ' (class)' : '') + ', ' + range(l.s, l.e) + ', ' + duration(it.minutes) +
             (student ? ', ' + student : '') + (where ? ', ' + where : '');
         var style = 'top:' + top + 'px;height:' + (h - 2) + 'px;' +
             'left:calc(' + (l.lane * 100 / l.lanes) + '% + 3px);' +
@@ -213,7 +232,7 @@
             '<span class="fcs-ev-dur">' + esc(duration(it.minutes)) + '</span>' +
             '</span>' +
             '<span class="fcs-ev-time">' + esc(range(l.s, l.e)) + '</span>' +
-            (student ? '<span class="fcs-ev-student">' + icon('school') + esc(student) + '</span>' : '') +
+            (student ? '<span class="fcs-ev-student">' + icon(isClass ? 'menu_book' : 'school') + esc(student) + '</span>' : '') +
             (where ? '<span class="fcs-ev-where">' + icon('location_on') + '<span>' + esc(whereShort(it)) + '</span></span>' : '') +
             '</div>';
     }
@@ -223,15 +242,15 @@
         var hours = (win.end - win.start) / 60;
         var gridH = hours * HOUR_H;
         var showNow = d.days.some(function (day) { return day.date === d.today; });
-        var nowTop = (nowMinutes() - win.start) / 60 * HOUR_H;
+        var nowTop = PAD + (nowMinutes() - win.start) / 60 * HOUR_H;
 
-        var heads = '<div class="fcs-corner"></div>';
+        var heads = '<div class="fcs-corner"><span>Time</span></div>';
         var cols = '';
         var labels = '';
         var m;
 
         for (m = win.start; m <= win.end; m += 60) {
-            labels += '<span class="fcs-hour" style="top:' + ((m - win.start) / 60 * HOUR_H) + 'px">' + esc(hourLabel(m)) + '</span>';
+            labels += '<span class="fcs-hour" style="top:' + (PAD + (m - win.start) / 60 * HOUR_H) + 'px">' + esc(hourLabel(m)) + '</span>';
         }
 
         d.days.forEach(function (day, i) {
@@ -255,7 +274,7 @@
 
         return '<div class="fcs-grid-wrap">' +
             '<div class="fcs-grid" role="group" aria-label="Weekly schedule, Monday to Saturday"' +
-            ' style="--fcs-hh:' + HOUR_H + 'px;--fcs-h:' + gridH + 'px">' +
+            ' style="--fcs-hh:' + HOUR_H + 'px;--fcs-h:' + gridH + 'px;--fcs-pad:' + PAD + 'px">' +
             heads + '<div class="fcs-gutter" aria-hidden="true">' + labels + '</div>' + cols +
             '</div>' + empty + '</div>';
     }
@@ -274,10 +293,11 @@
             } else {
                 day.items.forEach(function (it) {
                     var s = toMin(it.start), e = toMin(it.end), where = whereOf(it);
-                    out += '<div class="fcs-ag-ev ' + typeClass(it.purpose) + (isPast(day.date, e) ? ' is-past' : '') + '">' +
+                    out += '<div class="fcs-ag-ev ' + itemClass(it) + (isPast(day.date, e) ? ' is-past' : '') + '">' +
                         '<span class="fcs-ev-top"><span class="fcs-ev-title">' + esc(it.purpose) + '</span>' +
                         '<span class="fcs-ev-dur">' + esc(duration(it.minutes)) + '</span></span>' +
                         '<span class="fcs-ev-time">' + esc(range(s, e)) + '</span>' +
+                        (it.kind === 'class' && it.subject ? '<span class="fcs-ev-student">' + icon('menu_book') + esc(it.subject + (it.component === 'Laboratory' ? ' (Lab)' : '')) + '</span>' : '') +
                         (where ? '<span class="fcs-ev-where">' + icon('location_on') + '<span>' + esc(where) + '</span></span>' : '') +
                         '</div>';
                 });
@@ -285,6 +305,56 @@
             out += '</div></div>';
         });
         return out + '</div>';
+    }
+
+    /*  Semester class list (left)  */
+    function mondayOf(ymd) {
+        var dow = (parseYmd(ymd).getUTCDay() + 6) % 7;   /* Mon = 0, Sun = 6 */
+        return addDays(ymd, -dow);
+    }
+
+    function shortDate(ymd) {
+        var d = parseYmd(ymd);
+        return MONTHS[d.getUTCMonth()] + ' ' + d.getUTCDate();
+    }
+
+    function classHtml(c, d) {
+        var s = toMin(c.start), e = toMin(c.end);
+        var inWeek = (c.dates || []).some(function (x) { return x >= d.week_start && x <= d.week_end; });
+        var target = c.next_date || c.last_date;
+        var where = whereShort({ room: c.room, building: c.building });
+        var count = c.sessions + (c.sessions === 1 ? ' session' : ' sessions');
+        var state = c.next_date ? 'Next: ' + shortDate(c.next_date) : 'Done';
+        var isClass = c.kind === 'class';
+        var subject = isClass && c.subject ? c.subject + (c.component === 'Laboratory' ? ' (Lab)' : '') : '';
+        var tip = c.purpose + (isClass ? ' (class)' : '') + ', ' + DOW[c.dow - 1] + ' ' + range(s, e) + (subject ? ', ' + subject : '') + ', ' + [c.room, c.building].filter(Boolean).join(', ') +
+            ', ' + count + (c.student ? ', includes student bookings' : '');
+        return '<button type="button" class="fcs-cls ' + itemClass(c) + (inWeek ? ' is-week' : '') +
+            (c.next_date ? '' : ' is-done') + '" data-date="' + esc(target) + '" title="' + esc(tip) + '">' +
+            '<span class="fcs-cls-top"><span class="fcs-cls-title">' + esc(c.purpose) + '</span>' +
+            '<span class="fcs-cls-dur">' + esc(duration(c.minutes)) + '</span></span>' +
+            '<span class="fcs-cls-when">' + esc(DOW[c.dow - 1] || '') + ' &middot; ' + esc(range(s, e)) + '</span>' +
+            (subject ? '<span class="fcs-cls-where">' + icon('menu_book') + '<span>' + esc(subject) + '</span></span>' : '') +
+            (where ? '<span class="fcs-cls-where">' + icon('location_on') + '<span>' + esc(where) + '</span></span>' : '') +
+            '<span class="fcs-cls-meta">' + esc(count) + ' &middot; ' + esc(state) + '</span>' +
+            '</button>';
+    }
+
+    function renderList() {
+        if (!elList || !data || !data.semester) return;
+        var sem = data.semester, list = data.classes || [];
+        var items = list.length
+            ? list.map(function (c) { return classHtml(c, data); }).join('')
+            : '<p class="fcs-list-none">No classes or approved bookings yet this semester.</p>';
+        var foot = list.length
+            ? '<p class="fcs-list-foot">' + sem.classes + (sem.classes === 1 ? ' class' : ' classes') + ' &middot; ' +
+              sem.sessions + (sem.sessions === 1 ? ' session' : ' sessions') + '</p>'
+            : '';
+        elList.innerHTML = '<div class="fcs-list-in">' +
+            '<div class="fcs-list-head"><span class="fcs-list-kicker">Semester classes</span>' +
+            '<strong class="fcs-list-sem">' + esc(sem.name) + '</strong>' +
+            '<span class="fcs-list-ay">' + esc(sem.ay) + '</span></div>' +
+            '<div class="fcs-list-scroll">' + items + '</div>' + foot + '</div>';
     }
 
     function skeletonHtml() {
@@ -304,6 +374,7 @@
         body.removeAttribute('aria-busy');
         if (!data) return;
         body.innerHTML = gridHtml(data) + agendaHtml(data);
+        renderList();
         setNav();
     }
 
@@ -325,7 +396,7 @@
         var lines = body.querySelectorAll('.fcs-now');
         for (var i = 0; i < lines.length; i++) {
             var start = parseInt(lines[i].getAttribute('data-win'), 10);
-            lines[i].style.top = ((n - start) / 60 * HOUR_H) + 'px';
+            lines[i].style.top = (PAD + (n - start) / 60 * HOUR_H) + 'px';
         }
         var evs = body.querySelectorAll('.fcs-ev');
         for (var j = 0; j < evs.length; j++) {
@@ -378,6 +449,15 @@
     }
 
     /* ── Init ──────────────────────────────────────────────── */
+    /* A class on the left: show the week of its next (or last) session */
+    if (elList) {
+        elList.addEventListener('click', function (e) {
+            var btn = e.target.closest ? e.target.closest('.fcs-cls') : null;
+            if (!btn) return;
+            var date = btn.getAttribute('data-date');
+            if (date) load(mondayOf(date), false);
+        });
+    }
     btnPrev.addEventListener('click', function () { shift(-1); });
     btnNext.addEventListener('click', function () { shift(1); });
     btnToday.addEventListener('click', function () { load(data ? data.default_week : null, false); });

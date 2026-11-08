@@ -4,8 +4,11 @@ declare(strict_types=1);
  * submit-cart-borrow.php
  *
  * Multi-item personal borrow for the faculty equipment cart.
- * Accepts JSON, processes each item through BookingSchedule + ArbitrationEngine,
- * returns JSON — no page redirect, enabling live UI updates.
+ * Accepts JSON, checks each item against BookingSchedule (time window, availability, room
+ * conflicts) and files it as 'Waiting'. The ArbitrationEngine is NOT run here: a Borrow All
+ * request is always left for an admin to approve or decline (unlike the single-item same-day
+ * request in faculty-equipment-handlers.php, which the engine decides on the spot).
+ * Returns JSON — no page redirect, enabling live UI updates.
  *
  * POST JSON fields:
  *   csrf_token  string
@@ -68,7 +71,7 @@ $conn->set_charset('utf8mb4');
 BookingSchedule::ensureSchema($conn);
 
 // Load faculty info
-$stmt_usr = $conn->prepare("SELECT fullname, faculty_id, role FROM tbl_users WHERE faculty_id = ? LIMIT 1");
+$stmt_usr = $conn->prepare("SELECT fullname, faculty_id FROM tbl_users WHERE faculty_id = ? LIMIT 1");
 $stmt_usr->bind_param('s', $_SESSION['faculty_id']);
 $stmt_usr->execute();
 $user = $stmt_usr->get_result()->fetch_assoc();
@@ -79,7 +82,6 @@ if (!$user) {
 }
 $faculty_name = (string)$user['fullname'];
 $faculty_id   = (string)$user['faculty_id'];
-$is_adviser   = BookingSchedule::isAdviserRole((string)($user['role'] ?? ''));
 
 // Room: the cart uses a plain text input (not the room picker).
 // Store as a text label with room_id = null — same as "Outside" in the existing system.
@@ -145,7 +147,7 @@ foreach ($raw_items as $raw) {
     $qty  = max(1, (int)($raw['qty'] ?? 1));
     if ($name === '') continue;
 
-    $chk = BookingSchedule::parse($conn, $pseudo_post, $is_adviser, $name, $qty);
+    $chk = BookingSchedule::parse($conn, $pseudo_post, $name, $qty);
     if (!$chk['ok']) {
         $failed[] = ['name' => $name, 'error' => $chk['error']];
         continue;

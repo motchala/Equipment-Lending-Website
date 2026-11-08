@@ -1,204 +1,209 @@
 # PUPSync
 
-Institutional equipment-lending and room-reservation platform for PUP faculty, students, and admins. Three portals (Student, Faculty, Admin), one shared database, and a rule-based arbitration engine that auto-approves or declines borrow/reservation requests without human intervention.
+PUPSync is a website for **PUP Biñan Campus** where faculty borrow equipment and reserve rooms, students do the same with a code from their faculty, and admins keep track of everything in one place.
 
-**Live entry point:** `landing-page.php` (unified login for Faculty + Admin — see [Login flow](#login-flow))
+This guide has two parts: **[Set it up](#set-it-up-on-a-computer)** (no coding needed) and **[Notes for developers](#notes-for-developers)** at the bottom.
 
 ---
 
-## Tech stack
+## Who uses it
 
-| Layer | Choice |
-|---|---|
-| Language | PHP 8+ (procedural + OOP, `declare(strict_types=1)` in newer modules) |
-| Database | MySQL / MariaDB via **MySQLi** (prepared statements throughout, no ORM/PDO) |
-| Frontend | Server-rendered PHP + vanilla JS (no framework/bundler), Bootstrap 5.3, Material Symbols, Font Awesome |
-| Mail | PHPMailer (vendored under `vendor/PHPMailer`, no Composer) via Gmail SMTP |
-| QR codes | `qrcode.js` (generate return tokens) + `jsQR` (camera-based scanning) via CDN |
-| Auth/session | Native PHP sessions, hardened cookies (HttpOnly, SameSite=Strict, Secure on HTTPS) |
-| CI/CD | GitHub Actions → FTP deploy to InfinityFree shared hosting on push to `main` |
+| Who | How they get in | What they do |
+|---|---|---|
+| **Student** | No account. They enter a code from their faculty on the Student Portal. | Borrow equipment or reserve a facility |
+| **Faculty** | Account created by a Super Admin | Borrow equipment, reserve rooms, track everything in My Activity, give codes to students |
+| **Admin** | Account created by a Super Admin | Review requests, scan QR codes, manage equipment and facilities |
+| **Super Admin** | Seed account or created by another Super Admin | Everything an Admin does, plus faculty and admin accounts, imports and rules |
 
-There is **no build step and no Composer/npm dependency manager** — everything is `require_once`'d directly. This is intentional (constraint of the free shared-hosting target), not an oversight.
+Everyone signs in on the same page (`landing-page.php`). The system works out whether you are faculty or admin from your email. Students use the **Continue as Student** option instead.
 
-## Architecture
+## What it does
 
-Monolithic, module-per-feature PHP app. No MVC framework — each role has one thin "portal" entry file that assembles the SPA-like dashboard from module pieces, backed by small stateless JSON API endpoints for AJAX/polling.
+**Equipment**
+- Faculty pick items, a room (or "Outside") and a time: today for 1, 2, 3 or 5 hours, or a later date up to 3 weeks ahead.
+- A **same-day** request is decided by the system straight away, based on availability and the borrowing rules. A **later-date** request waits for an admin to **approve or decline** it, and can carry a request letter (recommended, never required).
+- Once approved, the faculty gets a **Claim QR** in *My Activity*. The admin scans it at the Admin Office and the item becomes *On Loan*.
+- On return, the faculty shows a **Return QR** and the admin scans it. The stock goes back automatically. Admins can also record a manual return without a QR.
+- Late items become *Overdue*. The faculty cannot borrow more until it is returned, but can *Extend* up to 2 times if nobody else needs the item.
+- Students with a faculty code or item code are approved right away and get their own Claim QR.
 
-```
-├── landing-page.php          # Public entry: login (thin loader -> auth/core/login-handler.php + auth/views/landing.php)
-├── student-dashboard.php     # Student portal (code-based access, no login)
-├── faculty-dashboard.php     # Faculty portal entry (thin loader; pieces live in dashboard/ + the feature modules)
-├── admin-dashboard.php       # Admin / Super Admin entry (thin loader)
-│
-├── auth/                     # Sign-in: login handler + landing view, logout, rate limiter, role splash
-├── dashboard/                # Dashboard data, render and handlers + the dashboard CSS/JS
-├── equipment-booking/        # Equipment lending (api/, core/, views/, assets/)
-├── room-reservation/         # Room booking (api/, core/, views/, assets/)
-├── account-management/       # Admin + faculty accounts, faculty/student registry uploads
-├── notifications/            # Notification feed (admin + faculty)
-├── activity/                 # Activity feed
-├── settings/                 # Profile, password, data export, student registry screen
-├── shared/                   # Cross-module code: core/ (mailer, activity logger, paths), views/ (page shells), assets/ (shell CSS/JS, logout modal, favicons), document-viewer.php
-│
-├── assets/                   # Third-party and database-referenced files only: fonts/, js/vendor/, images/faculty/ (building photos, paths stored in the DB)
-├── config/                   # Bootstrap required by every entry point: db, env, session, csrf, security-headers
-├── database/lending_db.sql   # Full schema + seed data (never deploy this folder)
-├── vendor/PHPMailer/         # Vendored library (no Composer)
-├── uploads/                  # User-submitted files: item photos, profile pictures, request letters
-└── .github/workflows/deploy.yml
-```
-Each module folder uses the same shape: `api/` (HTTP endpoints), `core/` (logic, include-only), `views/` (page pieces, include-only) and `assets/` (that module's CSS/JS). `core/` and `views/` are blocked from direct web access by a `.htaccess` in each.
+**Rooms (Facilities)**
+- Rooms are organised by campus, building and floor. Booking hours are 7:00 AM to 8:00 PM, Monday to Saturday.
+- A **same-day** booking is confirmed straight away if the slot is free. A **later-date** booking waits for an admin, and is declined automatically at 12:01 AM on that date if nobody decides. A request letter can be attached to a later-date booking (recommended, never required).
+- Each faculty can hold up to 2 active reservations.
+- Faculty can report room problems, join a waitlist for taken slots, and ask the built-in **room assistant** (an AI chat limited to 20 messages per hour).
 
-**Why "core" is split from "api":** `core/*.php` holds pure(r) business logic and is `require`'d by multiple callers; `api/*.php` files are thin HTTP endpoints — they handle the request, call into `core/`, and echo JSON. `admin-dashboard.php` and `faculty-dashboard.php` also `require_once` `core/` files directly to render initial page state without an AJAX round-trip.
+**For admins**
+- A **Dashboard** with what needs attention, an **Activity** timeline of every decision, notifications, and exports.
+- **Equipment** (catalog and loans) and **Facilities** (rooms, reservations, issues, archive).
+- Super Admin only: **Faculty** accounts, **Admins** (up to 5), and **Settings → Imports** for the faculty registry. (**Equipment Inventory** and **Rooms Assigned** import cards are there too, but they are not built yet.)
+- Both portals have a built-in **Help & Support** page inside Settings.
 
-**Self-healing schema:** several files (e.g. the login handler, `notif-functions.php`) run a `SHOW COLUMNS` / `information_schema` check on first use and `ALTER TABLE` if a column/table is missing. This lets an older deployed database catch up to schema changes without a manual migration step — keep this pattern in mind when adding columns.
+---
 
-## Roles & interfaces
+## Set it up on a computer
 
-| Role | How they get in | Portal | Notes |
-|---|---|---|---|
-| **Student** | No account. A Faculty member issues a one-time alphanumeric code (`tbl_faculty_codes`) tied to a request | `student-dashboard.php` | Code-verify → form → result, all in one screen |
-| **Regular Faculty** | Registered account (`tbl_users`, `role = 'Regular Faculty'`) | `faculty-dashboard.php` | Borrows equipment/rooms directly, or issues codes to students |
-| **Organization Adviser** | `tbl_users`, `role = 'Organization Adviser'`, `is_org_adviser = 1`, linked to `tbl_organizations` | `faculty-dashboard.php` | Requests on behalf of a student org; needs a signed document unless a Director's signature is detected |
-| **Admin** | `tbl_accounts`, `role = 'Admin'` | `admin-dashboard.php` | Manages inventory, requests, rooms, arbitration config |
-| **Super Admin** | `tbl_accounts`, `role = 'Super Admin'` | `admin-dashboard.php` | Everything Admin can do, plus creating/managing other Admin accounts |
+These steps use **XAMPP on Windows**. Mac and Linux work the same way (use XAMPP, MAMP or any Apache + PHP + MySQL/MariaDB setup).
 
-## Login flow
+### What you need
+- **XAMPP** with PHP 8.0 or newer (download it from apachefriends.org). It includes Apache, MySQL and phpMyAdmin.
+- An internet connection when using the site (fonts, icons and the QR scripts load from the internet).
 
-`landing-page.php` is a **single unified login form** — the user isn't asked whether they're Faculty or Admin. On submit it:
-1. Runs two layers of rate-limiting pre-checks (IP-wide, then email+IP pair) — see `rate-limiter.php`.
-2. Looks the email up in `tbl_accounts` (Admin) first, then `tbl_users` (Faculty) if no match.
-3. Redirects to whichever dashboard matches.
+### Steps
 
-Students never authenticate here at all — they enter through a faculty-issued code on `student-dashboard.php`.
+1. **Start the servers.** Open the XAMPP Control Panel and click **Start** next to **Apache** and **MySQL**.
 
-## Main modules / features
+2. **Put the project in `htdocs`.** Copy the whole `Equipment-Lending-Website` folder into `C:\xampp\htdocs\`.
 
-### 1. Equipment booking (`equipment-booking/`)
-- Faculty submit borrow requests, or generate a one-time code for a student to submit on their behalf.
-- Every new request is evaluated **synchronously and automatically** by the Arbitration Engine (below) — there is no manual "pending → approve" admin step for the common case.
-- Approved borrows get a QR-coded return token; Admin scans it via `return_confirm.php` (or a student/admin can hit the confirm link) to mark an item Returned and restock inventory.
-- Live polling endpoints (`poll-*.php`) keep the dashboards in sync without a page reload.
+3. **Load the database.**
+   - Open `http://localhost/phpmyadmin` in your browser.
+   - Click the **Import** tab, choose `database/lending_db.sql` from the project, and click **Import** at the bottom.
+   - You do not need to create the database first. The file creates one called `lending_db`. If one already exists, it is replaced.
 
-### 2. Room reservation (`room-reservation/`)
-- Mirrors the equipment flow but for physical spaces: **Campus → Building → Room** hierarchy (`tbl_campuses` / `tbl_buildings` / `tbl_rooms`).
-- Adds a **waitlist** (`tbl_room_waitlist`) for fully-booked slots and an **issue-reporting** flow (`tbl_room_issues`) for maintenance problems, both visible to Admins.
-- Runs through the same arbitration engine class, with room-specific rules (e.g. an Adviser with no document is Declined immediately for rooms, vs. held as Waiting for equipment, since rooms have no stock queue to hold a place in).
+4. **Create your two settings files.** In the project folder, make a copy of each file and rename the copy:
 
-### 3. Arbitration Engine (`equipment-booking/core/arbitration-engine.php`)
-The core differentiator of this project — a deterministic, rule-based scoring engine (not literal AI, but framed as "AI-driven" auto-decisioning in-code) that replaces manual admin approval. Entry point: `ArbitrationEngine::process($conn, $request_id)`, called immediately after a request is inserted.
+   | Copy this | To this |
+   |---|---|
+   | `.env.example` | `.env` |
+   | `config/db.example.php` | `config/db.php` |
 
-Decision flow: load config (`tbl_arbitration_config`) → pre-flight blocks (overdue borrower, duplicate request, missing required document, archived item, out-of-stock) → acquire a row lock on inventory (`SELECT ... FOR UPDATE`) → score and rank competing Waiting requests by:
-1. FIFO (submission order)
-2. Signatory level detected in the uploaded document (Director > none)
-3. Role priority (configurable: Director > Adviser > Faculty > Student)
-4. Return history (fewer past late returns wins ties)
-5. ID order (final deterministic tiebreaker)
+   Tip for Windows: turn on **View → File name extensions** in File Explorer so the copy is not accidentally named `.env.txt`.
 
-Every decision — approve, decline, or hold — is written back to `tbl_requests.status` and logged to `tbl_arbitration_log`. Rule weights and toggles are editable by Admins at runtime via `save-arbitration-config.php`, no deploy required.
+5. **Check the database settings in `.env`.** For a normal XAMPP install you can leave them as they are:
 
-### 4. Admin control center (`admin-dashboard.php` + `*-functions.php`)
-Inventory CRUD (with archiving, not hard deletes), request oversight and manual override (`admin-override.php`, for the rare case arbitration needs correcting), room/building/campus management, arbitration rule configuration, Admin/Super-Admin account management, and a live notification feed.
-
-### 5. Notifications (`notif-functions.php`)
-Deliberately **not stored as generated events** — the feed is computed fresh on every load from the current state of `tbl_requests`, `tbl_room_issues`, and `tbl_inventory` (e.g. "3 items overdue" is a live query, not a row someone inserted). Only read/deleted state per notification persists, in `tbl_notif_state`, keyed by a synthetic id like `overdue-12`.
-
-### 6. Role splash (post-login transition)
-A short full-screen overlay (PUPSYNC wordmark → role name: Admin / Super Admin / Faculty / Student) shown **only right after a successful sign-in** — never on a refresh or ordinary navigation. `landing-page.php` arms a one-shot session flag (`role_splash_arm()`) just before redirecting; the dashboard consumes it on that first load. Logging out destroys the session, so the next login shows it again. Students don't log in, so "Continue as Student" routes through `landing-page.php?go=student`, which arms the flag for them. Purely cosmetic — no auth or DB logic. Three files: `auth/core/role-splash.php` (markup helper + flag), `assets/css/role-splash.css` (look + entire timeline, tunable via the `--rs-t-*` variables), `assets/js/role-splash.js` (cleanup/skip only). Each dashboard integrates it with three lines: a `require_once`, `role_splash_head()` in `<head>`, and `render_role_splash('<Role>')` right after `<body>`.
-
-### 7. Responsive admin (mobile / tablet)
-The admin portal adapts to phones and tablets without changing the desktop layout (verified pixel-identical at 1200/1440/1920px). The base `admin-dashboard.css` already carries the off-canvas sidebar drawer and its 1024/768/480/400px breakpoints; `dashboard/assets/css/admin-dashboard-responsive.css` (loaded after it) adds what was missing, and `dashboard/assets/js/admin-dashboard-responsive.js` (deferred) prepares the markup it needs. **Tablet (769–1024px):** icon-rail sidebar, tighter table padding and scroll-shadow hints. **Phone (≤768px):** every data table (`.ps-table`, `.pr-table`, `.admin-table`) becomes stacked cards — the JS copies each column header onto its cells as `data-label` and tags the headline, thumbnail and actions cells, and re-runs whenever live-render/AJAX swaps rows in, so new tables need no extra work; the Room Schedule's Mon–Fri grid becomes a one-day agenda with day tabs; touch targets are ≥44px; text inputs are 16px so iOS doesn't auto-zoom. No existing class, id or script was renamed or modified.
-
-### 8. Admin Dashboard tab (home screen)
-The Dashboard tab is a read-only overview: five clickable stat cards (pending approvals, active loans, overdue returns, rooms today, stock alerts), a 7/14/30-day *Demand & decisions* chart (Equipment / Rooms), a *Needs attention* list, and panels for rooms, most-requested equipment, stock watch, latest requests and the arbitration decision log. It lives entirely in the three existing admin files: `admin-dashboard.php` (top of the file: `dash_collect()` gathers the numbers, `dash_render()` prints the markup; the Dashboard panel calls them for first paint, and `admin-dashboard.php?fragment=dashboard` returns the same markup for the live refresh), `assets/css/admin-dashboard.css` (the `dash-*` block at the end, laid out with container queries so it follows the content width rather than the window) and `assets/js/admin-dashboard.js` (the dashboard block at the end: draws the chart as plain SVG because the CSP allows no chart libraries, routes card clicks through the real sidebar items, and swaps in fresh markup every 15 s). The header (greeting, action buttons, bell, avatar) sits outside the swapped `#dashLive` region on purpose, since the rest of `admin-dashboard.js` binds to those ids. Read-only: overdue/auto-decline housekeeping stays in `admin-functions.php` and `poll-requests-data.php`.
-
-### 9. Security hardening
-This codebase has clearly been through an OWASP ZAP pass — worth knowing before you "simplify" something:
-- Per-request CSP with a nonce for inline scripts (`landing-page.php`, dashboards) or a static fallback CSP for API/utility files (`config/security-headers.php`).
-- Custom CSRF tokens (`config/csrf.php`), checked on every state-changing POST, with a header fallback (`X-CSRF-TOKEN`) for JSON/AJAX calls.
-- Hardened session cookies enforced at both the `ini_set` and `session_set_cookie_params` level (some shared hosts ignore one or the other).
-- Escalating login lockouts: 3 fails → lockout, doubling in severity (5 min → 15 min → 60 min) per email+IP pair, with lazy passive decay — see the doc-comment in `rate-limiter.php` for the full state machine.
-
-## Data model (key tables)
-
-Full schema with all columns lives in `database/lending_db.sql`. Summary:
-
-<details>
-<summary>Expand table reference</summary>
-
-| Table | Purpose |
-|---|---|
-| `tbl_accounts` | Admin/Super Admin logins |
-| `tbl_users` | Faculty logins (Regular Faculty / Organization Adviser) |
-| `tbl_faculty_codes` | One-time codes a Faculty issues so a Student can submit a request |
-| `tbl_organizations` | Student orgs an Adviser can request on behalf of |
-| `tbl_inventory` | Borrowable equipment catalog (quantity, condition, photo, archive flag) |
-| `tbl_requests` | Equipment borrow requests + status + return QR token |
-| `tbl_arbitration_config` | Runtime-editable weights/toggles for the arbitration engine |
-| `tbl_arbitration_log` | Audit trail of every arbitration decision |
-| `tbl_campuses` / `tbl_buildings` / `tbl_rooms` | Room location hierarchy |
-| `tbl_room_reservations` | Room booking requests + status |
-| `tbl_room_waitlist` | Queue for fully-booked room slots |
-| `tbl_room_issues` | Maintenance/issue reports on a room |
-| `tbl_login_attempts` / `tbl_ip_login_attempts` | Rate-limiter state |
-| `tbl_notif_state` | Read/deleted flags for the computed-live notification feed |
-
-</details>
-
-## Getting started (local setup)
-
-**Requirements:** PHP 8.0+ (with the `mysqli` and `mbstring` extensions), MySQL/MariaDB, Apache (or any server that honors `.htaccess`/`mod_headers`), a mail account for SMTP (Gmail used in dev).
-
-1. **Clone** the repo and serve it from a local stack (XAMPP/Laragon/MAMP) — there's no `artisan serve`/built-in dev server, this is plain Apache+PHP. `.htaccess` sets `DirectoryIndex landing-page.php` as the site root.
-2. **Database:** import `database/lending_db.sql` into a fresh schema (matches the default name `lending_db`).
-3. **Environment file:** copy `.env.example` → `.env` and fill in:
    ```
    DB_HOST=localhost
    DB_USER=root
    DB_PASS=
    DB_NAME=lending_db
-
-   MAIL_USERNAME=
-   MAIL_PASSWORD=       # Gmail App Password, not your login password
-   MAIL_FROM_NAME=PUPSync Notifications
    ```
-   (`.env.example` currently only ships the mailer keys — the DB_* keys above are read by `config/db.php`/`env.php` and must be added by hand until the example file is updated.)
-4. **`config/db.php` is gitignored** (intentionally, per its own doc-comment) and won't exist on a fresh clone. Recreate it at `config/db.php` — it contains no real code beyond reading `.env`, so this is safe to restore verbatim:
-   ```php
-   <?php
-   require_once __DIR__ . '/env.php';
-   load_env();
 
-   function getDB(): mysqli
-   {
-       static $conn = null;
-       if ($conn !== null) return $conn;
+6. **Open the site.** Go to `http://localhost/Equipment-Lending-Website/` and sign in.
 
-       $host = $_ENV['DB_HOST'] ?? 'localhost';
-       $user = $_ENV['DB_USER'] ?? 'root';
-       $pass = $_ENV['DB_PASS'] ?? '';
-       $name = $_ENV['DB_NAME'] ?? 'lending_db';
+### Signing in the first time
 
-       $conn = @new mysqli($host, $user, $pass, $name);
-       if ($conn->connect_error) {
-           error_log('[PUPSync] Database connection failed: ' . $conn->connect_error);
-           http_response_code(500);
-           exit('Service temporarily unavailable.');
-       }
-       $conn->set_charset('utf8mb4');
-       return $conn;
-   }
+The database comes with two admin accounts: **`main@admin.edu`** (Super Admin) and **`chico@admin.edu`** (Admin). The passwords are not written anywhere in the project, so set a new one for the account you want to use:
+
+1. Open the XAMPP **Shell** and run (change the password text first):
    ```
-5. Visit `landing-page.php` in the browser. Seed admin login is in `tbl_accounts` (`main@admin.edu`) — reset its password hash directly in the DB if you don't have the original plaintext.
+   php -r "echo password_hash('MyNewPassword1!', PASSWORD_DEFAULT);"
+   ```
+2. Copy the long text it prints.
+3. In phpMyAdmin, open `lending_db` → `tbl_accounts`, click **Edit** on the account, paste the text into the `password` box, and click **Go**.
+4. Sign in with that email and your new password.
 
-## Deployment
+### Things to set up after signing in
+As a Super Admin, go to **Settings → Imports** and import the official **Faculty Registry**. Then use the **Faculty** tab to create faculty accounts (it looks up each person in the registry). Add your equipment under **Equipment → Catalog** and your rooms under **Facilities**.
 
-`.github/workflows/deploy.yml` deploys straight to **InfinityFree** shared hosting via FTP on every push to `main` (`FTP_HOST` / `FTP_USER` / `FTP_PASS` repo secrets). `.env`, `config/db.php`, and `.git*` are excluded from the sync. There is no staging environment — treat `main` as production.
+---
 
-## Conventions to follow when contributing
+## Using it from other devices
 
-- **No Composer/npm.** New PHP libraries get vendored under `vendor/`; new JS libraries get pulled from a CDN inline, matching the existing pattern.
-- **Prepared statements only** for anything touching user input (a few legacy `mysqli_query` string-interpolation spots exist — don't copy them, use `bind_param`).
-- **Every state-changing POST needs `csrf_verify()`** and every entry point needs its own CSP header (or `require`s `config/security-headers.php`).
-- Schema changes should be additive and guarded (`SHOW COLUMNS` / `information_schema` check + `ALTER TABLE`) so already-deployed databases self-heal, matching the pattern in `notif-functions.php` and the login handler — don't assume `lending_db.sql` was just freshly imported.
-- Keep `core/` (logic) and `api/` (thin HTTP wrappers) separated when adding a feature to either module.
+To let other computers or phones on the **same Wi-Fi** open the site:
+
+1. Find the host computer's IP address (in Windows, run `ipconfig` and look for *IPv4 Address*, for example `192.168.1.20`).
+2. On the other device, open `http://192.168.1.20/Equipment-Lending-Website/`.
+3. If it will not load, allow **Apache** through the Windows Firewall when Windows asks.
+
+The QR codes the system creates already use the host computer's network address, so they work from other devices. Note that most browsers only allow camera access (used by **Scan return** on the admin Dashboard) on the host computer itself (`localhost`) or on an `https://` site, so scan on the host computer or use a secure address.
+
+## Optional settings
+
+Open `.env` to turn these on. The system still works without them.
+
+**Email notices** (for example, cancellation notices and waitlist alerts) use a Gmail account:
+```
+MAIL_USERNAME=your.address@gmail.com
+MAIL_PASSWORD=your-16-letter-app-password
+MAIL_FROM_NAME=PUPSync Notifications
+```
+`MAIL_PASSWORD` must be a Google **App Password** (Google Account → Security → 2-Step Verification → App passwords), not your normal Gmail password.
+
+**Room assistant (AI chat).** Add one or more Google Gemini keys, with an optional Groq key as a backup:
+```
+AI_API_KEY=
+AI_API_KEY2=
+AI_API_KEY3=
+GROQ_API_KEY=
+```
+Without a key, the room assistant will not answer.
+
+## If something goes wrong
+
+| What you see | What to try |
+|---|---|
+| "Service temporarily unavailable" | The database is not reachable. Check that MySQL is started and that `.env` and `config/db.php` both exist with the right `DB_` values. |
+| Blank page or a missing-file error | `config/db.php` or `.env` is missing. Redo step 4. |
+| Page looks plain (no fonts or icons) | The computer is offline. Fonts, icons and the QR scripts come from the internet. |
+| `404` or `403` error | Open the exact address `http://localhost/Equipment-Lending-Website/` and check the folder name matches. |
+| Error 500 right after setup | The first lines of `.htaccess` block `.env`. If your server does not support them, delete that `<Files ".env">` block. |
+| Photos or letters will not upload | The `uploads` folder must be writable. On Mac/Linux run `chmod -R 775 uploads`. |
+| Emails are not arriving | Check the Gmail App Password in `.env`. The system keeps working if email fails. |
+| Locked out after wrong passwords | Repeated wrong passwords lock sign-in for a few minutes. Wait and try again. |
+
+---
+
+## Notes for developers
+
+### Tech stack
+- **PHP 8+** (needs `mysqli`, `mbstring`, `fileinfo` and `zip`), MySQL/MariaDB through **MySQLi** with prepared statements.
+- Server-rendered PHP with plain JavaScript and CSS. There is **no build step and no Composer/npm**. New PHP libraries are vendored under `vendor/` (PHPMailer is already there).
+- QR codes: `qrcode.js` (create) and `jsQR` (scan) from a CDN.
+- Sign-in uses native PHP sessions with hardened cookies, an optional 30-day "remember me", and escalating lockouts for repeated failures.
+
+### Folder layout
+
+```
+├── landing-page.php          # Sign-in page
+├── student-dashboard.php     # Student Portal (code-based, no account)
+├── faculty-dashboard.php     # Faculty portal entry
+├── admin-dashboard.php       # Admin / Super Admin entry
+│
+├── auth/                     # Login, logout, rate limiter, remember-me, role splash
+├── dashboard/                # Dashboard data and screens, plus the portal CSS/JS
+├── equipment-booking/        # Borrowing, loans, QR claim/return, extensions, cancellations
+├── room-reservation/         # Rooms, reservations, waitlist, issues, room assistant
+├── account-management/       # Faculty and admin accounts, registry uploads
+├── notifications/            # Notification feeds
+├── activity/                 # Activity feeds and My Activity
+├── settings/                 # Profile, preferences, imports, Help & Support
+├── shared/                   # Shared helpers, page shells, logout dialog
+│
+├── config/                   # db, env, session, csrf, security headers
+├── database/lending_db.sql   # Full schema and starting data (never deploy this folder)
+├── vendor/PHPMailer/         # Vendored library
+├── uploads/                  # User-uploaded files
+└── .github/workflows/deploy.yml
+```
+
+Each feature folder follows the same shape: `api/` (small endpoints that return JSON), `core/` (logic, include-only), `views/` (page pieces, include-only) and `assets/` (that module's CSS/JS). `core/` and `views/` are blocked from direct web access by a `.htaccess`.
+
+### How decisions are made
+- **Equipment requests**: a same-day request from the faculty form is run through `arbitration-engine.php` as soon as it is saved and is approved or declined on the spot. A later-date request is stored as *Waiting* and decided by an admin (`admin-override.php`, `approve-borrow-bundle.php`). Student borrows made with a code are stored as *Approved* straight away. Status flow: Waiting → Approved → On Loan → Returned, with Overdue, Declined and Cancelled as side paths.
+- **Room reservations** use `equipment-booking/core/arbitration-engine.php`: same-day bookings are checked and confirmed on the spot, later dates are held as *Waiting* for an admin (`room-expiry.php` declines undecided ones).
+- Booking limits (hours, advance days, extension counts) live in `equipment-booking/core/booking-schedule.php` and `borrow-extension.php`. Room limits live in `room-reservation/core/room-quota.php`.
+- Notifications are computed from the current data on each load; only read/deleted state is saved.
+
+### Database changes
+The Organization Adviser role was removed. A database imported before that change should run `database/migration_remove_org_adviser.sql` once (back up first). A fresh import of `lending_db.sql` already has the new structure.
+
+Several files check for missing columns/tables on first use and add them (`ensureSchema()` and similar), so an older database catches up by itself. Keep schema changes additive and guarded the same way, and don't assume the SQL file was freshly imported.
+
+When you export a new `lending_db.sql` from phpMyAdmin, make sure these lines are at the very top so it imports cleanly on another computer:
+
+```sql
+DROP DATABASE IF EXISTS `lending_db`;
+CREATE DATABASE `lending_db`
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_general_ci;
+USE `lending_db`;
+```
+
+### Security rules to keep
+- A Content-Security-Policy is set on every page (with a nonce for inline scripts) or by `config/security-headers.php`. Avoid inline `style=""` and inline event handlers in new code.
+- Every state-changing request must check the CSRF token (`csrf_verify()` or the `X-CSRF-TOKEN` header).
+- Use prepared statements (`bind_param`) for anything that touches user input.
+- Never commit `.env` or `config/db.php` (both are in `.gitignore`).
+
+### Deployment
+`.github/workflows/deploy.yml` uploads the project to InfinityFree over FTP on every push to `main` (it uses the `FTP_HOST`, `FTP_USER` and `FTP_PASS` repository secrets). It skips `.env`, `config/db.php` and `database/`, so after the first deploy create those on the host by hand. There is no staging site: treat `main` as live.

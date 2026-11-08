@@ -36,13 +36,6 @@ require_once __DIR__ . '/../core/booking-schedule.php';
 $conn = getDB();
 BookingSchedule::ensureSchema($conn);
 
-$stmt = $conn->prepare('SELECT role FROM tbl_users WHERE faculty_id = ? LIMIT 1');
-$stmt->bind_param('s', $_SESSION['faculty_id']);
-$stmt->execute();
-$role = (string)($stmt->get_result()->fetch_assoc()['role'] ?? '');
-$stmt->close();
-$adviser = BookingSchedule::isAdviserRole($role);
-
 $mode     = (string)($_GET['mode'] ?? '');
 $date     = trim((string)($_GET['date'] ?? ''));
 $time     = trim((string)($_GET['time'] ?? ''));
@@ -53,7 +46,7 @@ if (!is_array($items)) {
 }
 $items = array_slice($items, 0, 40);
 
-$w = BookingSchedule::window($mode, $date, $time, $duration, $adviser);
+$w = BookingSchedule::window($mode, $date, $time, $duration);
 if (!$w['ok']) {
     echo json_encode(['ok' => false, 'error' => $w['error'], 'results' => []]);
     exit();

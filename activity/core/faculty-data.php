@@ -444,7 +444,11 @@ function fact_eq_render_item(array $it, string $kind, string $rootUrl, DateTimeI
         $when = fact_h(fact_range_label($now, $start, fact_s($it, 'start_time'), $due, fact_s($it, 'due_time')));
     }
 
-    $sub = [fact_h(fact_s($it, 'where'))];
+    $sub = [];
+    if (fact_i($it, 'bundle_count') > 1) {
+        $sub[] = 'Part of a bundle · ' . fact_i($it, 'bundle_count') . ' items';
+    }
+    $sub[] = fact_h(fact_s($it, 'where'));
     if (fact_s($it, 'student') !== '') {
         $student = 'Student: ' . fact_s($it, 'student');
         if (fact_s($it, 'student_id') !== '') {
@@ -458,81 +462,103 @@ function fact_eq_render_item(array $it, string $kind, string $rootUrl, DateTimeI
     if ($status === 'Waiting' && fact_s($it, 'reason') !== '') {
         $sub[] = fact_h(fact_s($it, 'reason'));
     }
+    // Why a button is greyed out is said here, in the detail line (and on hover over the button)
+    if ($kind === 'upcoming' && empty($it['can_cancel']) && fact_s($it, 'cancel_note') !== '') {
+        $sub[] = fact_h(fact_s($it, 'cancel_note'));
+    }
+    if ($kind === 'live' && !empty($it['extend_limit'])) {
+        $sub[] = 'Extension limit reached (' . BorrowExtension::MAX_EXTENSIONS . ' of ' . BorrowExtension::MAX_EXTENSIONS . ')';
+    }
 
     $html  = '<article class="fact-item fact-loan' . ($isOverdue ? ' is-overdue' : '') . '" data-req-id="' . fact_i($it, 'id') . '">';
     $html .= fact_eq_tile($it, $rootUrl);
     $html .= '<div class="fact-item-main"><div class="fact-item-top"><h4 class="fact-item-title">' . fact_eq_title($it) . '</h4>'
         . fact_status_chip($status) . '</div>';
-    if (fact_i($it, 'bundle_count') > 1) {
-        $html .= '<p class="fact-bundle-note"><span class="material-symbols-outlined" aria-hidden="true">link</span>'
-            . 'Part of a bundle · ' . fact_i($it, 'bundle_count') . ' items</p>';
-    }
     $html .= '<p class="fact-item-meta">' . $when . '</p>';
     $html .= '<p class="fact-item-sub">' . implode(' · ', $sub) . '</p>';
+    $html .= fact_render_actions(fact_eq_action_slots($it, $kind, $status));
+    return $html . '</div></article>';
+}
 
-    // Upcoming: Claim QR (for Approved only) + Cancel button
-    if ($kind === 'upcoming') {
-        $upButtons = '';
-        // Claim QR — shown while the request is Approved and not yet physically collected
-        if ($status === 'Approved' && !empty($it['bundle_claim_leader']) && fact_s($it, 'bundle_claim_token') !== '') {
-            $upButtons .= '<button type="button" class="fact-btn fact-btn-ghost" data-action="show-claim-qr"'
-                . ' data-token="' . fact_h(fact_s($it, 'bundle_claim_token')) . '"'
-                . ' data-bundle-claim="1"'
-                . ' data-equipment="' . fact_h(fact_s($it, 'bundle_claim_label')) . '">Claim Bundle QR</button>';
-        } elseif ($status === 'Approved' && fact_s($it, 'claim_token') !== '') {
-            $upButtons .= '<button type="button" class="fact-btn fact-btn-ghost" data-action="show-claim-qr"'
-                . ' data-token="' . fact_h(fact_s($it, 'claim_token')) . '"'
-                . ' data-equipment="' . fact_h(fact_s($it, 'name')) . '">Claim QR</button>';
-        }
-        if (!empty($it['can_cancel'])) {
-            $upButtons .= '<button type="button" class="fact-btn fact-btn-ghost is-danger" data-action="cancel-borrow"'
-                . ' data-request-id="' . fact_i($it, 'id') . '"'
-                . ' data-equipment="' . fact_h(fact_s($it, 'name')) . '"'
-                . ' title="Cancel this request">Cancel</button>';
-        } elseif (fact_s($it, 'cancel_note') !== '') {
-            $upButtons .= '<span class="fact-note" title="Requests can\'t be cancelled within 1 hour of the start time">'
-                . fact_icon('lock') . fact_h(fact_s($it, 'cancel_note')) . '</span>';
-        }
-        if ($upButtons !== '') {
-            $html .= '<div class="fact-item-actions">' . $upButtons . '</div>';
-        }
+/**
+ * The buttons an equipment row can have, each in its own slot (see "Where every button lives"
+ * in core/room-quota.php):
+ *   claim   Claim QR    the request is Approved and the item has not been handed over yet
+ *   return  Return QR   the item is out (or about to be): shown while there is a return code
+ *   extend  Extend      the return time has been reached (greyed out at the extension limit)
+ *   end     Cancel      Upcoming requests only (greyed out within 1 hour of the start)
+ *
+ * @param array<string, mixed> $it
+ * @return array{claim: string, return: string, extend: string, end: string}
+ */
+function fact_eq_action_slots(array $it, string $kind, string $status): array
+{
+    $slots = ['claim' => '', 'return' => '', 'extend' => '', 'end' => ''];
+
+    // Claim QR: Approved and not yet physically collected (a bundle has one QR, on its first row)
+    if ($status === 'Approved' && !empty($it['bundle_claim_leader']) && fact_s($it, 'bundle_claim_token') !== '') {
+        $slots['claim'] = fact_action_btn('Claim QR', 'qr_code_2', [
+            'action' => 'show-claim-qr', 'token' => fact_s($it, 'bundle_claim_token'),
+            'bundle-claim' => 1, 'equipment' => fact_s($it, 'bundle_claim_label'),
+        ], ['title' => 'Show the claim QR for the whole bundle', 'aria' => 'Claim bundle QR']);
+    } elseif ($status === 'Approved' && fact_s($it, 'claim_token') !== '') {
+        $slots['claim'] = fact_action_btn('Claim QR', 'qr_code_2', [
+            'action' => 'show-claim-qr', 'token' => fact_s($it, 'claim_token'), 'equipment' => fact_s($it, 'name'),
+        ], ['title' => 'Show the claim QR for this item']);
     }
 
-    // Actions on a live loan:
-    //   Approved-started (claim_token still set) → Claim QR first, then Return QR
-    //   On Loan / Overdue (claim_token nulled)   → Return QR only
-    //   Once return time reached                 → Extend option
     if ($kind === 'live') {
-        $buttons = '';
-        // Claim QR: item is Approved and started but not yet physically collected
-        if ($status === 'Approved' && !empty($it['bundle_claim_leader']) && fact_s($it, 'bundle_claim_token') !== '') {
-            $buttons .= '<button type="button" class="fact-btn fact-btn-ghost" data-action="show-claim-qr"'
-                . ' data-token="' . fact_h(fact_s($it, 'bundle_claim_token')) . '"'
-                . ' data-bundle-claim="1"'
-                . ' data-equipment="' . fact_h(fact_s($it, 'bundle_claim_label')) . '">Claim Bundle QR</button>';
-        } elseif ($status === 'Approved' && fact_s($it, 'claim_token') !== '') {
-            $buttons .= '<button type="button" class="fact-btn fact-btn-ghost" data-action="show-claim-qr"'
-                . ' data-token="' . fact_h(fact_s($it, 'claim_token')) . '"'
-                . ' data-equipment="' . fact_h(fact_s($it, 'name')) . '">Claim QR</button>';
-        }
         if (fact_s($it, 'token') !== '') {
-            $buttons .= '<button type="button" class="fact-btn fact-btn-ghost" data-action="show-return-qr"'
-                . ' data-token="' . fact_h(fact_s($it, 'token')) . '"'
-                . ' data-equipment="' . fact_h(fact_s($it, 'name')) . '">Return QR</button>';
+            $slots['return'] = fact_action_btn('Return QR', 'qr_code_scanner', [
+                'action' => 'show-return-qr', 'token' => fact_s($it, 'token'), 'equipment' => fact_s($it, 'name'),
+            ], ['title' => 'Show the return QR for this item']);
         }
         if (!empty($it['can_extend'])) {
-            $buttons .= '<button type="button" class="fact-btn fact-btn-ghost" data-action="extend-borrow"'
-                . ' data-request-id="' . fact_i($it, 'id') . '"'
-                . ' data-equipment="' . fact_h(fact_s($it, 'name')) . '">Extend</button>';
+            $slots['extend'] = fact_action_btn('Extend', 'update', [
+                'action' => 'extend-borrow', 'request-id' => fact_i($it, 'id'), 'equipment' => fact_s($it, 'name'),
+            ], ['title' => 'Ask for more time']);
         } elseif (!empty($it['extend_limit'])) {
-            $buttons .= '<span class="fact-note" title="This loan has been extended the most times allowed">'
-                . fact_icon('block') . 'Extension limit reached (' . BorrowExtension::MAX_EXTENSIONS . ' of ' . BorrowExtension::MAX_EXTENSIONS . ')</span>';
-        }
-        if ($buttons !== '') {
-            $html .= '<div class="fact-item-actions">' . $buttons . '</div>';
+            $slots['extend'] = fact_action_btn('Extend', 'lock', [], [
+                'disabled' => true, 'title' => 'This loan has been extended the most times allowed',
+            ]);
         }
     }
-    return $html . '</div></article>';
+
+    if ($kind === 'upcoming') {
+        if (!empty($it['can_cancel'])) {
+            $slots['end'] = fact_action_btn('Cancel', 'close', [
+                'action' => 'cancel-borrow', 'request-id' => fact_i($it, 'id'), 'equipment' => fact_s($it, 'name'),
+            ], ['danger' => true, 'title' => 'Cancel this request']);
+        } elseif (fact_s($it, 'cancel_note') !== '') {
+            $slots['end'] = fact_action_btn('Cancel', 'lock', [], [
+                'danger' => true, 'disabled' => true,
+                'title'  => 'Requests can\'t be cancelled within 1 hour of the start time',
+            ]);
+        }
+    }
+    return $slots;
+}
+
+/**
+ * The line under the "Equipment" title: how many requests there are, or, when something is
+ * overdue, why new borrowing is blocked (same rule and wording as the "Borrowing Blocked"
+ * notice on the other screens). Always one line, always in the same place.
+ *
+ * @param array<string, mixed> $d result of fact_eq_load()
+ */
+function fact_eq_render_status(array $d): string
+{
+    $live     = is_array($d['live'] ?? null) ? count($d['live']) : 0;
+    $upcoming = is_array($d['upcoming'] ?? null) ? count($d['upcoming']) : 0;
+
+    if (fact_eq_stats($d)['overdue'] > 0) {
+        return '<span class="fact-sub-alert" title="You have overdue equipment. Return it immediately before you can borrow again.">'
+            . fact_icon('block') . '<span>Borrowing blocked &middot; return your overdue equipment first</span></span>';
+    }
+    if ($live + $upcoming === 0) {
+        return 'Nothing borrowed right now';
+    }
+    return fact_h($live . ' in progress · ' . $upcoming . ' upcoming');
 }
 
 /**
@@ -544,15 +570,8 @@ function fact_eq_render_body(array $d, string $rootUrl): string
 {
     $live     = is_array($d['live'] ?? null) ? $d['live'] : [];
     $upcoming = is_array($d['upcoming'] ?? null) ? $d['upcoming'] : [];
-    $overdue  = fact_eq_stats($d)['overdue'];
     $now      = new DateTimeImmutable('now', new DateTimeZone('Asia/Manila'));
     $html     = '';
-
-    if ($overdue > 0) {
-        // Same rule and wording as the "Borrowing Blocked" notice on the other screens
-        $html .= '<div class="fact-notice" role="status">' . fact_icon('block')
-            . '<div><strong>Borrowing blocked</strong><span>You have overdue equipment. Return it immediately before you can borrow again.</span></div></div>';
-    }
 
     if (!$live && !$upcoming) {
         return $html . fact_render_empty('inventory_2', 'No equipment right now', 'Borrow equipment for your class, lab session or event.');
@@ -638,6 +657,7 @@ function fact_eq_render_history_rows(array $d, string $rootUrl): string
             . '<td data-label="When"><span class="fact-when">' . fact_h($range) . '</span>'
             . ($when2 !== '' ? '<span class="fact-row-sub">' . fact_h($when2) . '</span>' : '') . '</td>'
             . '<td data-label="Status" class="fact-col-status">' . fact_status_chip($status) . '</td>'
+            . '<td data-label="Action" class="fact-col-action"></td>'
             . '</tr>';
     }
     return $html;

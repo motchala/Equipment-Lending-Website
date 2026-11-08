@@ -985,6 +985,37 @@ html.rx-mobile #panel-activity #factRooms>*:nth-child(2):last-child {
     border-radius: var(--rxm-r) !important;
 }
 
+/* history: the page navigation sits under the table's white card, without a box of its own */
+html.rx-mobile #panel-activity #factHistFoot {
+    min-height: 0 !important;
+    padding: 10px 4px 0 !important;
+    border-top: 0 !important;
+    background: transparent !important;
+}
+
+/* the two cards size to their (max 5) rows here, and the card footer is the white list's bottom edge */
+html.rx-mobile #panel-activity .fact-live .fact-card-head {
+    height: auto !important;
+    min-height: 0 !important;
+}
+
+html.rx-mobile #panel-activity .fact-card-sub {
+    margin-top: 1px !important;
+}
+
+html.rx-mobile #panel-activity .fact-live .fact-card-body {
+    height: auto !important;
+    overflow: visible !important;
+}
+
+html.rx-mobile #panel-activity .fact-live .fact-card-foot {
+    height: auto !important;
+    min-height: 0 !important;
+    padding-top: 8px !important;
+    padding-bottom: 12px !important;
+    border-top-color: var(--rxm-line) !important;
+}
+
 html.rx-mobile #panel-activity .fact-item {
     padding-top: 14px !important;
     padding-bottom: 14px !important;

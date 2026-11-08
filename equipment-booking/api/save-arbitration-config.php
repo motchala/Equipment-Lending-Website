@@ -32,11 +32,10 @@ if (empty($csrf_token) || empty($_SESSION['csrf_token']) || !hash_equals($_SESSI
     send_json(403, 'error', 'Invalid or expired session. Please refresh the page and try again.');
 }
 
-// ── Whitelist of valid config keys (exactly the eight seeded keys) ────────────
+// ── Whitelist of valid config keys (exactly the seeded keys) ────────────
 const VALID_CONFIG_KEYS = [
     'tie_break_window_seconds',
     'role_priority_director',
-    'role_priority_adviser',
     'role_priority_faculty',
     'role_priority_student',
     'rule_overdue_block_enabled',

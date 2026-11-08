@@ -74,29 +74,65 @@
                     <div class="ps-drawer-note" id="ps-rr-notes">—</div>
                 </section>
 
-                <?php if (!empty($ps_rooms_can_view_sensitive_adviser_requests)): ?>
-                    <!-- Super Admin only: shown for Waiting requests. Open the attached letter above, then decide. -->
-                    <section class="ps-drawer-sec" id="ps-rr-review-sec" hidden>
-                        <h4>Your decision</h4>
-                        <label class="ps-drawer-muted" for="ps-rr-review-reason">Reason (at least 5 characters). It is saved with the decision.</label>
-                        <textarea class="ps-rr-reason" id="ps-rr-review-reason" rows="3" maxlength="500"></textarea>
-                        <div class="ps-rr-review-err" id="ps-rr-review-err" role="alert" hidden></div>
-                    </section>
-                <?php endif; ?>
+                <!-- Shown for Waiting requests. Open the attached request letter (if any) above, then decide. -->
+                <section class="ps-drawer-sec" id="ps-rr-review-sec" hidden>
+                    <h4>Your decision</h4>
+                    <label class="ps-drawer-muted" for="ps-rr-review-reason">Reason (at least 5 characters). It is saved with the decision.</label>
+                    <textarea class="ps-rr-reason" id="ps-rr-review-reason" rows="3" maxlength="500"></textarea>
+                    <div class="ps-rr-review-err" id="ps-rr-review-err" role="alert" hidden></div>
+                </section>
             </div>
             <div class="ps-drawer-foot">
                 <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-room-drawer">Close</button>
                 <button class="ps-btn ps-btn--danger" type="button" id="ps-rr-cancel-btn" data-rr-cancel hidden>
                     <span class="material-symbols-outlined">cancel</span> Cancel reservation
                 </button>
-                <?php if (!empty($ps_rooms_can_view_sensitive_adviser_requests)): ?>
-                    <button class="ps-btn ps-btn--danger" type="button" data-rr-decide="Declined" hidden>
-                        <span class="material-symbols-outlined">close</span> Decline
-                    </button>
-                    <button class="ps-btn ps-btn--success" type="button" data-rr-decide="Approved" hidden>
-                        <span class="material-symbols-outlined">check</span> Approve
-                    </button>
-                <?php endif; ?>
+                <button class="ps-btn ps-btn--danger" type="button" data-rr-decide="Declined" hidden>
+                    <span class="material-symbols-outlined">close</span> Decline
+                </button>
+                <button class="ps-btn ps-btn--success" type="button" data-rr-decide="Approved" hidden>
+                    <span class="material-symbols-outlined">check</span> Approve
+                </button>
             </div>
         </aside>
     </div>
+
+<?php if ($is_super_admin): ?>
+    <!-- ================================================================
+         MODAL: DELETE ALL RESERVATIONS  (Super Admin only)
+    ================================================================ -->
+    <div class="ps-modal-backdrop" id="rr-wipe-modal">
+        <div class="ps-modal ps-modal--sm">
+            <div class="ps-modal-head">
+                <div class="ps-modal-head-icon ps-mhi--danger">
+                    <span class="material-symbols-outlined">delete_forever</span>
+                </div>
+                <h3>Delete all reservations?</h3>
+                <button type="button" class="ps-modal-close" id="rr-wipe-close" aria-label="Close">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="ps-modal-body">
+                <p class="fac-reg-auth-lead">Every reservation record will be permanently deleted. This cannot be undone.</p>
+                <ul class="eq-wipe-summary" id="rr-wipe-summary" aria-live="polite">
+                    <li class="eq-wipe-loading">Counting records…</li>
+                </ul>
+                <label class="fac-del-pw-label" for="rr-wipe-pw">Your password</label>
+                <div class="fac-pw-wrap">
+                    <input type="password" id="rr-wipe-pw" class="form-control-custom"
+                        maxlength="128" autocomplete="current-password" placeholder="Enter your password to confirm">
+                    <button type="button" class="eq-wipe-pw-toggle" id="rr-wipe-pw-toggle" aria-label="Show or hide password">
+                        <span class="material-symbols-outlined" style="font-size:17px">visibility</span>
+                    </button>
+                </div>
+                <p class="fac-del-error hidden" id="rr-wipe-error" role="alert"></p>
+            </div>
+            <div class="ps-modal-foot">
+                <button type="button" class="ps-btn ps-btn--ghost" id="rr-wipe-cancel">Cancel</button>
+                <button type="button" class="ps-btn ps-btn--danger" id="rr-wipe-confirm" disabled>
+                    <span class="material-symbols-outlined">delete_forever</span> Delete everything
+                </button>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>

@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 /**
  * verify-item-code.php
@@ -64,7 +65,7 @@ if ($rl_row) {
     if ($rl_row['locked_until'] !== null && strtotime($rl_row['locked_until']) > time()) {
         $mins = (int)ceil((strtotime($rl_row['locked_until']) - time()) / 60);
         http_response_code(429);
-        echo json_encode(['error' => "Too many failed attempts. Try again in {$mins} minute" . ($mins === 1 ? '' : 's') . '.' ]);
+        echo json_encode(['error' => "Too many failed attempts. Try again in {$mins} minute" . ($mins === 1 ? '' : 's') . '.']);
         exit;
     }
     // Reset window if it expired
@@ -78,7 +79,7 @@ if ($rl_row) {
 $stmt = $conn->prepare(
     "SELECT ic.id, ic.faculty_id, ic.faculty_name, ic.item_name,
             ic.item_id, ic.is_used,
-            inv.quantity
+            inv.quantity, inv.category, inv.image_path
        FROM tbl_faculty_item_codes ic
        JOIN tbl_inventory inv ON inv.item_id = ic.item_id AND inv.is_archived = 0
       WHERE ic.code = BINARY ? LIMIT 1"
@@ -101,20 +102,14 @@ if ($row['is_used']) {
     exit;
 }
 
-// ── Student must be on the official student list (Settings → Student List) ──
-require_once __DIR__ . '/../../shared/core/student-registry.php';
+// ── Course must be one of the Student Portal's courses ──
+// (The Student No. itself is not validated.)
+require_once __DIR__ . '/../../shared/core/student-courses.php';
 $student_course = trim((string)($body['student_course'] ?? ''));
-if (!student_registry_valid_course($student_course)) {
+if (!student_course_valid($student_course)) {
     echo json_encode(['error' => 'Please select your course.']);
     exit;
 }
-$sv = student_registry_validate($conn, $student_id);
-if (!$sv['ok']) {
-    vic_record_fail($conn, $ip, (int)($rl_row['fail_count'] ?? 0), $max_fails, $window_sec);
-    echo json_encode(['error' => $sv['error']]);
-    exit;
-}
-$student_id = $sv['student_no'];
 
 // Check faculty not overdue
 $od = $conn->prepare(
@@ -147,6 +142,8 @@ echo json_encode([
     'item_name'    => (string)$row['item_name'],
     'item_id'      => (int)$row['item_id'],
     'quantity'     => (int)$row['quantity'],
+    'category'     => (string)($row['category'] ?? ''),
+    'image_path'   => (string)($row['image_path'] ?? ''),
     'code_db_id'   => (int)$row['id'],
 ]);
 
@@ -161,7 +158,7 @@ function vic_record_fail(mysqli $conn, string $ip, int $current_fails, int $max,
     $conn->query(
         "INSERT INTO tbl_item_code_attempts (ip_address, fail_count, window_start, locked_until)
          VALUES ('" . $conn->real_escape_string($ip) . "', {$new_fails}, NOW(), " .
-        ($locked ? "'" . $conn->real_escape_string($locked) . "'" : 'NULL') . ")
+            ($locked ? "'" . $conn->real_escape_string($locked) . "'" : 'NULL') . ")
          ON DUPLICATE KEY UPDATE
            fail_count   = {$new_fails},
            locked_until = " . ($locked ? "'" . $conn->real_escape_string($locked) . "'" : 'NULL')

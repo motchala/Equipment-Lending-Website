@@ -132,14 +132,6 @@ if ($request === null || $request === false) {
     send_json(404, 'error', 'Request not found.');
 }
 
-// Attached Organization Adviser requests are deliberately confidential until
-// a Super Admin reviews them. Enforce this here as well as in the UI/query.
-$is_sensitive_adviser_request = (string)($request['submitted_as'] ?? '') === 'adviser'
-    && trim((string)($request['document_path'] ?? '')) !== '';
-if ($is_sensitive_adviser_request && !admin_is_super_admin($conn)) {
-    send_json(403, 'error', 'Only a Super Admin can review an Organization Adviser request with a supporting document.');
-}
-
 $borrower_id     = (string)$request['faculty_id'];
 $borrower_name   = (string)($request['faculty_name'] ?? '');
 $equipment_name  = (string)$request['equipment_name'];

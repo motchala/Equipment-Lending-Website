@@ -91,9 +91,30 @@ while ($row = $result->fetch_assoc()) {
     ];
 }
 $stmt->close();
+
+// Weekly class meetings (imported timetable): "day" is 1 = Monday ... 6 = Saturday, repeating every week
+$classes = [];
+try {
+    require_once __DIR__ . '/../core/class-schedule.php';
+    foreach (cs_room_week_rows($conn, $room_id) as $c) {
+        $classes[] = [
+            'id'         => (int)$c['id'],
+            'day'        => (int)$c['day_of_week'],
+            'start'      => $c['start_hm'],
+            'end'        => $c['end_hm'],
+            'class'      => cs_class_label($c),
+            'subject'    => (string)$c['subject_name'],
+            'section'    => (string)$c['section'],
+            'component'  => (string)$c['component'],
+            'instructor' => (string)($c['faculty_name'] ?? ''),
+        ];
+    }
+} catch (Throwable $e) {
+    error_log('admin-room-schedule.php: class meetings failed - ' . $e->getMessage());
+}
 $conn->close();
 
 echo json_encode(
-    ['room_id' => $room_id, 'reservations' => $rows],
+    ['room_id' => $room_id, 'reservations' => $rows, 'classes' => $classes],
     JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES
 );

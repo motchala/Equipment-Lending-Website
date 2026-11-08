@@ -44,41 +44,6 @@
                     <input type="email" id="fac-edit-backup" class="form-control-custom" placeholder="backup@gmail.com">
                 </div>
 
-                <!-- Organization: org picker + org borrowing only appear for advisers -->
-                <div class="fac-opt-card">
-                    <label class="fac-opt-row" for="fac-edit-adviser">
-                        <span class="fac-opt-text">
-                            <span class="fac-opt-title">Organization adviser</span>
-                            <span class="fac-opt-sub">Gets organization borrowing automatically</span>
-                        </span>
-                        <input type="checkbox" id="fac-edit-adviser" class="faculty-toggle-input">
-                        <span class="faculty-toggle-track"></span>
-                    </label>
-
-                    <div class="fac-opt-extra" id="fac-edit-org-group" style="display:none;">
-                        <div class="form-group">
-                            <label for="fac-edit-org">Organization</label>
-                            <?php
-                            $orgs_grouped     = orgs_load_grouped($conn);
-                            $orgs_adviser_map = $orgs_adviser_map ?? orgs_adviser_map($conn);
-                            $orgs_total = count($orgs_grouped[ORG_CATEGORY_ACADEMIC])
-                                + count($orgs_grouped[ORG_CATEGORY_NON_ACADEMIC])
-                                + count($orgs_grouped['']);
-                            if ($orgs_total > 0): ?>
-                                <select id="fac-edit-org" class="form-control-custom"
-                                    data-advisers="<?= htmlspecialchars(json_encode($orgs_adviser_map, JSON_FORCE_OBJECT), ENT_QUOTES, 'UTF-8') ?>">
-                                    <option value="">&#8212; Select Organization &#8212;</option>
-                                    <?= orgs_render_options($orgs_grouped) ?>
-                                </select>
-                            <?php else: ?>
-                                <select id="fac-edit-org" class="form-control-custom" disabled>
-                                    <option value="">&#8212; Organizations unavailable &#8212;</option>
-                                </select>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                </div>
-
                 <div id="fac-edit-alert" class="alert-banner hidden" role="alert" style="margin-bottom:0"></div>
             </div>
             <div class="ps-modal-foot fac-foot-split">

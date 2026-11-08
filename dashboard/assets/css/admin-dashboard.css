@@ -269,6 +269,126 @@ body {
     color: var(--text-light);
 }
 
+.adm-email-hint.is-ok {
+    color: #1e7e45;
+}
+
+.adm-email-hint.is-bad {
+    color: var(--danger, #c0392b);
+}
+
+/* ── Add admin: live password strength ─────────────────────────── */
+.adm-pw-help {
+    margin: 0.15rem 0 0.25rem;
+}
+
+.adm-pw-meter {
+    --pw-color: var(--khaki-border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.adm-pw-bars {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+}
+
+.adm-pw-bars span {
+    height: 5px;
+    border-radius: 999px;
+    background: var(--khaki-border);
+    transition: background 0.2s;
+}
+
+.adm-pw-label {
+    min-width: 5.5rem;
+    text-align: right;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--pw-color);
+}
+
+.adm-pw-meter[data-level="0"] .adm-pw-label {
+    color: var(--text-light);
+    font-weight: 500;
+}
+
+.adm-pw-meter[data-level="1"] {
+    --pw-color: #c0392b;
+}
+
+.adm-pw-meter[data-level="2"] {
+    --pw-color: #d98a0b;
+}
+
+.adm-pw-meter[data-level="3"] {
+    --pw-color: #5a9a3c;
+}
+
+.adm-pw-meter[data-level="4"] {
+    --pw-color: #1e8e57;
+}
+
+.adm-pw-meter[data-level="1"] .adm-pw-bars span:nth-child(-n+1),
+.adm-pw-meter[data-level="2"] .adm-pw-bars span:nth-child(-n+2),
+.adm-pw-meter[data-level="3"] .adm-pw-bars span:nth-child(-n+3),
+.adm-pw-meter[data-level="4"] .adm-pw-bars span:nth-child(-n+4) {
+    background: var(--pw-color);
+}
+
+.adm-pw-rules {
+    list-style: none;
+    margin: 0.6rem 0 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px 14px;
+    font-size: 11.5px;
+    color: var(--text-light);
+}
+
+.adm-pw-rules li {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: color 0.15s;
+}
+
+.adm-pw-rules li::before {
+    content: '';
+    flex: none;
+    box-sizing: border-box;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 1.5px solid var(--khaki-border);
+    display: grid;
+    place-items: center;
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 1;
+    color: #fff;
+}
+
+.adm-pw-rules li.is-met {
+    color: #1e7e45;
+}
+
+.adm-pw-rules li.is-met::before {
+    content: '\2713';
+    background: #1e7e45;
+    border-color: #1e7e45;
+}
+
+@media (max-width: 520px) {
+    .adm-pw-rules {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
 .adm-reauth {
     margin: 1.1rem 0 0;
     padding-top: 1rem;
@@ -2133,21 +2253,39 @@ main#app-main {
 }
 
 #eq-loan-table th:nth-child(1),
-#eq-loan-table td:nth-child(1) { width: 145px; }
+#eq-loan-table td:nth-child(1) {
+    width: 145px;
+}
+
 #eq-loan-table th:nth-child(2),
-#eq-loan-table td:nth-child(2) { width: 145px; }
+#eq-loan-table td:nth-child(2) {
+    width: 145px;
+}
+
 #eq-loan-table th:nth-child(3),
 #eq-loan-table td:nth-child(3),
 #eq-loan-table th:nth-child(4),
-#eq-loan-table td:nth-child(4) { width: 105px; }
+#eq-loan-table td:nth-child(4) {
+    width: 105px;
+}
+
 #eq-loan-table th:nth-child(5),
-#eq-loan-table td:nth-child(5) { width: 115px; }
+#eq-loan-table td:nth-child(5) {
+    width: 115px;
+}
+
 #eq-loan-table th:nth-child(6),
-#eq-loan-table td:nth-child(6) { width: 105px; }
+#eq-loan-table td:nth-child(6) {
+    width: 105px;
+}
+
 #eq-loan-table th:nth-child(7),
-#eq-loan-table td:nth-child(7) { width: 360px; }
+#eq-loan-table td:nth-child(7) {
+    width: 360px;
+}
 
 .ps-table th {
+    background: var(--secondary-cream);
     text-align: left;
     padding: 0.6rem 1rem;
     font-weight: 700;
@@ -5643,12 +5781,6 @@ input[type="range"] {
     margin-top: 4px;
 }
 
-/* Wrapper that holds the adviser toggle label + track together */
-.faculty-adviser-toggle-wrap {
-    display: flex;
-    align-items: center;
-}
-
 /* Clickable label that wraps checkbox + track + text */
 .faculty-toggle-label {
     display: flex;
@@ -5725,8 +5857,7 @@ input[type="range"] {
 
 /* .form-group label (used for every other field label) sets display:block,
    uppercase text, and a bottom margin — and it wins over .faculty-toggle-label
-   on specificity when a toggle sits inside a .form-group (e.g. the
-   Organization Adviser toggle in Create Faculty Account), breaking the
+   on specificity when a toggle sits inside a .form-group, breaking the
    switch/text alignment. Restore the intended flex layout here. */
 .form-group label.faculty-toggle-label {
     display: flex;
@@ -7799,9 +7930,12 @@ body:has(#roomDeleteConfirm:not(.hidden)) {
     gap: 6px;
     min-height: 44px;
     padding: 0.6rem 1.15rem;
-    background: #570000;
-    border: 1.5px solid rgba(255, 255, 255, 0.35);
-    box-shadow: 0 2px 8px rgba(87, 0, 0, 0.35);
+    /* Frosted, maroon-tinted glass: takes on the hero's colour instead of a solid dark block */
+    background: rgba(87, 0, 0, 0.34);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    border: 1.5px solid rgba(255, 255, 255, 0.5);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
     border-radius: 8px;
     font-family: 'Poppins', sans-serif;
     font-size: 13.5px;
@@ -7816,8 +7950,13 @@ body:has(#roomDeleteConfirm:not(.hidden)) {
 }
 
 .ov-profile-hero .btn-edit-acc:hover {
-    background: #6e0606;
-    border-color: rgba(255, 255, 255, 0.6);
+    background: rgba(87, 0, 0, 0.5);
+    border-color: rgba(255, 255, 255, 0.8);
+}
+
+.ov-profile-hero .btn-edit-acc:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
 }
 
 .ov-profile-hero .btn-save-acc {
@@ -7931,6 +8070,12 @@ body:has(#roomDeleteConfirm:not(.hidden)) {
 
 .pw-change-untracked {
     font-style: italic;
+}
+
+/* "Not tracked" is gray, like the "Not provided" placeholders */
+#panel-settings .info-card .info-val.pw-change-untracked {
+    color: var(--text-light);
+    font-weight: 400;
 }
 
 .info-value-wrap {
@@ -8410,59 +8555,6 @@ body:has(#roomDeleteConfirm:not(.hidden)) {
     color: var(--text-light);
 }
 
-/* Switch rows (adviser / org borrowing) */
-.fac-opt-card {
-    border: 1px solid var(--khaki-border);
-    border-radius: 12px;
-    padding: 0 0.9rem;
-    margin-top: 1.1rem;
-}
-
-.fac-opt-row {
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 0.7rem 0;
-    cursor: pointer;
-    user-select: none;
-}
-
-.fac-opt-text {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-}
-
-.fac-opt-title {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-dark);
-}
-
-.fac-opt-sub {
-    font-size: 11.5px;
-    color: var(--text-light);
-}
-
-.fac-opt-row:hover .faculty-toggle-track {
-    box-shadow: 0 0 0 3px var(--accent-light);
-}
-
-.fac-opt-extra {
-    border-top: 1px solid var(--khaki-border);
-    padding-top: 0.8rem;
-}
-
-.fac-opt-extra .fac-opt-row {
-    border-top: 1px solid var(--khaki-border);
-}
-
-.fac-opt-extra .form-group {
-    margin-bottom: 0.6rem;
-}
-
 /* Footer: Delete on the left, Cancel + Save on the right */
 .ps-modal-foot.fac-foot-split {
     justify-content: space-between;
@@ -8682,12 +8774,6 @@ body:has(#roomDeleteConfirm:not(.hidden)) {
     color: var(--text-light);
     background: var(--secondary-cream);
     border: 1px solid var(--khaki-border);
-}
-
-.fac-role--adviser {
-    color: var(--accent-maroon);
-    background: var(--accent-light);
-    border-color: transparent;
 }
 
 @media (max-width: 520px) {
@@ -9356,7 +9442,6 @@ body.sidebar-collapsed .nav-user {
     color: var(--text-light);
 }
 
-
 /* ════════════════════════════════════════════════════════════════════
    APPROVALS — redesigned Waiting table, document chips, review drawer
    (additive block: nothing above this line is modified)
@@ -9699,13 +9784,13 @@ a.ps-doc-chip:hover {
     transform: translateY(-50%);
 }
 
-#eq-loan-table td:last-child > div.has-bundle-approve {
+#eq-loan-table td:last-child>div.has-bundle-approve {
     flex-wrap: nowrap;
     gap: 4px;
     white-space: nowrap;
 }
 
-#eq-loan-table td:last-child > div.has-bundle-approve [data-action="eq-open-bundle-approve"] {
+#eq-loan-table td:last-child>div.has-bundle-approve [data-action="eq-open-bundle-approve"] {
     flex-shrink: 0;
     white-space: nowrap;
 }
@@ -9907,7 +9992,6 @@ a.ps-doc-chip:hover {
     }
 }
 
-
 /* Rooms reservations table: document-bearing rows get the same gold edge as Approvals */
 .ps-rr-row.has-doc td:first-child {
     box-shadow: inset 3px 0 0 var(--accent-gold);
@@ -9920,7 +10004,6 @@ a.ps-doc-chip:hover {
 .ps-drawer-foot .ps-btn[hidden] {
     display: none;
 }
-
 
 /* ════════════════════════════════════════════════════════════════════
    SIDEBAR — roomier, easier-to-hit tabs
@@ -10118,7 +10201,6 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
      § 7  Adaptive layout (container queries)
 ================================================================ */
 
-
 /* ── § 1  TOKENS + SHELL ─────────────────────────────────────── */
 .dash {
     --dash-ok: #1e8e57;
@@ -10206,7 +10288,6 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
         transition: none !important;
     }
 }
-
 
 /* ── § 2  HEADER ─────────────────────────────────────────────── */
 .dash-head {
@@ -10354,7 +10435,6 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.32);
 }
 
-
 /* ── § 3  OVERVIEW (one card, two groups) ───────────────────── */
 .dash-kpis {
     display: grid;
@@ -10475,7 +10555,6 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     font-weight: 600;
 }
 
-
 /* ── § 4  GRID + CARDS ───────────────────────────────────────── */
 .dash-grid {
     display: grid;
@@ -10572,7 +10651,6 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     font-size: 11.5px;
     font-weight: 700;
 }
-
 
 /* ── § 5  CHART ──────────────────────────────────────────────── */
 .dash-controls {
@@ -11123,7 +11201,6 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     stroke-dasharray: 3 4;
 }
 
-
 /* ── § 6  LISTS, BARS, BADGES ────────────────────────────────── */
 .dash-list,
 .dash-attn {
@@ -11560,7 +11637,6 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     padding: 1.5rem !important;
 }
 
-
 /* ── § 7  ADAPTIVE LAYOUT (container queries) ────────────────── */
 
 /* Medium: the dashboard is ~700–1000px wide (sidebar open on a small laptop, or icon-rail tablet) */
@@ -11709,7 +11785,6 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     }
 }
 
-
 /* Phones: the shared responsive sheet turns .ps-table rows into stacked cards at <= 768px.
    Keep the requester name + id/time as two clean left-aligned lines in the card header. */
 @media (max-width: 768px) {
@@ -11734,7 +11809,6 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
         white-space: normal;
     }
 }
-
 
 /* ══════════════════════════════════════════════════════════════
    ROOMS PANEL -- calm layout (tiles + pills)
@@ -12234,22 +12308,18 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
 #panel-rooms .rr-status-bar {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 12px 1.25rem;
-    border-bottom: 1px solid var(--khaki-border);
 }
 
 #panel-rooms .rr-status-bar .pr-filter-select {
     margin-left: auto;
     width: auto;
-    min-width: 155px;
 }
 
 /* Sort: dropdown (what to sort by) + arrow button (direction), pushed to the right */
 #panel-rooms .rr-sort {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     margin-left: auto;
 }
 
@@ -12260,16 +12330,12 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
 #panel-rooms .rr-sort-dir {
     display: inline-grid;
     place-items: center;
-    flex: 0 0 auto;
     width: 36px;
     height: 36px;
-    padding: 0;
+    border-radius: 8px;
     border: 1.5px solid var(--khaki-border);
-    border-radius: 9px;
     background: var(--card-bg);
-    color: var(--text-dark);
     cursor: pointer;
-    transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
 
 #panel-rooms .rr-sort-dir:hover {
@@ -12286,24 +12352,10 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     font-size: 18px;
 }
 
-#panel-rooms .rr-active-chip {
-    gap: 5px;
-}
-
-#panel-rooms .rr-active-chip .material-symbols-outlined {
-    font-size: 15px;
-}
-
-/* Reservations status tabs (All / Active today / Waiting / Approved / Cancelled / Declined) + sort dropdown */
-#panel-rooms .rr-status-bar {
-    flex-wrap: wrap;
-}
-
 #panel-rooms .rr-tabs {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
+    gap: 4px;
 }
 
 #panel-rooms .rr-tab {
@@ -12313,12 +12365,12 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
 #panel-rooms .rr-tab-count {
     min-width: 19px;
     padding: 1px 7px;
-    border-radius: 999px;
-    background: rgba(0, 0, 0, 0.07);
-    color: inherit;
-    font-size: 10.5px;
+    border-radius: 99px;
+    font-size: 11px;
     font-weight: 700;
-    line-height: 1.5;
+    background: var(--secondary-cream);
+    color: var(--text-light);
+    display: inline-block;
     text-align: center;
 }
 
@@ -12330,26 +12382,6 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
 #panel-rooms .rr-tab-count.has {
     background: var(--danger);
     color: #fff;
-}
-
-@media (max-width: 700px) {
-    #panel-rooms .rr-sort {
-        flex: 1 1 100%;
-        margin-left: 0;
-    }
-
-    #panel-rooms .rr-status-bar .rr-sort .pr-filter-select {
-        flex: 1 1 auto;
-        width: auto;
-        min-width: 0;
-    }
-}
-
-@media (max-width: 768px) {
-    #panel-rooms .rr-sort-dir {
-        width: 44px;
-        height: 44px;
-    }
 }
 
 /* Reservation drawer: Super Admin decision box for Waiting requests */
@@ -12386,7 +12418,7 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
 
 #panel-rooms .rm-table thead th:last-child,
 #panel-rooms .rm-table tbody td:last-child {
-    text-align: right;
+    text-align: left;
 }
 
 #panel-rooms .rm-main {
@@ -12687,20 +12719,109 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     flex-wrap: wrap;
 }
 
-/* header: title on its own line, then tabs (left) + search (right); wraps on narrow screens */
+/* header: title left, search + tools right — single row */
 .eq-loan-head {
+    gap: 8px;
+}
+
+/* Status-tabs + sort strip — mirrors .rr-status-bar from the Reservations table */
+.eq-loan-status-bar {
+    display: flex;
+    align-items: center;
+    background: var(--secondary-cream);
+    border-bottom: 1px solid var(--khaki-border);
+    padding: 10px 1.25rem;
     flex-wrap: wrap;
-    gap: 12px 14px;
+    gap: 8px;
+}
+
+.eq-loan-sort {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+}
+
+.eq-loan-sort .pr-filter-select {
+    height: 36px;
+    padding: 0 2rem 0 0.85rem;
+    border: 1.5px solid var(--khaki-border);
+    border-radius: 9px;
+    background: var(--card-bg);
+    font-family: 'Poppins', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-dark);
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s;
+    width: auto;
+}
+
+.eq-loan-sort .pr-filter-select:focus {
+    border-color: var(--accent-maroon);
+}
+
+.eq-loan-sort-dir {
+    display: inline-grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: 1.5px solid var(--khaki-border);
+    background: var(--card-bg);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.eq-loan-sort-dir:hover {
+    border-color: var(--accent-maroon);
+    color: var(--accent-maroon);
+}
+
+.eq-loan-sort-dir:focus-visible {
+    outline: 2px solid var(--accent-maroon);
+    outline-offset: 2px;
+}
+
+.eq-loan-sort-dir .material-symbols-outlined {
+    font-size: 18px;
+}
+
+@media (max-width: 700px) {
+    .eq-loan-sort {
+        flex: 1 1 100%;
+        margin-left: 0;
+    }
+
+    .eq-loan-sort .pr-filter-select {
+        flex: 1 1 auto;
+        width: auto;
+    }
+}
+
+@media (max-width: 768px) {
+    .eq-loan-sort-dir {
+        width: 44px;
+        height: 44px;
+    }
+
+    .eq-loan-status-bar {
+        flex-wrap: wrap;
+    }
 }
 
 .eq-loan-title {
-    flex: 0 0 100%;
+    flex: 1 1 auto;
     margin: 0;
     font-family: inherit;
     font-size: 17px;
     font-weight: 700;
     line-height: 1.3;
     color: var(--text-dark);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* Rounded-square tabs (not pills): 8px corners */
@@ -12867,6 +12988,30 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     }
 }
 
+/* ─ Reservation sort: full-width on very small screens ─ */
+@media (max-width: 700px) {
+    #panel-rooms .rr-sort {
+        flex: 1 1 100%;
+        margin-left: 0;
+    }
+
+    #panel-rooms .rr-status-bar .rr-sort .pr-filter-select {
+        flex: 1 1 auto;
+        width: auto;
+    }
+}
+
+@media (max-width: 768px) {
+    #panel-rooms .rr-sort-dir {
+        width: 44px;
+        height: 44px;
+    }
+
+    #panel-rooms .rr-status-bar {
+        flex-wrap: wrap;
+    }
+}
+
 /* ═══════════════════════════════════════════════════════════════
    EQUIPMENT › TABS SIZE  (additive — Catalog / On Loan)
    Same size as the Facilities tabs above. Scoped to #eqTabs so the other
@@ -12988,7 +13133,6 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     content: '.';
     animation: fac-reg-ellipsis 1.2s steps(1) infinite;
 }
-
 
 /* ════════════════════════════════════════════════════════════════════
    FACULTY TAB — Create Faculty Account card refinement
@@ -13174,30 +13318,7 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     line-height: 1.4;
 }
 
-/* Organization adviser — a soft maroon tint so the switch stands out
-   a tiny bit from the rest of the form (and responds when switched on) */
-.faculty-form-card .fac-opt-card {
-    margin-top: 1.4rem;
-    padding: 0 1rem;
-    background: rgba(96, 3, 2, 0.035);
-    background: color-mix(in srgb, var(--accent-maroon) 4%, var(--card-bg));
-    border: 1px solid color-mix(in srgb, var(--accent-maroon) 22%, var(--khaki-border));
-    transition: background 0.2s, border-color 0.2s;
-}
-
-.faculty-form-card .fac-opt-card:has(.faculty-toggle-input:checked) {
-    background: color-mix(in srgb, var(--accent-maroon) 7%, var(--card-bg));
-    border-color: color-mix(in srgb, var(--accent-maroon) 45%, var(--khaki-border));
-}
-
-.faculty-form-card .fac-opt-row {
-    padding: 0.8rem 0;
-}
-
 /* Off-state track a touch darker so the switch itself is easier to spot */
-.faculty-form-card .fac-opt-card .faculty-toggle-input:not(:checked)+.faculty-toggle-track {
-    background: color-mix(in srgb, var(--text-light) 40%, var(--khaki-border));
-}
 
 /* Create Account — full-width, centred, a little more presence */
 .faculty-form-card .fac-submit-btn {
@@ -13281,6 +13402,7 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
 #panel-rooms .rr-status-bar {
     background: var(--secondary-cream);
     border-bottom: 1px solid var(--khaki-border);
+    padding: 10px 1.25rem;
 }
 
 #panel-rooms .rm-toolbar {
@@ -13374,7 +13496,6 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
         min-width: 0;
     }
 }
-
 
 /* ════════════════════════════════════════════════════════════════════
    FACULTY REGISTRY — "View registry list" (button row + 2 modals)
@@ -13690,6 +13811,10 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
    EQUIPMENT › ON LOAN › "Delete All"  (additive — Super Admin only)
    Button in the All Loans header + its confirmation dialog.
 ═══════════════════════════════════════════════════════════════ */
+
+#rr-wipe-btn {
+    white-space: nowrap;
+}
 #eq-loan-wipe-btn {
     white-space: nowrap;
 }
@@ -13759,3 +13884,8 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
 .eq-wipe-pw-toggle:hover {
     color: var(--accent-maroon);
 }
+
+/* ── Loan table: streamlined cell helpers ── */
+.eq-cell-name { font-weight: 600; line-height: 1.3; }
+.eq-cell-sub { font-size: 11px; color: var(--text-light); margin-top: 2px; line-height: 1.3; }
+.eq-act-wrap { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }

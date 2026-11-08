@@ -3,7 +3,11 @@
             <?php if (isset($_GET['success'])): ?>
                 <div class="alert-banner alert-success" id="success-alert">
                     <span class="material-symbols-outlined">check_circle</span>
-                    <strong>Success!</strong> Your borrow request has been submitted for approval.
+                    <?php if (($_GET['success'] ?? '') === 'approved'): ?>
+                        <strong>Approved!</strong> Your borrow request was approved.
+                    <?php else: ?>
+                        <strong>Success!</strong> Your borrow request has been submitted for approval.
+                    <?php endif; ?>
                     <button class="alert-close" data-action="dismiss-alert" data-target="success-alert" aria-label="Close">
                         <span class="material-symbols-outlined">close</span>
                     </button>

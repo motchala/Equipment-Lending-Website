@@ -164,6 +164,7 @@
 
     /* ── Theme DOM helpers ───────────────────────────────────── */
     function _applyThemeDOM(theme) {
+        if (theme !== 'light' && theme !== 'dark') theme = 'light';   // Light / Dark only (High Contrast removed)
         document.documentElement.setAttribute('data-theme', theme);
         document.documentElement.style.removeProperty('--section-tint-start');
         document.documentElement.style.removeProperty('--section-tint-end');
@@ -192,7 +193,9 @@
 
     /* ── Restore persisted state ─────────────────────────────── */
     function restoreState() {
-        const theme = LS.get('theme');
+        let theme = LS.get('theme');
+        // High Contrast was removed: anyone who had it saved falls back to Light.
+        if (theme && theme !== 'light' && theme !== 'dark') { theme = 'light'; LS.set('theme', theme); }
         if (theme && theme !== 'light') _applyThemeDOM(theme);
 
         const ac = LS.get('accentColor'), al = LS.get('accentLight');
@@ -1760,30 +1763,6 @@
         } catch (err) { console.warn('Action "' + action + '" failed:', err); }
     });
 
-    /* ── Faculty: adviser toggle show/hide ───────────────────── */
-    const facAdviserChk = document.getElementById('fac-adviser');
-    const facOrgGroup = document.getElementById('fac-org-group');
-    const facOrgSelect = document.getElementById('fac-org');
-
-    function _syncAdviserToggle() {
-        if (!facAdviserChk || !facOrgGroup) return;
-        const on = facAdviserChk.checked;
-        facOrgGroup.style.display = on ? '' : 'none';
-        if (facOrgSelect) {
-            if (on) {
-                facOrgSelect.setAttribute('required', 'required');
-            } else {
-                facOrgSelect.removeAttribute('required');
-                facOrgSelect.value = '';
-            }
-        }
-    }
-
-    if (facAdviserChk) {
-        facAdviserChk.addEventListener('change', _syncAdviserToggle);
-        _syncAdviserToggle(); // run once on page load to sync initial state
-    }
-
     /* ── Faculty: XSS helper and row builder ─────────────────── */
     function _esc(str) {
         const d = document.createElement('div');
@@ -1796,7 +1775,6 @@
        An id starting with NOTSET- is the internal placeholder for "no Faculty ID yet"
        (see shared/core/faculty-id.php) and is shown as "Not set yet". */
     window.psFacRender = function (tr, d) {
-        const isAdviser = d.role === 'Organization Adviser';
         const idUnset = !d.faculty_id || String(d.faculty_id).indexOf('NOTSET-') === 0;
         const init = ((d.fullname || 'F').trim().charAt(0) || 'F').toUpperCase();
 
@@ -1804,9 +1782,6 @@
         tr.dataset.email = d.email || '';
         tr.dataset.backupEmail = d.backup_email || '';
         tr.dataset.facultyId = d.faculty_id || '';
-        tr.dataset.role = d.role || '';
-        tr.dataset.org = d.org_name || '';
-        tr.dataset.orgId = String(d.org_id || '0');
         tr.dataset.init = init;
 
         tr.innerHTML =
@@ -1819,10 +1794,6 @@
             '<td>' + (idUnset
                 ? '<span class="fac-id-pending">Not set yet</span>'
                 : '<span class="fac-id">' + _esc(d.faculty_id) + '</span>') + '</td>' +
-            '<td>' + (isAdviser
-                ? '<span class="fac-role fac-role--adviser">Org Adviser</span>' +
-                (d.org_name ? '<div class="fac-person-sub">' + _esc(d.org_name) + '</div>' : '')
-                : '<span class="fac-role">Faculty</span>') + '</td>' +
             '<td class="fac-actions"><button class="ps-btn ps-btn--ghost ps-btn--sm fac-edit-btn" aria-label="Edit account">' +
             '<span class="material-symbols-outlined">edit</span></button></td>';
         return tr;
@@ -2127,8 +2098,6 @@
                 const el = document.getElementById(id);
                 if (el) el.value = '';
             });
-        if (facAdviserChk) facAdviserChk.checked = false;
-        _syncAdviserToggle();
         _clearFacAlert();
         _clearRegistryPreview();
 
@@ -2175,8 +2144,6 @@
             const lastName = _nm.last;
             const password = document.getElementById('fac-password')?.value || '';
             const confirm = document.getElementById('fac-confirm')?.value || '';
-            const isAdviser = facAdviserChk?.checked ? '1' : '0';
-            const orgId = facOrgSelect?.value || '';
 
             // Client-side pre-checks
             if (!_facRegistryMatch) {
@@ -2201,10 +2168,6 @@
             if (password !== confirm) {
                 _showFacAlert('Passwords do not match.', true); return;
             }
-            if (isAdviser === '1' && !orgId) {
-                _showFacAlert('An organization must be selected for an adviser.', true);
-                return;
-            }
             if (_facEmailEdited && email && !/^[^\s@]+@pupsync\.edu$/i.test(email)) {
                 _showFacAlert('The PUPSync email must be a valid address ending in @pupsync.edu.', true);
                 return;
@@ -2218,9 +2181,7 @@
                 first_name: firstName,
                 last_name: lastName,
                 password: password,
-                confirm_password: confirm,
-                is_org_adviser: isAdviser,
-                organization_id: orgId
+                confirm_password: confirm
             });
             // Only an email the admin changed by hand is sent; otherwise the server derives it.
             if (_facEmailEdited && email) body.append('pupsync_email', email);
@@ -2414,6 +2375,55 @@
         const s = admEl('span', 'material-symbols-outlined', name);
         s.setAttribute('aria-hidden', 'true');
         return s;
+    }
+
+    /* ── Rules for NEW admin accounts ─────────────────────────────
+       create-admin-account.php enforces the same rules on the server; these only give instant feedback. */
+    const ADM_EMAIL_DOMAIN = '@admin.edu';
+
+    /* '' when the email is fine, otherwise the message to show. `email` is already trimmed + lower-cased. */
+    function admEmailError(email) {
+        if (!email) return 'Admin email is required.';
+        if (email.slice(-ADM_EMAIL_DOMAIN.length) !== ADM_EMAIL_DOMAIN) {
+            return 'Admin emails must end in ' + ADM_EMAIL_DOMAIN + ' (e.g. name' + ADM_EMAIL_DOMAIN + ').';
+        }
+        const local = email.slice(0, -ADM_EMAIL_DOMAIN.length);
+        if (!local) return 'Add a name before ' + ADM_EMAIL_DOMAIN + ' (e.g. name' + ADM_EMAIL_DOMAIN + ').';
+        if (local.length > 64) return 'The part before ' + ADM_EMAIL_DOMAIN + ' can be at most 64 characters.';
+        if (!/^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$/.test(local) || local.indexOf('..') !== -1) {
+            return 'Before ' + ADM_EMAIL_DOMAIN + ', use only letters, numbers, dots, hyphens or underscores (start and end with a letter or number).';
+        }
+        return '';
+    }
+
+    /* Which password rules are met + a strength level for the meter:
+       0 empty · 1 Weak · 2 Fair · 3 Good (all rules met) · 4 Strong (all rules met and 12+ characters). */
+    function admPasswordInfo(pw) {
+        const rules = {
+            len: pw.length >= 8,
+            upper: /[A-Z]/.test(pw),
+            lower: /[a-z]/.test(pw),
+            num: /[0-9]/.test(pw),
+            sym: /[^A-Za-z0-9\s]/.test(pw)
+        };
+        const met = Object.keys(rules).filter(function (k) { return rules[k]; }).length;
+        const ok = met === 5 && pw.length <= 72;
+        let level = 0;
+        if (pw) level = met <= 2 ? 1 : (met < 5 ? 2 : (pw.length >= 12 ? 4 : 3));
+        return { rules: rules, met: met, ok: ok, level: level, label: ['Enter a password', 'Weak', 'Fair', 'Good', 'Strong'][level] };
+    }
+
+    /* The message to show when a password is rejected (same wording as the server). */
+    function admPasswordError(pw) {
+        if (!pw) return 'Password is required.';
+        if (pw.length < 8) return 'Password must be at least 8 characters.';
+        if (pw.length > 72) return 'Password can be at most 72 characters.';
+        const r = admPasswordInfo(pw).rules, missing = [];
+        if (!r.upper) missing.push('an uppercase letter');
+        if (!r.lower) missing.push('a lowercase letter');
+        if (!r.num) missing.push('a number');
+        if (!r.sym) missing.push('a special character (for example ! @ # $ %)');
+        return missing.length ? 'Password must include ' + missing.join(', ') + '.' : '';
     }
 
     /* "Oct 7" — day shown in the status tag (campus timezone) */
@@ -2912,6 +2922,39 @@
         /* ── ADD ──────────────────────────────────────────────── */
         const submitBtn = document.getElementById('adm-submit-btn');
 
+        /* Live feedback while typing: email convention + password strength */
+        const admEmailInput = document.getElementById('adm-email');
+        const admEmailHint = document.getElementById('adm-email-hint');
+        const admEmailHintDefault = admEmailHint ? admEmailHint.innerHTML : '';
+        const admPwInput = document.getElementById('adm-password');
+        const admPwMeter = document.getElementById('adm-pw-meter');
+        const admPwLabel = document.getElementById('adm-pw-label');
+        const admPwRules = document.getElementById('adm-pw-rules');
+
+        function showEmailHint(state) {   // state: '' (neutral) | 'ok' | 'bad'
+            if (!admEmailHint) return;
+            const v = admEmailInput.value.trim().toLowerCase();
+            const err = v ? admEmailError(v) : '';
+            admEmailHint.classList.remove('is-ok', 'is-bad');
+            if (state === 'bad' && err) { admEmailHint.textContent = err; admEmailHint.classList.add('is-bad'); }
+            else if (v && !err) { admEmailHint.textContent = 'Looks good.'; admEmailHint.classList.add('is-ok'); }
+            else admEmailHint.innerHTML = admEmailHintDefault;
+        }
+        function renderPasswordStrength() {
+            if (!admPwInput || !admPwMeter) return;
+            const info = admPasswordInfo(admPwInput.value);
+            admPwMeter.setAttribute('data-level', String(info.level));
+            admPwLabel.textContent = info.label;
+            admPwRules.querySelectorAll('li[data-rule]').forEach(function (li) {
+                li.classList.toggle('is-met', !!info.rules[li.getAttribute('data-rule')]);
+            });
+        }
+        if (admEmailInput) {
+            admEmailInput.addEventListener('input', function () { showEmailHint(''); });   // quiet while typing, green once valid
+            admEmailInput.addEventListener('blur', function () { showEmailHint('bad'); }); // spell out the problem when they leave the field
+        }
+        if (admPwInput) admPwInput.addEventListener('input', renderPasswordStrength);
+
         if (addBtn) {
             addBtn.addEventListener('click', function () {
                 if (addBtn.disabled) return;
@@ -2919,6 +2962,8 @@
                 ['adm-fullname', 'adm-email'].forEach(function (id) { document.getElementById(id).value = ''; });
                 document.getElementById('adm-role').value = 'Admin';
                 resetPasswordFields(['adm-password', 'adm-confirm'], addModal);
+                showEmailHint('');
+                renderPasswordStrength();
                 openModal(addModal);
                 document.getElementById('adm-fullname').focus();
             });
@@ -2937,9 +2982,10 @@
             /* Client-side pre-flight (mirrors the server checks) */
             if (!fullName) return showAlert('adm-form-alert', 'Full name is required.');
             if (!email) return showAlert('adm-form-alert', 'Admin email is required.');
-            if (!email.endsWith('@admin.edu')) return showAlert('adm-form-alert', 'Admin emails must end in @admin.edu (e.g. name@admin.edu).');
-            if (!password) return showAlert('adm-form-alert', 'Password is required.');
-            if (password.length < 8) return showAlert('adm-form-alert', 'Password must be at least 8 characters.');
+            const emailErr = admEmailError(email);
+            if (emailErr) return showAlert('adm-form-alert', emailErr);
+            const pwErr = admPasswordError(password);
+            if (pwErr) return showAlert('adm-form-alert', pwErr);
             if (password !== confirm) return showAlert('adm-form-alert', 'Passwords do not match.');
 
             busy = true;
@@ -4714,10 +4760,9 @@ function psSelectFmt(btn) {
    ROOMS — reservation details drawer (Rooms > Reservations table)
    Additive block. "Cancel reservation" in the drawer clicks the row's
    own Cancel button, so the existing cancel modal + API are reused.
-   Waiting requests (later-date reservations, and Org Adviser requests with an
-   attached letter) show a reason box and Approve / Decline buttons; the
-   decision goes to room-reservation/api/review-adviser-reservation.php (any
-   admin for later-date requests, Super Admin only for the adviser letters).
+   Waiting requests (reservations for a later date, with or without an attached
+   request letter) show a reason box and Approve / Decline buttons; the decision
+   goes to room-reservation/api/review-room-reservation.php (any admin).
    ═══════════════════════════════════════════════════════════════ */
 (function () {
     var drawer = document.getElementById('ps-room-drawer');
@@ -4916,7 +4961,7 @@ function psSelectFmt(btn) {
         decideBtns.forEach(function (b) { b.disabled = true; });
         btn.textContent = decision === 'Approved' ? 'Approving\u2026' : 'Declining\u2026';
 
-        fetch('room-reservation/api/review-adviser-reservation.php', {
+        fetch('room-reservation/api/review-room-reservation.php', {
             method: 'POST',
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
@@ -5650,10 +5695,12 @@ function psSelectFmt(btn) {
             if (chip) openPanel(chip.getAttribute('data-eq-panel'));
         });
 
-        /* On Loan: status tabs + live search + pagination (20 per page) */
+        /* On Loan: status tabs + live search + sort + pagination (20 per page) */
         var table = document.getElementById('eq-loan-table');
         var search = document.getElementById('eq-loan-search');
         var tabBar = document.getElementById('eqLoanFilter');
+        var sortSel = document.getElementById('eqLoanSort');
+        var sortDir = document.getElementById('eqLoanSortDir');
         var titleEl = document.getElementById('eqLoanTitle');
         var pager = document.getElementById('eq-loan-pager');
         var pgInfo = document.getElementById('eq-loan-pager-info');
@@ -5677,7 +5724,48 @@ function psSelectFmt(btn) {
         var mode = 'all';
         var query = '';
         var page = 1;
+        var dir = 'desc'; // desc = newest first, asc = oldest first
         var removedAny = false;   /* a row was removed this session (e.g. a cancelled booking) */
+
+        /* ── Sort ──────────────────────────────────────────────────────────
+           recent : request_date (data-submitted-ts on the row)
+           due    : due date / return date (data-due-ts)                   */
+        function sortComparator() {
+            var sign = dir === 'asc' ? 1 : -1;
+            var byDue = sortSel && sortSel.value === 'due';
+            return function (a, b) {
+                var ax = a.dataset, bx = b.dataset;
+                var av = byDue ? (+ax.dueTs || 0) : (+ax.submittedTs || 0);
+                var bv = byDue ? (+bx.dueTs || 0) : (+bx.submittedTs || 0);
+                var r = av - bv;
+                if (!r) r = (+ax.id || 0) - (+bx.id || 0);
+                return r * sign;
+            };
+        }
+
+        function sortRows() {
+            var tbody = table.tBodies[0];
+            if (!tbody) return;
+            rows.sort(sortComparator());
+            var frag = document.createDocumentFragment();
+            rows.forEach(function (r) { frag.appendChild(r); });
+            if (noMatch) frag.appendChild(noMatch);
+            tbody.appendChild(frag);
+        }
+
+        function syncSortDir() {
+            if (!sortDir) return;
+            var asc = dir === 'asc';
+            var byDue = sortSel && sortSel.value === 'due';
+            var label = byDue
+                ? (asc ? 'Earliest due first' : 'Latest due first')
+                : (asc ? 'Oldest requests first' : 'Newest requests first');
+            sortDir.setAttribute('data-dir', dir);
+            sortDir.title = label + ' (click to reverse)';
+            sortDir.setAttribute('aria-label', 'Sort direction: ' + label.toLowerCase() + '. Click to reverse.');
+            var ico = sortDir.querySelector('.material-symbols-outlined');
+            if (ico) ico.textContent = asc ? 'arrow_upward' : 'arrow_downward';
+        }
 
         function groupRows(sourceRows) {
             var groups = [];
@@ -5708,6 +5796,7 @@ function psSelectFmt(btn) {
                 });
             });
             if (noMatch) tbody.appendChild(noMatch);
+            sortRows();
         }
 
         function matchesMode(state) {
@@ -5856,6 +5945,16 @@ function psSelectFmt(btn) {
                     t.setAttribute('aria-selected', on ? 'true' : 'false');
                 });
                 if (titleEl) titleEl.textContent = TITLES[mode] || TITLES.all;
+                // Swap the visible thead to match the active tab
+                table.querySelectorAll('thead[data-loan-head]').forEach(function (h) {
+                    h.hidden = h.getAttribute('data-loan-head') !== mode;
+                });
+                // Update colspan on empty/nomatch rows to match the active thead column count
+                var activeCols = (table.querySelector('thead[data-loan-head="' + mode + '"] tr') || {}).cells;
+                var colCount = activeCols ? activeCols.length : 7;
+                table.querySelectorAll('.eq-loan-empty-cell, .eq-loan-nomatch-cell').forEach(function (td) {
+                    td.colSpan = colCount;
+                });
                 page = 1;
                 render();
             });
@@ -5864,6 +5963,23 @@ function psSelectFmt(btn) {
             search.addEventListener('input', function () {
                 query = this.value.trim().toLowerCase();
                 page = 1;
+                render();
+            });
+        }
+        if (sortSel) {
+            sortSel.addEventListener('change', function () {
+                page = 1;
+                syncSortDir();
+                sortRows();
+                render();
+            });
+        }
+        if (sortDir) {
+            sortDir.addEventListener('click', function () {
+                dir = dir === 'asc' ? 'desc' : 'asc';
+                page = 1;
+                syncSortDir();
+                sortRows();
                 render();
             });
         }
@@ -6077,6 +6193,7 @@ function psSelectFmt(btn) {
             });
         }
 
+        syncSortDir();
         window.psRefreshEquipmentLoans();
         try {
             if (sessionStorage.getItem('openManualReturnLoanTab') === '1' || sessionStorage.getItem('openOverdueLoanTab') === '1') {

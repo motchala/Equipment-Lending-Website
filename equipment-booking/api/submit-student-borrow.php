@@ -4,7 +4,9 @@ require_once __DIR__ . '/../../config/session.php';
 header('Content-Type: application/json');
 date_default_timezone_set('Asia/Manila');
 
-$body = json_decode(file_get_contents('php://input'), true);
+// JSON normally; multipart when the student attached a request letter (later-date borrow).
+$is_multipart = stripos($_SERVER['CONTENT_TYPE'] ?? '', 'multipart/form-data') !== false;
+$body = $is_multipart ? $_POST : json_decode(file_get_contents('php://input'), true);
 
 $code_db_id    = intval($body['code_db_id']    ?? 0);
 $faculty_id    = trim($body['faculty_id']      ?? '');
@@ -39,16 +41,6 @@ require_once __DIR__ . '/../../config/db.php';
 
 $conn = getDB();
 
-// ── Student must be on the official student list (re-checked here, never trusted from the form) ──
-require_once __DIR__ . '/../../shared/core/student-registry.php';
-$sv = student_registry_validate($conn, $student_id);
-if (!$sv['ok']) {
-    $conn->close();
-    echo json_encode(['error' => $sv['error']]);
-    exit();
-}
-$student_id = $sv['student_no'];
-
 // ── Re-verify code is still unused (race-condition guard) ─────────────────
 $chk = $conn->prepare("SELECT id FROM tbl_faculty_codes WHERE id = ? AND is_used = 0 LIMIT 1");
 $chk->bind_param('i', $code_db_id);
@@ -77,6 +69,24 @@ if (!$stock_row || $stock_row['quantity'] < $quantity) {
     exit();
 }
 
+// borrow_qty must exist: stock is decremented by $quantity below, and a return restores
+// stock from borrow_qty — so it has to hold the real quantity (same as submit-item-borrow.php).
+require_once __DIR__ . '/../core/booking-schedule.php';
+BookingSchedule::ensureSchema($conn);
+
+// ── Optional request letter: recommended for a LATER borrow date, ignored for a same-day one ──
+require_once __DIR__ . '/../../shared/core/document-helpers.php';
+$letter_path = null;
+if ($borrow_date > $today && $is_multipart && isset($_FILES['document'])) {
+    $letter_err  = null;
+    $letter_path = ps_store_request_letter($_FILES['document'], 'uploads/request_letters', $student_id, $letter_err);
+    if ($letter_path === null && $letter_err !== null) {
+        $conn->close();
+        echo json_encode(['error' => $letter_err]);
+        exit();
+    }
+}
+
 // ── Generate return token + claim token ───────────────────────────────────
 $return_token = bin2hex(random_bytes(32));
 $claim_token  = bin2hex(random_bytes(32));
@@ -85,12 +95,12 @@ $claim_token  = bin2hex(random_bytes(32));
 $ins = $conn->prepare(
     "INSERT INTO tbl_requests
         (faculty_name, faculty_id, equipment_name, instructor, room,
-         borrow_date, return_date, status, request_date,
+         borrow_date, return_date, borrow_qty, status, request_date,
          return_token, claim_token, submitted_by_name, submitted_by_id, submitted_as)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'Approved', NOW(), ?, ?, ?, ?, 'student')"
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Approved', NOW(), ?, ?, ?, ?, 'student')"
 );
 $ins->bind_param(
-    'sssssssssss',
+    'sssssssissss',
     $faculty_name,
     $faculty_id,
     $equipment,
@@ -98,6 +108,7 @@ $ins->bind_param(
     $room,
     $borrow_date,
     $return_date,
+    $quantity,
     $return_token,
     $claim_token,
     $student_name,
@@ -107,11 +118,23 @@ $ins->bind_param(
 if (!$ins->execute()) {
     $ins->close();
     $conn->close();
+    if ($letter_path !== null) {
+        @unlink(dirname(__DIR__, 2) . '/' . $letter_path);
+    }
     echo json_encode(['error' => 'Failed to save request. Please try again.']);
     exit();
 }
 $request_id = $conn->insert_id;
 $ins->close();
+
+if ($letter_path !== null) {
+    $doc = $conn->prepare('UPDATE tbl_requests SET document_path = ? WHERE id = ?');
+    if ($doc) {
+        $doc->bind_param('si', $letter_path, $request_id);
+        $doc->execute();
+        $doc->close();
+    }
+}
 
 // ── Decrement inventory quantity ──────────────────────────────────────────
 $dec = $conn->prepare(
@@ -125,7 +148,7 @@ $dec->close();
 // ── Mark code as used — only on the last item of a multi-item submission ──────
 // JS sends is_last_item=true on the final request. For intermediate items the
 // code stays available so the next item in the sequence can still be verified.
-$is_last_item = !empty($body['is_last_item']);
+$is_last_item = filter_var($body['is_last_item'] ?? false, FILTER_VALIDATE_BOOLEAN);
 if ($is_last_item) {
     $upd = $conn->prepare(
         "UPDATE tbl_faculty_codes

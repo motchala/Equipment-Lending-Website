@@ -69,9 +69,10 @@ $rows_input = $body['rows'] ?? [];
 $replace_all = !empty($body['replace_all']);
 $admin_name  = (string)($_SESSION['admin_name'] ?? 'Admin');
 
-if (!is_array($rows_input) || empty($rows_input)) {
+if (!is_array($rows_input)) {
     ur_respond(422, ['status' => 'error', 'error' => 'No rows provided.']);
 }
+// (an empty list is accepted only for a Room Timetables workbook; that is checked once the stored file is known)
 if (count($rows_input) > 5000) {
     ur_respond(422, ['status' => 'error', 'error' => 'Too many rows. Maximum is 5,000 per upload.']);
 }
@@ -83,17 +84,32 @@ require_once __DIR__ . '/../core/faculty-registry-files.php';
 frf_ensure_table($conn);
 $file_id   = (int)($body['file_id'] ?? 0);
 $file_name = '';
-if ($file_id > 0 && ($fst = $conn->prepare("SELECT original_name FROM tbl_faculty_registry_files WHERE id = ? AND status = 'uploaded' LIMIT 1"))) {
+$file_stored = '';
+if ($file_id > 0 && ($fst = $conn->prepare("SELECT original_name, stored_name FROM tbl_faculty_registry_files WHERE id = ? AND status = 'uploaded' LIMIT 1"))) {
     $fst->bind_param('i', $file_id);
     $fst->execute();
     $fres = $fst->get_result();
     if ($fres && $fres->num_rows === 1) {
-        $file_name = (string)$fres->fetch_assoc()['original_name'];
+        $frow = $fres->fetch_assoc();
+        $file_name   = (string)$frow['original_name'];
+        $file_stored = (string)$frow['stored_name'];
     }
     $fst->close();
 }
 if ($file_name === '') {
     ur_respond(422, ['status' => 'error', 'error' => 'The original file was not saved with this import. Please refresh the page and choose the file again.']);
+}
+
+// Class schedule: is the stored original a Faculty Rooms or Room Timetables workbook? (Read from the stored
+// copy, never from the browser, so what is imported is exactly what was uploaded.)
+require_once __DIR__ . '/../../room-reservation/core/class-schedule.php';
+$stored_path   = $file_stored !== '' ? frf_stored_path($file_stored) : null;
+$schedule_kind = ($stored_path !== null && is_file($stored_path)) ? cs_detect_file($stored_path) : null;
+if (empty($rows_input) && $schedule_kind !== 'room_timetable') {
+    ur_respond(422, ['status' => 'error', 'error' => 'No rows provided.']);
+}
+if ($schedule_kind === 'room_timetable') {
+    $replace_all = false;   // this workbook never touches the faculty list
 }
 
 // Ensure table exists (self-healing)
@@ -221,12 +237,32 @@ if ($ust = $conn->prepare(
     $ust->close();
 }
 
+// Class schedule (Faculty Rooms workbook: each faculty member's weekly classes; Room Timetables workbook:
+// room details + classes with no instructor yet). Saved after the faculty list so the registry is never
+// held up by it; if it fails, the list is already in and the error is reported.
+$schedule_result = null;
+if ($schedule_kind !== null && $stored_path !== null) {
+    try {
+        if ($schedule_kind === 'faculty_schedule') {
+            $schedule_result = ['kind' => 'faculty_schedule']
+                + cs_import_faculty_schedule($conn, cs_parse_faculty_workbook($stored_path), $file_id, $replace_all);
+        } else {
+            $schedule_result = ['kind' => 'room_timetable']
+                + cs_import_timetable($conn, cs_parse_timetable_workbook($stored_path), $file_id);
+        }
+    } catch (Throwable $e) {
+        error_log('[upload-faculty-registry] class schedule: ' . $e->getMessage());
+        $schedule_result = ['kind' => $schedule_kind, 'error' => 'The class schedule in this file could not be saved. The faculty list was imported.'];
+    }
+}
+
 // The import went through and its file is on record: this new file REPLACES the old
 // one(s). Every previously stored file (and its record) is removed so only the latest
 // import's file is kept. Never runs when the import failed, so a failed import can
-// never cost the previous file.
+// never cost the previous file. (A Room Timetables workbook is a companion to the Faculty
+// Rooms workbook, so it does not replace it.)
 $old_files_removed = 0;
-if (!empty($recorded)) {
+if (!empty($recorded) && $schedule_kind !== 'room_timetable') {
     $old_files_removed = frf_purge_other_files($conn, $file_id);
 }
 
@@ -236,6 +272,8 @@ admin_log_activity(
     'faculty',
     'Uploaded faculty registry: ' . $inserted . ' inserted, ' . $updated . ' updated, ' . $skipped . ' skipped'
         . ' (file: ' . mb_strimwidth($file_name, 0, 80, '…') . ($replace_all ? ', replaced the whole registry' : '') . ($old_files_removed > 0 ? ', replaced the previous file' : '') . ')'
+        . (isset($schedule_result['meetings']) ? '; class schedule: ' . $schedule_result['meetings'] . ' weekly meetings for ' . $schedule_result['faculty'] . ' faculty' : '')
+        . (isset($schedule_result['unassigned_classes']) ? '; room timetable: ' . $schedule_result['unassigned_classes'] . ' classes with no instructor yet' : '')
 );
 
 // Count total entries now in the registry for the badge update
@@ -249,4 +287,5 @@ ur_respond(200, [
     'skipped'     => $skipped,
     'total_after' => $total_after,
     'errors'      => array_slice($errors, 0, 20),
+    'schedule'    => $schedule_result,
 ]);

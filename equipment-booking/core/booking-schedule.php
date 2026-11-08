@@ -7,10 +7,9 @@ declare(strict_types=1);
  *
  * Scheduling rules for equipment borrowing (Borrow Request modal).
  *
- *  - Today bookings:  start hour + duration in hours (1 / 2 / 3 / 5; Organization
- *                     Advisers may use a custom length).
- *  - Later bookings:  borrow date + start hour + duration in days (1 / 2 / 3;
- *                     Organization Advisers also get 5) + quantity.
+ *  - Today bookings:  start hour + duration in hours (1 / 2 / 3 / 5). No request letter.
+ *  - Later bookings:  borrow date + start hour + duration in days (1 / 2 / 3)
+ *                     + quantity + an optional (recommended) request letter.
  *  - Later bookings are checked against the SCHEDULE (overlapping approved
  *    bookings versus the item's total stock), not against what happens to be on
  *    the shelf right now. Today bookings need the item to be available right now.
@@ -38,9 +37,7 @@ final class BookingSchedule
     public const MAX_ADVANCE_DAYS     = 21;        // how far ahead a booking may start (3 weeks)
     public const IMMEDIATE_GRACE_MIN  = 15;        // a "today" booking starting within this many minutes takes stock right away
     public const TODAY_HOURS          = [1, 2, 3, 5];
-    public const ADVISER_MAX_HOURS    = 12;
     public const FUTURE_DAYS          = [1, 2, 3];
-    public const ADVISER_FUTURE_DAYS  = [1, 2, 3, 5];
 
     private static ?bool $ready = null;
 
@@ -538,25 +535,17 @@ final class BookingSchedule
     // Parsing & validation
     // ═════════════════════════════════════════════════════════════════════════
 
-    public static function isAdviserRole(string $role): bool
-    {
-        return $role === 'Organization Adviser';
-    }
-
     /** Allowed lengths for the mode: hours (today) or days (later). */
-    public static function allowedLengths(string $mode, bool $adviser): array
+    public static function allowedLengths(string $mode): array
     {
-        if ($mode === 'today') {
-            return $adviser ? range(1, self::ADVISER_MAX_HOURS) : self::TODAY_HOURS;
-        }
-        return $adviser ? self::ADVISER_FUTURE_DAYS : self::FUTURE_DAYS;
+        return $mode === 'today' ? self::TODAY_HOURS : self::FUTURE_DAYS;
     }
 
     /**
      * Turns the form values into a booking window (no database access).
      * @return array{ok:bool,error?:string,data?:array<string,mixed>}
      */
-    public static function window(string $mode, string $date, string $time, int $length, bool $adviser): array
+    public static function window(string $mode, string $date, string $time, int $length): array
     {
         if (!in_array($mode, ['today', 'future'], true)) {
             return ['ok' => false, 'error' => 'Please choose when you need the equipment.'];
@@ -567,10 +556,10 @@ final class BookingSchedule
         if ($time < self::DAY_START || $time >= self::DAY_END) {
             return ['ok' => false, 'error' => 'Start time must be between ' . self::DAY_START . ' and ' . self::DAY_END . '.'];
         }
-        if (!in_array($length, self::allowedLengths($mode, $adviser), true)) {
+        if (!in_array($length, self::allowedLengths($mode), true)) {
             return ['ok' => false, 'error' => $mode === 'today'
-                ? 'That length of time is not allowed for your account.'
-                : 'That number of days is not allowed for your account.'];
+                ? 'Please choose how many hours you need it for.'
+                : 'Please choose how many days you need it for.'];
         }
 
         $today = date('Y-m-d');
@@ -617,11 +606,11 @@ final class BookingSchedule
      * Full server-side validation for one item: window + quantity + stock rules.
      * @return array{ok:bool,error?:string,data?:array<string,mixed>}
      */
-    public static function parse(mysqli $conn, array $post, bool $adviser, string $item, int $qty): array
+    public static function parse(mysqli $conn, array $post, string $item, int $qty): array
     {
         $mode   = (string)($post['booking_mode'] ?? '');
         $length = (int)($post['duration'] ?? 0);
-        $w = self::window($mode, trim((string)($post['borrow_date'] ?? '')), trim((string)($post['start_time'] ?? '')), $length, $adviser);
+        $w = self::window($mode, trim((string)($post['borrow_date'] ?? '')), trim((string)($post['start_time'] ?? '')), $length);
         if (!$w['ok']) {
             return $w;
         }
@@ -713,12 +702,12 @@ final class BookingSchedule
     /**
      * The shared "when / how long / how many" block. JS (faculty-dashboard.js, BorrowSchedule)
      * fills the time list and the length chips from window.BOOKING_META.
-     * $multi = true hides the single quantity stepper (the adviser checklist has one per item).
+     * A "Later date" booking also shows an optional request letter field (never shown for "Today").
      */
-    public static function renderSchedule(string $p, bool $multi = false): string
+    public static function renderSchedule(string $p): string
     {
         $p = self::h($p);
-        $qty = $multi ? '' : '
+        $qty = '
                 <div class="form-group bm-qty" data-bm-future-only hidden>
                     <span class="form-label">Quantity</span>
                     <div class="bm-stepper" data-bm-qty-wrap>
@@ -729,7 +718,7 @@ final class BookingSchedule
                     <p class="bm-hint" data-bm-qty-hint></p>
                 </div>';
         return '
-        <div class="bm-sched" data-bm-sched data-bm-multi="' . ($multi ? '1' : '0') . '" id="' . $p . 'Sched">
+        <div class="bm-sched" data-bm-sched id="' . $p . 'Sched">
             <input type="hidden" name="booking_mode" value="today" data-bm-mode-input>
             <input type="hidden" name="duration" value="" data-bm-duration-input>
 
@@ -772,16 +761,25 @@ final class BookingSchedule
                 <div class="form-group">
                     <span class="form-label" data-bm-length-label>For how long?</span>
                     <div class="bm-chips" data-bm-chips role="radiogroup" aria-label="For how long?"></div>
-                    <div class="bm-custom" data-bm-custom hidden>
-                        <label for="' . $p . 'Custom">Custom length</label>
-                        <input type="number" id="' . $p . 'Custom" min="1" step="1" inputmode="numeric" data-bm-custom-input>
-                        <span>hours</span>
-                    </div>
                 </div>
 ' . $qty . '
 
                 <div class="bm-summary" data-bm-summary aria-live="polite"></div>
                 <p class="bm-avail" data-bm-avail aria-live="polite"></p>
+            </div>
+
+            <div class="form-group bm-letter" data-bm-future-only hidden>
+                <span class="form-label">Request letter <span class="bm-opt">Recommended</span></span>
+                <label class="bm-drop" for="request_document">
+                    <span class="material-symbols-outlined bm-drop-icon" aria-hidden="true">upload_file</span>
+                    <span class="bm-drop-text">
+                        <strong data-bm-drop-title>Choose a file or drag it here</strong>
+                        <small>PDF, JPG, PNG or WEBP &middot; max 5 MB</small>
+                    </span>
+                    <input type="file" id="request_document" name="request_document"
+                        accept=".pdf,.jpg,.jpeg,.png,.webp">
+                </label>
+                <p class="bm-hint">Recommended for bookings on a later date. You can still submit without one.</p>
             </div>
         </div>';
     }
