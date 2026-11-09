@@ -150,18 +150,11 @@ require_once __DIR__ . '/auth/core/role-splash.php';
                     <input type="text" id="studentName" class="st-input" placeholder="Juan Dela Cruz" autocomplete="name">
                 </div>
 
-                <div class="st-row">
-                    <div class="st-field">
-                        <label for="studentId">Student ID</label>
-                        <input type="text" id="studentId" class="st-input" placeholder="Your student number"
-                            maxlength="30" autocomplete="off" spellcheck="false">
-                    </div>
-                    <div class="st-field">
-                        <label for="studentCourse">Course</label>
-                        <select id="studentCourse" class="st-input">
-                            <option value="" selected disabled>Select your course</option>
-                        </select>
-                    </div>
+                <div class="st-field">
+                    <label for="studentCourse">Course</label>
+                    <select id="studentCourse" class="st-input">
+                        <option value="" selected disabled>Select your course</option>
+                    </select>
                 </div>
 
                 <div class="st-actions">

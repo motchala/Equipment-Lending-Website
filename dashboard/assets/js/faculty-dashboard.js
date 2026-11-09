@@ -922,23 +922,23 @@
     /* ================================================================
        BORROW SCHEDULE  (Borrow Request modal: when / how long / how many)
        ----------------------------------------------------------------
-       Today  : start time + 1 / 2 / 3 / 5 hours
-       Later  : date (tomorrow … 3 weeks ahead) + start time + 1 / 2 / 3 days
+       Today  : start time + 1 / 2 / 3 / 6 hours
+       Later  : date (tomorrow … 2 weeks ahead) + start time + 1 / 2 / 3 / 6 hours
                 + quantity (up to the item's TOTAL stock) + an optional request letter
        Items that are out right now can still be booked for a later date.
        The server re-checks every rule; this is the friendly front end.
     ================================================================ */
     const BorrowSchedule = (function () {
-        const loadedAt = Date.now();
         const pad = n => String(n).padStart(2, '0');
         const meta = () => window.BOOKING_META || { items: {}, rules: {}, today: todayStr, nowMin: 0 };
         const rules = () => Object.assign({
-            dayStart: '07:00', dayEnd: '21:00', slot: 30, maxAhead: 21, todayHours: [1, 2, 3, 5],
-            futureDays: [1, 2, 3], graceMin: 15
+            dayStart: '07:00', lastStart: '20:00', dayEnd: '21:00', slot: 60, maxAhead: 14, durationHours: [1, 2, 3, 6],
+            graceMin: 15
         }, meta().rules || {});
         const toMin = hhmm => { const p = String(hhmm).split(':'); return (+p[0]) * 60 + (+p[1]); };
         const hhmm = min => pad(Math.floor(min / 60)) + ':' + pad(min % 60);
-        const nowMin = () => Math.floor((meta().nowMin || 0) + (Date.now() - loadedAt) / 60000);
+        const nowMin = () => { const now = new Date(); return now.getHours() * 60 + now.getMinutes(); };
+        const localToday = () => fmtYmd(new Date());
         const parseYmd = s => { const p = String(s).split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); };
         const fmtYmd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
         const addDays = (d, n) => { const x = new Date(d.getTime()); x.setDate(x.getDate() + n); return x; };
@@ -953,7 +953,8 @@
                 form: root.closest('form'),
                 els: {
                     modeInput: q(root, '[data-bm-mode-input]'), durInput: q(root, '[data-bm-duration-input]'),
-                    modeBtns: root.querySelectorAll('[data-bm-mode]'), outRow: q(root, '[data-bm-outnow]'),
+                    modeBtns: root.querySelectorAll('[data-bm-mode]'), todayInfo: q(root, '[data-bm-today-info]'), outRow: q(root, '[data-bm-outnow]'),
+                    todayWrapper: q(root, '[data-bm-today-wrapper]'),
                     outToggle: q(root, '[data-bm-outnow-toggle]'), fields: q(root, '[data-bm-fields]'),
                     date: q(root, '[data-bm-date]'), dateHint: q(root, '[data-bm-date-hint]'),
                     time: q(root, '[data-bm-time]'), chips: q(root, '[data-bm-chips]'), lengthLabel: q(root, '[data-bm-length-label]'),
@@ -989,6 +990,7 @@
                 if (err) { e.preventDefault(); e.stopImmediatePropagation(); showError(st, err); }
             }, true);
             reset(st);
+            st.availabilityTimer = window.setInterval(() => syncTodayAvailability(st), 30000);
         }
 
         /* ---- item + state helpers ------------------------------------ */
@@ -1005,15 +1007,27 @@
             st.els.modeBtns.forEach(b => { const on = b.dataset.bmMode === mode; b.classList.toggle('active', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
             st.els.futureOnly.forEach(el => { el.hidden = mode !== 'future'; });
             if (mode !== 'future') clearLetter(st);   /* a same-day request never carries a request letter */
-            const r = rules(), today = parseYmd(meta().today || todayStr);
+            const r = rules(), today = parseYmd(localToday());
             if (st.els.date) {
-                st.els.date.min = fmtYmd(addDays(today, 1));
-                st.els.date.max = fmtYmd(addDays(today, r.maxAhead));
+                st.els.date.innerHTML = '';
+                const placeholder = document.createElement('option');
+                placeholder.value = '';
+                placeholder.textContent = 'Choose a borrowing date';
+                placeholder.disabled = true;
+                st.els.date.appendChild(placeholder);
+                for (let offset = 1; offset <= r.maxAhead; offset++) {
+                    const date = addDays(today, offset);
+                    if (date.getDay() === 0) continue;
+                    const option = document.createElement('option');
+                    option.value = fmtYmd(date);
+                    option.textContent = fmtDay(date);
+                    st.els.date.appendChild(option);
+                }
                 st.els.date.required = mode === 'future';
-                if (mode === 'today') st.els.date.value = '';
-                if (st.els.dateHint) st.els.dateHint.textContent = 'Tomorrow up to ' + Math.round(r.maxAhead / 7) + ' weeks ahead (latest ' + fmtDay(addDays(today, r.maxAhead)) + ').';
+                if (mode === 'future') st.els.date.value = st.els.date.options[1] ? st.els.date.options[1].value : '';
+                if (st.els.dateHint) st.els.dateHint.textContent = '';
             }
-            st.els.lengthLabel.textContent = mode === 'today' ? 'For how long?' : 'For how many days?';
+            st.els.lengthLabel.textContent = 'For how many hours?';
             buildTimes(st); buildChips(st);
             if (st.els.qty) clampQty(st, true);
             refresh(st);
@@ -1021,29 +1035,31 @@
 
         function buildTimes(st) {
             const r = rules(), sel = st.els.time, prev = sel.value;
-            let start = toMin(r.dayStart); const end = toMin(r.dayEnd), step = +r.slot || 30;
+            const opening = toMin(r.dayStart), lastStart = toMin(r.lastStart), step = +r.slot || 60;
+            let start = opening;
             const opts = [];
             if (st.mode === 'today') {
                 const now = nowMin();
-                if (now >= start && now < end - 30) opts.push({ v: hhmm(now), t: 'Now (' + fmtClock(now) + ')' });
-                start = Math.max(start, Math.ceil((now + 1) / step) * step);
+                start = Math.max(start, Math.ceil(now / step) * step);
+            } else {
+                start = opening;
             }
-            for (let m = start; m < end; m += step) opts.push({ v: hhmm(m), t: fmtClock(m) });
+            for (let m = start; m <= lastStart; m += step) opts.push({ v: hhmm(m), t: fmtClock(m) });
             sel.innerHTML = '';
             if (!opts.length) { const o = document.createElement('option'); o.value = ''; o.textContent = 'No start times left today'; o.disabled = true; o.selected = true; sel.appendChild(o); return; }
             opts.forEach(o => { const e = document.createElement('option'); e.value = o.v; e.textContent = o.t; sel.appendChild(e); });
             const keep = opts.find(o => o.v === prev);
-            sel.value = keep ? keep.v : (st.mode === 'future' ? (opts.find(o => o.v === '09:00') || opts[0]).v : opts[0].v);
+            sel.value = keep ? keep.v : opts[0].v;
         }
 
         function buildChips(st) {
             const r = rules(), box = st.els.chips; box.innerHTML = '';
             const startMin = st.els.time.value ? toMin(st.els.time.value) : toMin(r.dayStart);
-            const list = st.mode === 'today' ? r.todayHours : r.futureDays;
+            const list = r.durationHours;
             list.forEach(n => {
                 const b = document.createElement('button'); b.type = 'button'; b.className = 'bm-chip'; b.dataset.len = n;
-                b.textContent = st.mode === 'today' ? n + (n === 1 ? ' hr' : ' hrs') : n + (n === 1 ? ' day' : ' days');
-                const tooLong = st.mode === 'today' && (startMin + n * 60 > toMin(r.dayEnd));
+                b.textContent = n + (n === 1 ? ' hr' : ' hrs');
+                const tooLong = startMin + n * 60 > toMin(r.dayEnd);
                 b.disabled = tooLong; if (tooLong && st.length === n) st.length = null;
                 const on = st.length === n;
                 b.classList.toggle('active', on); b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', on ? 'true' : 'false');
@@ -1075,12 +1091,12 @@
             if (!st.length || !st.els.time.value) return null;
             const startMin = toMin(st.els.time.value);
             if (st.mode === 'today') {
-                const d = parseYmd(meta().today || todayStr);
+                const d = parseYmd(localToday());
                 return { start: d, startMin: startMin, endDate: d, endMin: startMin + st.length * 60 };
             }
             if (!st.els.date.value) return null;
             const d = parseYmd(st.els.date.value);
-            return { start: d, startMin: startMin, endDate: addDays(d, st.length), endMin: startMin };
+            return { start: d, startMin: startMin, endDate: d, endMin: startMin + st.length * 60 };
         }
         function refresh(st) {
             const w = windowOf(st);
@@ -1088,9 +1104,9 @@
             if (st.els.qty) clampQty(st);
             if (!w) { st.els.summary.textContent = ''; st.els.summary.classList.remove('has'); setAvail(st, '', ''); st.ok = null; RoomPicker.setWindow(st.form, null); return; }
             const dayLabel = d => (st.mode === 'today' && d === w.start) ? 'Today' : fmtDay(d);
-            st.els.summary.innerHTML = '<span class="material-symbols-outlined">schedule</span><span><strong>' + dayLabel(w.start) + ' · ' + fmtClock(w.startMin) + '</strong> → <strong>' + (st.mode === 'today' ? fmtClock(w.endMin) : fmtDay(w.endDate) + ' · ' + fmtClock(w.endMin)) + '</strong></span>';
+            st.els.summary.innerHTML = '<span class="material-symbols-outlined">schedule</span><span><strong>' + dayLabel(w.start) + ' · ' + fmtClock(w.startMin) + '</strong> → <strong>' + fmtClock(w.endMin) + '</strong></span>';
             st.els.summary.classList.add('has');
-            const winText = (st.mode === 'today' ? 'Today' : fmtDay(w.start)) + ' · ' + fmtClock(w.startMin) + ' → ' + (st.mode === 'today' ? fmtClock(w.endMin) : fmtDay(w.endDate) + ' · ' + fmtClock(w.endMin));
+            const winText = (st.mode === 'today' ? 'Today' : fmtDay(w.start)) + ' · ' + fmtClock(w.startMin) + ' → ' + fmtClock(w.endMin);
             clearTimeout(st.timer); st.timer = setTimeout(() => { RoomPicker.setWindow(st.form, windowQuery(st), winText); check(st, w); }, 350);
         }
         /* window as query-string, shared by the availability and room checks */
@@ -1122,11 +1138,16 @@
             if (st.forcedOff) return 'Turn on “Out right now” to book this item for a later date.';
             if (st.mode === 'future') {
                 if (!st.els.date.value) return 'Please choose a borrow date.';
-                if (st.els.date.min && st.els.date.value < st.els.date.min) return 'Later bookings start tomorrow or after. Use “Today” for same-day use.';
-                if (st.els.date.max && st.els.date.value > st.els.date.max) return 'You can only book up to ' + Math.round(rules().maxAhead / 7) + ' weeks ahead.';
+                const today = parseYmd(localToday());
+                const selectedDate = parseYmd(st.els.date.value);
+                if (selectedDate <= today) return 'Choose a later date or use “Today” for same-day borrowing.';
+                if (selectedDate > addDays(today, rules().maxAhead)) return 'You can only book up to two weeks ahead.';
+                if (selectedDate.getDay() === 0) return 'Equipment borrowing is unavailable on Sundays.';
             }
+            if (st.mode === 'today' && parseYmd(localToday()).getDay() === 0) return 'Borrowing equipment today is unavailable on Sundays. Please choose a later date.';
+            if (st.mode === 'today' && nowMin() > toMin(rules().lastStart)) return 'Same-day borrowing is unavailable after 8:00 PM. Please choose a later date.';
             if (!st.els.time.value) return 'Please choose a start time.';
-            if (!st.length) return st.mode === 'today' ? 'Please choose how long you need it.' : 'Please choose how many days.';
+            if (!st.length) return 'Please choose a duration of 1, 2, 3, or 6 hours.';
             if (!RoomPicker.value(st.form)) return 'Please choose a room.';
             if (st.ok === false) return st.els.avail.textContent || 'That schedule is not available.';
             return null;
@@ -1141,13 +1162,48 @@
             st.els.fields.classList.remove('is-off');
             st.els.fields.querySelectorAll('input,select,button').forEach(x => { x.disabled = false; });
             if (st.els.date) st.els.date.value = '';
-            const allowToday = !st.item || (itemMeta(st.item) || {}).shelf > 0;
-            const outNow = st.item && !allowToday;
+            const today = parseYmd(localToday());
+            const isSunday = today.getDay() === 0;
+            const reason = isSunday ? 'sunday' : nowMin() > toMin(rules().lastStart) ? 'closed' : '';
+            st.scheduleDisabledReason = reason;
+            const scheduleClosed = reason !== '';
+            const allowToday = (!st.item || (itemMeta(st.item) || {}).shelf > 0) && !scheduleClosed;
+            const outNow = st.item && (itemMeta(st.item) || {}).shelf <= 0;
             if (st.els.outRow) st.els.outRow.hidden = !outNow;
-            st.els.modeBtns.forEach(b => { if (b.dataset.bmMode === 'today') b.disabled = outNow; });
-            setMode(st, outNow ? 'future' : 'today');
+            st.els.modeBtns.forEach(b => {
+                if (b.dataset.bmMode !== 'today') return;
+                b.disabled = !allowToday;
+                const info = st.els.todayInfo;
+                const wrapper = st.els.todayWrapper;
+                if (info) {
+                    info.hidden = !scheduleClosed;
+                    info.setAttribute('aria-hidden', scheduleClosed ? 'false' : 'true');
+                    const message = reason === 'sunday'
+                        ? 'Same-day borrowing is unavailable on Sundays. Choose a later date.'
+                        : 'Same-day borrowing is unavailable after 8:00 PM. Choose a later date.';
+                    info.title = scheduleClosed ? message : '';
+                    info.setAttribute('aria-label', scheduleClosed ? message : '');
+                    b.title = scheduleClosed ? message : '';
+                    b.setAttribute('aria-label', scheduleClosed ? 'Today unavailable. ' + message : 'Today');
+                    if (wrapper) {
+                        wrapper.title = scheduleClosed ? message : '';
+                        wrapper.tabIndex = scheduleClosed ? 0 : -1;
+                        wrapper.setAttribute('aria-label', scheduleClosed ? message : '');
+                    }
+                }
+            });
+            setMode(st, allowToday ? 'today' : 'future');
             setAvail(st, '', '');
             RoomPicker.reset(st.form);
+        }
+
+        function syncTodayAvailability(st) {
+            const today = parseYmd(localToday());
+            const reason = today.getDay() === 0 ? 'sunday' : nowMin() > toMin(rules().lastStart) ? 'closed' : '';
+            if (reason !== st.scheduleDisabledReason) {
+                reset(st);
+                return;
+            }
         }
 
         return {
@@ -6640,54 +6696,128 @@
         }
     });
 
-    // ── Cart time → room picker wiring ──────────────────────────────
-    // When start/end time changes, call RoomPicker.setWindow() so the room
-    // picker knows which slot to check availability for.
+    // ── Cart schedule → room picker wiring ──────────────────────────
     document.addEventListener('change', function(e) {
         var t = e.target;
-        if (t.id !== 'cartStartTime' && t.id !== 'cartEndTime') return;
+        if (t.id !== 'cartBorrowDate' && t.id !== 'cartStartTime' && t.id !== 'cartDuration') return;
+        if (t.id === 'cartBorrowDate' || t.id === 'cartDuration') cartRefreshStartTimes();
         cartUpdateRoomWindow();
     });
 
+    function cartLocalDate(date) {
+        return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' +
+            String(date.getDate()).padStart(2, '0');
+    }
+
+    function cartBorrowDates() {
+        var dates = [];
+        var today = new Date();
+        for (var offset = 0; offset <= 14; offset++) {
+            var date = new Date(today.getFullYear(), today.getMonth(), today.getDate() + offset);
+            if (offset > 0 && date.getDay() === 0) continue;
+            var available = offset !== 0 || (date.getDay() !== 0 && today.getHours() * 60 + today.getMinutes() <= 20 * 60);
+            dates.push({
+                value: cartLocalDate(date),
+                available: available,
+                label: (offset === 0 ? 'Today · ' : '') +
+                    date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+            });
+        }
+        return dates;
+    }
+
+    function cartStartTimes(date, duration) {
+        if (!date) return [];
+        var todayDate = cartLocalDate(new Date());
+        var start = date === todayDate
+            ? Math.max(7 * 60, Math.ceil((new Date().getHours() * 60 + new Date().getMinutes()) / 60) * 60)
+            : 7 * 60;
+        var hours = parseInt(duration, 10) || 1;
+        var times = [];
+        for (var minute = start; minute <= 20 * 60 && minute + hours * 60 <= 21 * 60; minute += 60) {
+            times.push(String(Math.floor(minute / 60)).padStart(2, '0') + ':00');
+        }
+        return times;
+    }
+
+    function cartRefreshStartTimes() {
+        var dateEl = document.getElementById('cartBorrowDate');
+        var startEl = document.getElementById('cartStartTime');
+        var durationEl = document.getElementById('cartDuration');
+        if (!dateEl || !startEl || !durationEl) return;
+        var previous = startEl.value;
+        var times = cartStartTimes(dateEl.value, durationEl.value);
+        startEl.innerHTML = '';
+        times.forEach(function (time) {
+            var option = document.createElement('option');
+            option.value = time;
+            option.textContent = new Date('2000-01-01T' + time + ':00').toLocaleTimeString('en-US', {
+                hour: 'numeric', minute: '2-digit'
+            });
+            startEl.appendChild(option);
+        });
+        if (!times.length) {
+            var empty = document.createElement('option');
+            empty.value = '';
+            empty.textContent = 'No hourly start times available';
+            empty.disabled = true;
+            empty.selected = true;
+            startEl.appendChild(empty);
+            return;
+        }
+        startEl.value = times.indexOf(previous) !== -1 ? previous : times[0];
+    }
+
     function cartUpdateRoomWindow() {
         var modal   = document.getElementById('cartCheckoutModal');
+        var dateEl  = document.getElementById('cartBorrowDate');
         var startEl = document.getElementById('cartStartTime');
-        var endEl   = document.getElementById('cartEndTime');
+        var durationEl = document.getElementById('cartDuration');
         var hintEl  = document.getElementById('cartTimeHint');
-        if (!modal || !startEl || !endEl || !window.RoomPicker) return;
+        if (!modal || !dateEl || !startEl || !durationEl || !window.RoomPicker) return;
 
+        var date = dateEl.value;
         var start = startEl.value;  // HH:MM
-        var end   = endEl.value;    // HH:MM
+        var durationHours = parseInt(durationEl.value, 10) || 0;
 
-        if (!start || !end) { window.RoomPicker.setWindow(modal, null); return; }
+        if (!date || !start || !durationHours) { window.RoomPicker.setWindow(modal, null); return; }
 
-        // Parse to minutes for comparison and duration calculation
-        var sParts = start.split(':'); var eParts = end.split(':');
-        var sMin   = parseInt(sParts[0], 10) * 60 + parseInt(sParts[1], 10);
-        var eMin   = parseInt(eParts[0], 10) * 60 + parseInt(eParts[1], 10);
+        var sParts = start.split(':');
+        var sMin = parseInt(sParts[0], 10) * 60 + parseInt(sParts[1], 10);
+        var eMin = sMin + durationHours * 60;
+        var todayStr = cartLocalDate(new Date());
+        var isToday = date === todayStr;
+        var parsedDate = new Date(date + 'T12:00:00');
 
-        if (eMin <= sMin) {
-            if (hintEl) { hintEl.textContent = 'End time must be after start time.'; hintEl.style.color = '#dc2626'; }
+        if (parsedDate.getDay() === 0) {
+            if (hintEl) { hintEl.textContent = 'Equipment borrowing is unavailable on Sundays.'; hintEl.style.color = '#dc2626'; }
+            window.RoomPicker.setWindow(modal, null);
+            return;
+        }
+        if (date < todayStr || date > cartLocalDate(new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() + 14))) {
+            if (hintEl) { hintEl.textContent = 'Choose a date within the next two weeks.'; hintEl.style.color = '#dc2626'; }
+            window.RoomPicker.setWindow(modal, null);
+            return;
+        }
+        var nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+        if (sMin < 7 * 60 || sMin > 20 * 60 || sMin % 60 !== 0 || eMin > 21 * 60 || (isToday && sMin < nowMin)) {
+            if (hintEl) { hintEl.textContent = isToday && sMin < nowMin
+                ? 'Start time must be in the future.' : 'Choose an hourly start time from 7:00 AM through 8:00 PM; bookings end by 9:00 PM.'; hintEl.style.color = '#dc2626'; }
             window.RoomPicker.setWindow(modal, null);
             return;
         }
         if (hintEl) { hintEl.textContent = ''; hintEl.style.color = ''; }
 
-        // Duration in hours (what check-booking-availability.php expects)
-        var durationHours = (eMin - sMin) / 60;
-
-        var today   = new Date();
-        var pad     = function(n) { return String(n).padStart(2, '0'); };
-        var dateStr = today.getFullYear() + '-' + pad(today.getMonth() + 1) + '-' + pad(today.getDate());
-
-        // check-booking-availability.php expects: mode, date, time, duration, items, rooms
-        var query = 'mode=today'
-            + '&date=' + encodeURIComponent(dateStr)
+        var mode = isToday ? 'today' : 'future';
+        var query = 'mode=' + mode
+            + '&date=' + encodeURIComponent(date)
             + '&time=' + encodeURIComponent(start)
             + '&duration=' + durationHours
             + '&items=%5B%5D'
             + '&rooms=1';
-        var label = 'Today · ' + start + ' → ' + end;
+        var dateLabel = isToday ? 'Today' : parsedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        var end = String(Math.floor(eMin / 60)).padStart(2, '0') + ':' + String(eMin % 60).padStart(2, '0');
+        var label = dateLabel + ' · ' + start + ' → ' + end;
         window.RoomPicker.setWindow(modal, query, label);
     }
 
@@ -6719,17 +6849,39 @@
 
         if (err) { err.style.display = 'none'; err.textContent = ''; }
 
-        // Pre-fill start = now rounded to next 5 min, end = start + 1 hour
-        var now   = new Date();
-        var pad   = function(n) { return String(n).padStart(2, '0'); };
-        var sMin  = now.getHours() * 60 + now.getMinutes();
-        sMin      = Math.ceil((sMin + 1) / 5) * 5;   // round up to next 5 min
-        var eMin  = sMin + 60;
+        // Restrict borrowing dates to today or the next 14 days, excluding Sundays.
+        var dateEl = document.getElementById('cartBorrowDate');
+        var dates = cartBorrowDates();
+        if (dateEl) {
+            dateEl.innerHTML = '';
+            var firstAvailable = dates.find(function (date) { return date.available; });
+            dates.forEach(function (date, index) {
+                var option = document.createElement('option');
+                option.value = date.value;
+                option.textContent = date.label;
+                option.disabled = !date.available;
+                if (date === firstAvailable) option.selected = true;
+                dateEl.appendChild(option);
+            });
+        }
+        var todayInfo = document.getElementById('cartTodayInfo');
+        if (todayInfo) {
+            var now = new Date();
+            var reason = now.getDay() === 0 ? 'sunday' : now.getHours() * 60 + now.getMinutes() > 20 * 60 ? 'closed' : '';
+            var message = reason === 'sunday'
+                ? 'Same-day borrowing is unavailable on Sundays. Choose a later date.'
+                : 'Same-day borrowing is unavailable after 8:00 PM. Choose a later date.';
+            todayInfo.hidden = !reason;
+            todayInfo.title = reason ? message : '';
+            todayInfo.setAttribute('aria-label', reason ? message : '');
+        }
+
+        // Start at 7:00 AM, or recommend the next whole-hour slot for today.
         var startEl = document.getElementById('cartStartTime');
-        var endEl   = document.getElementById('cartEndTime');
         var hintEl  = document.getElementById('cartTimeHint');
-        if (startEl) startEl.value = pad(Math.floor(sMin / 60) % 24) + ':' + pad(sMin % 60);
-        if (endEl)   endEl.value   = pad(Math.floor(eMin / 60) % 24) + ':' + pad(eMin % 60);
+        var durationEl = document.getElementById('cartDuration');
+        if (durationEl) durationEl.value = '1';
+        cartRefreshStartTimes();
         if (hintEl)  hintEl.textContent = '';
 
         // Reset room picker then set the pre-filled window
@@ -6758,17 +6910,39 @@
         var roomId      = roomIdInput ? roomIdInput.value.trim() : '';
         var room        = roomValEl ? (roomValEl.textContent || '').trim() : '';
         if (room === 'Choose a room') room = '';
+        var borrowDate  = (document.getElementById('cartBorrowDate') || {}).value || '';
         var startTime   = (document.getElementById('cartStartTime') || {}).value || '';
-        var endTime     = (document.getElementById('cartEndTime')   || {}).value || '';
+        var duration    = parseInt((document.getElementById('cartDuration') || {}).value, 10) || 0;
         var err  = document.getElementById('cartCheckoutError');
 
-        if (!startTime || !endTime) {
-            if (err) { err.textContent = 'Please set a start and end time.'; err.style.display = ''; }
+        if (!borrowDate || !startTime || [1, 2, 3, 6].indexOf(duration) === -1) {
+            if (err) { err.textContent = 'Please choose a valid borrowing date, start time, and duration.'; err.style.display = ''; }
             return;
         }
-        if (endTime <= startTime) {
-            if (err) { err.textContent = 'End time must be after start time.'; err.style.display = ''; }
+        var dateObj = new Date(borrowDate + 'T12:00:00');
+        var todayDate = cartLocalDate(new Date());
+        var latestDate = cartLocalDate(new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() + 14));
+        if (dateObj.getDay() === 0 || borrowDate < todayDate || borrowDate > latestDate) {
+            if (err) { err.textContent = 'Choose a non-Sunday date within the next two weeks.'; err.style.display = ''; }
             return;
+        }
+        var startParts = startTime.split(':');
+        var startMinutes = parseInt(startParts[0], 10) * 60 + parseInt(startParts[1], 10);
+        var endMinutes = startMinutes + duration * 60;
+        if (startMinutes < 1 || startMinutes > 20 * 60 || endMinutes > 21 * 60) {
+            if (err) { err.textContent = 'Choose an hourly start time from 7:00 AM through 8:00 PM; the booking must end by 9:00 PM.'; err.style.display = ''; }
+            return;
+        }
+        if (borrowDate === todayDate) {
+            var now = new Date();
+            if (now.getHours() * 60 + now.getMinutes() > 20 * 60) {
+                if (err) { err.textContent = 'Same-day borrowing is unavailable after 8:00 PM. Choose a later date.'; err.style.display = ''; }
+                return;
+            }
+            if (startMinutes < now.getHours() * 60 + now.getMinutes()) {
+                if (err) { err.textContent = 'Start time must be in the future.'; err.style.display = ''; }
+                return;
+            }
         }
         if (!room || !roomId) {
             if (err) {
@@ -6804,12 +6978,7 @@
             return { name: it.name, qty: it.qty };
         });
         var timeSlot = startTime;  // start time chosen by faculty
-        var roomIdEl = roomIdInput; // already read above
-        // Duration in hours from start to end time
-        var sParts2 = startTime.split(':'); var eParts2 = endTime.split(':');
-        var cartDurationHours = ((parseInt(eParts2[0], 10) * 60 + parseInt(eParts2[1], 10))
-            - (parseInt(sParts2[0], 10) * 60 + parseInt(sParts2[1], 10))) / 60;
-        if (cartDurationHours <= 0) cartDurationHours = 1;
+        var bookingMode = borrowDate === todayDate ? 'today' : 'future';
 
         fetch('equipment-booking/api/submit-cart-borrow.php', {
             method: 'POST',
@@ -6819,8 +6988,10 @@
                 room:                room,
                 room_id:             roomId,
                 items:               itemsPayload,
+                booking_mode:        bookingMode,
+                borrow_date:         borrowDate,
                 time_slot:           timeSlot,
-                duration:            cartDurationHours,
+                duration:            duration,
                 collector_type:      cartCollectorType,
                 collector_name:      cartCollectorName,
             }),

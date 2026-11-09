@@ -1,15 +1,13 @@
 <!-- ============================================================
     <!-- ============================================================
-         TAB: SETTINGS  (streamlined — consolidates the old Settings tab,
-         Account overlay, Arbitration tab, and Help Center overlay into
-         one screen with four sub-tabs)
+         TAB: SETTINGS  (account, preferences, equipment, imports, and help)
     ============================================================ -->
 <div class="tab-panel" id="panel-settings">
 
     <!-- Page Header -->
     <div class="sett-page-header admin-screen-header">
         <h1 class="sett-page-title">Settings</h1>
-        <p class="sett-page-sub">Manage your account, preferences, borrowing rules, and get help.</p>
+        <p class="sett-page-sub">Manage your account, preferences, and get help.</p>
     </div>
 
     <!-- Settings mega sub-tabs -->
@@ -17,7 +15,6 @@
         <button class="rq-sub-tab active" data-sett-panel="sett-account">My Account</button>
         <button class="rq-sub-tab" data-sett-panel="sett-prefs">Preferences</button>
         <?php if ($is_super_admin): ?>
-            <button class="rq-sub-tab" data-sett-panel="sett-rules">Borrowing Rules</button>
             <button class="rq-sub-tab" data-sett-panel="sett-equipment">Equipment</button>
             <button class="rq-sub-tab" data-sett-panel="sett-imports">Imports</button>
         <?php endif; ?>
@@ -274,116 +271,6 @@
             </button>
         </div>
     </div><!-- /sett-prefs -->
-
-    <!-- ── BORROWING RULES (was the standalone Arbitration tab; Super Admin only) ── -->
-    <?php if ($is_super_admin): ?>
-        <div class="rq-sub-panel" id="sett-rules">
-            <!-- Every automatic decision is recorded in the Activity timeline (Sidebar → Activity). -->
-            <div class="arb-note">
-                <span class="material-symbols-outlined" aria-hidden="true">history</span>
-                <p>Want to see what these rules decided? Every automatic decision is in the Activity timeline.</p>
-                <button type="button" class="act-open" data-act-open="auto">
-                    View automatic decisions <span class="material-symbols-outlined">arrow_forward</span>
-                </button>
-            </div>
-
-            <!-- ── CONFIGURATION ─────────────────────────────────────── -->
-            <div class="arb-sub-panel active" id="arb-sub-config">
-                <div class="ps-two-col">
-                    <!-- Left: Rules -->
-                    <div class="ps-card">
-                        <div class="ps-card-header">
-                            <h3><span class="material-symbols-outlined">rule</span> Auto-Approval Rules</h3>
-                        </div>
-                        <div class="ps-card-body">
-                            <div class="arb-rule">
-                                <h4>
-                                    <span class="material-symbols-outlined">check_circle</span>
-                                    Auto-approve Faculty Requests
-                                    <label class="ps-toggle" style="margin-left:auto">
-                                        <input type="checkbox" checked>
-                                        <span class="ps-toggle-track"></span>
-                                    </label>
-                                </h4>
-                                <p>Automatically approve equipment requests from verified faculty with cleared status.</p>
-                            </div>
-                            <div class="arb-rule">
-                                <h4>
-                                    <span class="material-symbols-outlined">block</span>
-                                    Block Overdue Borrowers
-                                    <label class="ps-toggle" style="margin-left:auto">
-                                        <input type="checkbox"
-                                            name="config[rule_overdue_block_enabled]" value="1"
-                                            <?php echo (($arb_config['rule_overdue_block_enabled'] ?? '1') == '1') ? 'checked' : ''; ?>>
-                                        <span class="ps-toggle-track"></span>
-                                    </label>
-                                </h4>
-                                <p>Automatically decline new requests from users with overdue items.</p>
-                            </div>
-                            <div class="arb-rule">
-                                <h4>
-                                    <span class="material-symbols-outlined">inventory</span>
-                                    Stock-Based Rejection
-                                    <label class="ps-toggle" style="margin-left:auto">
-                                        <input type="checkbox"
-                                            name="config[rule_duplicate_block_enabled]" value="1"
-                                            <?php echo (($arb_config['rule_duplicate_block_enabled'] ?? '0') == '1') ? 'checked' : ''; ?>>
-                                        <span class="ps-toggle-track"></span>
-                                    </label>
-                                </h4>
-                                <p>Automatically decline if available stock falls below minimum threshold.</p>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- Right: Thresholds -->
-                    <div class="ps-card">
-                        <div class="ps-card-header">
-                            <h3><span class="material-symbols-outlined">tune</span> Thresholds &amp; Limits</h3>
-                        </div>
-                        <div class="ps-card-body">
-                            <form id="arbConfigForm" autocomplete="off">
-                                <?= csrf_field() ?>
-                                <!-- toggles from the left card are also submitted via JS -->
-                                <div class="ps-form-group">
-                                    <label class="ps-form-label">Maximum Borrow Days</label>
-                                    <input class="ps-form-control" type="number" min="1" max="60"
-                                        name="config[max_borrow_days]"
-                                        value="<?php echo htmlspecialchars($arb_config['max_borrow_days'] ?? 7); ?>">
-                                    <div class="ps-form-hint">Items must be returned within this many days.</div>
-                                </div>
-                                <div class="ps-form-group">
-                                    <label class="ps-form-label">Max Items Per Borrower</label>
-                                    <input class="ps-form-control" type="number" min="1" max="20"
-                                        name="config[max_items_per_borrower]"
-                                        value="<?php echo htmlspecialchars($arb_config['max_items_per_borrower'] ?? 3); ?>">
-                                    <div class="ps-form-hint">Maximum number of items a user can have at once.</div>
-                                </div>
-                                <div class="ps-form-group">
-                                    <label class="ps-form-label">Low Stock Threshold</label>
-                                    <input class="ps-form-control" type="number" min="0" max="10"
-                                        name="config[low_stock_threshold]"
-                                        value="<?php echo htmlspecialchars($arb_config['low_stock_threshold'] ?? 2); ?>">
-                                    <div class="ps-form-hint">Trigger low-stock alert when quantity drops below this.</div>
-                                </div>
-                                <div class="ps-form-group">
-                                    <label class="ps-form-label">Buffer Time (Auto-Approve)</label>
-                                    <input class="ps-form-control" type="number" min="0" max="1440"
-                                        name="config[auto_approve_timeout_minutes]"
-                                        value="<?php echo htmlspecialchars($arb_config['auto_approve_timeout_minutes'] ?? 30); ?>">
-                                    <div class="ps-form-hint">Auto-approve Waiting requests after this many minutes. Set to 0 to disable.</div>
-                                </div>
-                                <button type="button" id="saveArbConfig" class="ps-btn ps-btn--primary"
-                                    style="width:100%;justify-content:center;margin-top:0.25rem">
-                                    <span class="material-symbols-outlined">save</span> Save Configuration
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </div><!-- /arb-sub-config -->
-
-        </div><!-- /sett-rules -->
-    <?php endif; ?>
 
     <!-- ── IMPORTS (Super Admin only) ─────────────────────────────
                      Equipment Inventory + Rooms Assigned (placeholders: those imports are not built yet) +
@@ -1032,15 +919,6 @@
                                     </div>
                                 </details>
 
-                                <details class="hc-faq-item">
-                                    <summary class="hc-faq-q">
-                                        <span class="hc-faq-q-text">What is Borrowing Rules? (Super Admin)</span>
-                                        <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
-                                    </summary>
-                                    <div class="hc-faq-a">
-                                        <strong>Settings → Borrowing Rules</strong> holds the rule settings (toggles and limits) for the automatic decision engine. It decides <strong>same-day</strong> equipment requests and room reservations on the spot. <strong>Later-date</strong> equipment requests are not decided by it: they wait in <strong>Equipment → Loans → Waiting</strong> for an admin. Automatic decisions are listed in <strong>Activity</strong> under <em>Automatic</em>.
-                                    </div>
-                                </details>
                             <?php endif; ?>
 
                         </div><!-- /.hc-faq-list -->

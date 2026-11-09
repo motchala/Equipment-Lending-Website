@@ -10,7 +10,6 @@
  * POST body (JSON):
  *   code         — faculty-generated one-time code
  *   student_name — student's full name
- *   student_id   — student's ID number
  *
  * Success response:
  *   { valid: true, faculty_id, faculty_name, code_db_id, rooms: [...] }
@@ -32,10 +31,9 @@ date_default_timezone_set('Asia/Manila');
 $body         = json_decode(file_get_contents('php://input'), true);
 $code         = trim($body['code']         ?? '');
 $student_name = trim($body['student_name'] ?? '');
-$student_id   = trim($body['student_id']   ?? '');
 
-if (!$code || !$student_name || !$student_id) {
-    echo json_encode(['error' => 'All fields are required.']);
+if (!$code || !$student_name) {
+    echo json_encode(['error' => 'Code and student name are required.']);
     exit();
 }
 
@@ -117,10 +115,6 @@ if ($fac_row && !empty($fac_row['email'])) {
                 <tr style="background:#f9f5f5;">
                     <td style="padding:10px 14px;color:#666;width:40%;">Student Name</td>
                     <td style="padding:10px 14px;color:#222;font-weight:700;">' . htmlspecialchars($student_name) . '</td>
-                </tr>
-                <tr>
-                    <td style="padding:10px 14px;color:#666;">Student ID</td>
-                    <td style="padding:10px 14px;color:#222;font-weight:700;">' . htmlspecialchars($student_id) . '</td>
                 </tr>
                 <tr style="background:#f9f5f5;">
                     <td style="padding:10px 14px;color:#666;">Course</td>

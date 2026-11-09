@@ -1281,10 +1281,18 @@
        NOTE: this intentionally does NOT use setupLiveSearch(). That
        helper replaces the container's innerHTML with whatever
        live-search.php's ?section=inventory case returns (old
-       Bootstrap markup), which garbled the list. Instead every
-       <tr.inv-row-item> is rendered once by PHP and this function only
-       shows/hides them: filter by the search box, then show 10 rows
-       per page. Nothing is ever replaced, so there's nothing to garble. */
+       Bootstrap markup), which garbled the list. The inventory tbody
+       is rendered by PHP and may be refreshed in place; this function
+       filters and paginates those rows while retaining the current
+       search and page across refreshes. */
+    const inventoryListState = {
+        rows: [],
+        query: '',
+        page: 1,
+        initialized: false,
+        render: null
+    };
+
     function setupInventoryList() {
         const PAGE_SIZE = 10;
         const body = document.getElementById('inventory-body');
@@ -1299,8 +1307,9 @@
         const nums = document.getElementById('inv-pg-nums');
         const prevBtn = document.getElementById('inv-pg-prev');
         const nextBtn = document.getElementById('inv-pg-next');
-        let query = '';
-        let page = 1;
+        const state = inventoryListState;
+        state.rows = rows;
+        state.query = input ? input.value.trim().toLowerCase() : state.query;
 
         // Thumbnail fallback (replaces the old inline onerror handler).
         rows.forEach(function (row) {
@@ -1313,10 +1322,10 @@
         });
 
         function matches(row) {
-            if (!query) return true;
+            if (!state.query) return true;
             const d = row.dataset;
             return [d.itemName, d.itemCategory, d.itemCondition].some(function (v) {
-                return (v || '').toLowerCase().includes(query);
+                return (v || '').toLowerCase().includes(state.query);
             });
         }
 
@@ -1335,33 +1344,33 @@
             return list;
         }
 
-        function render() {
-            const hits = rows.filter(matches);
+        state.render = function () {
+            const hits = state.rows.filter(matches);
             const total = hits.length;
             const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-            page = Math.min(Math.max(page, 1), pages);
-            const start = (page - 1) * PAGE_SIZE;
+            state.page = Math.min(Math.max(state.page, 1), pages);
+            const start = (state.page - 1) * PAGE_SIZE;
             const end = Math.min(start + PAGE_SIZE, total);
             const visible = new Set(hits.slice(start, end));
 
-            rows.forEach(function (row) {
+            state.rows.forEach(function (row) {
                 row.classList.toggle('inv-row-hidden', !visible.has(row));
             });
-            if (noMatch) noMatch.classList.toggle('inv-row-hidden', !(rows.length > 0 && total === 0));
+            if (noMatch) noMatch.classList.toggle('inv-row-hidden', !(state.rows.length > 0 && total === 0));
 
             if (!pager) return;
-            pager.hidden = rows.length === 0;
+            pager.hidden = state.rows.length === 0;
             if (info) {
                 info.textContent = total
                     ? 'Showing ' + (start + 1) + '\u2013' + end + ' of ' + total
                     : 'No results';
             }
             if (ctl) ctl.hidden = pages <= 1;
-            if (prevBtn) prevBtn.disabled = page <= 1;
-            if (nextBtn) nextBtn.disabled = page >= pages;
+            if (prevBtn) prevBtn.disabled = state.page <= 1;
+            if (nextBtn) nextBtn.disabled = state.page >= pages;
             if (nums) {
                 nums.textContent = '';
-                pageList(pages, page).forEach(function (n) {
+                pageList(pages, state.page).forEach(function (n) {
                     if (n === 'gap') {
                         const gap = document.createElement('span');
                         gap.className = 'inv-pager-gap';
@@ -1371,47 +1380,52 @@
                     }
                     const btn = document.createElement('button');
                     btn.type = 'button';
-                    btn.className = 'inv-pager-btn' + (n === page ? ' is-active' : '');
+                    btn.className = 'inv-pager-btn' + (n === state.page ? ' is-active' : '');
                     btn.dataset.page = String(n);
                     btn.textContent = String(n);
                     btn.setAttribute('aria-label', 'Page ' + n);
-                    if (n === page) btn.setAttribute('aria-current', 'page');
+                    if (n === state.page) btn.setAttribute('aria-current', 'page');
                     nums.appendChild(btn);
                 });
             }
-        }
+        };
 
-        if (input) {
+        if (!state.initialized && input) {
             input.addEventListener('input', function () {
-                query = this.value.trim().toLowerCase();
-                page = 1;
-                render();
+                state.query = this.value.trim().toLowerCase();
+                state.page = 1;
+                state.render();
             });
         }
-        if (prevBtn) prevBtn.addEventListener('click', function () { page--; render(); });
-        if (nextBtn) nextBtn.addEventListener('click', function () { page++; render(); });
-        if (nums) {
+        if (!state.initialized && prevBtn) {
+            prevBtn.addEventListener('click', function () { state.page--; state.render(); });
+        }
+        if (!state.initialized && nextBtn) {
+            nextBtn.addEventListener('click', function () { state.page++; state.render(); });
+        }
+        if (!state.initialized && nums) {
             nums.addEventListener('click', function (e) {
                 const btn = e.target.closest('[data-page]');
                 if (!btn) return;
-                page = parseInt(btn.dataset.page, 10) || 1;
-                render();
+                state.page = parseInt(btn.dataset.page, 10) || 1;
+                state.render();
             });
         }
+        state.initialized = true;
 
         // Lets notification deep-links open the page that holds a given item
         // (clears any search so the row is guaranteed to be listed).
         window.psInventoryRevealRow = function (itemId) {
-            query = '';
+            state.query = '';
             if (input) input.value = '';
-            const pos = rows.findIndex(function (r) { return r.dataset.itemId === String(itemId); });
+            const pos = state.rows.findIndex(function (r) { return r.dataset.itemId === String(itemId); });
             if (pos < 0) return null;
-            page = Math.floor(pos / PAGE_SIZE) + 1;
-            render();
-            return rows[pos];
+            state.page = Math.floor(pos / PAGE_SIZE) + 1;
+            state.render();
+            return state.rows[pos];
         };
 
-        render();
+        state.render();
     }
 
     /* ── Faculty list: client-side search + pagination (20 per page) ──
@@ -2331,8 +2345,7 @@
         btn.addEventListener('click', function () { switchRoomsTab(this.dataset.roomsTab); });
     });
 
-    /* ── Settings mega sub-tabs (My Account / Preferences /
-       Borrowing Rules / Help & FAQ) ─────────────────────────── */
+    /* ── Settings sub-tabs ───────────────────────────────────── */
     document.querySelectorAll('#settMainTabs .rq-sub-tab').forEach(btn => {
         btn.addEventListener('click', function () { switchSettMainTab(this.dataset.settPanel); });
     });
@@ -3262,7 +3275,7 @@
         if (panel.classList.contains('active')) ensureLoaded();
         window.psActivityReady = ensureLoaded; // lets ?view=activity open it with data
 
-        /* Open Activity with a preset — used by the Admins panel, Borrowing Rules and My Account.
+        /* Open Activity with a preset — used by the Admins panel and My Account.
            opts: { actor: 'all' | 'auto' | 'me' | <admin id>, filter: chip key, range: today | 7d | 30d | all } */
         window.psActivityOpen = function (opts) {
             opts = opts || {};
@@ -3786,45 +3799,6 @@
             }
         }
 
-        // ── Save Arbitration Config ───────────────────────────────────────
-        const saveArbConfigBtn = document.getElementById('saveArbConfig');
-        if (saveArbConfigBtn) {
-            saveArbConfigBtn.addEventListener('click', function () {
-                const form = document.getElementById('arbConfigForm');
-                if (!form) return;
-                const formData = new FormData(form);
-                // Ensure unchecked checkboxes for rule toggles send '0'
-                ['rule_overdue_block_enabled', 'rule_duplicate_block_enabled', 'rule_missing_doc_block_enabled'].forEach(key => {
-                    if (!formData.has('config[' + key + ']')) {
-                        formData.append('config[' + key + ']', '0');
-                    }
-                });
-                saveArbConfigBtn.disabled = true;
-                saveArbConfigBtn.textContent = 'Saving...';
-                fetch('equipment-booking/api/save-arbitration-config.php', {
-                    method: 'POST',
-                    body: formData
-                })
-                    .then(r => r.json())
-                    .then(data => {
-                        if (data.status === 'success') {
-                            const msg = document.getElementById('arbConfigMsg');
-                            if (msg) {
-                                msg.style.display = 'flex';
-                                setTimeout(() => { msg.style.display = 'none'; }, 3000);
-                            }
-                            showToast('Arbitration settings saved.');
-                        } else {
-                            showToast(data.message || 'Could not save settings.');
-                        }
-                    })
-                    .catch(() => showToast('Network error. Please try again.'))
-                    .finally(() => {
-                        saveArbConfigBtn.disabled = false;
-                        saveArbConfigBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="20 6 9 17 4 12" /></svg> Save Arbitration Settings';
-                    });
-            });
-        }
     }
 
     // ── Override Modal ────────────────────────────────────────────────────────
@@ -6895,6 +6869,8 @@ function psSelectFmt(btn) {
     // swaps the inventory tbody in-place without a page reload.
     (function startLiveSync() {
         var syncing = false;
+        var syncToastInterval = 3 * 60 * 1000;
+        var lastSyncToastAt = Number(LS.get('inventorySyncToastAt')) || 0;
 
         var csrfTokenForSync = (function () {
             var m = document.querySelector('meta[name="csrf-token"]');
@@ -6953,7 +6929,11 @@ function psSelectFmt(btn) {
                     if (s.added    > 0) parts.push(s.added    + ' added');
                     if (s.updated  > 0) parts.push(s.updated  + ' updated');
                     if (s.archived > 0) parts.push(s.archived + ' archived');
-                    if (parts.length > 0 && typeof window.showToast === 'function') {
+                    var now = Date.now();
+                    if (parts.length > 0 && now - lastSyncToastAt >= syncToastInterval
+                        && typeof window.showToast === 'function') {
+                        lastSyncToastAt = now;
+                        LS.set('inventorySyncToastAt', now);
                         window.showToast('Inventory synced: ' + parts.join(', ') + '.', 'success');
                     }
                 })

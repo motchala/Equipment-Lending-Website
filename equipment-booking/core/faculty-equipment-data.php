@@ -19,11 +19,11 @@ $bk_meta_json = json_encode([
     'nowMin'  => (int)date('G') * 60 + (int)date('i'),
     'rules'   => [
         'dayStart'   => BookingSchedule::DAY_START,
+        'lastStart'  => BookingSchedule::LAST_START,
         'dayEnd'     => BookingSchedule::DAY_END,
         'slot'       => BookingSchedule::SLOT_MINUTES,
         'maxAhead'   => BookingSchedule::MAX_ADVANCE_DAYS,
-        'todayHours' => BookingSchedule::TODAY_HOURS,
-        'futureDays' => BookingSchedule::FUTURE_DAYS,
+        'durationHours' => BookingSchedule::DURATION_HOURS,
         'graceMin'   => BookingSchedule::IMMEDIATE_GRACE_MIN,
     ],
 ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE);

@@ -33,7 +33,7 @@
 
     var activeBuildingId = null;
     var activeFloorIdx = 0;
-    var onlyFree = false;
+    var onlyFree = true;
     var currentRoom = null;    /* { room, name, location } for the open dialog  */
 
     var loaded = false;
@@ -204,7 +204,14 @@
     }
 
     function start() {
-        if (loaded) { startPolling(); return; }
+        onlyFree = true;
+        var onlyFreeToggle = $('fcty-only-free');
+        if (onlyFreeToggle) onlyFreeToggle.checked = true;
+        if (loaded) {
+            if (activeBuildingId && roomsView.style.display !== 'none') renderFloor(activeFloorIdx);
+            startPolling();
+            return;
+        }
         if (loading) return;
         loading = true;
         var err = $('fcty-load-error');
@@ -355,8 +362,7 @@
         floorTabs.style.display = b.floors.length > 1 ? '' : 'none';
         floorTabs.innerHTML = b.floors.map(function (f, i) {
             return '<button type="button" class="fcty-floor-tab" role="tab" data-floor="' + i + '">' +
-                '<span>' + esc(f.label) + '</span>' +
-                '<span class="fcty-floor-count">' + f.rooms.length + '</span></button>';
+                '<span>' + esc(f.label) + '</span></button>';
         }).join('');
 
         /* Open on the first floor that actually has something to book */

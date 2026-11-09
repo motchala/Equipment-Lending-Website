@@ -10,7 +10,7 @@
  *   mode      today | future
  *   date      YYYY-MM-DD   (future only)
  *   time      HH:MM        start time
- *   duration  hours (today) or days (future)
+ *   duration  hours (today and future)
  *   items     JSON [{"n":"Projector","q":2}, ...]
  *   rooms     1 = also report which rooms are reserved by someone else (blocked) and which
  *             are reserved by this faculty member (suggested) during that window
@@ -91,7 +91,7 @@ foreach ($items as $it) {
             $row['ok']      = true;
             $row['message'] = $mode === 'today'
                 ? 'Available for that time.'
-                : $free . ' of ' . $total . ' free for those dates.';
+                : $free . ' of ' . $total . ' free for that time.';
         } else {
             $row['message'] = $free <= 0
                 ? 'Fully booked for that schedule.'

@@ -14,9 +14,10 @@ declare(strict_types=1);
  *   csrf_token  string
  *   room_id     string   (from RoomPicker, may be empty for "Outside")
  *   items       array of { name: string, qty: int }
- *   borrow_mode string   "today" (only today supported for now)
- *   time_slot   string   "HH:MM" start time (today mode only)
- *   duration    int      hours (today mode only)
+ *   booking_mode string  "today" or "future"
+ *   borrow_date  string  "YYYY-MM-DD" (future mode)
+ *   time_slot    string  "HH:MM" start time
+ *   duration     int     hours (1, 2, 3, or 6)
  *
  * Returns:
  *   { ok: true,  submitted: [{name, request_id, status}], failed: [{name, error}] }
@@ -83,8 +84,7 @@ if (!$user) {
 $faculty_name = (string)$user['fullname'];
 $faculty_id   = (string)$user['faculty_id'];
 
-// Room: the cart uses a plain text input (not the room picker).
-// Store as a text label with room_id = null — same as "Outside" in the existing system.
+// Preserve the selected room label for display; "Outside" has no room ID.
 $room_label = trim((string)($body['room'] ?? ''));
 if ($room_label === '') {
     echo json_encode(['ok' => false, 'error' => 'Please enter a room or location.']);
@@ -114,15 +114,12 @@ if (!is_array($raw_items) || empty($raw_items)) {
     exit;
 }
 
-// Build a pseudo-$_POST array that BookingSchedule::parse() expects
-// The cart always submits today borrowing, so mode=today with time+duration
-// BookingSchedule::parse() reads: booking_mode, start_time, duration, borrow_date
+// Build a pseudo-$_POST array that BookingSchedule::parse() expects.
 $pseudo_post = [
-    'booking_mode' => 'today',
+    'booking_mode' => (string)($body['booking_mode'] ?? ''),
     'start_time'   => (string)($body['time_slot'] ?? date('H:i')),
-    'end_time'     => (string)($body['end_time']   ?? ''),
     'duration'     => (int)($body['duration'] ?? 1),
-    'borrow_date'  => date('Y-m-d'),
+    'borrow_date'  => (string)($body['borrow_date'] ?? ''),
 ];
 // room_id from the room picker (nullable — "outside" maps to null)
 $raw_room_id = trim((string)($body['room_id'] ?? ''));

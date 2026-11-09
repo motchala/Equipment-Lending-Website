@@ -7,13 +7,15 @@ declare(strict_types=1);
  *
  * Scheduling rules for equipment borrowing (Borrow Request modal).
  *
- *  - Today bookings:  start hour + duration in hours (1 / 2 / 3 / 5). No request letter.
- *  - Later bookings:  borrow date + start hour + duration in days (1 / 2 / 3)
+ *  - Today bookings:  hourly start time (7:00 AM through 8:00 PM) + duration in hours
+ *                     (1 / 2 / 3 / 6). No request letter.
+ *  - Later bookings:  borrow date + start time + duration in hours (1 / 2 / 3 / 6)
  *                     + quantity + an optional (recommended) request letter.
  *  - Later bookings are checked against the SCHEDULE (overlapping approved
  *    bookings versus the item's total stock), not against what happens to be on
  *    the shelf right now. Today bookings need the item to be available right now.
- *  - A booking can start at most MAX_ADVANCE_DAYS days from today.
+ *  - Bookings end by 9:00 PM and can start at most MAX_ADVANCE_DAYS days from today;
+ *    Sundays are not bookable.
  *
  * "Total stock" is the stock the admin set. tbl_inventory.quantity only holds what is
  * on the shelf right now (approvals subtract, returns add back), so the total is
@@ -32,12 +34,12 @@ final class BookingSchedule
 {
     // ── Tunable rules ────────────────────────────────────────────────────────
     public const DAY_START            = '07:00';   // earliest start time
-    public const DAY_END              = '21:00';   // bookings must end by this time (today bookings)
-    public const SLOT_MINUTES         = 30;        // start-time step
-    public const MAX_ADVANCE_DAYS     = 21;        // how far ahead a booking may start (3 weeks)
+    public const LAST_START            = '20:00';   // latest start time
+    public const DAY_END              = '21:00';   // bookings must end by this time
+    public const SLOT_MINUTES         = 60;        // start-time step
+    public const MAX_ADVANCE_DAYS     = 14;        // how far ahead a booking may start (2 weeks)
     public const IMMEDIATE_GRACE_MIN  = 15;        // a "today" booking starting within this many minutes takes stock right away
-    public const TODAY_HOURS          = [1, 2, 3, 5];
-    public const FUTURE_DAYS          = [1, 2, 3];
+    public const DURATION_HOURS       = [1, 2, 3, 6];
 
     private static ?bool $ready = null;
 
@@ -535,10 +537,10 @@ final class BookingSchedule
     // Parsing & validation
     // ═════════════════════════════════════════════════════════════════════════
 
-    /** Allowed lengths for the mode: hours (today) or days (later). */
+    /** Allowed booking durations, in hours, for both today and future dates. */
     public static function allowedLengths(string $mode): array
     {
-        return $mode === 'today' ? self::TODAY_HOURS : self::FUTURE_DAYS;
+        return self::DURATION_HOURS;
     }
 
     /**
@@ -553,17 +555,24 @@ final class BookingSchedule
         if (!preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $time)) {
             return ['ok' => false, 'error' => 'Please choose a start time.'];
         }
-        if ($time < self::DAY_START || $time >= self::DAY_END) {
-            return ['ok' => false, 'error' => 'Start time must be between ' . self::DAY_START . ' and ' . self::DAY_END . '.'];
+        if ($time < self::DAY_START || $time > self::LAST_START) {
+            return ['ok' => false, 'error' => 'Start time must be between ' . self::DAY_START . ' and ' . self::LAST_START . '.'];
+        }
+        if (substr($time, 3, 2) !== '00') {
+            return ['ok' => false, 'error' => 'Start times are available on the hour only.'];
         }
         if (!in_array($length, self::allowedLengths($mode), true)) {
-            return ['ok' => false, 'error' => $mode === 'today'
-                ? 'Please choose how many hours you need it for.'
-                : 'Please choose how many days you need it for.'];
+            return ['ok' => false, 'error' => 'Please choose a duration of 1, 2, 3, or 6 hours.'];
         }
 
         $today = date('Y-m-d');
         if ($mode === 'today') {
+            if ((int)date('w') === 0) {
+                return ['ok' => false, 'error' => 'Borrowing equipment today is unavailable on Sundays. Please choose a later date.'];
+            }
+            if (date('H:i') > self::LAST_START) {
+                return ['ok' => false, 'error' => 'Same-day borrowing is unavailable after 8:00 PM. Please choose a later date.'];
+            }
             $startDate = $today;
             $startTs   = strtotime($startDate . ' ' . $time . ':00');
             if ($startTs < time() - 10 * 60) {
@@ -574,7 +583,8 @@ final class BookingSchedule
                 return ['ok' => false, 'error' => 'Today bookings must end by ' . self::DAY_END . '.'];
             }
         } else {
-            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || strtotime($date) === false) {
+            if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $date, $dateParts) ||
+                !checkdate((int)$dateParts[2], (int)$dateParts[3], (int)$dateParts[1])) {
                 return ['ok' => false, 'error' => 'Please choose a borrow date.'];
             }
             $startDate = $date;
@@ -584,10 +594,16 @@ final class BookingSchedule
                 return ['ok' => false, 'error' => 'Later bookings start tomorrow or after. Use "Today" for same-day use.'];
             }
             if ($startDate > $latest) {
-                return ['ok' => false, 'error' => 'You can only book up to ' . (self::MAX_ADVANCE_DAYS / 7) . ' weeks ahead (latest start: ' . date('M j, Y', strtotime($latest)) . ').'];
+                return ['ok' => false, 'error' => 'You can only book up to two weeks ahead (latest start: ' . date('M j, Y', strtotime($latest)) . ').'];
+            }
+            if ((int)date('w', strtotime($startDate)) === 0) {
+                return ['ok' => false, 'error' => 'Equipment borrowing is unavailable on Sundays. Please choose another date.'];
             }
             $startTs = strtotime($startDate . ' ' . $time . ':00');
-            $endTs   = strtotime('+' . $length . ' days', $startTs);
+            $endTs   = $startTs + $length * 3600;
+        }
+        if ($endTs > strtotime($startDate . ' ' . self::DAY_END . ':00')) {
+            return ['ok' => false, 'error' => 'Bookings must end by ' . self::DAY_END . '.'];
         }
 
         return ['ok' => true, 'data' => [
@@ -640,12 +656,15 @@ final class BookingSchedule
     }
 
     /** First start date (on/after $fromDate, within the booking window) where $qty units are free. */
-    public static function earliestFreeDate(mysqli $conn, string $item, int $qty, string $time, int $lengthDays, string $fromDate): ?string
+    public static function earliestFreeDate(mysqli $conn, string $item, int $qty, string $time, int $lengthHours, string $fromDate): ?string
     {
         $latest = date('Y-m-d', strtotime('+' . self::MAX_ADVANCE_DAYS . ' days'));
         for ($d = $fromDate; $d <= $latest; $d = date('Y-m-d', strtotime($d . ' +1 day'))) {
+            if ((int)date('w', strtotime($d)) === 0) {
+                continue;
+            }
             $start = strtotime($d . ' ' . $time . ':00');
-            $end   = strtotime('+' . $lengthDays . ' days', $start);
+            $end   = $start + $lengthHours * 3600;
             if (self::freeUnits($conn, $item, date('Y-m-d H:i:s', $start), date('Y-m-d H:i:s', $end)) >= $qty) {
                 return $d;
             }
@@ -725,9 +744,12 @@ final class BookingSchedule
             <div class="form-group">
                 <span class="form-label">When do you need it?</span>
                 <div class="bm-seg" role="tablist" aria-label="When do you need it?">
-                    <button type="button" class="bm-seg-btn active" role="tab" aria-selected="true" data-bm-mode="today">
-                        <span class="material-symbols-outlined">bolt</span> Today
-                    </button>
+                    <span class="bm-seg-option" data-bm-today-wrapper role="presentation">
+                        <button type="button" class="bm-seg-btn active" role="tab" aria-selected="true" data-bm-mode="today">
+                            <span class="material-symbols-outlined">bolt</span> Today
+                            <span class="material-symbols-outlined bm-mode-info" data-bm-today-info aria-hidden="true" hidden>error</span>
+                        </button>
+                    </span>
                     <button type="button" class="bm-seg-btn" role="tab" aria-selected="false" data-bm-mode="future">
                         <span class="material-symbols-outlined">event</span> Later date
                     </button>
@@ -749,7 +771,7 @@ final class BookingSchedule
                 <div class="bm-when">
                     <div class="form-group bm-when-date" data-bm-future-only hidden>
                         <label class="form-label" for="' . $p . 'Date">Borrow date</label>
-                        <input type="date" id="' . $p . 'Date" name="borrow_date" class="form-input" data-bm-date>
+                        <select id="' . $p . 'Date" name="borrow_date" class="form-input bm-select" data-bm-date></select>
                     </div>
                     <div class="form-group bm-when-time">
                         <label class="form-label" for="' . $p . 'Time">Start time</label>

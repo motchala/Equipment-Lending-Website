@@ -29,24 +29,33 @@
                     <input type="hidden" name="instructor" value="<?php echo htmlspecialchars($fullname); ?>">
                     <?= BookingSchedule::renderSchedule('bm1') ?>
                     <?= BookingSchedule::renderRoomPicker('borrow_room') ?>
-                    <div class="form-group">
-                        <span class="form-label">Who will collect the equipment?</span>
-                        <div class="bm-collector-toggle" role="radiogroup" aria-label="Collector">
+                    <section class="form-group bm-collector-panel" aria-labelledby="bmCollectorTitle">
+                        <div class="bm-collector-heading">
+                            <span class="bm-collector-icon material-symbols-outlined" aria-hidden="true">person_pin_circle</span>
+                            <div>
+                                <span class="form-label" id="bmCollectorTitle">Who will collect the equipment?</span>
+                                <p class="bm-collector-caption">Choose who will pick up this request.</p>
+                            </div>
+                        </div>
+                        <div class="bm-collector-toggle" role="radiogroup" aria-labelledby="bmCollectorTitle">
                             <label class="bm-collector-opt">
-                                <input type="radio" name="collector_type" value="faculty" checked> Faculty (me)
+                                <input type="radio" name="collector_type" value="faculty" checked>
+                                <span><strong>Faculty (me)</strong><small>I'll collect the equipment</small></span>
                             </label>
                             <label class="bm-collector-opt">
-                                <input type="radio" name="collector_type" value="student"> Student
+                                <input type="radio" name="collector_type" value="student">
+                                <span><strong>Student</strong><small>A student will collect it</small></span>
                             </label>
                         </div>
                         <div class="bm-collector-student" id="collectorStudentFields" style="display:none;margin-top:10px;">
+                            <label class="form-label" for="bm_collector_name_input">Student name</label>
                             <input type="hidden" name="submitted_by_name" id="bm_collector_name" value="">
-                            <input type="text" class="form-control-custom" id="bm_collector_name_input"
+                            <input type="text" class="form-input" id="bm_collector_name_input"
                                 placeholder="Last name, First name (e.g. Dela Cruz, Juan)" autocomplete="off"
                                 style="width:100%;">
                             <p class="bm-hint">The student will show the Claim QR to collect.</p>
                         </div>
-                    </div>
+                    </section>
                     <div class="bm-actions">
                         <button type="button" class="btn-cancel-acc" data-action="close-borrow-modal">Cancel</button>
                         <button type="submit" class="btn-save-acc">
@@ -68,7 +77,6 @@
                 </span>
                 <div class="bm-heading">
                     <h3 id="cartCheckoutTitle">Borrow Multiple Items</h3>
-                    <p class="bm-sub">All selected items will be borrowed today.</p>
                 </div>
                 <button class="modal-close-btn" data-action="cart-checkout-close" aria-label="Close">
                     <span class="material-symbols-outlined">close</span>
@@ -80,22 +88,26 @@
                     <span class="form-label">Items to borrow</span>
                     <div id="cartCheckoutList" class="eq-cart-checkout-list"></div>
                 </div>
-                <!-- Start/end time: tells the room picker which slot to check availability for -->
                 <div class="form-group">
-                    <span class="form-label">Borrow time <span style="color:var(--color-error)">*</span></span>
-                    <div style="display:flex;gap:.75rem;align-items:center;">
-                        <div style="flex:1;">
-                            <label style="font-size:.78rem;color:#666;display:block;margin-bottom:3px;">Start</label>
-                            <input type="time" id="cartStartTime" class="form-control-custom"
-                                style="width:100%;" required>
-                        </div>
-                        <span style="color:#888;margin-top:18px;">→</span>
-                        <div style="flex:1;">
-                            <label style="font-size:.78rem;color:#666;display:block;margin-bottom:3px;">End</label>
-                            <input type="time" id="cartEndTime" class="form-control-custom"
-                                style="width:100%;" required>
-                        </div>
-                    </div>
+                    <label class="form-label" for="cartBorrowDate">Borrow date <span style="color:var(--color-error)">*</span>
+                        <span class="material-symbols-outlined bm-mode-info" id="cartTodayInfo" title="" aria-label="" tabindex="0" hidden>error</span>
+                    </label>
+                    <select id="cartBorrowDate" class="form-control-custom" style="width:100%;" required></select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="cartStartTime">Start time <span style="color:var(--color-error)">*</span></label>
+                    <select id="cartStartTime" class="form-control-custom" style="width:100%;" required>
+                        <option value="" selected disabled>Choose an hourly start time</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="cartDuration">Duration <span style="color:var(--color-error)">*</span></label>
+                    <select id="cartDuration" class="form-control-custom" style="width:100%;" required>
+                        <option value="1" selected>1 hour</option>
+                        <option value="2">2 hours</option>
+                        <option value="3">3 hours</option>
+                        <option value="6">6 hours</option>
+                    </select>
                     <p class="bm-hint" id="cartTimeHint"></p>
                 </div>
                 <!-- Room picker — label comes from renderRoomPicker itself ("Room") -->
@@ -129,4 +141,3 @@
             </div>
         </div>
     </div><!-- /cartCheckoutModal -->
-

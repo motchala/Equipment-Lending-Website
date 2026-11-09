@@ -15,31 +15,42 @@ $student_name  = trim($body['student_name']    ?? '');
 $student_id    = trim($body['student_id']      ?? '');
 $equipment     = trim($body['equipment_name']  ?? '');
 $quantity      = max(1, (int)($body['quantity'] ?? 1));
-$room          = trim($body['room']            ?? '');
+$room_id       = intval($body['room_id']       ?? 0);
+$booking_mode  = trim($body['booking_mode']    ?? '');
 $borrow_date   = trim($body['borrow_date']     ?? '');
-$return_date   = trim($body['return_date']     ?? '');
+$start_time    = trim($body['start_time']      ?? '');
+$duration      = (int)($body['duration']       ?? 0);
 
 if (
-    !$code_db_id || !$faculty_id || !$student_name || !$student_id ||
-    !$equipment || !$room || !$borrow_date || !$return_date
+    !$code_db_id || !$faculty_id || !$student_name ||
+    !$equipment || $room_id <= 0 || !$booking_mode || !$borrow_date || !$start_time || !$duration
 ) {
     echo json_encode(['error' => 'All fields are required.']);
     exit();
 }
 
-$today = date('Y-m-d');
-if ($borrow_date < $today) {
-    echo json_encode(['error' => 'Borrow date cannot be in the past.']);
-    exit();
-}
-if ($return_date <= $borrow_date) {
-    echo json_encode(['error' => 'Return date must be after the borrow date.']);
-    exit();
-}
-
 require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../../shared/core/student-room-options.php';
+require_once __DIR__ . '/../core/booking-schedule.php';
 
 $conn = getDB();
+$conn->set_charset('utf8mb4');
+BookingSchedule::ensureSchema($conn);
+try {
+    $selected_room = student_room_find($conn, $room_id);
+} catch (RuntimeException $e) {
+    error_log('[submit-student-borrow] ' . $e->getMessage());
+    $conn->close();
+    http_response_code(500);
+    echo json_encode(['error' => 'Could not verify the selected room. Please try again.']);
+    exit();
+}
+if (!$selected_room) {
+    $conn->close();
+    echo json_encode(['error' => 'That room is no longer available. Please choose another room.']);
+    exit();
+}
+$room = $selected_room['room_name'];
 
 // ── Re-verify code is still unused (race-condition guard) ─────────────────
 $chk = $conn->prepare("SELECT id FROM tbl_faculty_codes WHERE id = ? AND is_used = 0 LIMIT 1");
@@ -54,20 +65,35 @@ if ($chk->num_rows === 0) {
 }
 $chk->close();
 
-// ── Check equipment is still in stock ────────────────────────────────────
-$stock = $conn->prepare(
-    "SELECT quantity FROM tbl_inventory WHERE item_name = ? AND is_archived = 0 LIMIT 1"
-);
-$stock->bind_param('s', $equipment);
-$stock->execute();
-$stock_row = $stock->get_result()->fetch_assoc();
-$stock->close();
-
-if (!$stock_row || $stock_row['quantity'] < $quantity) {
+// ── Validate the selected borrowing window and inventory ────────────────
+$schedule = BookingSchedule::parse($conn, [
+    'booking_mode' => $booking_mode,
+    'borrow_date' => $borrow_date,
+    'start_time' => $start_time,
+    'duration' => $duration,
+], $equipment, $quantity);
+if (!$schedule['ok']) {
     $conn->close();
-    echo json_encode(['error' => 'Sorry, ' . htmlspecialchars($equipment) . ' only has ' . (int)($stock_row['quantity'] ?? 0) . ' unit(s) available.']);
+    echo json_encode(['error' => $schedule['error']]);
     exit();
 }
+$booking = $schedule['data'];
+if (BookingSchedule::freeUnits($conn, $equipment, $booking['start_ts'], $booking['end_ts']) < $quantity) {
+    $conn->close();
+    echo json_encode(['error' => 'That equipment is already booked for the selected time. Please choose another time.']);
+    exit();
+}
+$roomConflict = BookingSchedule::roomConflictMessage($conn, $room_id, $booking['start_ts'], $booking['end_ts'], $faculty_id);
+if ($roomConflict) {
+    $conn->close();
+    echo json_encode(['error' => $roomConflict]);
+    exit();
+}
+$borrow_date = $booking['borrow_date'];
+$return_date = $booking['return_date'];
+$borrow_time = $booking['borrow_time'];
+$return_time = $booking['return_time'];
+$booking_mode = $booking['mode'];
 
 // borrow_qty must exist: stock is decremented by $quantity below, and a return restores
 // stock from borrow_qty — so it has to hold the real quantity (same as submit-item-borrow.php).
@@ -77,7 +103,7 @@ BookingSchedule::ensureSchema($conn);
 // ── Optional request letter: recommended for a LATER borrow date, ignored for a same-day one ──
 require_once __DIR__ . '/../../shared/core/document-helpers.php';
 $letter_path = null;
-if ($borrow_date > $today && $is_multipart && isset($_FILES['document'])) {
+if ($booking_mode === 'future' && $is_multipart && isset($_FILES['document'])) {
     $letter_err  = null;
     $letter_path = ps_store_request_letter($_FILES['document'], 'uploads/request_letters', $student_id, $letter_err);
     if ($letter_path === null && $letter_err !== null) {
@@ -92,21 +118,26 @@ if ($borrow_date > $today && $is_multipart && isset($_FILES['document'])) {
 // or admin-override.php), not at insert time.
 $ins = $conn->prepare(
     "INSERT INTO tbl_requests
-        (faculty_name, faculty_id, equipment_name, instructor, room,
-         borrow_date, return_date, borrow_qty, status, request_date,
-         submitted_by_name, submitted_by_id, submitted_as)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Waiting', NOW(), ?, ?, 'student')"
+        (faculty_name, faculty_id, equipment_name, instructor, room, room_id,
+            borrow_date, return_date, borrow_time, return_time, borrow_qty, booking_mode,
+            stock_applied, status, request_date,
+            submitted_by_name, submitted_by_id, submitted_as)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'Waiting', NOW(), ?, ?, 'student')"
 );
 $ins->bind_param(
-    'sssssssisss',
+    'sssssissssisss',
     $faculty_name,
     $faculty_id,
     $equipment,
     $faculty_name,
     $room,
+    $room_id,
     $borrow_date,
     $return_date,
+    $borrow_time,
+    $return_time,
     $quantity,
+    $booking_mode,
     $student_name,
     $student_id
 );
@@ -177,7 +208,7 @@ if ($fac_mail_row2 && !empty($fac_mail_row2['email'])) {
                 </tr>
                 <tr>
                     <td style="padding:10px 14px;color:#666;">Student</td>
-                    <td style="padding:10px 14px;color:#222;font-weight:700;">' . htmlspecialchars($student_name) . ' &nbsp;·&nbsp; ' . htmlspecialchars($student_id) . '</td>
+                    <td style="padding:10px 14px;color:#222;font-weight:700;">' . htmlspecialchars($student_name) . ($student_id !== '' ? ' &nbsp;·&nbsp; ' . htmlspecialchars($student_id) : '') . '</td>
                 </tr>
                 <tr style="background:#f9f5f5;">
                     <td style="padding:10px 14px;color:#666;">Equipment</td>

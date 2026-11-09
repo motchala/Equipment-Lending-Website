@@ -80,7 +80,7 @@
 ================================================================ -->
         <nav class="sidebar" id="adminSidebar">
 
-            <!-- Brand row: [logo] [PUPSYNC / Admin Portal] ........ [collapse toggle].
+            <!-- Brand row: [logo] [PUPSYNC / role portal] ........ [collapse toggle].
                  On phones the same toggle closes the drawer (see admin-dashboard.js). -->
             <div class="sidebar-brand">
                 <div class="sidebar-logo" aria-hidden="true">
@@ -94,7 +94,7 @@
                 </div>
                 <div class="sidebar-brand-text">
                     <span class="sidebar-title"><strong>PUP</strong><span class="snt-light">SYNC</span></span>
-                    <span class="sidebar-sub">Admin Portal</span>
+                    <span class="sidebar-sub"><?php echo htmlspecialchars((string)($_SESSION['admin_role'] ?? 'Admin'), ENT_QUOTES, 'UTF-8'); ?> Portal</span>
                 </div>
                 <button type="button" class="sidebar-toggle" id="sidebarCollapseBtn"
                     title="Collapse sidebar" aria-label="Collapse sidebar" aria-expanded="true"

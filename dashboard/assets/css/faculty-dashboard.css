@@ -460,6 +460,7 @@ body {
 /* ── Main Canvas ───────────────────────────────────────────── */
 .app-main {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
     padding: 32px 36px;
     background: var(--color-background);
@@ -5639,7 +5640,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    width: 228px;
+    width: 260px;
     height: 40px;
     flex-shrink: 0;
 }
@@ -5664,8 +5665,7 @@ body {
     gap: 7px;
     min-height: 40px;
     padding: 8px 20px;
-    /* Rounded pill in the system maroon, with a gold-tinted edge and a drop shadow */
-    border: 1.5px solid rgba(251, 191, 36, 0.85);
+    border: 1.5px solid transparent;
     border-radius: 999px;
     background: var(--color-primary-container);
     box-shadow: 0 4px 14px rgba(60, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.25);
@@ -5673,7 +5673,7 @@ body {
 }
 
 .sov-profile-actions .sov-btn-outline:hover {
-    border-color: #fbbf24;
+    border-color: transparent;
     background: var(--color-primary-container);
     filter: brightness(1.12);
     box-shadow: 0 6px 18px rgba(60, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.25);
@@ -5681,7 +5681,7 @@ body {
 }
 
 .sov-profile-actions .sov-btn-outline:focus-visible {
-    outline: 2px solid #fbbf24;
+    outline: 2px solid #fff;
     outline-offset: 2px;
 }
 
@@ -5691,6 +5691,7 @@ body {
     left: 0;
     min-height: 40px;
     padding: 8px 14px;
+    border-radius: 999px;
     background: #570000;
     box-shadow: 0 2px 8px rgba(87, 0, 0, 0.24);
 }
@@ -10112,6 +10113,84 @@ html body #panel-lending .catalog-search-wrap input {
     gap: 12px;
 }
 
+#borrowModal .bm-collector-panel {
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid var(--color-outline-variant);
+    border-radius: 14px;
+    background: var(--color-surface-container);
+}
+
+#borrowModal .bm-collector-heading {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+#borrowModal .bm-collector-icon {
+    color: var(--color-primary);
+    font-size: 21px;
+}
+
+#borrowModal .bm-collector-caption {
+    margin: 3px 0 0;
+    color: var(--color-on-surface-variant);
+    font-size: 0.75rem;
+}
+
+#borrowModal .bm-collector-toggle {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+#borrowModal .bm-collector-opt {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--color-outline-variant);
+    border-radius: 11px;
+    background: var(--color-surface-lowest);
+    cursor: pointer;
+    transition: border-color var(--transition), background var(--transition);
+}
+
+#borrowModal .bm-collector-opt:has(input:checked) {
+    border-color: var(--color-primary-container);
+    background: color-mix(in srgb, var(--color-primary-container) 8%, var(--color-surface-lowest));
+}
+
+#borrowModal .bm-collector-opt input {
+    flex: 0 0 auto;
+    margin: 0;
+    accent-color: var(--color-primary);
+}
+
+#borrowModal .bm-collector-opt span {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+#borrowModal .bm-collector-opt strong {
+    color: var(--color-on-surface);
+    font-size: 0.8125rem;
+}
+
+#borrowModal .bm-collector-opt small {
+    color: var(--color-on-surface-variant);
+    font-size: 0.7rem;
+    line-height: 1.35;
+}
+
+#borrowModal #collectorStudentFields {
+    padding-top: 10px;
+    border-top: 1px solid var(--color-outline-variant);
+}
+
 [data-theme="dark"] .bm-form input[type="date"],
 [data-theme="high-contrast"] .bm-form input[type="date"] {
     color-scheme: dark;
@@ -10581,6 +10660,12 @@ body .side-nav .side-nav-user .side-nav-user-name {
     background: var(--color-surface-container);
 }
 
+.bm-seg-option {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+}
+
 .bm-seg-btn {
     flex: 1;
     display: flex;
@@ -10603,6 +10688,10 @@ body .side-nav .side-nav-user .side-nav-user-name {
     font-size: 18px;
 }
 
+.bm-seg-btn .bm-mode-info {
+    color: #dc2626;
+}
+
 .bm-seg-btn:hover:not(:disabled):not(.active) {
     color: var(--color-on-surface);
 }
@@ -10621,6 +10710,12 @@ body .side-nav .side-nav-user .side-nav-user-name {
 .bm-seg-btn:disabled {
     opacity: 0.45;
     cursor: not-allowed;
+}
+
+.bm-seg-option:focus-visible {
+    outline: 2px solid var(--accent-gold-deep);
+    outline-offset: 1px;
+    border-radius: 9px;
 }
 
 /* "Out right now" switch row */
@@ -11139,8 +11234,8 @@ body .side-nav .side-nav-user .side-nav-user-name {
     display: none;
 }
 
-/* Equipment + Room reservations: a fixed size, whatever is (or is not) inside.
-   Five rows plus all four group labels (the most a page can hold) fit without scrolling. */
+/* Equipment + Room reservations: the card pager limits each card to five rows,
+   so let the page own vertical scrolling instead of trapping it inside the card. */
 #panel-activity .fact-live {
     display: flex;
     flex-direction: column;
@@ -11156,10 +11251,8 @@ body .side-nav .side-nav-user .side-nav-user-name {
 #panel-activity .fact-live .fact-card-body {
     flex: none;
     box-sizing: border-box;
-    height: var(--fact-body-h, 684px);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    scrollbar-width: thin;
+    height: auto;
+    overflow: visible;
 }
 
 #panel-activity .fact-live .fact-card-foot {
