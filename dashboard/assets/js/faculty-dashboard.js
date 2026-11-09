@@ -443,13 +443,17 @@
 
     function getMatchingEquipment() {
         const searchEl = document.getElementById('equipmentSearch');
-        const catEl = document.getElementById('categoryFilter');
-        const search = (searchEl ? searchEl.value : '').toLowerCase();
+        const catEl    = document.getElementById('categoryFilter');
+        const search   = (searchEl ? searchEl.value : '').toLowerCase();
         const category = (catEl ? catEl.value : '').toLowerCase();
+        const activeCampusBtn = document.querySelector('.eq-campus-tab.active');
+        const campus = activeCampusBtn ? (activeCampusBtn.dataset.campus || '') : '';
+
         return Array.from(document.querySelectorAll('.item-node')).filter(item => {
-            const nameMatch = (item.dataset.name || '').includes(search);
-            const catMatch = !category || item.dataset.category === category;
-            return nameMatch && catMatch;
+            const nameMatch   = (item.dataset.name || '').includes(search);
+            const catMatch    = !category || item.dataset.category === category;
+            const campusMatch = !campus   || String(item.dataset.campus) === campus;
+            return nameMatch && catMatch && campusMatch;
         });
     }
 
@@ -461,17 +465,39 @@
         if (eqCurrentPage < 1) eqCurrentPage = 1;
 
         // Hide everything, then reveal only this page's slice
-        document.querySelectorAll('.item-node').forEach(el => { el.style.display = 'none'; });
-        const start = (eqCurrentPage - 1) * EQ_PER_PAGE;
-        matches.slice(start, start + EQ_PER_PAGE).forEach(el => { el.style.display = ''; });
+        var grid = document.getElementById('equipmentList');
+        document.querySelectorAll('.item-node').forEach(function (el) { el.style.display = 'none'; });
+        // Force reflow so the browser paints the hidden state before revealing matches
+        if (grid) void grid.offsetHeight;
+        var start = (eqCurrentPage - 1) * EQ_PER_PAGE;
+        matches.slice(start, start + EQ_PER_PAGE).forEach(function (el) { el.style.display = ''; });
 
         // Count chip reflects the filtered total, not the page size
         const chip = document.getElementById('equipCountChip');
         if (chip) chip.textContent = total + (total === 1 ? ' item' : ' items');
 
-        // Empty state
+        // Empty state — message depends on context
         const noRes = document.getElementById('equipNoResults');
-        if (noRes) noRes.style.display = total === 0 ? '' : 'none';
+        if (noRes) {
+            noRes.style.display = total === 0 ? '' : 'none';
+            if (total === 0) {
+                const activeCampusTabBtn = document.querySelector('.eq-campus-tab.active');
+                const activeCampus = activeCampusTabBtn ? (activeCampusTabBtn.dataset.campus || '') : '';
+                const searchEl2 = document.getElementById('equipmentSearch');
+                const catEl2    = document.getElementById('categoryFilter');
+                const hasSearch = searchEl2 && searchEl2.value.trim() !== '';
+                const hasCat    = catEl2 && catEl2.value !== '';
+                const msgEl  = document.getElementById('equipNoResultsMsg');
+                const iconEl = document.getElementById('equipNoResultsIcon');
+                if (activeCampus && !hasSearch && !hasCat) {
+                    if (msgEl)  msgEl.textContent  = 'No equipment available in this campus yet.';
+                    if (iconEl) iconEl.textContent = 'location_off';
+                } else {
+                    if (msgEl)  msgEl.textContent  = 'No equipment matches your search.';
+                    if (iconEl) iconEl.textContent = 'search_off';
+                }
+            }
+        }
 
         // Pagination bar — hidden when everything fits on one page
         const pager = document.getElementById('equipPagination');
@@ -3357,6 +3383,56 @@
     document.querySelectorAll('.notif-tab').forEach(btn => {
         btn.addEventListener('click', function () {
             filterNotifs(this.dataset.notifFilter);
+        });
+    });
+
+    /* ── Equipment campus tabs ────────────────────────────────────────── */
+    document.querySelectorAll('.eq-campus-tab').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            document.querySelectorAll('.eq-campus-tab').forEach(function (b) {
+                b.classList.remove('active');
+                b.setAttribute('aria-selected', 'false');
+            });
+            btn.classList.add('active');
+            btn.setAttribute('aria-selected', 'true');
+
+            // Narrow the category dropdown to only show this campus's options
+            const campus = btn.dataset.campus || '';
+
+            // Hide featured cards that don't belong to the selected campus
+            var featHero = document.querySelector('.feat-hero[data-campus]');
+            var featSec  = document.querySelector('.feat-secondary[data-campus]');
+            var featSection = document.getElementById('featuredSection');
+            if (featSection) {
+                featSection.style.display = '';
+                if (featHero) featHero.style.display = '';
+                if (featSec)  featSec.style.display  = '';
+
+                if (!campus) {
+                    featSection.classList.remove('eq-campus-hidden');
+                    if (featHero) featHero.classList.remove('eq-campus-hidden');
+                    if (featSec)  featSec.classList.remove('eq-campus-hidden');
+                } else {
+                    var heroMatch = featHero && String(featHero.dataset.campus) === campus;
+                    var secMatch  = featSec  && String(featSec.dataset.campus)  === campus;
+                    if (featHero) featHero.classList.toggle('eq-campus-hidden', !heroMatch);
+                    if (featSec)  featSec.classList.toggle('eq-campus-hidden', !secMatch);
+                    featSection.classList.toggle('eq-campus-hidden', !heroMatch && !secMatch);
+                }
+            }
+
+            const catEl  = document.getElementById('categoryFilter');
+            if (catEl) {
+                catEl.value = ''; // reset selection when switching campus
+                Array.from(catEl.options).forEach(function (opt) {
+                    if (!opt.value) { opt.hidden = false; return; } // "All Categories"
+                    opt.hidden = campus !== '' && String(opt.dataset.campusId || '') !== campus;
+                });
+                Array.from(catEl.querySelectorAll('optgroup')).forEach(function (grp) {
+                    grp.hidden = campus !== '' && String(grp.dataset.campusId || '') !== campus;
+                });
+            }
+            filterEquipment();
         });
     });
 
@@ -6564,13 +6640,63 @@
         }
     });
 
+    // ── Cart time → room picker wiring ──────────────────────────────
+    // When start/end time changes, call RoomPicker.setWindow() so the room
+    // picker knows which slot to check availability for.
+    document.addEventListener('change', function(e) {
+        var t = e.target;
+        if (t.id !== 'cartStartTime' && t.id !== 'cartEndTime') return;
+        cartUpdateRoomWindow();
+    });
+
+    function cartUpdateRoomWindow() {
+        var modal   = document.getElementById('cartCheckoutModal');
+        var startEl = document.getElementById('cartStartTime');
+        var endEl   = document.getElementById('cartEndTime');
+        var hintEl  = document.getElementById('cartTimeHint');
+        if (!modal || !startEl || !endEl || !window.RoomPicker) return;
+
+        var start = startEl.value;  // HH:MM
+        var end   = endEl.value;    // HH:MM
+
+        if (!start || !end) { window.RoomPicker.setWindow(modal, null); return; }
+
+        // Parse to minutes for comparison and duration calculation
+        var sParts = start.split(':'); var eParts = end.split(':');
+        var sMin   = parseInt(sParts[0], 10) * 60 + parseInt(sParts[1], 10);
+        var eMin   = parseInt(eParts[0], 10) * 60 + parseInt(eParts[1], 10);
+
+        if (eMin <= sMin) {
+            if (hintEl) { hintEl.textContent = 'End time must be after start time.'; hintEl.style.color = '#dc2626'; }
+            window.RoomPicker.setWindow(modal, null);
+            return;
+        }
+        if (hintEl) { hintEl.textContent = ''; hintEl.style.color = ''; }
+
+        // Duration in hours (what check-booking-availability.php expects)
+        var durationHours = (eMin - sMin) / 60;
+
+        var today   = new Date();
+        var pad     = function(n) { return String(n).padStart(2, '0'); };
+        var dateStr = today.getFullYear() + '-' + pad(today.getMonth() + 1) + '-' + pad(today.getDate());
+
+        // check-booking-availability.php expects: mode, date, time, duration, items, rooms
+        var query = 'mode=today'
+            + '&date=' + encodeURIComponent(dateStr)
+            + '&time=' + encodeURIComponent(start)
+            + '&duration=' + durationHours
+            + '&items=%5B%5D'
+            + '&rooms=1';
+        var label = 'Today · ' + start + ' → ' + end;
+        window.RoomPicker.setWindow(modal, query, label);
+    }
+
     // ── Checkout modal ──────────────────────────────────────────────
     function openCartCheckout() {
         if (cartCount() === 0) return;
         var modal = document.getElementById('cartCheckoutModal');
         var list  = document.getElementById('cartCheckoutList');
         var err   = document.getElementById('cartCheckoutError');
-        var room  = document.getElementById('cartRoom');
         if (!modal || !list) return;
 
         // Build item rows with quantity input per item
@@ -6591,8 +6717,25 @@
             list.appendChild(row);
         });
 
-        if (err)  { err.style.display = 'none'; err.textContent = ''; }
-        if (room) room.value = '';
+        if (err) { err.style.display = 'none'; err.textContent = ''; }
+
+        // Pre-fill start = now rounded to next 5 min, end = start + 1 hour
+        var now   = new Date();
+        var pad   = function(n) { return String(n).padStart(2, '0'); };
+        var sMin  = now.getHours() * 60 + now.getMinutes();
+        sMin      = Math.ceil((sMin + 1) / 5) * 5;   // round up to next 5 min
+        var eMin  = sMin + 60;
+        var startEl = document.getElementById('cartStartTime');
+        var endEl   = document.getElementById('cartEndTime');
+        var hintEl  = document.getElementById('cartTimeHint');
+        if (startEl) startEl.value = pad(Math.floor(sMin / 60) % 24) + ':' + pad(sMin % 60);
+        if (endEl)   endEl.value   = pad(Math.floor(eMin / 60) % 24) + ':' + pad(eMin % 60);
+        if (hintEl)  hintEl.textContent = '';
+
+        // Reset room picker then set the pre-filled window
+        if (window.RoomPicker) window.RoomPicker.reset(modal);
+        cartUpdateRoomWindow();
+
         modal.style.display = 'flex';
     }
 
@@ -6609,14 +6752,30 @@
         if (!e.target.closest('#cartCheckoutSubmit')) return;
 
         if (_submitting) return;
-        var room = (document.getElementById('cartRoom') ? document.getElementById('cartRoom').value : '').trim();
+        var cartModal   = document.getElementById('cartCheckoutModal');
+        var roomIdInput = cartModal ? cartModal.querySelector('[data-bm-room-input]') : null;
+        var roomValEl   = cartModal ? cartModal.querySelector('[data-bm-room-value]') : null;
+        var roomId      = roomIdInput ? roomIdInput.value.trim() : '';
+        var room        = roomValEl ? (roomValEl.textContent || '').trim() : '';
+        if (room === 'Choose a room') room = '';
+        var startTime   = (document.getElementById('cartStartTime') || {}).value || '';
+        var endTime     = (document.getElementById('cartEndTime')   || {}).value || '';
         var err  = document.getElementById('cartCheckoutError');
 
-        if (!room) {
+        if (!startTime || !endTime) {
+            if (err) { err.textContent = 'Please set a start and end time.'; err.style.display = ''; }
+            return;
+        }
+        if (endTime <= startTime) {
+            if (err) { err.textContent = 'End time must be after start time.'; err.style.display = ''; }
+            return;
+        }
+        if (!room || !roomId) {
             if (err) {
-                err.textContent = 'Room / Location is required.';
+                err.textContent = 'Please choose a room before submitting.';
                 err.style.display = '';
-                document.getElementById('cartRoom').focus();
+                var trigger = cartModal ? cartModal.querySelector('[data-bm-room-trigger]') : null;
+                if (trigger) trigger.focus();
             }
             return;
         }
@@ -6644,9 +6803,13 @@
         var itemsPayload = Object.values(_cart).map(function (it) {
             return { name: it.name, qty: it.qty };
         });
-        var now = new Date();
-        var timeSlot = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
-        var roomIdEl = document.getElementById('cartRoomId');
+        var timeSlot = startTime;  // start time chosen by faculty
+        var roomIdEl = roomIdInput; // already read above
+        // Duration in hours from start to end time
+        var sParts2 = startTime.split(':'); var eParts2 = endTime.split(':');
+        var cartDurationHours = ((parseInt(eParts2[0], 10) * 60 + parseInt(eParts2[1], 10))
+            - (parseInt(sParts2[0], 10) * 60 + parseInt(sParts2[1], 10))) / 60;
+        if (cartDurationHours <= 0) cartDurationHours = 1;
 
         fetch('equipment-booking/api/submit-cart-borrow.php', {
             method: 'POST',
@@ -6654,9 +6817,10 @@
             body: JSON.stringify({
                 csrf_token:          csrf,
                 room:                room,
+                room_id:             roomId,
                 items:               itemsPayload,
                 time_slot:           timeSlot,
-                duration:            1,
+                duration:            cartDurationHours,
                 collector_type:      cartCollectorType,
                 collector_name:      cartCollectorName,
             }),

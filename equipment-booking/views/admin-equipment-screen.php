@@ -195,15 +195,43 @@
                                         </div>
 
                                         <div class="form-group">
+                                            <label for="inv-campus">Campus <span class="req-star">*</span></label>
+                                            <select id="inv-campus" name="campus_id"
+                                                class="form-control-custom" required>
+                                                <?php
+                                                $campuses_q = $conn->query("SELECT campus_id, campus_name FROM tbl_campuses ORDER BY campus_id ASC");
+                                                while ($campuses_q && ($cr = $campuses_q->fetch_assoc())):
+                                                    $sel = ($edit_item && (int)($edit_item['campus_id'] ?? 1) === (int)$cr['campus_id']) ? 'selected' : '';
+                                                ?>
+                                                    <option value="<?php echo (int)$cr['campus_id']; ?>" <?php echo $sel; ?>><?php echo htmlspecialchars($cr['campus_name']); ?></option>
+                                                <?php endwhile; ?>
+                                            </select>
+                                        </div>
+
+                                        <div class="form-group">
                                             <label for="inv-category">Category <span class="req-star">*</span></label>
                                             <select id="inv-category" name="category"
                                                 class="form-control-custom inv-category-select" required>
                                                 <option value="">Select category...</option>
                                                 <?php
-                                                $cats = ['Audio/Visual', 'Cables & Connectors', 'Computing', 'Lab Equipment', 'Networking', 'Power', 'Tools', 'Others'];
-                                                foreach ($cats as $c) {
-                                                    $sel = ($edit_item && $edit_item['category'] === $c) ? 'selected' : '';
-                                                    echo '<option value="' . htmlspecialchars($c) . '" ' . $sel . '>' . htmlspecialchars($c) . '</option>';
+                                                // Categories loaded from tbl_equipment_categories, grouped by campus.
+                                                // Super Admin manages this list in Settings → Equipment Categories.
+                                                $cats_q = $conn->query(
+                                                    "SELECT ec.category_id, ec.campus_id, ec.name
+                                                       FROM tbl_equipment_categories ec
+                                                      ORDER BY ec.campus_id ASC, ec.sort_order ASC, ec.name ASC"
+                                                );
+                                                $cats_by_campus = [];
+                                                while ($cats_q && ($cr2 = $cats_q->fetch_assoc())) {
+                                                    $cats_by_campus[(int)$cr2['campus_id']][] = $cr2['name'];
+                                                }
+                                                foreach ($cats_by_campus as $cid => $cats) {
+                                                    echo '<optgroup label="" data-campus-id="' . $cid . '">';
+                                                    foreach ($cats as $c) {
+                                                        $sel = ($edit_item && $edit_item['category'] === $c) ? 'selected' : '';
+                                                        echo '<option value="' . htmlspecialchars($c) . '" data-campus-id="' . $cid . '" ' . $sel . '>' . htmlspecialchars($c) . '</option>';
+                                                    }
+                                                    echo '</optgroup>';
                                                 }
                                                 ?>
                                             </select>

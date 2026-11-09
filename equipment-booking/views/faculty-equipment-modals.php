@@ -42,7 +42,7 @@
                         <div class="bm-collector-student" id="collectorStudentFields" style="display:none;margin-top:10px;">
                             <input type="hidden" name="submitted_by_name" id="bm_collector_name" value="">
                             <input type="text" class="form-control-custom" id="bm_collector_name_input"
-                                placeholder="Student full name" autocomplete="off"
+                                placeholder="Last name, First name (e.g. Dela Cruz, Juan)" autocomplete="off"
                                 style="width:100%;">
                             <p class="bm-hint">The student will show the Claim QR to collect.</p>
                         </div>
@@ -80,16 +80,26 @@
                     <span class="form-label">Items to borrow</span>
                     <div id="cartCheckoutList" class="eq-cart-checkout-list"></div>
                 </div>
-                <!-- Shared room field -->
-                <input type="hidden" id="cartRoomId" value="">
+                <!-- Start/end time: tells the room picker which slot to check availability for -->
                 <div class="form-group">
-                    <label class="form-label" for="cartRoom">
-                        Room / Location <span style="color:var(--color-error)">*</span>
-                    </label>
-                    <input type="text" id="cartRoom" class="form-control-custom"
-                        placeholder="e.g. B-205"
-                        autocomplete="off">
+                    <span class="form-label">Borrow time <span style="color:var(--color-error)">*</span></span>
+                    <div style="display:flex;gap:.75rem;align-items:center;">
+                        <div style="flex:1;">
+                            <label style="font-size:.78rem;color:#666;display:block;margin-bottom:3px;">Start</label>
+                            <input type="time" id="cartStartTime" class="form-control-custom"
+                                style="width:100%;" required>
+                        </div>
+                        <span style="color:#888;margin-top:18px;">→</span>
+                        <div style="flex:1;">
+                            <label style="font-size:.78rem;color:#666;display:block;margin-bottom:3px;">End</label>
+                            <input type="time" id="cartEndTime" class="form-control-custom"
+                                style="width:100%;" required>
+                        </div>
+                    </div>
+                    <p class="bm-hint" id="cartTimeHint"></p>
                 </div>
+                <!-- Room picker — label comes from renderRoomPicker itself ("Room") -->
+                <?= BookingSchedule::renderRoomPicker('cartRoom') ?>
                 <!-- Who will collect -->
                 <div class="form-group">
                     <span class="form-label">Who will collect the equipment?</span>
@@ -103,7 +113,7 @@
                     </div>
                     <div id="cartCollectorStudentFields" style="display:none;margin-top:10px;">
                         <input type="text" class="form-control-custom" id="cartCollectorName"
-                            placeholder="Student full name" autocomplete="off"
+                            placeholder="Last name, First name (e.g. Dela Cruz, Juan)" autocomplete="off"
                             style="width:100%;">
                         <p class="bm-hint">The student will show the Claim QR to collect.</p>
                     </div>

@@ -142,38 +142,11 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name'])) {
         }
     }
 
-    // ── Same day: the system decides now ──────────────────────────────────
-    if ($is_today) {
-        require_once __DIR__ . '/arbitration-engine.php';
-        ArbitrationEngine::process($conn, $new_request_id);
-        $declined_reason = ArbitrationEngine::discardIfDeclined($conn, $new_request_id);
-        if ($declined_reason !== null) {
-            bm_fail($declined_reason);   // a declined request is never kept; tell the faculty why
-        }
-        $st = $conn->prepare('SELECT status FROM tbl_requests WHERE id = ? LIMIT 1');
-        $final_status = '';
-        if ($st) {
-            $st->bind_param('i', $new_request_id);
-            $st->execute();
-            $final_status = (string)(($st->get_result()->fetch_assoc())['status'] ?? '');
-            $st->close();
-        }
-        if ($final_status === 'Approved') {
-            // Same as an admin approval: the faculty needs their Claim / Return QR tokens.
-            $return_token = bin2hex(random_bytes(32));
-            $claim_token  = bin2hex(random_bytes(32));
-            $tok = $conn->prepare('UPDATE tbl_requests SET return_token = ?, claim_token = ?, bundle_claim_token = NULL WHERE id = ? AND claim_token IS NULL');
-            if ($tok) {
-                $tok->bind_param('ssi', $return_token, $claim_token, $new_request_id);
-                $tok->execute();
-                $tok->close();
-            }
-        }
-        header('Location: faculty-dashboard.php?success=' . ($final_status === 'Approved' ? 'approved' : '1'));
-        exit();
-    }
-
-    // ── Later date: stays Waiting — an admin reviews and approves ─────────
+    // ── All requests (same-day and future) now stay Waiting ───────────────
+    // The arbitration engine is no longer called at submit time.
+    // The auto-approve tick (equipment-booking/core/auto-approve-tick.php)
+    // will flip them to Approved after the configured buffer time expires,
+    // or an admin can approve/decline manually at any time.
     header("Location: faculty-dashboard.php?success=1");
     exit();
 }

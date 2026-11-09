@@ -41,6 +41,10 @@ const VALID_CONFIG_KEYS = [
     'rule_overdue_block_enabled',
     'rule_duplicate_block_enabled',
     'rule_missing_doc_block_enabled',
+    'max_borrow_days',
+    'max_items_per_borrower',
+    'low_stock_threshold',
+    'auto_approve_timeout_minutes',
 ];
 
 // ── Parse POST payload ────────────────────────────────────────────────────────

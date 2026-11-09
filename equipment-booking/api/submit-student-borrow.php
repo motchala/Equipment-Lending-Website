@@ -87,20 +87,18 @@ if ($borrow_date > $today && $is_multipart && isset($_FILES['document'])) {
     }
 }
 
-// ── Generate return token + claim token ───────────────────────────────────
-$return_token = bin2hex(random_bytes(32));
-$claim_token  = bin2hex(random_bytes(32));
-
-// ── Insert as Approved (faculty code is the authorization) ────────────────
+// ── Insert as Waiting — the auto-approve tick will approve after buffer expires ──
+// Tokens and inventory decrement happen at approval time (auto-approve-tick.php
+// or admin-override.php), not at insert time.
 $ins = $conn->prepare(
     "INSERT INTO tbl_requests
         (faculty_name, faculty_id, equipment_name, instructor, room,
          borrow_date, return_date, borrow_qty, status, request_date,
-         return_token, claim_token, submitted_by_name, submitted_by_id, submitted_as)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Approved', NOW(), ?, ?, ?, ?, 'student')"
+         submitted_by_name, submitted_by_id, submitted_as)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Waiting', NOW(), ?, ?, 'student')"
 );
 $ins->bind_param(
-    'sssssssissss',
+    'sssssssisss',
     $faculty_name,
     $faculty_id,
     $equipment,
@@ -109,8 +107,6 @@ $ins->bind_param(
     $borrow_date,
     $return_date,
     $quantity,
-    $return_token,
-    $claim_token,
     $student_name,
     $student_id
 );
@@ -135,15 +131,6 @@ if ($letter_path !== null) {
         $doc->close();
     }
 }
-
-// ── Decrement inventory quantity ──────────────────────────────────────────
-$dec = $conn->prepare(
-    "UPDATE tbl_inventory SET quantity = quantity - ?
-      WHERE item_name = ? AND is_archived = 0 AND quantity >= ?"
-);
-$dec->bind_param('isi', $quantity, $equipment, $quantity);
-$dec->execute();
-$dec->close();
 
 // ── Mark code as used — only on the last item of a multi-item submission ──────
 // JS sends is_last_item=true on the final request. For intermediate items the
@@ -227,4 +214,9 @@ if ($fac_mail_row2 && !empty($fac_mail_row2['email'])) {
 
 $conn->close();
 
-echo json_encode(['success' => true, 'request_id' => $request_id, 'return_token' => $return_token, 'claim_token' => $claim_token]);
+echo json_encode([
+    'success'      => true,
+    'request_id'   => $request_id,
+    'return_token' => null,
+    'claim_token'  => null,
+]);

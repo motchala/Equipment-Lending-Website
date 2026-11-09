@@ -136,8 +136,9 @@ if (isset($_POST['add_item'])) {
         }
     }
 
-    $stmt = $conn->prepare("INSERT INTO tbl_inventory (item_name, category, quantity, image_path, `condition`, description) VALUES (?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param("ssisss", $name, $category, $qty, $image_path, $condition, $description);
+    $campus_id = max(1, (int)($_POST['campus_id'] ?? 1));
+    $stmt = $conn->prepare("INSERT INTO tbl_inventory (campus_id, item_name, category, quantity, image_path, `condition`, description) VALUES (?, ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param("ississs", $campus_id, $name, $category, $qty, $image_path, $condition, $description);
 
     if ($stmt->execute()) {
         $stmt->close();
@@ -169,10 +170,11 @@ if (isset($_POST['update_item'])) {
     $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
     $is_ajax = ($_POST['ajax'] ?? '') === '1';
 
-    $item_id = intval($_POST['item_id']);
-    $name = $_POST['item_name'];
-    $category = $_POST['category'];
-    $qty = intval($_POST['quantity']);
+    $item_id   = intval($_POST['item_id']);
+    $name      = $_POST['item_name'];
+    $category  = $_POST['category'];
+    $qty       = intval($_POST['quantity']);
+    $campus_id = max(1, (int)($_POST['campus_id'] ?? 1));
     $condition = in_array($_POST['condition'] ?? '', ['Good', 'Fair', 'For Repair']) ? $_POST['condition'] : 'Good';
 
     // The photo currently on record comes from the database, not from the form's
@@ -246,14 +248,15 @@ if (isset($_POST['update_item'])) {
     try {
         $stmt = $conn->prepare(
             "UPDATE tbl_inventory
-             SET item_name = ?,
-                 category = ?,
-                 quantity = ?,
+             SET campus_id  = ?,
+                 item_name  = ?,
+                 category   = ?,
+                 quantity   = ?,
                  image_path = ?,
                  `condition` = ?
              WHERE item_id = ?"
         );
-        $stmt->bind_param("ssissi", $name, $category, $qty, $image_path, $condition, $item_id);
+        $stmt->bind_param("ississi", $campus_id, $name, $category, $qty, $image_path, $condition, $item_id);
         $stmt->execute();
         $stmt->close();
     } catch (Throwable $e) {

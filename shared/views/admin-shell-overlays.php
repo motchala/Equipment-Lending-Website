@@ -8,18 +8,35 @@
     <div id="qrScannerModal" class="qr-scanner-backdrop">
         <div class="qr-scanner-card">
             <button id="closeQrScanner" class="qr-scanner-close" title="Close scanner">✕</button>
-            <h3>Scan Return QR Code</h3>
-            <p>Point the camera at the faculty member's QR code.</p>
-            <div class="qr-video-wrap">
-                <video id="qrVideo" playsinline autoplay></video>
-                <!-- Scan guide overlay -->
-                <div class="qr-scan-guide">
-                    <div class="qr-scan-guide-box"></div>
+            <h3 id="qrScannerTitle">Scan QR Code</h3>
+            <p id="qrScannerSubtitle">Point camera at a Claim QR or Return QR.</p>
+
+            <!-- Camera view -->
+            <div id="qrCameraView">
+                <div class="qr-video-wrap">
+                    <video id="qrVideo" playsinline autoplay></video>
+                    <div class="qr-scan-guide">
+                        <div class="qr-scan-guide-box"></div>
+                    </div>
+                </div>
+                <p id="qrScanStatus">Initializing camera...</p>
+            </div>
+
+            <!-- Inline checklist (hidden until a checklist QR is scanned) -->
+            <div id="qrChecklistView" style="display:none;">
+                <div id="qrChecklistItems" style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin:1rem 0;max-height:280px;overflow-y:auto;"></div>
+                <p id="qrChecklistHint" style="font-size:.8rem;color:#888;margin-bottom:.75rem;"></p>
+                <div style="display:flex;gap:.5rem;">
+                    <button id="qrChecklistConfirm" type="button"
+                        style="flex:1;background:#600302;color:#fff;border:none;padding:.75rem;border-radius:8px;font-size:.95rem;font-weight:600;cursor:pointer;">
+                        Confirm
+                    </button>
+                    <button id="qrChecklistCancel" type="button"
+                        style="background:#f3f4f6;color:#374151;border:none;padding:.75rem 1.25rem;border-radius:8px;font-size:.95rem;cursor:pointer;">
+                        Back
+                    </button>
                 </div>
             </div>
-            <p id="qrScanStatus">
-                Initializing camera...
-            </p>
         </div>
     </div>
 

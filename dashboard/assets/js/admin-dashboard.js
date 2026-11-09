@@ -4429,7 +4429,7 @@
                 const code = window.jsQR(imageData.data, w, h, { inversionAttempts: 'attemptBoth' });
                 if (code) {
                     scanning = false;
-                    status.textContent = '✅ QR detected — confirming return...';
+                    status.textContent = '✅ QR detected — processing...';
                     status.style.color = '#22c55e';
 
                     // Extract token from the URL in the QR
@@ -4462,17 +4462,239 @@
                     })
                         .then(r => r.json())
                         .then(data => {
-                            if (data.success) {
-                                scannedCount++;
+                            if (data.success && data.checklist) {
+                                // Show inline checklist inside the scanner modal
+                                scanning = false;
+                                const cameraView    = document.getElementById('qrCameraView');
+                                const checklistView = document.getElementById('qrChecklistView');
+                                const itemsEl       = document.getElementById('qrChecklistItems');
+                                const hintEl        = document.getElementById('qrChecklistHint');
+                                const confirmBtn    = document.getElementById('qrChecklistConfirm');
+                                const cancelBtn     = document.getElementById('qrChecklistCancel');
+                                const titleEl       = document.getElementById('qrScannerTitle');
+                                const subtitleEl    = document.getElementById('qrScannerSubtitle');
+
+                                // Switch view
+                                cameraView.style.display    = 'none';
+                                checklistView.style.display = '';
+                                titleEl.textContent    = isClaimQr ? 'Claim Checklist' : 'Return Checklist';
+                                subtitleEl.textContent = isClaimQr
+                                    ? 'Hand over to ' + (data.collector || data.borrower)
+                                    : 'Return from ' + data.borrower;
+
+                                // Build item rows
+                                itemsEl.innerHTML = '';
+                                const CONDITIONS = ['Good', 'Fair', 'Damaged', 'Missing'];
+                                data.items.forEach(function(item, idx) {
+                                    const bg = idx % 2 === 0 ? '#fff' : '#fafafa';
+                                    const row = document.createElement('div');
+                                    row.style.cssText = 'display:flex;align-items:center;gap:.65rem;padding:.75rem 1rem;background:' + bg + ';border-bottom:1px solid #f0f0f0;';
+                                    if (isClaimQr) {
+                                        // Claim row: qty spinner (how many units actually handed over)
+                                        // + condition for units NOT handed over.
+                                        // Admin sets actual_qty = how many go with faculty.
+                                        // Remainder = borrow_qty - actual_qty stays in cabinet.
+                                        const maxQty = item.borrow_qty;
+                                        const notHandedOpts = ['Good', 'Damaged', 'Missing'].map(c =>
+                                            '<option value="' + c + '">' + c + '</option>'
+                                        ).join('');
+                                        row.innerHTML =
+                                            '<span style="flex:1;"><strong style="display:block;font-size:.9rem;">' + item.equipment_name + '</strong>' +
+                                            '<span style="font-size:.78rem;color:#888;">Requested: ' + maxQty + '</span></span>' +
+                                            '<div style="display:flex;align-items:center;gap:.4rem;flex-shrink:0;">' +
+                                            '<span style="font-size:.78rem;color:#555;white-space:nowrap;">Give:</span>' +
+                                            '<button type="button" data-claim-dec data-req-id="' + item.id + '" ' +
+                                            'style="width:26px;height:26px;border:1px solid #d1d5db;border-radius:6px;background:#f9f9f9;font-size:1rem;cursor:pointer;line-height:1;">−</button>' +
+                                            '<input type="number" data-claim-qty data-req-id="' + item.id + '" data-max-qty="' + maxQty + '" ' +
+                                            'value="' + maxQty + '" min="0" max="' + maxQty + '" ' +
+                                            'style="width:42px;text-align:center;border:1px solid #d1d5db;border-radius:6px;padding:.25rem;font-size:.9rem;">' +
+                                            '<button type="button" data-claim-inc data-req-id="' + item.id + '" ' +
+                                            'style="width:26px;height:26px;border:1px solid #d1d5db;border-radius:6px;background:#f9f9f9;font-size:1rem;cursor:pointer;line-height:1;">+</button>' +
+                                            '</div>' +
+                                            '<select data-claim-cond data-req-id="' + item.id + '" ' +
+                                            'title="Condition of units NOT given" ' +
+                                            'style="padding:.3rem .5rem;border:1px solid #d1d5db;border-radius:6px;font-size:.82rem;background:#fff;cursor:pointer;display:none;" >' +
+                                            notHandedOpts + '</select>';
+                                    } else {
+                                        const opts = CONDITIONS.map(c =>
+                                            '<option value="' + c + '">' + c + '</option>'
+                                        ).join('');
+                                        const itemToken = item.return_token || token;
+                                        // Checkbox: admin ticks only the items being returned RIGHT NOW.
+                                        // Unticked items stay On Loan — their Return QR remains valid.
+                                        row.innerHTML =
+                                            '<input type="checkbox" data-req-id="' + item.id + '" checked ' +
+                                            'style="width:17px;height:17px;accent-color:#800000;flex-shrink:0;cursor:pointer;">' +
+                                            '<span style="flex:1;"><strong style="display:block;font-size:.9rem;">' + item.equipment_name + '</strong>' +
+                                            '<span style="font-size:.78rem;color:#888;">Qty: ' + item.borrow_qty + ' · ' + item.status + '</span></span>' +
+                                            '<select data-req-id="' + item.id + '" data-return-token="' + itemToken + '" ' +
+                                            'style="padding:.35rem .6rem;border:1px solid #d1d5db;border-radius:6px;font-size:.85rem;background:#fff;">' +
+                                            opts + '</select>';
+                                    }
+                                    itemsEl.appendChild(row);
+                                });
+
+                                // Wire qty +/- buttons and condition dropdown visibility
                                 if (isClaimQr) {
-                                    status.textContent = '✅ Claim confirmed!';
-                                    status.style.color = '#22c55e';
-                                    showToast('✅ Equipment claim confirmed — item handed over.');
-                                } else {
-                                    status.textContent = '✅ Return confirmed!';
-                                    status.style.color = '#22c55e';
-                                    showToast('✅ Equipment return confirmed via QR.');
+                                    itemsEl.addEventListener('click', function(e) {
+                                        var dec = e.target.closest('[data-claim-dec]');
+                                        var inc = e.target.closest('[data-claim-inc]');
+                                        var btn = dec || inc;
+                                        if (!btn) return;
+                                        var rid  = btn.dataset.reqId || btn.getAttribute('data-req-id');
+                                        var inp  = itemsEl.querySelector('input[data-claim-qty][data-req-id="' + rid + '"]');
+                                        var cond = itemsEl.querySelector('select[data-claim-cond][data-req-id="' + rid + '"]');
+                                        if (!inp) return;
+                                        var max = parseInt(inp.dataset.maxQty || inp.max, 10);
+                                        var v   = parseInt(inp.value, 10);
+                                        if (dec) v = Math.max(0, v - 1);
+                                        if (inc) v = Math.min(max, v + 1);
+                                        inp.value = v;
+                                        // Show condition dropdown only when some units are withheld
+                                        if (cond) cond.style.display = (v < max) ? '' : 'none';
+                                    });
+                                    itemsEl.addEventListener('change', function(e) {
+                                        var inp = e.target.closest('input[data-claim-qty]');
+                                        if (!inp) return;
+                                        var max  = parseInt(inp.dataset.maxQty || inp.max, 10);
+                                        var v    = Math.max(0, Math.min(max, parseInt(inp.value, 10) || 0));
+                                        inp.value = v;
+                                        var rid  = inp.getAttribute('data-req-id');
+                                        var cond = itemsEl.querySelector('select[data-claim-cond][data-req-id="' + rid + '"]');
+                                        if (cond) cond.style.display = (v < max) ? '' : 'none';
+                                    });
                                 }
+
+                                hintEl.textContent = isClaimQr
+                                    ? 'Set how many units to give. If less than requested, choose why (Damaged/Missing/Good). A reason is required.'
+                                    : 'Tick only items being returned now. Unticked items stay On Loan. "Damaged" or "Missing" flags the record.';
+
+                                // Confirm handler
+                                confirmBtn.onclick = function() {
+                                    confirmBtn.disabled = true;
+                                    confirmBtn.textContent = 'Saving...';
+
+                                    const formData = new FormData();
+                                    formData.append('token', token);
+
+                                    // Get CSRF from the page
+                                    const csrfInput = document.querySelector('input[name="csrf_token"]');
+                                    if (csrfInput) formData.append('csrf_token', csrfInput.value);
+
+                                    if (isClaimQr) {
+                                        // Collect actual qty per item from the spinners
+                                        const claimRows = [];
+                                        itemsEl.querySelectorAll('input[data-claim-qty][data-req-id]').forEach(function(inp) {
+                                            const rid      = inp.getAttribute('data-req-id');
+                                            const maxQty   = parseInt(inp.dataset.maxQty || inp.max, 10);
+                                            const giveQty  = Math.max(0, Math.min(maxQty, parseInt(inp.value, 10) || 0));
+                                            const condSel  = itemsEl.querySelector('select[data-claim-cond][data-req-id="' + rid + '"]');
+                                            const withheld = maxQty - giveQty;
+                                            const cond     = (withheld > 0 && condSel) ? condSel.value : 'Good';
+                                            claimRows.push({ id: rid, give: giveQty, max: maxQty, withheld: withheld, condition: cond });
+                                        });
+
+                        // Reason required only when a GOOD-condition item is being withheld.
+                        // Damaged / Missing are self-explanatory — no reason needed.
+                        const needReason = claimRows.filter(r => r.withheld > 0 && r.condition === 'Good');
+                        if (needReason.length > 0) {
+                            const lines = needReason.map(function(r) {
+                                const inp = itemsEl.querySelector('input[data-claim-qty][data-req-id="' + r.id + '"]');
+                                const nameEl = inp ? inp.closest('div').previousElementSibling.querySelector('strong') : null;
+                                const name = nameEl ? nameEl.textContent : 'Item #' + r.id;
+                                return name + ': giving ' + r.give + ' of ' + r.max;
+                            }).join('\n');
+                            const reason = window.prompt(
+                                'You are withholding a Good-condition item:\n' + lines +
+                                '\n\nReason is required (e.g. "Reserved for another faculty"):',
+                                ''
+                            );
+                            if (reason === null || reason.trim() === '') {
+                                confirmBtn.disabled = false;
+                                confirmBtn.textContent = 'Confirm';
+                                return;
+                            }
+                            needReason.forEach(function(r) {
+                                formData.append('reason[' + r.id + ']', reason.trim());
+                            });
+                        }
+                        // Damaged / Missing withheld items get an automatic reason
+                        claimRows.filter(r => r.withheld > 0 && r.condition !== 'Good').forEach(function(r) {
+                            formData.append('reason[' + r.id + ']', r.condition + ' at handover — item kept in cabinet.');
+                        });
+
+
+                                        claimRows.forEach(function(r) {
+                                            formData.append('give_qty[' + r.id + ']', r.give);
+                                            if (r.withheld > 0) {
+                                                formData.append('withheld_qty[' + r.id + ']', r.withheld);
+                                                formData.append('withheld_cond[' + r.id + ']', r.condition);
+                                            }
+                                        });
+
+                                        fetch('equipment-booking/api/partial-claim.php', {
+                                            method: 'POST', credentials: 'same-origin', body: formData
+                                        }).then(function(r) { return r.json(); })
+                                        .then(function(result) {
+                                            const msg = (result.claimed || 0) + ' item(s) handed over' +
+                                                (result.withheld > 0 ? ', ' + result.withheld + ' unit(s) withheld.' : '.');
+                                            showToast('✅ ' + msg);
+                                            resetToCamera();
+                                            if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
+                                        }).catch(function() {
+                                            showToast('Network error. Please try again.');
+                                            confirmBtn.disabled = false;
+                                            confirmBtn.textContent = 'Confirm';
+                                        });
+                                    } else {
+                                        // Only process items whose checkbox is ticked
+                                        itemsEl.querySelectorAll('input[type="checkbox"]:checked[data-req-id]').forEach(function(cb) {
+                                            const rid = cb.dataset.reqId;
+                                            const sel = itemsEl.querySelector('select[data-req-id="' + rid + '"]');
+                                            if (sel) {
+                                                formData.append('condition[' + rid + ']', sel.value);
+                                                if (sel.dataset.returnToken) {
+                                                    formData.append('item_token[' + rid + ']', sel.dataset.returnToken);
+                                                }
+                                            }
+                                        });
+                                        fetch('equipment-booking/api/partial-return.php', {
+                                            method: 'POST', credentials: 'same-origin', body: formData
+                                        }).then(function(r) { return r.json(); })
+                                        .then(function(result) {
+                                            const n = result.returned || 0;
+                                            showToast('✅ ' + n + ' item' + (n === 1 ? '' : 's') + ' marked as returned.');
+                                            resetToCamera();
+                                            if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
+                                        }).catch(function() {
+                                            showToast('Network error. Please try again.');
+                                            confirmBtn.disabled = false;
+                                            confirmBtn.textContent = 'Confirm';
+                                        });
+                                    }
+                                };
+
+                                // Cancel — go back to camera view
+                                cancelBtn.onclick = resetToCamera;
+
+                                function resetToCamera() {
+                                    confirmBtn.disabled = false;
+                                    confirmBtn.textContent = 'Confirm';
+                                    checklistView.style.display = 'none';
+                                    cameraView.style.display    = '';
+                                    titleEl.textContent    = 'Scan QR Code';
+                                    subtitleEl.textContent = 'Point the camera at the faculty member\'s QR code.';
+                                    status.textContent = 'Point camera at the next QR code.';
+                                    status.style.color = '#888';
+                                    scanning = true;
+                                    tick();
+                                }
+
+                            } else if (data.success) {
+                                scannedCount++;
+                                status.textContent = isClaimQr ? '✅ Claim confirmed!' : '✅ Return confirmed!';
+                                status.style.color = '#22c55e';
+                                showToast(isClaimQr ? '✅ Equipment claim confirmed.' : '✅ Equipment return confirmed via QR.');
                                 setTimeout(() => {
                                     status.textContent = scannedCount > 1
                                         ? `Point camera at the next QR code. (${scannedCount} confirmed this session)`
@@ -6420,4 +6642,326 @@ function psSelectFmt(btn) {
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
     else init();
+
+    /* ── Admin inventory form: filter category options by selected campus ── */
+    (function () {
+        var campusSel   = document.getElementById('inv-campus');
+        var categorySel = document.getElementById('inv-category');
+        if (!campusSel || !categorySel) return;
+
+        function syncCategoryOptions() {
+            var cid = campusSel.value;
+            var firstVisible = null;
+            Array.from(categorySel.querySelectorAll('optgroup')).forEach(function (grp) {
+                var show = !cid || String(grp.dataset.campusId) === cid;
+                grp.hidden = !show;
+                if (show && !firstVisible) firstVisible = grp.querySelector('option');
+            });
+            // If current selection belongs to a hidden group, reset
+            var selected = categorySel.querySelector('option:checked');
+            if (selected && selected.value && selected.dataset.campusId && String(selected.dataset.campusId) !== cid) {
+                categorySel.value = '';
+            }
+        }
+
+        campusSel.addEventListener('change', syncCategoryOptions);
+        syncCategoryOptions(); // run once on page load for the edit form
+    }());
+
+        /* ── Equipment Category Manager (Settings → Equipment tab) ──────────── */
+    (function () {
+        var campusSel = document.getElementById('catMgrCampus');
+        var listEl    = document.getElementById('catMgrList');
+        var input     = document.getElementById('catMgrInput');
+        var addBtn    = document.getElementById('catMgrAdd');
+        var msgEl     = document.getElementById('catMgrMsg');
+        if (!campusSel || !listEl) return;
+
+        var csrfToken = (function () {
+            var m = document.querySelector('meta[name="csrf-token"]');
+            if (m) return m.content;
+            var i = document.querySelector('input[name="csrf_token"]');
+            return i ? i.value : '';
+        }());
+
+        function showMsg(text, isError) {
+            if (!msgEl) return;
+            msgEl.textContent = text;
+            msgEl.style.color = isError ? 'var(--color-error, #c62828)' : 'var(--color-success, #2e7d32)';
+            msgEl.style.display = '';
+            setTimeout(function () { msgEl.style.display = 'none'; }, 4000);
+        }
+
+        function loadCategories() {
+            var campusId = campusSel.value;
+            listEl.innerHTML = '<span style="color:var(--text-light);font-size:.875rem;">Loading…</span>';
+            fetch('equipment-booking/api/manage-categories.php?action=list&campus_id=' + encodeURIComponent(campusId), {
+                credentials: 'same-origin'
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (!data.categories || !data.categories.length) {
+                    listEl.innerHTML = '<span style="color:var(--text-light);font-size:.875rem;">No categories yet. Add one below.</span>';
+                    return;
+                }
+                listEl.innerHTML = '';
+                var ul = document.createElement('ul');
+                ul.style.cssText = 'list-style:none;padding:0;margin:0;display:flex;flex-wrap:wrap;gap:8px;';
+                data.categories.forEach(function (cat) {
+                    var li = document.createElement('li');
+                    li.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:5px 10px 5px 14px;background:var(--color-surface-container,#f5f0f0);border-radius:20px;font-size:.82rem;';
+                    li.innerHTML = '<span>' + cat.name.replace(/&/g,'&').replace(/</g,'<').replace(/>/g,'>') + '</span>'
+                        + '<button type="button" title="Delete this category" data-cat-id="' + cat.category_id + '" style="background:none;border:none;cursor:pointer;padding:0;line-height:1;color:var(--text-light);">'
+                        + '<span class="material-symbols-outlined" style="font-size:15px;">close</span></button>';
+                    ul.appendChild(li);
+                });
+                listEl.appendChild(ul);
+
+                listEl.querySelectorAll('[data-cat-id]').forEach(function (btn) {
+                    btn.addEventListener('click', function () {
+                        if (!confirm('Delete this category? Items already assigned to it are not affected.')) return;
+                        var fd = new FormData();
+                        fd.append('action', 'delete');
+                        fd.append('csrf_token', csrfToken);
+                        fd.append('category_id', btn.dataset.catId);
+                        fetch('equipment-booking/api/manage-categories.php', {
+                            method: 'POST', credentials: 'same-origin', body: fd
+                        })
+                        .then(function (r) { return r.json(); })
+                        .then(function (d) {
+                            if (d.status === 'success') { loadCategories(); showMsg('Deleted.', false); }
+                            else showMsg(d.error || 'Could not delete.', true);
+                        });
+                    });
+                });
+            })
+            .catch(function () { listEl.innerHTML = '<span style="color:var(--color-error,#c62828);font-size:.875rem;">Could not load categories.</span>'; });
+        }
+
+        campusSel.addEventListener('change', loadCategories);
+        loadCategories();
+
+        if (addBtn) {
+            addBtn.addEventListener('click', function () {
+                var name = input ? input.value.trim() : '';
+                if (!name) { showMsg('Enter a category name.', true); return; }
+                var fd = new FormData();
+                fd.append('action', 'add');
+                fd.append('csrf_token', csrfToken);
+                fd.append('campus_id', campusSel.value);
+                fd.append('name', name);
+                fetch('equipment-booking/api/manage-categories.php', {
+                    method: 'POST', credentials: 'same-origin', body: fd
+                })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (d.status === 'success') {
+                        if (input) input.value = '';
+                        loadCategories();
+                        showMsg('Category added.', false);
+                    } else {
+                        showMsg(d.error || 'Could not add.', true);
+                    }
+                });
+            });
+
+            if (input) {
+                input.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter') { e.preventDefault(); addBtn.click(); }
+                });
+            }
+        }
+    }());
+
+    /* ── Google Sheets Sync (Settings → Equipment tab) ──────────────────── */
+    (function () {
+        var urlInput  = document.getElementById('gsheetUrl');
+        var saveBtn   = document.getElementById('gsheetSaveUrl');
+        var syncBtn   = document.getElementById('gsheetSyncNow');
+        var resultEl  = document.getElementById('gsheetSyncResult');
+        var lastSyncEl = document.getElementById('gsheetLastSync');
+        if (!syncBtn) return;
+
+        var csrfToken = (function () {
+            var m = document.querySelector('meta[name="csrf-token"]');
+            if (m) return m.content;
+            var i = document.querySelector('input[name="csrf_token"]');
+            return i ? i.value : '';
+        }());
+
+        function showResult(msg, isError) {
+            if (!resultEl) return;
+            resultEl.style.display = '';
+            resultEl.style.background = isError ? '#fdecea' : '#e8f5e9';
+            resultEl.style.color = isError ? '#c62828' : '#2e7d32';
+            resultEl.textContent = msg;
+        }
+
+        // Save URL
+        if (saveBtn && urlInput) {
+            saveBtn.addEventListener('click', function () {
+                var fd = new FormData();
+                fd.append('action', 'save_url');
+                fd.append('csrf_token', csrfToken);
+                fd.append('url', urlInput.value.trim());
+                fetch('equipment-booking/api/sync-config.php', { method: 'POST', credentials: 'same-origin', body: fd })
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) {
+                        showResult(d.status === 'success' ? 'URL saved.' : (d.error || 'Could not save.'), d.status !== 'success');
+                    });
+            });
+        }
+
+        // Sync Now
+        syncBtn.addEventListener('click', function () {
+            syncBtn.disabled = true;
+            syncBtn.innerHTML = '<span class="material-symbols-outlined" style="animation:spin .8s linear infinite">sync</span> Syncing…';
+            if (resultEl) resultEl.style.display = 'none';
+
+            var fd = new FormData();
+            fd.append('csrf_token', csrfToken);
+            fetch('equipment-booking/api/sync-inventory.php', { method: 'POST', credentials: 'same-origin', body: fd })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    syncBtn.disabled = false;
+                    syncBtn.innerHTML = '<span class="material-symbols-outlined">sync</span> Sync Now';
+                    if (d.status === 'success') {
+                        var s = d.summary;
+                        var msg = 'Sync complete — ' + s.added + ' added, ' + s.updated + ' updated.';
+                        if (s.archived > 0) msg += ' ' + s.archived + ' item(s) removed from sheet (archived).';
+                        if (s.skipped_sheets && s.skipped_sheets.length) msg += ' Skipped: ' + s.skipped_sheets.join(', ') + '.';
+                        showResult(msg, false);
+                        if (lastSyncEl) lastSyncEl.textContent = 'Last synced: just now';
+                        // Refresh the inventory table in-place instead of a full reload.
+                        if (s.added > 0 || s.updated > 0 || s.archived > 0) {
+                            setTimeout(function () {
+                                fetch('admin-dashboard.php?fragment=inventory-tbody', {
+                                    credentials: 'same-origin',
+                                    cache: 'no-store'
+                                })
+                                .then(function (r) { return r.ok ? r.json() : null; })
+                                .then(function (frag) {
+                                    if (!frag || frag.status !== 'success') {
+                                        window.location.reload();
+                                        return;
+                                    }
+                                    var tbody = document.getElementById('inventory-body');
+                                    if (tbody) {
+                                        tbody.innerHTML = frag.active_html;
+                                        if (typeof window._setupInventoryListFn === 'function') {
+                                            window._setupInventoryListFn();
+                                        }
+                                    }
+                                })
+                                .catch(function () { window.location.reload(); });
+                            }, 800);
+                        }
+                    } else {
+                        showResult(d.error || 'Sync failed.', true);
+                    }
+                })
+                .catch(function () {
+                    syncBtn.disabled = false;
+                    syncBtn.innerHTML = '<span class="material-symbols-outlined">sync</span> Sync Now';
+                    showResult('Network error. Please try again.', true);
+                });
+        });
+
+        // Pending deletion actions
+        document.querySelectorAll('[data-pd-action]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var action = btn.dataset.pdAction;
+                var pdId   = btn.dataset.pdId;
+                var fd = new FormData();
+                fd.append('action', action === 'archive' ? 'pd_archive' : 'pd_keep');
+                fd.append('csrf_token', csrfToken);
+                fd.append('pd_id', pdId);
+                fetch('equipment-booking/api/sync-config.php', { method: 'POST', credentials: 'same-origin', body: fd })
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) {
+                        if (d.status === 'success') {
+                            var row = document.querySelector('.pd-row[data-pd-id="' + pdId + '"]');
+                            if (row) row.remove();
+                        }
+                    });
+            });
+        });
+    }());
+
+    // ── Live sync poller (always active — not gated on the Settings tab) ────────
+    // Checks every 5 s whether the Google Sheet changed; if yes, runs sync and
+    // swaps the inventory tbody in-place without a page reload.
+    (function startLiveSync() {
+        var syncing = false;
+
+        var csrfTokenForSync = (function () {
+            var m = document.querySelector('meta[name="csrf-token"]');
+            if (m) return m.content;
+            var i = document.querySelector('input[name="csrf_token"]');
+            return i ? i.value : '';
+        }());
+
+        function refreshInventoryTable() {
+            fetch('admin-dashboard.php?fragment=inventory-tbody', {
+                credentials: 'same-origin',
+                cache: 'no-store'
+            })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (frag) {
+                if (!frag || frag.status !== 'success') return;
+                var tbody = document.getElementById('inventory-body');
+                if (tbody) {
+                    tbody.innerHTML = frag.active_html;
+                    if (typeof window._setupInventoryListFn === 'function') {
+                        window._setupInventoryListFn();
+                    }
+                }
+            })
+            .catch(function () {});
+        }
+
+        function poll() {
+            if (syncing) return;
+            fetch('equipment-booking/api/check-sheet-modified.php', {
+                credentials: 'same-origin',
+                cache: 'no-store'
+            })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (d) {
+                if (!d || !d.changed) return;
+                syncing = true;
+                var fd = new FormData();
+                fd.append('csrf_token', csrfTokenForSync);
+                fetch('equipment-booking/api/sync-inventory.php', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    body: fd
+                })
+                .then(function (r) { return r.json(); })
+                .then(function (syncData) {
+                    syncing = false;
+                    if (!syncData || syncData.status !== 'success') return;
+                    var s = syncData.summary;
+                    // Always refresh the table when the sheet was detected as changed —
+                    // even if added/updated/archived are all 0 (Google export cache may
+                    // lag behind Ctrl+Z / Ctrl+Y for a cycle or two, but the DB is still
+                    // re-read fresh so the next render will reflect the true state).
+                    refreshInventoryTable();
+                    var parts = [];
+                    if (s.added    > 0) parts.push(s.added    + ' added');
+                    if (s.updated  > 0) parts.push(s.updated  + ' updated');
+                    if (s.archived > 0) parts.push(s.archived + ' archived');
+                    if (parts.length > 0 && typeof window.showToast === 'function') {
+                        window.showToast('Inventory synced: ' + parts.join(', ') + '.', 'success');
+                    }
+                })
+                .catch(function () { syncing = false; });
+            })
+            .catch(function () {});
+        }
+
+        setInterval(poll, 5000);
+        setTimeout(poll, 2000);
+    }());
+
 })();

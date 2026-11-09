@@ -87,6 +87,8 @@ function fact_eq_housekeeping(mysqli $conn): void
         $stmt->close();
     }
     BookingSchedule::tick($conn);
+    require_once __DIR__ . '/../../equipment-booking/core/auto-approve-tick.php';
+    equipment_auto_approve_tick($conn);
 }
 
 /** Catalogue photo per item name (tbl_requests only stores the name as text). */
@@ -272,6 +274,10 @@ function fact_eq_load(mysqli $conn, string $faculty_id): array
 
         $batchIds = [];
         $claimGroups = [];
+        // returnGroups: batch_id => ['ids' => [], 'leader_token' => '']
+        // Groups On Loan / Overdue items by batch_id so only the lowest-id row
+        // shows a Return QR button. All items in the batch share that one QR.
+        $returnGroups = [];
         foreach (['live', 'upcoming', 'history'] as $bucket) {
             foreach ($out[$bucket] as $item) {
                 if ($item['batch_id'] !== '') {
@@ -282,8 +288,24 @@ function fact_eq_load(mysqli $conn, string $faculty_id): array
                     $claimGroups[$token]['ids'][] = (int)$item['id'];
                     $claimGroups[$token]['names'][$item['name']] = true;
                 }
+                // Group active (On Loan / Overdue) bundle items by batch_id
+                // so we can designate one leader Return QR per bundle.
+                $bid = $item['batch_id'];
+                if ($bid !== '' && in_array($item['status'], ['On Loan', 'Overdue'], true) && $item['token'] !== '') {
+                    if (!isset($returnGroups[$bid])) {
+                        $returnGroups[$bid] = ['ids' => [], 'tokens' => []];
+                    }
+                    $returnGroups[$bid]['ids'][]    = (int)$item['id'];
+                    $returnGroups[$bid]['tokens'][(int)$item['id']] = $item['token'];
+                }
             }
         }
+        // Compute leader (lowest id) per return group
+        foreach ($returnGroups as &$rg) {
+            $rg['leader_id']    = min($rg['ids']);
+            $rg['leader_token'] = $rg['tokens'][$rg['leader_id']] ?? '';
+        }
+        unset($rg);
 
         $batchCounts = [];
         foreach (['live', 'upcoming', 'history'] as $bucket) {
@@ -330,6 +352,10 @@ function fact_eq_load(mysqli $conn, string $faculty_id): array
                 $item['bundle_claim_label'] = $claimGroup !== null
                     ? 'Bundle (' . $claimGroup['count'] . ' ' . ($claimGroup['count'] === 1 ? 'item' : 'items') . ')'
                     : '';
+                // Return QR bundle grouping
+                $rg = $batchId !== '' ? ($returnGroups[$batchId] ?? null) : null;
+                $item['bundle_return_leader'] = $rg !== null && (int)$item['id'] === $rg['leader_id'];
+                $item['bundle_return_token']  = $rg !== null ? $rg['leader_token'] : '';
             }
             unset($item);
         }
@@ -470,7 +496,8 @@ function fact_eq_render_item(array $it, string $kind, string $rootUrl, DateTimeI
         $sub[] = 'Extension limit reached (' . BorrowExtension::MAX_EXTENSIONS . ' of ' . BorrowExtension::MAX_EXTENSIONS . ')';
     }
 
-    $html  = '<article class="fact-item fact-loan' . ($isOverdue ? ' is-overdue' : '') . '" data-req-id="' . fact_i($it, 'id') . '">';
+    $isBundle = fact_i($it, 'bundle_count') > 1;
+    $html  = '<article class="fact-item fact-loan' . ($isOverdue ? ' is-overdue' : '') . ($isBundle ? ' is-bundle' : '') . '" data-req-id="' . fact_i($it, 'id') . '">';
     $html .= fact_eq_tile($it, $rootUrl);
     $html .= '<div class="fact-item-main"><div class="fact-item-top"><h4 class="fact-item-title">' . fact_eq_title($it) . '</h4>'
         . fact_status_chip($status) . '</div>';
@@ -508,11 +535,31 @@ function fact_eq_action_slots(array $it, string $kind, string $status): array
     }
 
     if ($kind === 'live') {
-        if (fact_s($it, 'token') !== '') {
-            $slots['return'] = fact_action_btn('Return QR', 'qr_code_scanner', [
-                'action' => 'show-return-qr', 'token' => fact_s($it, 'token'), 'equipment' => fact_s($it, 'name'),
-            ], ['title' => 'Show the return QR for this item']);
+        // Return QR only when the item is physically out (On Loan or Overdue).
+        // For bundle items: only the leader row shows the Return QR (one QR covers all
+        // remaining On Loan / Overdue items in that bundle).
+        // For solo items (no batch_id): each item shows its own Return QR as before.
+        if (in_array($status, ['On Loan', 'Overdue'], true)) {
+            $isBundleItem = fact_s($it, 'bundle_return_token') !== '';
+            if ($isBundleItem && !empty($it['bundle_return_leader'])) {
+                // Bundle leader: show one Return QR for the whole bundle
+                $slots['return'] = fact_action_btn('Return QR', 'qr_code_scanner', [
+                    'action'        => 'show-return-qr',
+                    'token'         => fact_s($it, 'bundle_return_token'),
+                    'equipment'     => 'Bundle (' . fact_i($it, 'bundle_count') . ' items)',
+                    'bundle-return' => 1,
+                ], ['title' => 'Show the return QR for this bundle']);
+            } elseif (!$isBundleItem && fact_s($it, 'token') !== '') {
+                // Solo item: show its own Return QR
+                $slots['return'] = fact_action_btn('Return QR', 'qr_code_scanner', [
+                    'action'    => 'show-return-qr',
+                    'token'     => fact_s($it, 'token'),
+                    'equipment' => fact_s($it, 'name'),
+                ], ['title' => 'Show the return QR for this item']);
+            }
+            // Non-leader bundle items: no Return QR button (leader covers them)
         }
+
         if (!empty($it['can_extend'])) {
             $slots['extend'] = fact_action_btn('Extend', 'update', [
                 'action' => 'extend-borrow', 'request-id' => fact_i($it, 'id'), 'equipment' => fact_s($it, 'name'),

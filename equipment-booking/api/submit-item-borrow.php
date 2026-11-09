@@ -104,41 +104,26 @@ try {
         exit;
     }
 
-    // Generate return token + claim token
-    $return_token = bin2hex(random_bytes(32));
-    $claim_token  = bin2hex(random_bytes(32));
-
-    // Insert request — borrow_date and return_date both = today (same-day)
-    // return_time stored in the return_time column (BookingSchedule column)
+    // Insert as Waiting — tokens and inventory decrement happen at approval time
+    // (auto-approve-tick.php or admin-override.php), not at insert time.
     $ins = $conn->prepare(
         "INSERT INTO tbl_requests
             (faculty_name, faculty_id, equipment_name, instructor, room,
              borrow_date, return_date, borrow_qty, return_time,
-             status, request_date, return_token, claim_token,
+             status, request_date,
              submitted_by_name, submitted_by_id, submitted_as)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Approved', NOW(), ?, ?, ?, ?, 'student')"
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Waiting', NOW(), ?, ?, 'student')"
     );
     if (!$ins) throw new RuntimeException('Could not save request.');
     $ins->bind_param(
-        'sssssssisssss',
+        'ssssssissss',
         $faculty_name, $faculty_id, $item_name, $faculty_name, $room,
         $today, $today, $quantity, $return_time,
-        $return_token, $claim_token, $student_name, $student_id
+        $student_name, $student_id
     );
     if (!$ins->execute()) throw new RuntimeException('Insert failed: ' . $ins->error);
     $request_id = (int)$conn->insert_id;
     $ins->close();
-
-    // Decrement inventory
-    $dec = $conn->prepare(
-        "UPDATE tbl_inventory SET quantity = quantity - ?
-          WHERE item_id = ? AND is_archived = 0 AND quantity >= ?"
-    );
-    if (!$dec) throw new RuntimeException('Could not update stock.');
-    $dec->bind_param('iii', $quantity, $item_id, $quantity);
-    $dec->execute();
-    if ($dec->affected_rows !== 1) throw new RuntimeException('Stock update failed.');
-    $dec->close();
 
     // Mark code as used
     $mark = $conn->prepare(
@@ -190,7 +175,7 @@ try {
     echo json_encode([
         'success'      => true,
         'request_id'   => $request_id,
-        'return_token' => $return_token,
+        'return_token' => null,
         'claim_token'  => $claim_token,
     ]);
 
