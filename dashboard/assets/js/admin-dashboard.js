@@ -4583,46 +4583,47 @@
 
                                     if (isClaimQr) {
                                         // Collect actual qty per item from the spinners
-                                        const claimRows = [];
+                                                                                const claimRows = [];
                                         itemsEl.querySelectorAll('input[data-claim-qty][data-req-id]').forEach(function(inp) {
-                                            const rid      = inp.getAttribute('data-req-id');
-                                            const maxQty   = parseInt(inp.dataset.maxQty || inp.max, 10);
-                                            const giveQty  = Math.max(0, Math.min(maxQty, parseInt(inp.value, 10) || 0));
-                                            const condSel  = itemsEl.querySelector('select[data-claim-cond][data-req-id="' + rid + '"]');
-                                            const withheld = maxQty - giveQty;
-                                            const cond     = (withheld > 0 && condSel) ? condSel.value : 'Good';
-                                            claimRows.push({ id: rid, give: giveQty, max: maxQty, withheld: withheld, condition: cond });
+                                            const rid     = inp.getAttribute('data-req-id');
+                                            const maxQty  = parseInt(inp.dataset.maxQty || inp.max, 10);
+                                            const giveQty = Math.max(0, Math.min(maxQty, parseInt(inp.value, 10) || 0));
+                                            const condSel = itemsEl.querySelector('select[data-claim-cond][data-req-id="' + rid + '"]');
+                                            const held    = maxQty - giveQty;
+                                            const cond    = (held > 0 && condSel) ? condSel.value : 'Good';
+                                            claimRows.push({ id: rid, give: giveQty, max: maxQty, withheld: held, condition: cond });
                                         });
 
-                        // Reason required only when a GOOD-condition item is being withheld.
-                        // Damaged / Missing are self-explanatory — no reason needed.
-                        const needReason = claimRows.filter(r => r.withheld > 0 && r.condition === 'Good');
-                        if (needReason.length > 0) {
-                            const lines = needReason.map(function(r) {
-                                const inp = itemsEl.querySelector('input[data-claim-qty][data-req-id="' + r.id + '"]');
-                                const nameEl = inp ? inp.closest('div').previousElementSibling.querySelector('strong') : null;
-                                const name = nameEl ? nameEl.textContent : 'Item #' + r.id;
-                                return name + ': giving ' + r.give + ' of ' + r.max;
-                            }).join('\n');
-                            const reason = window.prompt(
-                                'You are withholding a Good-condition item:\n' + lines +
-                                '\n\nReason is required (e.g. "Reserved for another faculty"):',
-                                ''
-                            );
-                            if (reason === null || reason.trim() === '') {
-                                confirmBtn.disabled = false;
-                                confirmBtn.textContent = 'Confirm';
-                                return;
-                            }
-                            needReason.forEach(function(r) {
-                                formData.append('reason[' + r.id + ']', reason.trim());
-                            });
-                        }
-                        // Damaged / Missing withheld items get an automatic reason
-                        claimRows.filter(r => r.withheld > 0 && r.condition !== 'Good').forEach(function(r) {
-                            formData.append('reason[' + r.id + ']', r.condition + ' at handover — item kept in cabinet.');
-                        });
+                                        // Reason required only when a GOOD-condition item is withheld.
+                                        // Damaged / Missing are self-explanatory — automatic reason applied.
+                                        const needReason = claimRows.filter(function(r) { return r.withheld > 0 && r.condition === 'Good'; });
+                                        if (needReason.length > 0) {
+                                            const lines = needReason.map(function(r) {
+                                                const inp2 = itemsEl.querySelector('input[data-claim-qty][data-req-id="' + r.id + '"]');
+                                                const prev = inp2 ? inp2.closest('div') : null;
+                                                const nameEl = prev ? prev.previousElementSibling.querySelector('strong') : null;
+                                                const name = nameEl ? nameEl.textContent : 'Item #' + r.id;
+                                                return name + ': giving ' + r.give + ' of ' + r.max;
+                                            }).join('\n');
+                                            const reason = window.prompt(
+                                                'You are withholding a Good-condition item:\n' + lines +
+                                                '\n\nReason is required (e.g. "Reserved for another faculty"):',
+                                                ''
+                                            );
+                                            if (reason === null || reason.trim() === '') {
+                                                confirmBtn.disabled = false;
+                                                confirmBtn.textContent = 'Confirm';
+                                                return;
+                                            }
+                                            needReason.forEach(function(r) {
+                                                formData.append('reason[' + r.id + ']', reason.trim());
+                                            });
+                                        }
 
+                                        // Damaged / Missing: automatic reason, no prompt needed
+                                        claimRows.filter(function(r) { return r.withheld > 0 && r.condition !== 'Good'; }).forEach(function(r) {
+                                            formData.append('reason[' + r.id + ']', r.condition + ' at handover — item kept in cabinet.');
+                                        });
 
                                         claimRows.forEach(function(r) {
                                             formData.append('give_qty[' + r.id + ']', r.give);
@@ -4646,6 +4647,7 @@
                                             confirmBtn.disabled = false;
                                             confirmBtn.textContent = 'Confirm';
                                         });
+
                                     } else {
                                         // Only process items whose checkbox is ticked
                                         itemsEl.querySelectorAll('input[type="checkbox"]:checked[data-req-id]').forEach(function(cb) {
