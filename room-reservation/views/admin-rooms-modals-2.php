@@ -24,6 +24,7 @@
             <div class="form-card-body">
                 <div id="admin-cancel-rr-alert" style="display:none;padding:10px;border-radius:6px;margin-bottom:15px;font-size:.85rem;font-weight:500;"></div>
                 <p id="adminCancelRrDesc" style="font-size:.85rem;color:var(--text-light);margin-bottom:1rem;"></p>
+                <p id="adminCancelRrWlNote" style="display:none;font-size:.82rem;padding:8px 12px;border-radius:6px;background:#f0f4ff;color:#374151;margin-bottom:1rem;border-left:3px solid #6366f1;"></p>
                 <p style="font-size:.83rem;color:var(--text-light);margin-bottom:1rem;">
                     The faculty member will be notified by email. All faculty on the waitlist for this slot will also be notified that the slot is now available.
                 </p>
@@ -33,6 +34,70 @@
                     <button type="button" class="btn-submit-form" id="submitAdminCancelRrBtn"
                         style="margin-top:0;width:auto;padding:8px 16px;background:var(--danger);">
                         Confirm Cancellation
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Reschedule Reservation Modal -->
+    <div class="modal-overlay" id="adminRescheduleRrModal"
+        style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:99999;align-items:center;justify-content:center;">
+        <div class="modal-backdrop" id="adminRescheduleRrBackdrop" style="position:absolute;inset:0;"></div>
+        <div class="eq-card form-card" style="position:relative;width:100%;max-width:460px;margin:20px;z-index:100000;">
+            <div class="form-card-header">
+                <h2>
+                    <span class="material-symbols-outlined" style="font-size:20px;margin-right:6px;">edit_calendar</span>
+                    Reschedule Reservation
+                </h2>
+                <button type="button" class="btn-close-custom" id="closeAdminRescheduleRrModal">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+            <div class="form-card-body">
+                <div id="admin-reschedule-rr-alert" style="display:none;padding:10px;border-radius:6px;margin-bottom:15px;font-size:.85rem;font-weight:500;"></div>
+                <p id="adminRescheduleRrDesc" style="font-size:.85rem;color:var(--text-light);margin-bottom:1rem;"></p>
+                <input type="hidden" id="adminRescheduleRrId">
+                
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label for="adminRescheduleRoomId" style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Facility</label>
+                    <select id="adminRescheduleRoomId" class="form-control-custom" style="width:100%;">
+                        <?php if (!empty($rooms_list)): foreach ($rooms_list as $rl): ?>
+                            <option value="<?php echo (int)$rl['room_id']; ?>"><?php echo htmlspecialchars($rl['room_name'] . ' (' . ($rl['building_name'] ?? '') . ')'); ?></option>
+                        <?php endforeach; endif; ?>
+                    </select>
+                </div>
+
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label for="adminRescheduleDate" style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Date</label>
+                    <input type="date" id="adminRescheduleDate" class="form-control-custom" style="width:100%;" required>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+                    <div class="form-group">
+                        <label for="adminRescheduleStartTime" style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Start Time</label>
+                        <input type="time" id="adminRescheduleStartTime" class="form-control-custom" style="width:100%;" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="adminRescheduleEndTime" style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">End Time</label>
+                        <input type="time" id="adminRescheduleEndTime" class="form-control-custom" style="width:100%;" required>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label for="adminRescheduleNotes" style="font-size:.82rem;font-weight:600;display:block;margin-bottom:4px;">Admin Note / Reason <span style="font-weight:400;color:var(--text-light);">(optional)</span></label>
+                    <textarea id="adminRescheduleNotes" class="form-control-custom" rows="2" style="width:100%;resize:vertical;" placeholder="Reason for adjusting time/room (emailed to faculty)..."></textarea>
+                </div>
+
+                <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:1.25rem;">
+                    <button type="button" class="btn-cancel-acc" id="cancelAdminRescheduleRrBtn" style="padding:8px 16px;width:auto;">Go Back</button>
+                    <button type="button" class="btn-submit-form" id="submitAdminRescheduleRrBtn"
+                        style="margin-top:0;width:auto;padding:8px 16px;">
+                        Save &amp; Notify
                     </button>
                 </div>
             </div>

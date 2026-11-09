@@ -113,6 +113,14 @@ if (!function_exists('admin_activity_bootstrap')) {
                 $added_by_id = admin_activity_has_column($conn, 'tbl_arbitration_log', 'override_by_id');
             }
 
+            // Add admin_notes column for internal (admin-only) notes on equipment decisions.
+            if (
+                admin_activity_table_exists($conn, 'tbl_arbitration_log')
+                && !admin_activity_has_column($conn, 'tbl_arbitration_log', 'admin_notes')
+            ) {
+                @$conn->query("ALTER TABLE `tbl_arbitration_log` ADD COLUMN `admin_notes` text DEFAULT NULL AFTER `override_reason`");
+            }
+
             // Fill override_by_id for existing rows — only for names that belong to exactly one account.
             if ($added_by_id) {
                 @$conn->query(

@@ -205,6 +205,7 @@ CREATE TABLE `tbl_arbitration_log` (
   `override_by` varchar(255) DEFAULT NULL,
   `override_by_id` int(11) DEFAULT NULL,
   `override_reason` text DEFAULT NULL,
+  `admin_notes` text DEFAULT NULL,
   `created_at` datetime DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 

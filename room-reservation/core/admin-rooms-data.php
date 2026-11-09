@@ -100,7 +100,7 @@ $rooms_archived = ps_load_archived_rooms($conn);
 
 // ── All room reservations (admin read-only view) ──────────────────────────
 require_once __DIR__ . '/room-expiry.php';
-ps_room_expire_unreviewed($conn);   // undecided Waiting reservations past 12:01 AM of their day become Declined
+$rooms_expired_count = ps_room_expire_unreviewed($conn);   // undecided Waiting reservations past 12:01 AM of their day become Declined
 
 $admin_room_reservations_result = $conn->query(
     "SELECT rr.id, rr.room_id, rr.reservation_date,
@@ -135,6 +135,28 @@ $admin_room_reservations = [];
 if ($admin_room_reservations_result) {
     while ($row = $admin_room_reservations_result->fetch_assoc()) {
         $admin_room_reservations[] = $row;
+    }
+}
+
+// ── Waitlist counts for Approved reservations (Suggestion 9) ─────────────
+// Build a map: "room_id|date|start|end" => count so the view can render a
+// data-waitlist-count attribute on each cancellable row without N extra queries.
+$admin_room_waitlist_counts = [];
+$_wl_tbl = $conn->query(
+    "SELECT 1 FROM information_schema.TABLES
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tbl_room_waitlist' LIMIT 1"
+);
+if ($_wl_tbl && $_wl_tbl->num_rows > 0) {
+    $wl_res = $conn->query(
+        "SELECT room_id, reservation_date, start_time, end_time, COUNT(*) AS cnt
+           FROM tbl_room_waitlist
+          GROUP BY room_id, reservation_date, start_time, end_time"
+    );
+    if ($wl_res) {
+        while ($wr = $wl_res->fetch_assoc()) {
+            $wl_key = $wr['room_id'] . '|' . $wr['reservation_date'] . '|' . $wr['start_time'] . '|' . $wr['end_time'];
+            $admin_room_waitlist_counts[$wl_key] = (int)$wr['cnt'];
+        }
     }
 }
 

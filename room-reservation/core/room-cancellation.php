@@ -53,7 +53,7 @@ class RoomCancellation
       return ['success' => false, 'error' => 'Only Approved or Waiting reservations can be cancelled.'];
     }
 
-    // ── 1-hour cutoff enforcement ───────────────────────────────────
+    // ── 1-hour cutoff enforcement (faculty only; admins can cancel anytime before end) ──
     $resStart = new DateTime(
       $row['reservation_date'] . ' ' . $row['start_time'],
       new DateTimeZone('Asia/Manila')
@@ -61,7 +61,7 @@ class RoomCancellation
     $now      = new DateTime('now', new DateTimeZone('Asia/Manila'));
     $diffSecs = $resStart->getTimestamp() - $now->getTimestamp();
 
-    if (!$isWaiting && $diffSecs <= 3600) {
+    if ($actor !== 'admin' && !$isWaiting && $diffSecs <= 3600) {
       return [
         'success' => false,
         'error'   => 'Cancellations are not allowed within 1 hour of the reservation start time.',
@@ -94,16 +94,19 @@ class RoomCancellation
     }
 
     // ── Notify all waitlisted faculty for this slot (only if it actually held the slot) ─
-    if (!$isWaiting) self::notifyWaitlist(
-      $conn,
-      (int) $row['room_id'],
-      $row['reservation_date'],
-      $row['start_time'],
-      $row['end_time'],
-      $row['room_name']
-    );
+    $waitlistNotified = 0;
+    if (!$isWaiting) {
+      $waitlistNotified = self::notifyWaitlist(
+        $conn,
+        (int) $row['room_id'],
+        $row['reservation_date'],
+        $row['start_time'],
+        $row['end_time'],
+        $row['room_name']
+      );
+    }
 
-    return ['success' => true, 'error' => null];
+    return ['success' => true, 'error' => null, 'waitlist_notified' => $waitlistNotified];
   }
 
   /** One row in tbl_room_arbitration_log (decision 'Cancelled', rule 'faculty_cancelled'). Never blocks the cancel. */
@@ -199,6 +202,7 @@ class RoomCancellation
   /**
    * Query tbl_room_waitlist for the exact slot and email every entry.
    * Waitlist rows are NOT deleted — they remain as an audit trail.
+   * Returns the number of faculty notified.
    */
   public static function notifyWaitlist(
     mysqli $conn,
@@ -207,7 +211,7 @@ class RoomCancellation
     string $startTime,
     string $endTime,
     string $roomName
-  ): void {
+  ): int {
     $stmt = $conn->prepare(
       "SELECT faculty_id, faculty_name, faculty_email
                FROM tbl_room_waitlist
@@ -226,7 +230,7 @@ class RoomCancellation
     }
     $stmt->close();
 
-    if (empty($entries)) return;
+    if (empty($entries)) return 0;
 
     require_once __DIR__ . '/../../shared/core/mailer.php';
 
@@ -273,5 +277,6 @@ class RoomCancellation
 
       sendPupSyncEmail($entry['faculty_email'], $entry['faculty_name'], $subject, $bodyHtml);
     }
+    return count($entries);
   }
 }

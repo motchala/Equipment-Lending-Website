@@ -76,6 +76,7 @@
         'room_updated'  => 'Facility updated. Changes saved.',
         'room_archived' => 'Facility archived. It has been removed from the active registry.',
         'room_restored' => 'Facility restored. It is now back in the active registry.',
+        'room_deleted'  => 'Facility permanently deleted.',
         'room_error'    => 'Error: Could not save facility. Please check required fields and try again.',
     ];
     $flash_strip = [];

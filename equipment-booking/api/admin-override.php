@@ -58,9 +58,15 @@ if (empty($csrf_token) || empty($_SESSION['csrf_token']) || !hash_equals($_SESSI
 $admin_name = isset($_SESSION['admin_name']) ? (string)$_SESSION['admin_name'] : 'Admin';
 
 // ── Task 7.1: Parse POST inputs ───────────────────────────────────────────────
-$raw_request_id    = $_POST['request_id']      ?? '';
-$raw_new_status    = $_POST['new_status']       ?? '';
+$raw_request_id      = $_POST['request_id']      ?? '';
+$raw_new_status      = $_POST['new_status']       ?? '';
 $raw_override_reason = trim((string)($_POST['override_reason'] ?? ''));
+$raw_admin_notes     = trim((string)($_POST['admin_notes']     ?? ''));
+// Sanitize: cap internal note to 1000 chars
+if (mb_strlen($raw_admin_notes) > 1000) {
+    $raw_admin_notes = mb_substr($raw_admin_notes, 0, 1000);
+}
+$admin_notes_value = $raw_admin_notes !== '' ? $raw_admin_notes : null;
 
 // ── Validate override_reason — must be at least 5 characters ─────────────────
 if (mb_strlen($raw_override_reason) < 5) {
@@ -309,41 +315,63 @@ try {
     // ── INSERT or UPDATE tbl_arbitration_log (one row per request_id) ──────────
     // ON DUPLICATE KEY UPDATE ensures re-overrides update the existing row
     // rather than creating duplicates.
+    //
+    // admin_notes is an optional internal note (not shown to faculty) — only
+    // written when the column exists (guarded by a runtime schema check below).
+    $_arb_has_notes = false;
+    $_col_check = $conn->query("SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tbl_arbitration_log' AND COLUMN_NAME = 'admin_notes' LIMIT 1");
+    if ($_col_check && $_col_check->num_rows > 0) {
+        $_arb_has_notes = true;
+    }
+
+    $log_sql_cols   = "(request_id, borrower_id, borrower_name, equipment_name,\n             decision, rule_applied, reason,\n             override_by, override_by_id, override_reason, created_at)";
+    $log_sql_vals   = "(?, ?, ?, ?,\n             ?, '{$log_rule}', ?,\n             ?, ?, ?, NOW())";
+    $log_sql_update = "decision        = VALUES(decision),\n            rule_applied    = '{$log_rule}',\n            reason          = VALUES(reason),\n            override_by     = VALUES(override_by),\n            override_by_id  = VALUES(override_by_id),\n            override_reason = VALUES(override_reason),\n            created_at      = NOW()";
+    $log_bind_types = 'issssssis';
+
+    if ($_arb_has_notes) {
+        $log_sql_cols   = "(request_id, borrower_id, borrower_name, equipment_name,\n             decision, rule_applied, reason,\n             override_by, override_by_id, override_reason, admin_notes, created_at)";
+        $log_sql_vals   = "(?, ?, ?, ?,\n             ?, '{$log_rule}', ?,\n             ?, ?, ?, ?, NOW())";
+        $log_sql_update = "decision        = VALUES(decision),\n            rule_applied    = '{$log_rule}',\n            reason          = VALUES(reason),\n            override_by     = VALUES(override_by),\n            override_by_id  = VALUES(override_by_id),\n            override_reason = VALUES(override_reason),\n            admin_notes     = VALUES(admin_notes),\n            created_at      = NOW()";
+        $log_bind_types = 'issssssiss';
+    }
+
     $log_stmt = $conn->prepare(
-        "INSERT INTO tbl_arbitration_log
-            (request_id, borrower_id, borrower_name, equipment_name,
-             decision, rule_applied, reason,
-             override_by, override_by_id, override_reason, created_at)
-         VALUES
-            (?, ?, ?, ?,
-             ?, '{$log_rule}', ?,
-             ?, ?, ?, NOW())
-         ON DUPLICATE KEY UPDATE
-            decision        = VALUES(decision),
-            rule_applied    = '{$log_rule}',
-            reason          = VALUES(reason),
-            override_by     = VALUES(override_by),
-            override_by_id  = VALUES(override_by_id),
-            override_reason = VALUES(override_reason),
-            created_at      = NOW()"
+        "INSERT INTO tbl_arbitration_log\n            {$log_sql_cols}\n         VALUES\n            {$log_sql_vals}\n         ON DUPLICATE KEY UPDATE\n            {$log_sql_update}"
     );
 
     if ($log_stmt === false) {
         throw new RuntimeException('Failed to prepare arbitration log insert.');
     }
 
-    $log_stmt->bind_param(
-        'issssssis',
-        $request_id,
-        $borrower_id,
-        $borrower_name,
-        $equipment_name,
-        $new_status,
-        $raw_override_reason,
-        $admin_name,
-        $acting_admin_id,
-        $raw_override_reason
-    );
+    if ($_arb_has_notes) {
+        $log_stmt->bind_param(
+            $log_bind_types,
+            $request_id,
+            $borrower_id,
+            $borrower_name,
+            $equipment_name,
+            $new_status,
+            $raw_override_reason,
+            $admin_name,
+            $acting_admin_id,
+            $raw_override_reason,
+            $admin_notes_value
+        );
+    } else {
+        $log_stmt->bind_param(
+            $log_bind_types,
+            $request_id,
+            $borrower_id,
+            $borrower_name,
+            $equipment_name,
+            $new_status,
+            $raw_override_reason,
+            $admin_name,
+            $acting_admin_id,
+            $raw_override_reason
+        );
+    }
 
     if (!$log_stmt->execute()) {
         $log_stmt->close();

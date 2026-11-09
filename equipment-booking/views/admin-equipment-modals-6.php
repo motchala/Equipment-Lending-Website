@@ -48,6 +48,16 @@
                     <div class="ps-drawer-note" id="ps-loan-detail-note">—</div>
                 </section>
 
+                <section class="ps-drawer-sec" id="ps-loan-detail-admin-note-section" hidden>
+                    <h4>Admin Note <span style="font-size:10px;font-weight:400;color:var(--text-light);margin-left:4px;">(internal — not visible to faculty)</span></h4>
+                    <div class="ps-drawer-note" id="ps-loan-detail-admin-note" style="color:var(--text-dark);background:var(--secondary-cream);border:1px solid var(--khaki-border);border-radius:8px;padding:.65rem .85rem;font-size:12.5px;">—</div>
+                </section>
+
+                <section class="ps-drawer-sec" id="ps-loan-detail-notice-section" hidden>
+                    <h4>Overdue Notice History</h4>
+                    <div class="ps-drawer-note" id="ps-loan-detail-notice" style="color:#b45309;font-weight:500;">—</div>
+                </section>
+
                 <section class="ps-drawer-sec">
                     <h4>Handled by</h4>
                     <div class="ps-drawer-note" id="ps-loan-detail-handled-by">—</div>

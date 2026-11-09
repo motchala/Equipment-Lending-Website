@@ -31,7 +31,7 @@ function dash_render(array $d): void
             'sub' => $d['pickup'] > 0 ? 'Awaiting claim scan' : 'Nothing to hand over',
             'go' => 'inventory',
             'chip' => '',
-            'loan_filter' => 'active',
+            'loan_filter' => 'pickup',
         ],
         [
             'tone' => 'ok',
@@ -43,6 +43,17 @@ function dash_render(array $d): void
             'go' => 'inventory',
             'chip' => '',
             'loan_filter' => 'active',
+        ],
+        [
+            'tone' => $d['scheduled'] > 0 ? 'info' : 'ok',
+            'icon' => 'event_upcoming',
+            'label' => 'Scheduled',
+            'group' => 'loans',
+            'val' => $d['scheduled'],
+            'sub' => $d['scheduled'] > 0 ? 'Approved, not yet started' : 'No upcoming bookings',
+            'go' => 'inventory',
+            'chip' => '',
+            'loan_filter' => 'waiting',
         ],
         [
             'tone' => $d['overdue'] > 0 ? 'danger' : 'ok',
@@ -58,15 +69,29 @@ function dash_render(array $d): void
             'loan_filter' => 'overdue',
         ],
         [
-            'tone' => 'info',
-            'icon' => 'meeting_room',
-            'label' => 'Facilities today',
+            'tone' => ($d['rooms_waiting'] ?? 0) > 0 ? 'warn' : 'ok',
+            'icon' => 'pending_actions',
+            'label' => 'Pending reservations',
             'group' => 'places',
-            'val' => $d['rooms_today'],
+            'val' => $d['rooms_waiting'] ?? 0,
+            'sub' => ($d['rooms_waiting'] ?? 0) > 0 ? 'Awaiting review' : 'Queue is clear',
+            'go' => 'rooms',
+            'rooms_tab' => 'rooms-reservations',
+            'rooms_filter' => 'Waiting',
+            'chip' => '',
+        ],
+        [
+            'tone' => ($d['rooms_in_use_now'] ?? 0) > 0 ? 'info' : 'ok',
+            'icon' => 'meeting_room',
+            'label' => 'Facilities in use',
+            'group' => 'places',
+            'val' => $d['rooms_in_use_now'] ?? 0,
             'sub' => $d['rooms_bookable'] > 0
-                ? $d['rooms_in_use'] . ' of ' . $d['rooms_bookable'] . ' in use'
+                ? ($d['rooms_in_use_now'] ?? 0) . ' of ' . $d['rooms_bookable'] . ' in use now · ' . $d['rooms_today'] . ' booked today'
                 : 'No bookable facilities yet',
             'go' => 'rooms',
+            'rooms_tab' => 'rooms-reservations',
+            'rooms_filter' => 'active',
             'chip' => '',
         ],
         [
@@ -95,7 +120,9 @@ function dash_render(array $d): void
                     <?php foreach ($kpis as $k): if (($k['group'] ?? 'loans') !== $gk) continue; ?>
                         <button type="button" class="dash-kpi dash-tone-<?php echo dash_h($k['tone']); ?>"
                             data-dash-go="<?php echo dash_h($k['go']); ?>"
-                            data-dash-loan-filter="<?php echo dash_h($k['loan_filter'] ?? ''); ?>">
+                            data-dash-loan-filter="<?php echo dash_h($k['loan_filter'] ?? ''); ?>"
+                            <?php if (!empty($k['rooms_tab'])): ?>data-dash-rooms-tab="<?php echo dash_h($k['rooms_tab']); ?>"<?php endif; ?>
+                            <?php if (!empty($k['rooms_filter'])): ?>data-dash-rooms-filter="<?php echo dash_h($k['rooms_filter']); ?>"<?php endif; ?>>
                             <span class="dash-kpi-label"><span class="dash-kpi-dot" aria-hidden="true"></span><?php echo dash_h($k['label']); ?></span>
                             <span class="dash-kpi-val"><?php echo (int)$k['val']; ?></span>
                             <span class="dash-kpi-sub"><?php echo dash_h($k['sub']); ?></span>
@@ -149,7 +176,9 @@ function dash_render(array $d): void
                         <li>
                             <button type="button" class="dash-attn-item dash-tone-<?php echo dash_h($a['tone']); ?>"
                                 data-dash-go="<?php echo dash_h($a['go']); ?>"
-                                data-dash-loan-filter="<?php echo dash_h($a['loan_filter'] ?? ''); ?>">
+                                data-dash-loan-filter="<?php echo dash_h($a['loan_filter'] ?? ''); ?>"
+                                <?php if (!empty($a['rooms_tab'])): ?>data-dash-rooms-tab="<?php echo dash_h($a['rooms_tab']); ?>"<?php endif; ?>
+                                <?php if (!empty($a['rooms_filter'])): ?>data-dash-rooms-filter="<?php echo dash_h($a['rooms_filter']); ?>"<?php endif; ?>>
                                 <span class="dash-attn-icon" aria-hidden="true"><span class="material-symbols-outlined"><?php echo dash_h($a['icon']); ?></span></span>
                                 <span class="dash-attn-text">
                                     <strong><?php echo dash_h($a['title']); ?></strong>
@@ -180,10 +209,10 @@ function dash_render(array $d): void
             </header>
             <div class="dash-meter">
                 <div class="dash-meter-top">
-                    <span><strong><?php echo (int)$d['rooms_in_use']; ?></strong> of <?php echo (int)$d['rooms_bookable']; ?> facilities in use today</span>
+                    <span><strong><?php echo (int)($d['rooms_in_use_now'] ?? $d['rooms_in_use']); ?></strong> of <?php echo (int)$d['rooms_bookable']; ?> facilities in use now (<?php echo (int)$d['rooms_today']; ?> booked today)</span>
                     <span class="dash-meter-pct"><?php echo (int)$d['rooms_pct']; ?>%</span>
                 </div>
-                <div class="dash-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?php echo (int)$d['rooms_pct']; ?>" aria-label="Facility utilization today">
+                <div class="dash-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?php echo (int)$d['rooms_pct']; ?>" aria-label="Facility utilization now">
                     <span style="width:<?php echo max($d['rooms_pct'] > 0 ? 2 : 0, (int)$d['rooms_pct']); ?>%"></span>
                 </div>
                 <?php if ($d['rooms_issues'] > 0): ?>
@@ -356,6 +385,12 @@ function dash_render(array $d): void
                             <span class="dash-row-main">
                                 <strong title="<?php echo dash_h($l['text']); ?>"><?php echo dash_h($l['text']); ?></strong>
                                 <small><?php echo dash_h($who); ?></small>
+                                <?php if (!empty($l['ref_type']) && !empty($l['ref_id'])): ?>
+                                    <button type="button" class="act-event-jump" data-ref-type="<?php echo dash_h($l['ref_type']); ?>" data-ref-id="<?php echo (int)$l['ref_id']; ?>" style="margin-top:4px;">
+                                        View <?php echo $l['ref_type'] === 'reservation' ? 'reservation' : ($l['ref_type'] === 'room' ? 'facility' : 'request'); ?> #<?php echo (int)$l['ref_id']; ?>
+                                        <span class="material-symbols-outlined" style="font-size:12px;margin-left:4px;">open_in_new</span>
+                                    </button>
+                                <?php endif; ?>
                             </span>
                             <span class="dash-row-time"><?php echo dash_h(dash_ago(max(0, time() - (int)$l['ts']), date('Y-m-d H:i:s', (int)$l['ts']))); ?></span>
                         </li>

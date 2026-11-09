@@ -118,8 +118,9 @@ function dash_collect(mysqli $conn): array
 
     // ── Equipment requests ───────────────────────────────────────────────
     $d['waiting']   = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_requests WHERE status='Waiting'");
-    $d['pickup']    = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_requests WHERE status='Approved'");
+    $d['pickup']    = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_requests WHERE status='Approved' AND NOT (COALESCE(booking_mode,'')='future' AND TIMESTAMP(borrow_date, COALESCE(borrow_time,'00:00:00')) > NOW())");
     $d['active']    = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_requests WHERE status='On Loan'");
+    $d['scheduled'] = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_requests WHERE status='Approved' AND COALESCE(booking_mode,'')='future' AND TIMESTAMP(borrow_date, COALESCE(borrow_time,'00:00:00')) > NOW()");
     $d['due_today'] = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_requests WHERE status IN ('Approved','On Loan') AND return_date = ?", 's', [$today]);
     $d['overdue']   = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_requests WHERE status='Overdue'");
 
@@ -136,12 +137,14 @@ function dash_collect(mysqli $conn): array
     $d['stock']     = dash_rows($conn, "SELECT item_name, category, quantity FROM tbl_inventory WHERE is_archived=0 AND quantity<=2 ORDER BY quantity ASC, item_name ASC LIMIT 5");
 
     // ── Rooms ────────────────────────────────────────────────────────────
-    $d['rooms_bookable'] = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_rooms WHERE is_archived=0 AND status='Available'");
-    $d['rooms_today']    = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_room_reservations WHERE reservation_date = ? AND status='Approved'", 's', [$today]);
-    $d['rooms_in_use']   = dash_scalar($conn, "SELECT COUNT(DISTINCT room_id) FROM tbl_room_reservations WHERE reservation_date = ? AND status='Approved'", 's', [$today]);
-    $d['rooms_issues']   = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_room_issues WHERE status='Open'");
-    $d['rooms_pct']      = $d['rooms_bookable'] > 0
-        ? (int)min(100, round($d['rooms_in_use'] / $d['rooms_bookable'] * 100))
+    $d['rooms_bookable']   = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_rooms WHERE is_archived=0 AND status='Available'");
+    $d['rooms_waiting']    = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_room_reservations WHERE status='Waiting'");
+    $d['rooms_today']      = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_room_reservations WHERE reservation_date = ? AND status='Approved'", 's', [$today]);
+    $d['rooms_in_use_now'] = dash_scalar($conn, "SELECT COUNT(DISTINCT room_id) FROM tbl_room_reservations WHERE reservation_date = ? AND status='Approved' AND start_time <= ? AND end_time > ?", 'sss', [$today, $nowT, $nowT]);
+    $d['rooms_in_use']     = $d['rooms_in_use_now'];
+    $d['rooms_issues']     = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_room_issues WHERE status='Open'");
+    $d['rooms_pct']        = $d['rooms_bookable'] > 0
+        ? (int)min(100, round($d['rooms_in_use_now'] / $d['rooms_bookable'] * 100))
         : 0;
     $d['upcoming'] = dash_rows(
         $conn,
@@ -301,6 +304,18 @@ function dash_attention(array $d): array
             'loan_filter' => 'waiting'
         ];
     }
+    if (!empty($d['rooms_waiting']) && $d['rooms_waiting'] > 0) {
+        $a[] = [
+            'tone' => 'warn',
+            'icon' => 'pending_actions',
+            'title' => dash_pl($d['rooms_waiting'], 'pending room reservation'),
+            'sub'   => 'Awaiting admin review',
+            'go' => 'rooms',
+            'rooms_tab' => 'rooms-reservations',
+            'rooms_filter' => 'Waiting',
+            'chip' => ''
+        ];
+    }
     if ($d['due_today'] > 0) {
         $a[] = [
             'tone' => 'info',
@@ -319,6 +334,7 @@ function dash_attention(array $d): array
             'title' => dash_pl($d['rooms_issues'], 'open facility issue'),
             'sub'   => 'Reported by faculty, not yet resolved',
             'go' => 'rooms',
+            'rooms_tab' => 'rooms-reservations',
             'chip' => ''
         ];
     }

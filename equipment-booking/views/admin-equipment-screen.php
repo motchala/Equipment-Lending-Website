@@ -50,6 +50,37 @@
                     $eq_loan_total   = count($eq_loan_rows);
                     $eq_loan_pickup  = count(array_filter($eq_loan_rows, fn($r) => $r['_state'] === 'pickup'));
                     $eq_loan_active  = $eq_loan_total - $eq_loan_overdue - $eq_loan_pickup;
+
+                    // Overdue notices sent to borrowers (indexed by request_id)
+                    $eq_notices = [];
+                    $_notices_tbl = mysqli_query($conn, "SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tbl_faculty_admin_notice' LIMIT 1");
+                    if ($_notices_tbl && mysqli_num_rows($_notices_tbl) > 0) {
+                        $nq = mysqli_query($conn, "SELECT request_id, MAX(created_at) AS last_notice_at, COUNT(*) AS notice_count
+                                                     FROM tbl_faculty_admin_notice
+                                                    WHERE request_id IS NOT NULL
+                                                    GROUP BY request_id");
+                        if ($nq) {
+                            while ($nr = mysqli_fetch_assoc($nq)) {
+                                $eq_notices[(int)$nr['request_id']] = [
+                                    'count' => (int)$nr['notice_count'],
+                                    'last_at' => $nr['last_notice_at'],
+                                ];
+                            }
+                        }
+                    }
+
+                    // Admin notes from the arbitration log (indexed by request_id)
+                    $eq_arb_notes = [];
+                    $_arb_col = mysqli_query($conn, "SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tbl_arbitration_log' AND COLUMN_NAME = 'admin_notes' LIMIT 1");
+                    if ($_arb_col && mysqli_num_rows($_arb_col) > 0) {
+                        $aq = mysqli_query($conn, "SELECT request_id, admin_notes FROM tbl_arbitration_log WHERE admin_notes IS NOT NULL AND admin_notes <> ''");
+                        if ($aq) {
+                            while ($ar = mysqli_fetch_assoc($aq)) {
+                                $eq_arb_notes[(int)$ar['request_id']] = (string)$ar['admin_notes'];
+                            }
+                        }
+                    }
+
                     // Returned history for the Returned / All tabs (newest first, last 100)
                     $eq_ret_rows = [];
                     $eq_ret_q = mysqli_query($conn, "SELECT r.*,
@@ -575,6 +606,7 @@
                                     </thead>
                                     <tbody>
                                         <?php if ($eq_view_total > 0):
+                                            $eq_prev_state = null;
                                             foreach ($eq_view_rows as $r):
                                                 $lqty  = max(1, (int)($r['borrow_qty'] ?? 1));
                                                 $ltype = ps_submitted_as_label($r['submitted_as'] ?? '');
@@ -590,7 +622,19 @@
                                                 $lstart_lbl = date('M d, Y', strtotime($r['borrow_date'])) . ($lbt !== '' ? ' · ' . $lbt : '');
                                                 $ldue_lbl   = date('M d, Y', strtotime($r['return_date'])) . ($lrt !== '' ? ' · ' . $lrt : '');
                                                 $lstudent = (string)($r['submitted_as'] ?? '') === 'student' && trim((string)($r['submitted_by_name'] ?? '')) !== '';
-                                        ?>
+                                                // ── Section divider: emitted once when the first scheduled row follows
+                                                //    pending-review rows (or is the first row in the table).
+                                                if ($lst === 'scheduled' && $eq_prev_state !== 'scheduled'): ?>
+                                                    <tr class="eq-loan-section-divider" data-section-divider="scheduled">
+                                                        <td colspan="6">
+                                                            <div class="eq-loan-section-label">
+                                                                <span class="material-symbols-outlined" aria-hidden="true">event_upcoming</span>
+                                                                Scheduled bookings &mdash; approved, not yet started
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                <?php endif;
+                                                $eq_prev_state = $lst; ?>
                                                 <tr class="eq-loan-row is-<?php echo $lst; ?>"
                                                     data-id="<?php echo (int)$r['id']; ?>"
                                                     data-batch-id="<?php echo htmlspecialchars((string)($r['batch_id'] ?? ''), ENT_QUOTES); ?>"
@@ -623,7 +667,10 @@
                                                     data-doc-name="<?php echo $ldoc ? htmlspecialchars($ldoc['name']) : ''; ?>"
                                                     data-doc-kind="<?php echo $ldoc ? $ldoc['kind'] : ''; ?>"
                                                     data-returned-at-display="<?php echo !empty($r['returned_at']) ? date('M d, Y g:i A', strtotime($r['returned_at'])) : ''; ?>"
-                                                    data-handled-by="<?php echo htmlspecialchars($ldec['by'] ?? ''); ?>">
+                                                    data-handled-by="<?php echo htmlspecialchars($ldec['by'] ?? ''); ?>"
+                                                    data-notice-count="<?php echo isset($eq_notices[(int)$r['id']]) ? (int)$eq_notices[(int)$r['id']]['count'] : 0; ?>"
+                                                    data-notice-last="<?php echo isset($eq_notices[(int)$r['id']]) ? date('M j, Y g:i A', strtotime($eq_notices[(int)$r['id']]['last_at'])) : ''; ?>"
+                                                    data-admin-note="<?php echo htmlspecialchars($eq_arb_notes[(int)$r['id']] ?? '', ENT_QUOTES); ?>">
                                                     <?php $lbundle = trim((string)($r['batch_id'] ?? '')); ?>
                                                     <td data-col="borrower">
                                                         <div class="eq-cell-name"><?php echo htmlspecialchars($lstudent ? (string)$r['submitted_by_name'] : $r['faculty_name']); ?></div>
@@ -652,7 +699,18 @@
                                                         <?php elseif ($lst === 'returned'): ?>
                                                             <?php echo date('M d', strtotime($lret)); ?><div class="eq-cell-sub"><?php echo date('g:i A', strtotime($lret)); ?></div>
                                                         <?php elseif ($lst === 'overdue'): ?>
-                                                            <?php echo date('M d', strtotime($r['return_date'])); ?><div class="eq-cell-sub" style="font-weight:400"><?php echo max(1,$ldays); ?>d overdue</div>
+                                                            <?php echo date('M d', strtotime($r['return_date'])); ?>
+                                                            <div class="eq-cell-sub" style="font-weight:400"><?php echo max(1,$ldays); ?>d overdue</div>
+                                                            <?php if (!empty($eq_notices[(int)$r['id']])): 
+                                                                $ninfo = $eq_notices[(int)$r['id']];
+                                                                $nSecs = max(0, time() - strtotime($ninfo['last_at']));
+                                                                $nAgo = $nSecs < 60 ? 'just now' : ($nSecs < 3600 ? floor($nSecs/60).'m ago' : ($nSecs < 86400 ? floor($nSecs/3600).'h ago' : ($nSecs < 172800 ? 'yesterday' : floor($nSecs/86400).'d ago')));
+                                                            ?>
+                                                                <div class="eq-cell-sub" style="color:#059669;font-weight:500;display:flex;align-items:center;gap:3px;margin-top:2px;" title="Notice sent: <?php echo date('M j, Y g:i A', strtotime($ninfo['last_at'])); ?>">
+                                                                    <span class="material-symbols-outlined" style="font-size:12px;">mark_email_read</span>
+                                                                    Notice sent (<?php echo $nAgo; ?>)
+                                                                </div>
+                                                            <?php endif; ?>
                                                         <?php else: ?>
                                                             <?php echo date('M d', strtotime($r['return_date'])); ?><?php if ($lrt !== ''): ?><div class="eq-cell-sub"><?php echo $lrt; ?></div><?php endif; ?><?php if ((int)($r['extension_count'] ?? 0) > 0): $lext=(int)$r['extension_count']; ?><div class="eq-cell-sub" title="Extended <?php echo $lext; ?> time<?php echo $lext===1?'':'s'; ?><?php echo !empty($r['original_return_date'])? ', was '.date('M d',strtotime($r['original_return_date'])):''; ?>">+<?php echo $lext; ?> ext</div><?php endif; ?>
                                                         <?php endif; ?>
@@ -683,11 +741,19 @@
                                                                 <button type="button" class="ps-btn ps-btn--danger ps-btn--sm" data-action="ps-open-modal" data-modal="ps-cancel-booking-modal"><span class="material-symbols-outlined">event_busy</span> Cancel</button>
                                                             <?php elseif ($lst === 'pickup'): ?>
                                                                 <span class="eq-cell-sub">Awaiting Claim QR</span>
+                                                                <button type="button" class="ps-btn ps-btn--outline ps-btn--sm" data-action="ps-open-modal" data-modal="ps-manual-claim-modal"><span class="material-symbols-outlined">move_to_inbox</span> Manual</button>
                                                             <?php elseif ($lst === 'returned'): ?>
                                                                 <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-action="eq-open-loan-detail">View</button>
                                                             <?php else: ?>
                                                                 <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-action="ps-open-modal" data-modal="ps-return-modal">Return</button>
-                                                                <?php if ($lst === 'overdue'): ?><button type="button" class="ps-btn ps-btn--outline ps-btn--sm" data-action="ps-open-modal" data-modal="ps-notice-modal">Notice</button><?php endif; ?>
+                                                                <?php if ($lst === 'overdue'): 
+                                                                    $hasNotice = !empty($eq_notices[(int)$r['id']]);
+                                                                ?>
+                                                                    <button type="button" class="ps-btn <?php echo $hasNotice ? 'ps-btn--ghost' : 'ps-btn--outline'; ?> ps-btn--sm" data-action="ps-open-modal" data-modal="ps-notice-modal" title="<?php echo $hasNotice ? 'Notice already sent (' . $eq_notices[(int)$r['id']]['count'] . 'x). Click to send another.' : 'Send overdue notice'; ?>">
+                                                                        <span class="material-symbols-outlined" style="font-size:14px;"><?php echo $hasNotice ? 'mark_email_read' : 'mail'; ?></span>
+                                                                        <?php echo $hasNotice ? 'Notice (' . $eq_notices[(int)$r['id']]['count'] . ')' : 'Notice'; ?>
+                                                                    </button>
+                                                                <?php endif; ?>
                                                             <?php endif; ?>
                                                         </div>
                                                     </td>

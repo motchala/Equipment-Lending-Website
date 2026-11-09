@@ -127,23 +127,68 @@
                                 /* Archive: both the per-row icon (in the table) and the
                                    modal's own Archive Room link share the same href
                                    pattern, so one delegated listener catches both. */
+                                let pendingArchiveHref = '';
+
                                 document.addEventListener('click', function(e) {
                                     const link = e.target.closest('a[href*="archive_room="]');
                                     if (!link) return;
                                     e.preventDefault();
-                                    if (!confirm('Archive this facility? It will be hidden from the registry and can be restored later.')) return;
 
-                                    const href = link.getAttribute('href');
+                                    // Populate the confirm modal with the facility name + location
+                                    // from the nearest row context (table row or edit form).
+                                    let roomName = '';
+                                    const tr = link.closest('tr.pr-room-row');
+                                    if (tr) {
+                                        roomName = tr.dataset.roomName || '';
+                                    } else {
+                                        // Opened from the Edit form — read the form's current values
+                                        const nameEl = document.getElementById('rf-name');
+                                        roomName = nameEl ? nameEl.value.trim() : '';
+                                    }
+
+                                    const nameEl2 = document.getElementById('ps-archive-room-name');
+                                    if (nameEl2) nameEl2.textContent = roomName || '—';
+
+                                    pendingArchiveHref = link.getAttribute('href');
+                                    if (typeof psOpenModal === 'function') psOpenModal('ps-archive-room-modal');
+                                });
+
+                                /* Delegated — the confirm button lives in admin-rooms-modals.php which
+                                   is appended after this inline script runs, so getElementById at load
+                                   time returns null. A document-level delegated listener always works. */
+                                document.addEventListener('click', function(e) {
+                                    const btn = e.target.closest('#ps-archive-room-confirm-btn');
+                                    if (!btn) return;
+                                    if (!pendingArchiveHref) return;
+
+                                    if (typeof psCloseModal === 'function') psCloseModal('ps-archive-room-modal');
+
+                                    const href = pendingArchiveHref;
+                                    pendingArchiveHref = '';
+                                    btn.disabled = true;
+
                                     const url = href + (href.indexOf('?') !== -1 ? '&' : '?') + 'ajax=1';
-
-                                    fetch(url, {
-                                            credentials: 'same-origin'
+                                    fetch(url, { credentials: 'same-origin' })
+                                        .then(function(res) { return res.json(); })
+                                        .then(function(json) {
+                                            btn.disabled = false;
+                                            json = normalizeReply(json);
+                                            if (json && json.status === 'success') {
+                                                if (window.psRefreshRoomsRegistry) {
+                                                    window.psRefreshRoomsRegistry(json.html, json.floors_by_building);
+                                                }
+                                                refreshArchived(json);
+                                                closeRoomModal();
+                                                if (typeof switchRoomsTab === 'function') switchRoomsTab('rooms-archived');
+                                                if (typeof showToast === 'function') showToast(json.message || 'Facility archived.');
+                                            } else {
+                                                if (typeof showToast === 'function') showToast((json && json.message) || 'Could not archive facility. Please try again.');
+                                            }
                                         })
-                                        .then(function(res) {
-                                            return res.json();
-                                        })
-                                        .then(afterMutation)
-                                        .catch(onNetworkError);
+                                        .catch(function() {
+                                            btn.disabled = false;
+                                            onNetworkError();
+                                        });
                                 });
 
                                 /* Restore: intercept restore_room= links in the Archived sub-panel. */

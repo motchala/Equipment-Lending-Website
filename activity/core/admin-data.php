@@ -193,7 +193,7 @@ if (!function_exists('adm_act_specs')) {
                 'where'      => implode(' AND ', $where),
                 'types'      => $types,
                 'params'     => $params,
-                'cols'       => 't.admin_id, COALESCE(a.fullName, t.admin_name) AS actor_name, t.category, t.action, t.summary, UNIX_TIMESTAMP(t.created_at) AS ts',
+                'cols'       => 't.admin_id, COALESCE(a.fullName, t.admin_name) AS actor_name, t.category, t.action, t.summary, t.ref_type, t.ref_id, UNIX_TIMESTAMP(t.created_at) AS ts',
                 'order'      => 't.created_at DESC, t.id DESC',
                 'map'        => static function (array $r): array {
                     [$chip, $tab]  = adm_act_category_meta($r['category']);
@@ -209,6 +209,8 @@ if (!function_exists('adm_act_specs')) {
                         'text'       => (string)$r['summary'],
                         'meta'       => '',
                         'tab'        => $tab,
+                        'ref_type'   => (string)($r['ref_type'] ?? ''),
+                        'ref_id'     => (int)($r['ref_id'] ?? 0),
                     ];
                 },
             ];
@@ -250,6 +252,8 @@ if (!function_exists('adm_act_specs')) {
                         'text'       => $text,
                         'meta'       => adm_act_rule_label($r['rule_applied']),
                         'tab'        => 'requests',
+                        'ref_type'   => 'request',
+                        'ref_id'     => (int)$r['request_id'],
                     ];
                 },
             ];
@@ -290,6 +294,8 @@ if (!function_exists('adm_act_specs')) {
                         'text'       => $text,
                         'meta'       => adm_act_rule_label($r['rule_applied']),
                         'tab'        => 'rooms',
+                        'ref_type'   => 'reservation',
+                        'ref_id'     => (int)$r['reservation_id'],
                     ];
                 },
             ];
@@ -328,6 +334,8 @@ if (!function_exists('adm_act_specs')) {
                         'text'       => 'Extended request #' . (int)$r['request_id'] . ': ' . trim((string)$r['equipment_name']) . ($who !== '' ? ' for ' . $who : ''),
                         'meta'       => (string)$r['detail'],
                         'tab'        => 'requests',
+                        'ref_type'   => 'request',
+                        'ref_id'     => (int)$r['request_id'],
                     ];
                 },
             ];

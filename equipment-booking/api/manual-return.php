@@ -104,6 +104,21 @@ try {
         $stock->close();
     }
 
+    // Write the return condition back to the catalog so the item's current
+    // condition reflects the last known state. Only downgrade (Damaged/Missing/Fair)
+    // — do not overwrite a worse condition with 'Good' since another unit of the
+    // same item might already be flagged.
+    if (in_array($condition, ['Damaged', 'Missing', 'Fair'], true)) {
+        $condUpd = $conn->prepare(
+            "UPDATE tbl_inventory SET `condition` = ? WHERE item_name = ? LIMIT 1"
+        );
+        if ($condUpd) {
+            $condUpd->bind_param('ss', $condition, $loan['equipment_name']);
+            $condUpd->execute();
+            $condUpd->close();
+        }
+    }
+
     $details = 'Condition: ' . $condition . ($notes === '' ? '' : "\nNotes: " . $notes);
     $reason = 'Equipment returned manually by an administrator.';
     $log = $conn->prepare(
