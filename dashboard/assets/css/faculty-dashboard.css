@@ -11205,6 +11205,19 @@ body .side-nav .side-nav-user .side-nav-user-name {
     padding: 9px 0;
 }
 
+.fact-item.is-bundle {
+    border-left: 3px solid #800000;
+    padding-left: calc(1rem - 3px);
+}
+
+.fact-item.is-bundle .fact-item-sub::before {
+    content: '⬡ ';
+    color: #800000;
+    font-size: .75rem;
+}
+
+
+
 #panel-activity .fact-item.is-paged-out {
     display: none;
 }

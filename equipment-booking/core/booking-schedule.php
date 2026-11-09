@@ -621,9 +621,9 @@ final class BookingSchedule
         }
 
         if ($mode === 'today') {
-            $qty = 1;
-            if ($shelf < 1) {
-                return ['ok' => false, 'error' => '"' . $item . '" is out right now. Book it for a later date instead.'];
+            if ($shelf < $qty) {
+                $available = max(0, $shelf);
+                return ['ok' => false, 'error' => '"' . $item . '" only has ' . $available . ' unit(s) available right now.'];
             }
         } else {
             $total = self::totalStock($conn, $item);

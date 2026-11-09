@@ -80,7 +80,8 @@ function equipment_auto_approve_tick(mysqli $conn): void
                     r.borrow_qty,
                     r.borrow_date,
                     r.borrow_time,
-                    r.stock_applied
+                    r.stock_applied,
+                    r.batch_id
                FROM tbl_requests r
                JOIN tbl_inventory i ON i.item_name = r.equipment_name
               WHERE r.status = 'Waiting'
@@ -104,157 +105,170 @@ function equipment_auto_approve_tick(mysqli $conn): void
             return;
         }
 
-        // ── 4. Process each candidate ────────────────────────────────────────
+        // ── 4. Group candidates: batch rows together, solo rows alone ────────
+        // Rows sharing a batch_id must share one bundle_claim_token (same as
+        // approve-borrow-bundle.php) so the faculty sees 1 Claim QR for a bundle,
+        // not one per item. Rows with no batch_id are approved individually.
+        $groups   = [];   // group_key => [rows]
+        $seen_ids = [];   // guard: a row should only appear in one group
+
         foreach ($candidates as $req) {
-            $request_id    = (int)$req['id'];
-            $item_name     = (string)$req['equipment_name'];
-            $borrower_id   = (string)$req['faculty_id'];
-            $borrower_name = (string)$req['faculty_name'];
-            $is_scheduled  = in_array((string)($req['booking_mode'] ?? ''), ['today', 'future'], true);
-            $borrow_qty    = max(1, (int)($req['borrow_qty'] ?? 1));
+            $rid      = (int)$req['id'];
+            $batch    = trim((string)($req['batch_id'] ?? ''));
+            $key      = $batch !== '' ? 'batch:' . $batch : 'solo:' . $rid;
+            $groups[$key][] = $req;
+            $seen_ids[$rid] = true;
+        }
+
+        foreach ($groups as $group_key => $group_rows) {
+            $is_bundle = str_starts_with($group_key, 'batch:');
+
+            // One shared bundle_claim_token for the whole group; NULL for solo rows.
+            $bundle_claim_token = $is_bundle ? bin2hex(random_bytes(32)) : null;
 
             $conn->begin_transaction();
+            $committed = false;
 
             try {
-                // ── 4a. Idempotency guard: re-check status inside the transaction ──
-                // Another poll may have already approved this row between our SELECT
-                // above and now; skip it if so.
-                $check = $conn->prepare(
-                    "SELECT status FROM tbl_requests WHERE id = ? FOR UPDATE"
-                );
-                if (!$check) {
-                    $conn->rollback();
-                    continue;
-                }
-                $check->bind_param('i', $request_id);
-                $check->execute();
-                $check_row = $check->get_result()->fetch_assoc();
-                $check->close();
+                foreach ($group_rows as $req) {
+                    $request_id    = (int)$req['id'];
+                    $item_name     = (string)$req['equipment_name'];
+                    $borrower_id   = (string)$req['faculty_id'];
+                    $borrower_name = (string)$req['faculty_name'];
+                    $is_scheduled  = in_array((string)($req['booking_mode'] ?? ''), ['today', 'future'], true);
+                    $borrow_qty    = max(1, (int)($req['borrow_qty'] ?? 1));
 
-                if (!$check_row || (string)$check_row['status'] !== 'Waiting') {
-                    // Already approved / declined by another concurrent call.
-                    $conn->rollback();
-                    continue;
-                }
-
-                // ── 4b. Stock check (non-scheduled items only) ───────────────
-                if (!$is_scheduled) {
-                    $inv = $conn->prepare(
-                        "SELECT quantity FROM tbl_inventory WHERE item_name = ? LIMIT 1 FOR UPDATE"
+                    // ── Idempotency guard ─────────────────────────────────────
+                    $check = $conn->prepare(
+                        "SELECT status FROM tbl_requests WHERE id = ? FOR UPDATE"
                     );
-                    if (!$inv) {
+                    if (!$check) { $conn->rollback(); continue 2; }
+                    $check->bind_param('i', $request_id);
+                    $check->execute();
+                    $check_row = $check->get_result()->fetch_assoc();
+                    $check->close();
+
+                    if (!$check_row || (string)$check_row['status'] !== 'Waiting') {
                         $conn->rollback();
-                        continue;
+                        continue 2;
                     }
-                    $inv->bind_param('s', $item_name);
-                    $inv->execute();
-                    $inv_row = $inv->get_result()->fetch_assoc();
-                    $inv->close();
 
-                    if (!$inv_row || (int)$inv_row['quantity'] <= 0) {
-                        // Out of stock — leave as Waiting; a human can deal with it.
-                        $conn->rollback();
-                        continue;
+                    // ── Stock check (non-scheduled only) ──────────────────────
+                    if (!$is_scheduled) {
+                        $inv = $conn->prepare(
+                            "SELECT quantity FROM tbl_inventory WHERE item_name = ? LIMIT 1 FOR UPDATE"
+                        );
+                        if (!$inv) { $conn->rollback(); continue 2; }
+                        $inv->bind_param('s', $item_name);
+                        $inv->execute();
+                        $inv_row = $inv->get_result()->fetch_assoc();
+                        $inv->close();
+                        if (!$inv_row || (int)$inv_row['quantity'] < $borrow_qty) {
+                            $conn->rollback();
+                            continue 2;
+                        }
                     }
-                }
 
-                // ── 4c. Flip status to Approved ──────────────────────────────
-                $upd = $conn->prepare(
-                    "UPDATE tbl_requests
-                        SET status           = 'Approved',
-                            arbitration_rule = 'auto_approve_timeout',
-                            reason           = 'Auto-approved: no admin action within the buffer time.'
-                      WHERE id = ? AND status = 'Waiting'"
-                );
-                if (!$upd) {
-                    $conn->rollback();
-                    continue;
-                }
-                $upd->bind_param('i', $request_id);
-                $upd->execute();
-                $affected = $upd->affected_rows;
-                $upd->close();
-
-                if ($affected === 0) {
-                    // Another concurrent process already moved this row.
-                    $conn->rollback();
-                    continue;
-                }
-
-                // ── 4d. Generate return + claim tokens ───────────────────────
-                $return_token = bin2hex(random_bytes(32));
-                $claim_token  = bin2hex(random_bytes(32));
-
-                $tok = $conn->prepare(
-                    "UPDATE tbl_requests
-                        SET return_token = ?, claim_token = ?, bundle_claim_token = NULL
-                      WHERE id = ? AND claim_token IS NULL"
-                );
-                if (!$tok) {
-                    $conn->rollback();
-                    continue;
-                }
-                $tok->bind_param('ssi', $return_token, $claim_token, $request_id);
-                $tok->execute();
-                $tok->close();
-
-                // ── 4e. Inventory handling ───────────────────────────────────
-                if ($is_scheduled) {
-                    // Scheduled: stock will be taken when the booking starts
-                    // (BookingSchedule::activateDue). Mark stock_applied = 0
-                    // so activateDue knows it still needs to act.
-                    $sa = $conn->prepare(
-                        "UPDATE tbl_requests SET stock_applied = 0 WHERE id = ?"
+                    // ── Flip to Approved ──────────────────────────────────────
+                    $upd = $conn->prepare(
+                        "UPDATE tbl_requests
+                            SET status           = 'Approved',
+                                arbitration_rule = 'auto_approve_timeout',
+                                reason           = 'Auto-approved: no admin action within the buffer time.'
+                          WHERE id = ? AND status = 'Waiting'"
                     );
-                    if ($sa) {
-                        $sa->bind_param('i', $request_id);
-                        $sa->execute();
-                        $sa->close();
-                    }
-                } else {
-                    // Non-scheduled: take stock immediately.
-                    $dec = $conn->prepare(
-                        "UPDATE tbl_inventory SET quantity = quantity - 1 WHERE item_name = ? AND quantity > 0"
-                    );
-                    if (!$dec) {
-                        $conn->rollback();
-                        continue;
-                    }
-                    $dec->bind_param('s', $item_name);
-                    $dec->execute();
-                    $dec->close();
-                }
+                    if (!$upd) { $conn->rollback(); continue 2; }
+                    $upd->bind_param('i', $request_id);
+                    $upd->execute();
+                    $affected = $upd->affected_rows;
+                    $upd->close();
 
-                // ── 4f. Write arbitration log ────────────────────────────────
-                $log = $conn->prepare(
-                    "INSERT INTO tbl_arbitration_log
-                        (request_id, borrower_id, borrower_name, equipment_name,
-                         decision, rule_applied, reason,
-                         override_by, override_by_id, override_reason, created_at)
-                     VALUES
-                        (?, ?, ?, ?,
-                         'Approved', 'auto_approve_timeout',
-                         'Auto-approved: no admin action within the buffer time.',
-                         NULL, NULL, NULL, NOW())
-                     ON DUPLICATE KEY UPDATE
-                        decision     = 'Approved',
-                        rule_applied = 'auto_approve_timeout',
-                        reason       = 'Auto-approved: no admin action within the buffer time.',
-                        created_at   = NOW()"
-                );
-                if ($log) {
-                    $log->bind_param('isss', $request_id, $borrower_id, $borrower_name, $item_name);
-                    $log->execute();
-                    $log->close();
-                }
+                    if ($affected === 0) { $conn->rollback(); continue 2; }
+
+                    // ── Tokens ────────────────────────────────────────────────
+                    // Bundle rows: shared bundle_claim_token + NULL claim_token
+                    //              (same as approve-borrow-bundle.php)
+                    // Solo rows:   individual claim_token + NULL bundle_claim_token
+                    $return_token = bin2hex(random_bytes(32));
+
+                    if ($is_bundle) {
+                        $tok = $conn->prepare(
+                            "UPDATE tbl_requests
+                                SET return_token = ?,
+                                    claim_token = NULL,
+                                    bundle_claim_token = ?
+                              WHERE id = ?"
+                        );
+                        if (!$tok) { $conn->rollback(); continue 2; }
+                        $tok->bind_param('ssi', $return_token, $bundle_claim_token, $request_id);
+                    } else {
+                        $claim_token = bin2hex(random_bytes(32));
+                        $tok = $conn->prepare(
+                            "UPDATE tbl_requests
+                                SET return_token = ?,
+                                    claim_token = ?,
+                                    bundle_claim_token = NULL
+                              WHERE id = ?"
+                        );
+                        if (!$tok) { $conn->rollback(); continue 2; }
+                        $tok->bind_param('ssi', $return_token, $claim_token, $request_id);
+                    }
+                    $tok->execute();
+                    $tok->close();
+
+                    // ── Inventory ─────────────────────────────────────────────
+                    if ($is_scheduled) {
+                        $sa = $conn->prepare(
+                            "UPDATE tbl_requests SET stock_applied = 0 WHERE id = ?"
+                        );
+                        if ($sa) {
+                            $sa->bind_param('i', $request_id);
+                            $sa->execute();
+                            $sa->close();
+                        }
+                    } else {
+                        $dec = $conn->prepare(
+                            "UPDATE tbl_inventory
+                                SET quantity = quantity - ?
+                              WHERE item_name = ? AND quantity >= ?"
+                        );
+                        if (!$dec) { $conn->rollback(); continue 2; }
+                        $dec->bind_param('isi', $borrow_qty, $item_name, $borrow_qty);
+                        $dec->execute();
+                        $dec->close();
+                    }
+
+                    // ── Arbitration log ───────────────────────────────────────
+                    $log = $conn->prepare(
+                        "INSERT INTO tbl_arbitration_log
+                            (request_id, borrower_id, borrower_name, equipment_name,
+                             decision, rule_applied, reason,
+                             override_by, override_by_id, override_reason, created_at)
+                         VALUES (?, ?, ?, ?,
+                             'Approved', 'auto_approve_timeout',
+                             'Auto-approved: no admin action within the buffer time.',
+                             NULL, NULL, NULL, NOW())
+                         ON DUPLICATE KEY UPDATE
+                            decision     = 'Approved',
+                            rule_applied = 'auto_approve_timeout',
+                            reason       = 'Auto-approved: no admin action within the buffer time.',
+                            created_at   = NOW()"
+                    );
+                    if ($log) {
+                        $log->bind_param('isss', $request_id, $borrower_id, $borrower_name, $item_name);
+                        $log->execute();
+                        $log->close();
+                    }
+                } // end foreach group_rows
 
                 $conn->commit();
+                $committed = true;
 
             } catch (\Throwable $e) {
-                $conn->rollback();
-                error_log('equipment_auto_approve_tick[id=' . $request_id . '] — ' . $e->getMessage());
+                if (!$committed) $conn->rollback();
+                error_log('equipment_auto_approve_tick[group=' . $group_key . '] — ' . $e->getMessage());
             }
-        }
+        } // end foreach groups
 
     } catch (\Throwable $e) {
         error_log('equipment_auto_approve_tick — ' . $e->getMessage());

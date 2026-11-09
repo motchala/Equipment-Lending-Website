@@ -120,9 +120,13 @@ if (!is_array($raw_items) || empty($raw_items)) {
 $pseudo_post = [
     'booking_mode' => 'today',
     'start_time'   => (string)($body['time_slot'] ?? date('H:i')),
+    'end_time'     => (string)($body['end_time']   ?? ''),
     'duration'     => (int)($body['duration'] ?? 1),
     'borrow_date'  => date('Y-m-d'),
 ];
+// room_id from the room picker (nullable — "outside" maps to null)
+$raw_room_id = trim((string)($body['room_id'] ?? ''));
+$room_id     = ($raw_room_id !== '' && $raw_room_id !== 'outside') ? (int)$raw_room_id : null;
 
 $submitted = [];
 $failed    = [];

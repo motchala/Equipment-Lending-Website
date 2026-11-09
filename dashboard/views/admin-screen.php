@@ -34,7 +34,7 @@
                                  Keeps id="openQrScannerBtn": initQrScanner() in admin-dashboard.js binds to it. -->
                             <div class="dash-actions">
                                 <button type="button" class="dash-btn dash-btn--primary" id="openQrScannerBtn">
-                                    <span class="material-symbols-outlined" aria-hidden="true">qr_code_scanner</span>Scan return
+                                    <span class="material-symbols-outlined" aria-hidden="true">qr_code_scanner</span>Scan QR Code
                                 </button>
                             </div>
                             <div class="dash-head-user">

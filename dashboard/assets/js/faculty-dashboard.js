@@ -6640,13 +6640,63 @@
         }
     });
 
+    // ── Cart time → room picker wiring ──────────────────────────────
+    // When start/end time changes, call RoomPicker.setWindow() so the room
+    // picker knows which slot to check availability for.
+    document.addEventListener('change', function(e) {
+        var t = e.target;
+        if (t.id !== 'cartStartTime' && t.id !== 'cartEndTime') return;
+        cartUpdateRoomWindow();
+    });
+
+    function cartUpdateRoomWindow() {
+        var modal   = document.getElementById('cartCheckoutModal');
+        var startEl = document.getElementById('cartStartTime');
+        var endEl   = document.getElementById('cartEndTime');
+        var hintEl  = document.getElementById('cartTimeHint');
+        if (!modal || !startEl || !endEl || !window.RoomPicker) return;
+
+        var start = startEl.value;  // HH:MM
+        var end   = endEl.value;    // HH:MM
+
+        if (!start || !end) { window.RoomPicker.setWindow(modal, null); return; }
+
+        // Parse to minutes for comparison and duration calculation
+        var sParts = start.split(':'); var eParts = end.split(':');
+        var sMin   = parseInt(sParts[0], 10) * 60 + parseInt(sParts[1], 10);
+        var eMin   = parseInt(eParts[0], 10) * 60 + parseInt(eParts[1], 10);
+
+        if (eMin <= sMin) {
+            if (hintEl) { hintEl.textContent = 'End time must be after start time.'; hintEl.style.color = '#dc2626'; }
+            window.RoomPicker.setWindow(modal, null);
+            return;
+        }
+        if (hintEl) { hintEl.textContent = ''; hintEl.style.color = ''; }
+
+        // Duration in hours (what check-booking-availability.php expects)
+        var durationHours = (eMin - sMin) / 60;
+
+        var today   = new Date();
+        var pad     = function(n) { return String(n).padStart(2, '0'); };
+        var dateStr = today.getFullYear() + '-' + pad(today.getMonth() + 1) + '-' + pad(today.getDate());
+
+        // check-booking-availability.php expects: mode, date, time, duration, items, rooms
+        var query = 'mode=today'
+            + '&date=' + encodeURIComponent(dateStr)
+            + '&time=' + encodeURIComponent(start)
+            + '&duration=' + durationHours
+            + '&items=%5B%5D'
+            + '&rooms=1';
+        var label = 'Today · ' + start + ' → ' + end;
+        window.RoomPicker.setWindow(modal, query, label);
+    }
+
     // ── Checkout modal ──────────────────────────────────────────────
     function openCartCheckout() {
         if (cartCount() === 0) return;
         var modal = document.getElementById('cartCheckoutModal');
         var list  = document.getElementById('cartCheckoutList');
         var err   = document.getElementById('cartCheckoutError');
-        var room  = document.getElementById('cartRoom');
         if (!modal || !list) return;
 
         // Build item rows with quantity input per item
@@ -6667,8 +6717,25 @@
             list.appendChild(row);
         });
 
-        if (err)  { err.style.display = 'none'; err.textContent = ''; }
-        if (room) room.value = '';
+        if (err) { err.style.display = 'none'; err.textContent = ''; }
+
+        // Pre-fill start = now rounded to next 5 min, end = start + 1 hour
+        var now   = new Date();
+        var pad   = function(n) { return String(n).padStart(2, '0'); };
+        var sMin  = now.getHours() * 60 + now.getMinutes();
+        sMin      = Math.ceil((sMin + 1) / 5) * 5;   // round up to next 5 min
+        var eMin  = sMin + 60;
+        var startEl = document.getElementById('cartStartTime');
+        var endEl   = document.getElementById('cartEndTime');
+        var hintEl  = document.getElementById('cartTimeHint');
+        if (startEl) startEl.value = pad(Math.floor(sMin / 60) % 24) + ':' + pad(sMin % 60);
+        if (endEl)   endEl.value   = pad(Math.floor(eMin / 60) % 24) + ':' + pad(eMin % 60);
+        if (hintEl)  hintEl.textContent = '';
+
+        // Reset room picker then set the pre-filled window
+        if (window.RoomPicker) window.RoomPicker.reset(modal);
+        cartUpdateRoomWindow();
+
         modal.style.display = 'flex';
     }
 
@@ -6685,14 +6752,30 @@
         if (!e.target.closest('#cartCheckoutSubmit')) return;
 
         if (_submitting) return;
-        var room = (document.getElementById('cartRoom') ? document.getElementById('cartRoom').value : '').trim();
+        var cartModal   = document.getElementById('cartCheckoutModal');
+        var roomIdInput = cartModal ? cartModal.querySelector('[data-bm-room-input]') : null;
+        var roomValEl   = cartModal ? cartModal.querySelector('[data-bm-room-value]') : null;
+        var roomId      = roomIdInput ? roomIdInput.value.trim() : '';
+        var room        = roomValEl ? (roomValEl.textContent || '').trim() : '';
+        if (room === 'Choose a room') room = '';
+        var startTime   = (document.getElementById('cartStartTime') || {}).value || '';
+        var endTime     = (document.getElementById('cartEndTime')   || {}).value || '';
         var err  = document.getElementById('cartCheckoutError');
 
-        if (!room) {
+        if (!startTime || !endTime) {
+            if (err) { err.textContent = 'Please set a start and end time.'; err.style.display = ''; }
+            return;
+        }
+        if (endTime <= startTime) {
+            if (err) { err.textContent = 'End time must be after start time.'; err.style.display = ''; }
+            return;
+        }
+        if (!room || !roomId) {
             if (err) {
-                err.textContent = 'Room / Location is required.';
+                err.textContent = 'Please choose a room before submitting.';
                 err.style.display = '';
-                document.getElementById('cartRoom').focus();
+                var trigger = cartModal ? cartModal.querySelector('[data-bm-room-trigger]') : null;
+                if (trigger) trigger.focus();
             }
             return;
         }
@@ -6720,9 +6803,13 @@
         var itemsPayload = Object.values(_cart).map(function (it) {
             return { name: it.name, qty: it.qty };
         });
-        var now = new Date();
-        var timeSlot = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
-        var roomIdEl = document.getElementById('cartRoomId');
+        var timeSlot = startTime;  // start time chosen by faculty
+        var roomIdEl = roomIdInput; // already read above
+        // Duration in hours from start to end time
+        var sParts2 = startTime.split(':'); var eParts2 = endTime.split(':');
+        var cartDurationHours = ((parseInt(eParts2[0], 10) * 60 + parseInt(eParts2[1], 10))
+            - (parseInt(sParts2[0], 10) * 60 + parseInt(sParts2[1], 10))) / 60;
+        if (cartDurationHours <= 0) cartDurationHours = 1;
 
         fetch('equipment-booking/api/submit-cart-borrow.php', {
             method: 'POST',
@@ -6730,9 +6817,10 @@
             body: JSON.stringify({
                 csrf_token:          csrf,
                 room:                room,
+                room_id:             roomId,
                 items:               itemsPayload,
                 time_slot:           timeSlot,
-                duration:            1,
+                duration:            cartDurationHours,
                 collector_type:      cartCollectorType,
                 collector_name:      cartCollectorName,
             }),

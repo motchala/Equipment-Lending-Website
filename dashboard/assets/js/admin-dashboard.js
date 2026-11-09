@@ -4429,7 +4429,7 @@
                 const code = window.jsQR(imageData.data, w, h, { inversionAttempts: 'attemptBoth' });
                 if (code) {
                     scanning = false;
-                    status.textContent = '✅ QR detected — confirming return...';
+                    status.textContent = '✅ QR detected — processing...';
                     status.style.color = '#22c55e';
 
                     // Extract token from the URL in the QR
@@ -4462,17 +4462,239 @@
                     })
                         .then(r => r.json())
                         .then(data => {
-                            if (data.success) {
-                                scannedCount++;
+                            if (data.success && data.checklist) {
+                                // Show inline checklist inside the scanner modal
+                                scanning = false;
+                                const cameraView    = document.getElementById('qrCameraView');
+                                const checklistView = document.getElementById('qrChecklistView');
+                                const itemsEl       = document.getElementById('qrChecklistItems');
+                                const hintEl        = document.getElementById('qrChecklistHint');
+                                const confirmBtn    = document.getElementById('qrChecklistConfirm');
+                                const cancelBtn     = document.getElementById('qrChecklistCancel');
+                                const titleEl       = document.getElementById('qrScannerTitle');
+                                const subtitleEl    = document.getElementById('qrScannerSubtitle');
+
+                                // Switch view
+                                cameraView.style.display    = 'none';
+                                checklistView.style.display = '';
+                                titleEl.textContent    = isClaimQr ? 'Claim Checklist' : 'Return Checklist';
+                                subtitleEl.textContent = isClaimQr
+                                    ? 'Hand over to ' + (data.collector || data.borrower)
+                                    : 'Return from ' + data.borrower;
+
+                                // Build item rows
+                                itemsEl.innerHTML = '';
+                                const CONDITIONS = ['Good', 'Fair', 'Damaged', 'Missing'];
+                                data.items.forEach(function(item, idx) {
+                                    const bg = idx % 2 === 0 ? '#fff' : '#fafafa';
+                                    const row = document.createElement('div');
+                                    row.style.cssText = 'display:flex;align-items:center;gap:.65rem;padding:.75rem 1rem;background:' + bg + ';border-bottom:1px solid #f0f0f0;';
+                                    if (isClaimQr) {
+                                        // Claim row: qty spinner (how many units actually handed over)
+                                        // + condition for units NOT handed over.
+                                        // Admin sets actual_qty = how many go with faculty.
+                                        // Remainder = borrow_qty - actual_qty stays in cabinet.
+                                        const maxQty = item.borrow_qty;
+                                        const notHandedOpts = ['Good', 'Damaged', 'Missing'].map(c =>
+                                            '<option value="' + c + '">' + c + '</option>'
+                                        ).join('');
+                                        row.innerHTML =
+                                            '<span style="flex:1;"><strong style="display:block;font-size:.9rem;">' + item.equipment_name + '</strong>' +
+                                            '<span style="font-size:.78rem;color:#888;">Requested: ' + maxQty + '</span></span>' +
+                                            '<div style="display:flex;align-items:center;gap:.4rem;flex-shrink:0;">' +
+                                            '<span style="font-size:.78rem;color:#555;white-space:nowrap;">Give:</span>' +
+                                            '<button type="button" data-claim-dec data-req-id="' + item.id + '" ' +
+                                            'style="width:26px;height:26px;border:1px solid #d1d5db;border-radius:6px;background:#f9f9f9;font-size:1rem;cursor:pointer;line-height:1;">−</button>' +
+                                            '<input type="number" data-claim-qty data-req-id="' + item.id + '" data-max-qty="' + maxQty + '" ' +
+                                            'value="' + maxQty + '" min="0" max="' + maxQty + '" ' +
+                                            'style="width:42px;text-align:center;border:1px solid #d1d5db;border-radius:6px;padding:.25rem;font-size:.9rem;">' +
+                                            '<button type="button" data-claim-inc data-req-id="' + item.id + '" ' +
+                                            'style="width:26px;height:26px;border:1px solid #d1d5db;border-radius:6px;background:#f9f9f9;font-size:1rem;cursor:pointer;line-height:1;">+</button>' +
+                                            '</div>' +
+                                            '<select data-claim-cond data-req-id="' + item.id + '" ' +
+                                            'title="Condition of units NOT given" ' +
+                                            'style="padding:.3rem .5rem;border:1px solid #d1d5db;border-radius:6px;font-size:.82rem;background:#fff;cursor:pointer;display:none;" >' +
+                                            notHandedOpts + '</select>';
+                                    } else {
+                                        const opts = CONDITIONS.map(c =>
+                                            '<option value="' + c + '">' + c + '</option>'
+                                        ).join('');
+                                        const itemToken = item.return_token || token;
+                                        // Checkbox: admin ticks only the items being returned RIGHT NOW.
+                                        // Unticked items stay On Loan — their Return QR remains valid.
+                                        row.innerHTML =
+                                            '<input type="checkbox" data-req-id="' + item.id + '" checked ' +
+                                            'style="width:17px;height:17px;accent-color:#800000;flex-shrink:0;cursor:pointer;">' +
+                                            '<span style="flex:1;"><strong style="display:block;font-size:.9rem;">' + item.equipment_name + '</strong>' +
+                                            '<span style="font-size:.78rem;color:#888;">Qty: ' + item.borrow_qty + ' · ' + item.status + '</span></span>' +
+                                            '<select data-req-id="' + item.id + '" data-return-token="' + itemToken + '" ' +
+                                            'style="padding:.35rem .6rem;border:1px solid #d1d5db;border-radius:6px;font-size:.85rem;background:#fff;">' +
+                                            opts + '</select>';
+                                    }
+                                    itemsEl.appendChild(row);
+                                });
+
+                                // Wire qty +/- buttons and condition dropdown visibility
                                 if (isClaimQr) {
-                                    status.textContent = '✅ Claim confirmed!';
-                                    status.style.color = '#22c55e';
-                                    showToast('✅ Equipment claim confirmed — item handed over.');
-                                } else {
-                                    status.textContent = '✅ Return confirmed!';
-                                    status.style.color = '#22c55e';
-                                    showToast('✅ Equipment return confirmed via QR.');
+                                    itemsEl.addEventListener('click', function(e) {
+                                        var dec = e.target.closest('[data-claim-dec]');
+                                        var inc = e.target.closest('[data-claim-inc]');
+                                        var btn = dec || inc;
+                                        if (!btn) return;
+                                        var rid  = btn.dataset.reqId || btn.getAttribute('data-req-id');
+                                        var inp  = itemsEl.querySelector('input[data-claim-qty][data-req-id="' + rid + '"]');
+                                        var cond = itemsEl.querySelector('select[data-claim-cond][data-req-id="' + rid + '"]');
+                                        if (!inp) return;
+                                        var max = parseInt(inp.dataset.maxQty || inp.max, 10);
+                                        var v   = parseInt(inp.value, 10);
+                                        if (dec) v = Math.max(0, v - 1);
+                                        if (inc) v = Math.min(max, v + 1);
+                                        inp.value = v;
+                                        // Show condition dropdown only when some units are withheld
+                                        if (cond) cond.style.display = (v < max) ? '' : 'none';
+                                    });
+                                    itemsEl.addEventListener('change', function(e) {
+                                        var inp = e.target.closest('input[data-claim-qty]');
+                                        if (!inp) return;
+                                        var max  = parseInt(inp.dataset.maxQty || inp.max, 10);
+                                        var v    = Math.max(0, Math.min(max, parseInt(inp.value, 10) || 0));
+                                        inp.value = v;
+                                        var rid  = inp.getAttribute('data-req-id');
+                                        var cond = itemsEl.querySelector('select[data-claim-cond][data-req-id="' + rid + '"]');
+                                        if (cond) cond.style.display = (v < max) ? '' : 'none';
+                                    });
                                 }
+
+                                hintEl.textContent = isClaimQr
+                                    ? 'Set how many units to give. If less than requested, choose why (Damaged/Missing/Good). A reason is required.'
+                                    : 'Tick only items being returned now. Unticked items stay On Loan. "Damaged" or "Missing" flags the record.';
+
+                                // Confirm handler
+                                confirmBtn.onclick = function() {
+                                    confirmBtn.disabled = true;
+                                    confirmBtn.textContent = 'Saving...';
+
+                                    const formData = new FormData();
+                                    formData.append('token', token);
+
+                                    // Get CSRF from the page
+                                    const csrfInput = document.querySelector('input[name="csrf_token"]');
+                                    if (csrfInput) formData.append('csrf_token', csrfInput.value);
+
+                                    if (isClaimQr) {
+                                        // Collect actual qty per item from the spinners
+                                        const claimRows = [];
+                                        itemsEl.querySelectorAll('input[data-claim-qty][data-req-id]').forEach(function(inp) {
+                                            const rid      = inp.getAttribute('data-req-id');
+                                            const maxQty   = parseInt(inp.dataset.maxQty || inp.max, 10);
+                                            const giveQty  = Math.max(0, Math.min(maxQty, parseInt(inp.value, 10) || 0));
+                                            const condSel  = itemsEl.querySelector('select[data-claim-cond][data-req-id="' + rid + '"]');
+                                            const withheld = maxQty - giveQty;
+                                            const cond     = (withheld > 0 && condSel) ? condSel.value : 'Good';
+                                            claimRows.push({ id: rid, give: giveQty, max: maxQty, withheld: withheld, condition: cond });
+                                        });
+
+                        // Reason required only when a GOOD-condition item is being withheld.
+                        // Damaged / Missing are self-explanatory — no reason needed.
+                        const needReason = claimRows.filter(r => r.withheld > 0 && r.condition === 'Good');
+                        if (needReason.length > 0) {
+                            const lines = needReason.map(function(r) {
+                                const inp = itemsEl.querySelector('input[data-claim-qty][data-req-id="' + r.id + '"]');
+                                const nameEl = inp ? inp.closest('div').previousElementSibling.querySelector('strong') : null;
+                                const name = nameEl ? nameEl.textContent : 'Item #' + r.id;
+                                return name + ': giving ' + r.give + ' of ' + r.max;
+                            }).join('\n');
+                            const reason = window.prompt(
+                                'You are withholding a Good-condition item:\n' + lines +
+                                '\n\nReason is required (e.g. "Reserved for another faculty"):',
+                                ''
+                            );
+                            if (reason === null || reason.trim() === '') {
+                                confirmBtn.disabled = false;
+                                confirmBtn.textContent = 'Confirm';
+                                return;
+                            }
+                            needReason.forEach(function(r) {
+                                formData.append('reason[' + r.id + ']', reason.trim());
+                            });
+                        }
+                        // Damaged / Missing withheld items get an automatic reason
+                        claimRows.filter(r => r.withheld > 0 && r.condition !== 'Good').forEach(function(r) {
+                            formData.append('reason[' + r.id + ']', r.condition + ' at handover — item kept in cabinet.');
+                        });
+
+
+                                        claimRows.forEach(function(r) {
+                                            formData.append('give_qty[' + r.id + ']', r.give);
+                                            if (r.withheld > 0) {
+                                                formData.append('withheld_qty[' + r.id + ']', r.withheld);
+                                                formData.append('withheld_cond[' + r.id + ']', r.condition);
+                                            }
+                                        });
+
+                                        fetch('equipment-booking/api/partial-claim.php', {
+                                            method: 'POST', credentials: 'same-origin', body: formData
+                                        }).then(function(r) { return r.json(); })
+                                        .then(function(result) {
+                                            const msg = (result.claimed || 0) + ' item(s) handed over' +
+                                                (result.withheld > 0 ? ', ' + result.withheld + ' unit(s) withheld.' : '.');
+                                            showToast('✅ ' + msg);
+                                            resetToCamera();
+                                            if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
+                                        }).catch(function() {
+                                            showToast('Network error. Please try again.');
+                                            confirmBtn.disabled = false;
+                                            confirmBtn.textContent = 'Confirm';
+                                        });
+                                    } else {
+                                        // Only process items whose checkbox is ticked
+                                        itemsEl.querySelectorAll('input[type="checkbox"]:checked[data-req-id]').forEach(function(cb) {
+                                            const rid = cb.dataset.reqId;
+                                            const sel = itemsEl.querySelector('select[data-req-id="' + rid + '"]');
+                                            if (sel) {
+                                                formData.append('condition[' + rid + ']', sel.value);
+                                                if (sel.dataset.returnToken) {
+                                                    formData.append('item_token[' + rid + ']', sel.dataset.returnToken);
+                                                }
+                                            }
+                                        });
+                                        fetch('equipment-booking/api/partial-return.php', {
+                                            method: 'POST', credentials: 'same-origin', body: formData
+                                        }).then(function(r) { return r.json(); })
+                                        .then(function(result) {
+                                            const n = result.returned || 0;
+                                            showToast('✅ ' + n + ' item' + (n === 1 ? '' : 's') + ' marked as returned.');
+                                            resetToCamera();
+                                            if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
+                                        }).catch(function() {
+                                            showToast('Network error. Please try again.');
+                                            confirmBtn.disabled = false;
+                                            confirmBtn.textContent = 'Confirm';
+                                        });
+                                    }
+                                };
+
+                                // Cancel — go back to camera view
+                                cancelBtn.onclick = resetToCamera;
+
+                                function resetToCamera() {
+                                    confirmBtn.disabled = false;
+                                    confirmBtn.textContent = 'Confirm';
+                                    checklistView.style.display = 'none';
+                                    cameraView.style.display    = '';
+                                    titleEl.textContent    = 'Scan QR Code';
+                                    subtitleEl.textContent = 'Point the camera at the faculty member\'s QR code.';
+                                    status.textContent = 'Point camera at the next QR code.';
+                                    status.style.color = '#888';
+                                    scanning = true;
+                                    tick();
+                                }
+
+                            } else if (data.success) {
+                                scannedCount++;
+                                status.textContent = isClaimQr ? '✅ Claim confirmed!' : '✅ Return confirmed!';
+                                status.style.color = '#22c55e';
+                                showToast(isClaimQr ? '✅ Equipment claim confirmed.' : '✅ Equipment return confirmed via QR.');
                                 setTimeout(() => {
                                     status.textContent = scannedCount > 1
                                         ? `Point camera at the next QR code. (${scannedCount} confirmed this session)`
