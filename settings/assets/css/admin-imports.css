@@ -1,6 +1,6 @@
 /* ================================================================
    admin-imports.css
-   Settings -> Imports (Super Admin). Loaded after admin-dashboard.css and built
+   Imports screen (Super Admin, its own sidebar tab: #panel-imports). Loaded after admin-dashboard.css and built
    only from its design tokens (--accent-maroon, --accent-gold*, --khaki-border,
    --card-bg, --radius ...), so it follows the light / dark theme automatically.
    No inline styles are used in the markup (CSP).
@@ -17,7 +17,7 @@
     transition: filter .5s ease, opacity .5s ease, transform .5s ease;
 }
 
-/* Locked: only THIS content is blurred and dead to clicks (the rest of Settings stays usable) */
+/* Locked: only THIS content is blurred and dead to clicks (the page header stays visible) */
 .imp-shell.is-locked {
     overflow: hidden;
     max-height: 640px;
@@ -1372,5 +1372,64 @@
 @media (prefers-reduced-motion: reduce) {
     .imp-guide-panel {
         animation: none;
+    }
+}
+
+/* ================================================================
+   SCREEN LAYOUT  (Imports is its own sidebar screen, #panel-imports)
+   Page header on top; below it the import cards on the left and the
+   import guide on the right (sticky, so it stays in view while you work).
+   Under 1180px the guide drops below the cards.
+================================================================ */
+.imp-page-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.imp-page-head-text {
+    min-width: 0;
+}
+
+.imp-page-head-text .sett-page-sub {
+    max-width: 70ch;
+}
+
+.imp-session[hidden] {
+    display: none;
+}
+
+.imp-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
+    gap: 1.5rem;
+    align-items: start;
+}
+
+.imp-main {
+    display: flex;
+    flex-direction: column;
+    gap: 1.9rem;
+    min-width: 0;
+}
+
+.imp-layout .imp-guide {
+    position: sticky;
+    top: 1rem;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+}
+
+@media (max-width: 1180px) {
+    .imp-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .imp-layout .imp-guide {
+        position: static;
+        max-height: none;
+        overflow: visible;
     }
 }

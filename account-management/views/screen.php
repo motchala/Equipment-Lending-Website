@@ -329,6 +329,7 @@
                                 data-name="<?php echo htmlspecialchars($acct['fullName'] ?? '', ENT_QUOTES); ?>"
                                 data-email="<?php echo htmlspecialchars($acct['email'] ?? '', ENT_QUOTES); ?>"
                                 data-role="<?php echo htmlspecialchars($acct['role'] ?? 'Admin', ENT_QUOTES); ?>"
+                                data-admin-no="<?php echo (int)($acct['admin_no'] ?? 0) ?: ''; ?>"
                                 data-created="<?php echo htmlspecialchars($am_created, ENT_QUOTES); ?>"
                                 data-last-login="<?php echo htmlspecialchars($am_login, ENT_QUOTES); ?>"
                                 data-locked-until="<?php echo $am_until; ?>"
@@ -369,6 +370,7 @@
                                 <h3 class="am-d-name" id="am-d-name"></h3>
                                 <p class="am-d-email" id="am-d-email"></p>
                                 <div class="am-tags">
+                                    <span class="am-tag am-tag--no" id="am-d-no" hidden></span>
                                     <span class="am-tag" id="am-d-role"></span>
                                     <span class="am-tag" id="am-d-status"></span>
                                 </div>

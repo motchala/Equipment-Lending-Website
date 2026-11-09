@@ -2534,7 +2534,10 @@
                     li.classList.add('act-event--who');
                     const who = admEl('div', 'act-event-who');
                     if (ev.actor_type === 'auto') who.appendChild(admEl('span', 'act-pill', 'Automatic'));
-                    else who.textContent = ev.actor_name;
+                    else {
+                        who.appendChild(document.createTextNode(ev.actor_name));
+                        if (ev.actor_no) who.appendChild(admEl('span', 'act-no', 'Admin ' + ev.actor_no));
+                    }
                     li.appendChild(who);
                 }
                 li.appendChild(admEl('time', 'act-event-time', actTimeLabel(ev.ts)));
@@ -2714,13 +2717,13 @@
 
         /* ── seats (header counter + Add button) ──────────────── */
         /* The Activity page's "Who" list mirrors the admin accounts, so changes here show up there at once. */
-        function syncActorOption(id, name) {
+        function syncActorOption(id, name, adminNo) {
             const sel = document.getElementById('act-actor');
             if (!sel || !id) return;
             let opt = Array.from(sel.options).find(function (o) { return o.value === String(id); });
             if (name === null) { if (opt) opt.remove(); return; }
             if (!opt) { opt = document.createElement('option'); opt.value = String(id); sel.appendChild(opt); }
-            opt.textContent = name;
+            opt.textContent = name + (parseInt(adminNo, 10) > 0 ? ' (Admin ' + parseInt(adminNo, 10) + ')' : '');
         }
 
         function updateSeats(count, remaining) {
@@ -2754,6 +2757,7 @@
             b.setAttribute('data-name', a.name);
             b.setAttribute('data-email', a.email);
             b.setAttribute('data-role', a.role);
+            b.setAttribute('data-admin-no', a.adminNo ? String(a.adminNo) : '');
             b.setAttribute('data-created', a.created || '');
             b.setAttribute('data-last-login', '');
             b.setAttribute('data-locked-until', '0');
@@ -2824,6 +2828,12 @@
             document.getElementById('am-d-avatar').textContent = initials(name);
             document.getElementById('am-d-name').textContent = name;
             document.getElementById('am-d-email').textContent = item.getAttribute('data-email');
+            const adminNo = parseInt(item.getAttribute('data-admin-no'), 10) || 0;
+            const noTag = document.getElementById('am-d-no');
+            if (noTag) {
+                noTag.hidden = !adminNo;
+                if (adminNo) setTag(noTag, 'Admin ' + adminNo, 'no');
+            }
             setTag(document.getElementById('am-d-role'), role, role === 'Super Admin' ? 'super' : '');
             if (until) setTag(document.getElementById('am-d-status'), 'Locked until ' + admShortDate(until), 'locked', 'lock');
             else setTag(document.getElementById('am-d-status'), 'Active', 'active');
@@ -3035,11 +3045,11 @@
                         return showAlert('adm-form-alert', data.message || 'Something went wrong. Please try again.');
                     }
                     const item = buildItem({
-                        id: data.id, name: fullName, email: email, role: role,
+                        id: data.id, name: fullName, email: email, role: role, adminNo: data.admin_no,
                         created: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: ADM_TZ })
                     });
                     list.insertBefore(item, listEmpty);
-                    syncActorOption(data.id, fullName);
+                    syncActorOption(data.id, fullName, data.admin_no);
                     refreshListEmpty();
                     if (typeof data.accounts_remaining === 'number') updateSeats(5 - data.accounts_remaining, data.accounts_remaining);
                     closeModal(addModal);
@@ -3099,7 +3109,7 @@
                 item.querySelector('.am-avatar').textContent = initials(r.data.full_name);
                 item.querySelector('.am-item-name').firstChild.textContent = r.data.full_name;
                 item.querySelector('.am-item-email').textContent = r.data.email;
-                syncActorOption(item.getAttribute('data-id'), r.data.full_name);
+                syncActorOption(item.getAttribute('data-id'), r.data.full_name, item.getAttribute('data-admin-no'));
                 if (item === current) renderDetail(item);
                 closeModal(editModal);
                 showToast(r.data.signed_out ? 'Saved. They have been signed out everywhere.' : 'Admin details saved.', 'success');

@@ -183,23 +183,61 @@ $dup_stmt->close();
 $password_hash = password_hash($password_raw, PASSWORD_BCRYPT);
 $now = date('Y-m-d H:i:s');
 
-$ins_stmt = $conn->prepare(
-    "INSERT INTO tbl_accounts (fullName, email, password, role, created_at) VALUES (?, ?, ?, ?, ?)"
-);
-if (!$ins_stmt) {
-    error_log('[create-admin-account] INSERT prepare failed: ' . $conn->error);
+// Seat number: Admin 1 is the Super Admin, so a new admin gets the lowest free number from 2 to 5.
+// (The unique index on admin_no makes two simultaneous creates retry instead of sharing a number.)
+require_once __DIR__ . '/../core/admin-numbers.php';
+$has_admin_no = admin_no_ensure($conn);
+$admin_no = 0;
+$new_id = 0;
+for ($attempt = 0; $attempt < 3 && $new_id === 0; $attempt++) {
+    if ($has_admin_no) {
+        $admin_no = admin_no_next($conn);
+        if ($admin_no < 1) {
+            send_json(409, 'error', 'All 5 admin numbers are in use. Remove an existing account before adding a new one.');
+        }
+        $ins_stmt = $conn->prepare(
+            "INSERT INTO tbl_accounts (fullName, email, password, role, admin_no, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+        );
+        if ($ins_stmt) {
+            $ins_stmt->bind_param('ssssis', $full_name, $email, $password_hash, $role, $admin_no, $now);
+        }
+    } else {
+        // admin_no column unavailable (no ALTER permission): still create the account, just unnumbered.
+        $ins_stmt = $conn->prepare(
+            "INSERT INTO tbl_accounts (fullName, email, password, role, created_at) VALUES (?, ?, ?, ?, ?)"
+        );
+        if ($ins_stmt) {
+            $ins_stmt->bind_param('sssss', $full_name, $email, $password_hash, $role, $now);
+        }
+    }
+    if (!$ins_stmt) {
+        error_log('[create-admin-account] INSERT prepare failed: ' . $conn->error);
+        send_json(500, 'error', 'Could not create account. Please try again.');
+    }
+    $errno = 0;
+    try {
+        if ($ins_stmt->execute()) {
+            $new_id = (int)$ins_stmt->insert_id;
+        } else {
+            $errno = (int)$ins_stmt->errno;
+        }
+    } catch (mysqli_sql_exception $e) {   // PHP 8.1+ throws instead of returning false
+        $errno = (int)$e->getCode();
+    }
+    $ins_stmt->close();
+    if ($new_id === 0) {
+        error_log('[create-admin-account] INSERT execute failed (errno ' . $errno . ')');
+        if (!($errno === 1062 && $has_admin_no)) {   // 1062 = someone just took that number: pick again
+            send_json(500, 'error', 'Could not create account. Please try again.');
+        }
+    }
+}
+if ($new_id === 0) {
     send_json(500, 'error', 'Could not create account. Please try again.');
 }
-$ins_stmt->bind_param('sssss', $full_name, $email, $password_hash, $role, $now);
-if (!$ins_stmt->execute()) {
-    error_log('[create-admin-account] INSERT execute failed: ' . $conn->error);
-    send_json(500, 'error', 'Could not create account. Please try again.');
-}
-$new_id = (int)$ins_stmt->insert_id;
-$ins_stmt->close();
 
 require_once __DIR__ . '/../../shared/core/activity-logger.php';
-admin_log_activity($conn, 'account', 'Created admin account for ' . $full_name);
+admin_log_activity($conn, 'account', 'Created admin account for ' . $full_name . ($admin_no > 0 ? ' (Admin ' . $admin_no . ')' : ''));
 
 // ── Success ───────────────────────────────────────────────────────────────────
 $remaining = 5 - ($current_count + 1);
@@ -208,6 +246,7 @@ echo json_encode([
     'status'       => 'success',
     'message'      => "Admin account for {$full_name} created successfully.",
     'id'           => $new_id,
+    'admin_no'     => $admin_no,
     'accounts_remaining' => $remaining,
 ]);
 exit;

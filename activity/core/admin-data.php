@@ -20,6 +20,7 @@
  */
 
 require_once __DIR__ . '/../../shared/core/activity-logger.php';
+require_once __DIR__ . '/../../account-management/core/admin-numbers.php';
 
 if (!function_exists('adm_act_categories')) {
     /** Filter chip → tbl_admin_activity categories ('decisions' is internal: requests + rooms). */
@@ -193,7 +194,7 @@ if (!function_exists('adm_act_specs')) {
                 'where'      => implode(' AND ', $where),
                 'types'      => $types,
                 'params'     => $params,
-                'cols'       => 't.admin_id, COALESCE(a.fullName, t.admin_name) AS actor_name, t.category, t.action, t.summary, t.ref_type, t.ref_id, UNIX_TIMESTAMP(t.created_at) AS ts',
+                'cols'       => 't.admin_id, COALESCE(a.fullName, t.admin_name) AS actor_name, ' . (!empty($q['has_admin_no']) ? 'a.admin_no' : 'NULL') . ' AS actor_no, t.category, t.action, t.summary, t.ref_type, t.ref_id, UNIX_TIMESTAMP(t.created_at) AS ts',
                 'order'      => 't.created_at DESC, t.id DESC',
                 'map'        => static function (array $r): array {
                     [$chip, $tab]  = adm_act_category_meta($r['category']);
@@ -203,6 +204,7 @@ if (!function_exists('adm_act_specs')) {
                         'actor_type' => 'admin',
                         'actor_id'   => (int)$r['admin_id'],
                         'actor_name' => (string)$r['actor_name'],
+                        'actor_no'   => (int)($r['actor_no'] ?? 0),   // "Admin N" seat number (0 = none)
                         'category'   => $chip,
                         'icon'       => $icon,
                         'tone'       => $tone,
@@ -349,6 +351,7 @@ if (!function_exists('admin_activity_count')) {
     function admin_activity_count(mysqli $conn, array $q): int
     {
         admin_activity_bootstrap($conn);
+        $q['has_admin_no'] = admin_no_ensure($conn);
         $total = 0;
         foreach (adm_act_specs($q) as $spec) {
             if (in_array($spec['from'], ['tbl_room_arbitration_log', 'tbl_request_events'], true) && !admin_activity_table_exists($conn, $spec['from'])) {
@@ -380,6 +383,7 @@ if (!function_exists('admin_activity_feed')) {
     function admin_activity_feed(mysqli $conn, array $q): array
     {
         admin_activity_bootstrap($conn);
+        $q['has_admin_no'] = admin_no_ensure($conn);
 
         $offset = max(0, (int)($q['offset'] ?? 0));
         $limit  = max(1, (int)($q['limit'] ?? 15));
