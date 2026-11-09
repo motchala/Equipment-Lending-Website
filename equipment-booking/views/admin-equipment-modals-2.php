@@ -297,3 +297,71 @@
             </div>
         </div>
     </div>
+
+    <!-- MODAL: MANUAL CLAIM (Pickup tab — no borrower QR code available) -->
+    <div class="ps-modal-backdrop" id="ps-manual-claim-modal">
+        <div class="ps-modal ps-modal--sm">
+            <div class="ps-modal-head">
+                <div class="ps-modal-head-icon ps-mhi--success">
+                    <span class="material-symbols-outlined">move_to_inbox</span>
+                </div>
+                <h3>Manual Claim</h3>
+                <button class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-manual-claim-modal"
+                    aria-label="Close">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="ps-modal-body">
+                <input type="hidden" id="manual-claim-request-id" value="">
+                <div id="ps-manual-claim-alert" class="ps-inline-alert"
+                    style="display:none;margin-bottom:.85rem;padding:.6rem .8rem;border-radius:8px;font-size:12.5px"></div>
+
+                <div class="ps-req-summary">
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Borrower</span><span class="ps-rsv" id="mc-borrower" style="font-weight:600">—</span></div>
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Equipment</span><span class="ps-rsv" id="mc-equipment">—</span></div>
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Due Date</span><span class="ps-rsv" id="mc-due">—</span></div>
+                </div>
+
+                <div class="ps-form-group" style="margin-top:1rem">
+                    <label class="ps-form-label">Units to hand over</label>
+                    <div style="display:flex;align-items:center;gap:8px">
+                        <button type="button" id="mc-qty-dec"
+                            style="width:30px;height:30px;border:1px solid var(--border);border-radius:6px;background:var(--surface-2);font-size:1.1rem;cursor:pointer;line-height:1">−</button>
+                        <input type="number" id="mc-qty" min="0" max="1" value="1"
+                            style="width:56px;text-align:center;border:1px solid var(--border);border-radius:6px;padding:.35rem;font-size:.95rem">
+                        <button type="button" id="mc-qty-inc"
+                            style="width:30px;height:30px;border:1px solid var(--border);border-radius:6px;background:var(--surface-2);font-size:1.1rem;cursor:pointer;line-height:1">+</button>
+                        <span id="mc-qty-of" style="font-size:.82rem;color:var(--text-light)">of 1</span>
+                    </div>
+                    <div class="ps-form-hint">Set to 0 if nothing is being handed over (will decline the request).</div>
+                </div>
+
+                <div class="ps-form-group" id="mc-withheld-wrap" style="display:none">
+                    <label class="ps-form-label">Condition of withheld units</label>
+                    <select class="ps-form-control" id="mc-withheld-cond">
+                        <option value="Good">Good — available, just not given now</option>
+                        <option value="Damaged">Damaged — needs repair</option>
+                        <option value="Missing">Missing — cannot be located</option>
+                    </select>
+                </div>
+
+                <div class="ps-form-group" id="mc-reason-wrap" style="display:none">
+                    <label class="ps-form-label">Reason for withholding <span style="font-size:11px;color:var(--text-light)">(required)</span></label>
+                    <textarea class="ps-form-control" id="mc-reason" rows="2" maxlength="500"
+                        placeholder="e.g. Unit set aside for scheduled maintenance..."></textarea>
+                </div>
+
+                <div class="ps-alert ps-alert--info" style="margin:0">
+                    <span class="material-symbols-outlined">info</span>
+                    Records the handover without a QR scan. Use this only when the borrower's claim QR is unavailable.
+                </div>
+            </div>
+            <div class="ps-modal-foot">
+                <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal"
+                    data-modal="ps-manual-claim-modal">Cancel</button>
+                <button type="button" class="ps-btn ps-btn--success" id="manual-claim-confirm-btn">
+                    <span class="material-symbols-outlined">check</span> Record Handover
+                </button>
+            </div>
+        </div>
+    </div>

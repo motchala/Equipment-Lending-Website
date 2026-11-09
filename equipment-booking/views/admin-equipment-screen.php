@@ -575,6 +575,7 @@
                                     </thead>
                                     <tbody>
                                         <?php if ($eq_view_total > 0):
+                                            $eq_prev_state = null;
                                             foreach ($eq_view_rows as $r):
                                                 $lqty  = max(1, (int)($r['borrow_qty'] ?? 1));
                                                 $ltype = ps_submitted_as_label($r['submitted_as'] ?? '');
@@ -590,7 +591,19 @@
                                                 $lstart_lbl = date('M d, Y', strtotime($r['borrow_date'])) . ($lbt !== '' ? ' · ' . $lbt : '');
                                                 $ldue_lbl   = date('M d, Y', strtotime($r['return_date'])) . ($lrt !== '' ? ' · ' . $lrt : '');
                                                 $lstudent = (string)($r['submitted_as'] ?? '') === 'student' && trim((string)($r['submitted_by_name'] ?? '')) !== '';
-                                        ?>
+                                                // ── Section divider: emitted once when the first scheduled row follows
+                                                //    pending-review rows (or is the first row in the table).
+                                                if ($lst === 'scheduled' && $eq_prev_state !== 'scheduled'): ?>
+                                                    <tr class="eq-loan-section-divider" data-section-divider="scheduled">
+                                                        <td colspan="6">
+                                                            <div class="eq-loan-section-label">
+                                                                <span class="material-symbols-outlined" aria-hidden="true">event_upcoming</span>
+                                                                Scheduled bookings &mdash; approved, not yet started
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                <?php endif;
+                                                $eq_prev_state = $lst; ?>
                                                 <tr class="eq-loan-row is-<?php echo $lst; ?>"
                                                     data-id="<?php echo (int)$r['id']; ?>"
                                                     data-batch-id="<?php echo htmlspecialchars((string)($r['batch_id'] ?? ''), ENT_QUOTES); ?>"
@@ -683,6 +696,7 @@
                                                                 <button type="button" class="ps-btn ps-btn--danger ps-btn--sm" data-action="ps-open-modal" data-modal="ps-cancel-booking-modal"><span class="material-symbols-outlined">event_busy</span> Cancel</button>
                                                             <?php elseif ($lst === 'pickup'): ?>
                                                                 <span class="eq-cell-sub">Awaiting Claim QR</span>
+                                                                <button type="button" class="ps-btn ps-btn--outline ps-btn--sm" data-action="ps-open-modal" data-modal="ps-manual-claim-modal"><span class="material-symbols-outlined">move_to_inbox</span> Manual</button>
                                                             <?php elseif ($lst === 'returned'): ?>
                                                                 <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-action="eq-open-loan-detail">View</button>
                                                             <?php else: ?>

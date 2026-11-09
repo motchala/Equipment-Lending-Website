@@ -45,6 +45,17 @@ function dash_render(array $d): void
             'loan_filter' => 'active',
         ],
         [
+            'tone' => $d['scheduled'] > 0 ? 'info' : 'ok',
+            'icon' => 'event_upcoming',
+            'label' => 'Scheduled',
+            'group' => 'loans',
+            'val' => $d['scheduled'],
+            'sub' => $d['scheduled'] > 0 ? 'Approved, not yet started' : 'No upcoming bookings',
+            'go' => 'inventory',
+            'chip' => '',
+            'loan_filter' => 'waiting',
+        ],
+        [
             'tone' => $d['overdue'] > 0 ? 'danger' : 'ok',
             'icon' => 'schedule',
             'label' => 'Overdue returns',

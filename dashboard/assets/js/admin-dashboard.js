@@ -6166,6 +6166,11 @@ function psSelectFmt(btn) {
                 table.querySelectorAll('.eq-loan-empty-cell, .eq-loan-nomatch-cell').forEach(function (td) {
                     td.colSpan = colCount;
                 });
+                // Show the scheduled-section divider only on "all" and "waiting" tabs
+                var showDivider = (mode === 'all' || mode === 'waiting');
+                table.querySelectorAll('tr[data-section-divider]').forEach(function (tr) {
+                    tr.style.display = showDivider ? '' : 'none';
+                });
                 page = 1;
                 render();
             });
@@ -6402,6 +6407,129 @@ function psSelectFmt(btn) {
                 noticeBtn.textContent = 'Sending\u2026';
                 try { sessionStorage.setItem('openOverdueLoanTab', '1'); } catch (_) { }
             });
+        }
+
+        /* ── Manual Claim ──────────────────────────────────────────────────
+           Lets an admin record an equipment handover without the borrower's
+           QR code. Shown as a small "Manual" button on every pickup-tab row. */
+        var mcModal    = document.getElementById('ps-manual-claim-modal');
+        var mcReqId    = document.getElementById('manual-claim-request-id');
+        var mcAlert    = document.getElementById('ps-manual-claim-alert');
+        var mcBorrower = document.getElementById('mc-borrower');
+        var mcEquipment = document.getElementById('mc-equipment');
+        var mcDue      = document.getElementById('mc-due');
+        var mcQtyInp   = document.getElementById('mc-qty');
+        var mcQtyOf    = document.getElementById('mc-qty-of');
+        var mcWrap     = document.getElementById('mc-withheld-wrap');
+        var mcCondSel  = document.getElementById('mc-withheld-cond');
+        var mcReasonWrap = document.getElementById('mc-reason-wrap');
+        var mcReasonInp  = document.getElementById('mc-reason');
+        var mcConfirm  = document.getElementById('manual-claim-confirm-btn');
+        var mcMaxQty   = 1;
+
+        function mcUpdateUI() {
+            if (!mcQtyInp) return;
+            var give = Math.max(0, Math.min(mcMaxQty, parseInt(mcQtyInp.value, 10) || 0));
+            var keep = mcMaxQty - give;
+            mcQtyInp.value = give;
+            if (mcWrap) mcWrap.style.display = keep > 0 ? '' : 'none';
+            if (mcReasonWrap) {
+                var cond = mcCondSel ? mcCondSel.value : 'Good';
+                mcReasonWrap.style.display = (keep > 0 && cond === 'Good') ? '' : 'none';
+            }
+        }
+
+        if (mcModal) {
+            // Open: populate from the clicked row
+            document.addEventListener('click', function (e) {
+                var trigger = e.target.closest('#eq-loan-table [data-modal="ps-manual-claim-modal"]');
+                if (!trigger) return;
+                var tr = trigger.closest('tr.eq-loan-row');
+                if (!tr) return;
+                var d = tr.dataset;
+                if (mcReqId) mcReqId.value = d.id || '';
+                mcMaxQty = Math.max(1, parseInt(d.qty, 10) || 1);
+                if (mcBorrower)  mcBorrower.textContent  = d.borrower  || '—';
+                if (mcEquipment) mcEquipment.textContent = d.equipment + (mcMaxQty > 1 ? ' \u00d7' + mcMaxQty : '');
+                if (mcDue)       mcDue.textContent       = d.dueLabel  || '—';
+                if (mcQtyInp)    { mcQtyInp.max = mcMaxQty; mcQtyInp.value = mcMaxQty; }
+                if (mcQtyOf)     mcQtyOf.textContent = 'of ' + mcMaxQty;
+                if (mcCondSel)   mcCondSel.selectedIndex = 0;
+                if (mcReasonInp) mcReasonInp.value = '';
+                if (mcAlert)     { mcAlert.style.display = 'none'; mcAlert.textContent = ''; }
+                if (mcConfirm)   { mcConfirm.disabled = false; mcConfirm.innerHTML = '<span class="material-symbols-outlined">check</span> Record Handover'; }
+                mcUpdateUI();
+            });
+
+            // +/- buttons
+            document.getElementById('mc-qty-dec') && document.getElementById('mc-qty-dec').addEventListener('click', function () {
+                if (!mcQtyInp) return;
+                mcQtyInp.value = Math.max(0, (parseInt(mcQtyInp.value, 10) || 0) - 1);
+                mcUpdateUI();
+            });
+            document.getElementById('mc-qty-inc') && document.getElementById('mc-qty-inc').addEventListener('click', function () {
+                if (!mcQtyInp) return;
+                mcQtyInp.value = Math.min(mcMaxQty, (parseInt(mcQtyInp.value, 10) || 0) + 1);
+                mcUpdateUI();
+            });
+            if (mcQtyInp) mcQtyInp.addEventListener('input', mcUpdateUI);
+            if (mcCondSel) mcCondSel.addEventListener('change', mcUpdateUI);
+
+            // Submit
+            if (mcConfirm) {
+                mcConfirm.addEventListener('click', function () {
+                    var id = mcReqId ? mcReqId.value : '';
+                    if (!id) { if (typeof window.showToast === 'function') window.showToast('No loan selected.'); return; }
+                    var give = Math.max(0, Math.min(mcMaxQty, parseInt(mcQtyInp ? mcQtyInp.value : '1', 10) || 0));
+                    var keep = mcMaxQty - give;
+                    var cond = mcCondSel ? mcCondSel.value : 'Good';
+                    var reason = mcReasonInp ? mcReasonInp.value.trim() : '';
+                    if (keep > 0 && cond === 'Good' && reason === '') {
+                        if (mcAlert) { mcAlert.textContent = 'Please explain why units in good condition are being withheld.'; mcAlert.style.display = ''; mcAlert.style.background = '#fef3c7'; mcAlert.style.color = '#92400e'; }
+                        return;
+                    }
+                    mcConfirm.disabled = true;
+                    mcConfirm.textContent = 'Recording\u2026';
+                    if (mcAlert) mcAlert.style.display = 'none';
+                    var body = new URLSearchParams();
+                    body.set('csrf_token', (document.querySelector('input[name="csrf_token"]') || {}).value || '');
+                    body.set('request_id', id);
+                    body.set('give_qty', give);
+                    body.set('withheld_cond', cond);
+                    body.set('withheld_reason', reason);
+                    fetch('equipment-booking/api/manual-claim.php', { method: 'POST', body: body, credentials: 'same-origin' })
+                        .then(function (r) { return r.json(); })
+                        .then(function (j) {
+                            if (j.status === 'success') {
+                                if (typeof psCloseModal === 'function') psCloseModal('ps-manual-claim-modal');
+                                if (typeof window.showToast === 'function') window.showToast('\u2705 ' + j.message);
+                                // Move the row to On Loan: update its state and refresh the table
+                                var table2 = document.getElementById('eq-loan-table');
+                                var row = table2 ? table2.querySelector('tr.eq-loan-row[data-id="' + id + '"]') : null;
+                                if (row) {
+                                    if (give > 0) {
+                                        row.className = row.className.replace(/\bis-\S+/g, '').trim() + ' is-ok';
+                                        row.dataset.loanState = 'ok';
+                                        row.dataset.status = 'On Loan';
+                                        var actionCell = row.querySelector('td:last-child > div');
+                                        if (actionCell) actionCell.innerHTML = '<button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-action="ps-open-modal" data-modal="ps-return-modal"><span class="material-symbols-outlined">assignment_return</span> Return</button>';
+                                    } else {
+                                        // 0 units → row is declined, remove it from the live list
+                                        if (row.parentNode) row.parentNode.removeChild(row);
+                                    }
+                                    window.psRefreshEquipmentLoans && window.psRefreshEquipmentLoans();
+                                }
+                            } else {
+                                if (mcAlert) { mcAlert.textContent = j.message || 'Could not record the handover.'; mcAlert.style.display = ''; mcAlert.style.background = '#fee2e2'; mcAlert.style.color = '#991b1b'; }
+                                if (mcConfirm) { mcConfirm.disabled = false; mcConfirm.innerHTML = '<span class="material-symbols-outlined">check</span> Record Handover'; }
+                            }
+                        })
+                        .catch(function () {
+                            if (mcAlert) { mcAlert.textContent = 'Network error. Please try again.'; mcAlert.style.display = ''; }
+                            if (mcConfirm) { mcConfirm.disabled = false; mcConfirm.innerHTML = '<span class="material-symbols-outlined">check</span> Record Handover'; }
+                        });
+                });
+            }
         }
 
         syncSortDir();

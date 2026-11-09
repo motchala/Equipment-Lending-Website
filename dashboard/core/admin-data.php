@@ -120,6 +120,7 @@ function dash_collect(mysqli $conn): array
     $d['waiting']   = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_requests WHERE status='Waiting'");
     $d['pickup']    = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_requests WHERE status='Approved' AND NOT (COALESCE(booking_mode,'')='future' AND TIMESTAMP(borrow_date, COALESCE(borrow_time,'00:00:00')) > NOW())");
     $d['active']    = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_requests WHERE status='On Loan'");
+    $d['scheduled'] = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_requests WHERE status='Approved' AND COALESCE(booking_mode,'')='future' AND TIMESTAMP(borrow_date, COALESCE(borrow_time,'00:00:00')) > NOW()");
     $d['due_today'] = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_requests WHERE status IN ('Approved','On Loan') AND return_date = ?", 's', [$today]);
     $d['overdue']   = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_requests WHERE status='Overdue'");
 
