@@ -29,7 +29,7 @@
                                 <option value="me">Me</option>
                                 <?php foreach ($admin_accounts_list as $act_acct):
                                     if (strtolower($act_acct['email'] ?? '') === strtolower($admin_email)) continue; ?>
-                                    <option value="<?php echo (int)($act_acct['id'] ?? 0); ?>"><?php echo htmlspecialchars($act_acct['fullName'] ?? ''); ?></option>
+                                    <option value="<?php echo (int)($act_acct['id'] ?? 0); ?>"><?php echo htmlspecialchars($act_acct['fullName'] ?? ''); ?><?php echo !empty($act_acct['admin_no']) ? ' (Admin ' . (int)$act_acct['admin_no'] . ')' : ''; ?></option>
                                 <?php endforeach; ?>
                             </select>
                             <select id="act-range" class="form-control-custom" aria-label="When">

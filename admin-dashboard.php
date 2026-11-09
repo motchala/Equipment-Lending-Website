@@ -45,6 +45,7 @@ require __DIR__ . '/equipment-booking/core/admin-equipment-return.php';
 <?php require __DIR__ . '/activity/views/admin-screen.php'; ?>
 <?php require __DIR__ . '/equipment-booking/views/admin-equipment-screen.php'; ?>
 <?php require __DIR__ . '/settings/views/admin-screen.php'; ?>
+<?php require __DIR__ . '/settings/views/admin-imports-screen.php'; ?>
         </main><!-- /app-main -->
 
     </div><!-- /app-body -->

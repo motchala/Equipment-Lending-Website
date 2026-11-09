@@ -36,7 +36,7 @@ Everyone signs in on the same page (`landing-page.php`). The system works out wh
 **For admins**
 - A **Dashboard** with what needs attention, an **Activity** timeline of every decision, notifications, and exports.
 - **Equipment** (catalog and loans) and **Facilities** (rooms, reservations, issues, archive).
-- Super Admin only: **Faculty** accounts, **Admins** (up to 5), and **Settings → Imports** for the faculty registry. (**Equipment Inventory** and **Rooms Assigned** import cards are there too, but they are not built yet.)
+- Super Admin only: **Faculty** accounts, **Admins** (up to 5), and **Imports** (sidebar, under Data) for the faculty registry. (**Equipment Inventory** and **Rooms Assigned** import cards are there too, but they are not built yet.)
 - Both portals have a built-in **Help & Support** page inside Settings.
 
 ---
@@ -93,7 +93,7 @@ The database comes with two admin accounts: **`main@admin.edu`** (Super Admin) a
 4. Sign in with that email and your new password.
 
 ### Things to set up after signing in
-As a Super Admin, go to **Settings → Imports** and import the official **Faculty Registry**. Then use the **Faculty** tab to create faculty accounts (it looks up each person in the registry). Add your equipment under **Equipment → Catalog** and your rooms under **Facilities**.
+As a Super Admin, go to **Imports** (sidebar, under Data) and import the official **Faculty Registry**. Then use the **Faculty** tab to create faculty accounts (it looks up each person in the registry). Add your equipment under **Equipment → Catalog** and your rooms under **Facilities**.
 
 ---
 

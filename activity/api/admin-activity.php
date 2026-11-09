@@ -116,7 +116,7 @@ if ($format === 'csv') {
         fputcsv($out, [
             date('Y-m-d', $e['ts']),
             date('g:i A', $e['ts']),
-            $safe($e['actor_name']),
+            $safe($e['actor_name'] . (!empty($e['actor_no']) ? ' (Admin ' . (int)$e['actor_no'] . ')' : '')),
             $labels[$e['category']] ?? $e['category'],
             $safe($e['text']),
             $safe($e['meta']),

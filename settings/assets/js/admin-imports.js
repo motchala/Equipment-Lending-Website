@@ -209,6 +209,8 @@
             shell.classList.toggle('is-unlocked', !locked);
             content.toggleAttribute('inert', locked);
             content.setAttribute('aria-hidden', locked ? 'true' : 'false');
+            var sessionPill = $('imp-session');
+            if (sessionPill) sessionPill.hidden = locked;
             if (lockMsg) {
                 lockMsg.textContent = message || '';
                 lockMsg.classList.toggle('hidden', !(locked && message));
@@ -877,12 +879,8 @@
 
         /* Re-check the server session on reload and whenever Imports is revisited. */
         restoreUnlock();
-        var settingsTabs = $('settMainTabs');
-        if (settingsTabs) {
-            settingsTabs.addEventListener('click', function (e) {
-                if (e.target.closest('[data-sett-panel="sett-imports"]')) restoreUnlock();
-            });
-        }
+        var importsNav = document.querySelector('.nav-item[data-tab="imports"]');
+        if (importsNav) importsNav.addEventListener('click', restoreUnlock);
     }
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

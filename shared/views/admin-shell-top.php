@@ -41,7 +41,7 @@
                 }
             }
 
-            if (['rooms', 'faculty', 'admins', 'activity', 'inventory', 'settings'].indexOf(tab) === -1) return;
+            if (['rooms', 'faculty', 'admins', 'activity', 'inventory', 'settings', 'imports'].indexOf(tab) === -1) return;
             try {
                 if (sessionStorage.getItem('adminHardRefresh') === '1') return;
             } catch (_) {}
@@ -110,7 +110,7 @@
             </div>
 
             <!-- Tabs are grouped by purpose: Overview (what's happening) · Operations (day-to-day work) ·
-                 Accounts (Super Admin only). Each group title shares a row with its thin separator line. -->
+                 Accounts and Data (Super Admin only). Each group title shares a row with its thin separator line. -->
             <div class="sidebar-links">
                 <div class="nav-group" role="group" aria-labelledby="navg-overview">
                     <span class="nav-group-title" id="navg-overview">Overview</span>
@@ -144,6 +144,13 @@
                         <a class="nav-item" data-tab="admins" id="snav-admins" href="#">
                             <span class="material-symbols-outlined">admin_panel_settings</span>
                             <span class="nav-label">Admins</span>
+                        </a>
+                    </div>
+                    <div class="nav-group" role="group" aria-labelledby="navg-data">
+                        <span class="nav-group-title" id="navg-data">Data</span>
+                        <a class="nav-item" data-tab="imports" id="snav-imports" href="#">
+                            <span class="material-symbols-outlined">upload_file</span>
+                            <span class="nav-label">Imports</span>
                         </a>
                     </div>
                 <?php endif; ?>

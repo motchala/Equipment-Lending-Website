@@ -32,15 +32,17 @@ $admin_accounts_remaining = max(0, 5 - $admin_accounts_count);
 
 // Fetch the list of all admin accounts (for the Manage Admins panel).
 // Columns: fullName, email, role, created_at — id added by migration.
+require_once __DIR__ . '/admin-numbers.php';
+$_no_col = admin_no_ensure($conn) ? ', admin_no' : '';   // "Admin 1 ... Admin 5" seat number
 $_admin_list_result = @mysqli_query(
     $conn,
-    "SELECT id, fullName, email, role, created_at, last_login, dormant_until FROM tbl_accounts ORDER BY created_at ASC, email ASC"
+    "SELECT id, fullName, email, role{$_no_col}, created_at, last_login, dormant_until FROM tbl_accounts ORDER BY created_at ASC, email ASC"
 );
 if (!$_admin_list_result) {
     // last_login column not migrated yet — fall back so the panel still lists everyone.
     $_admin_list_result = @mysqli_query(
         $conn,
-        "SELECT id, fullName, email, role, created_at, dormant_until FROM tbl_accounts ORDER BY created_at ASC, email ASC"
+        "SELECT id, fullName, email, role{$_no_col}, created_at, dormant_until FROM tbl_accounts ORDER BY created_at ASC, email ASC"
     );
 }
 $admin_accounts_list = [];

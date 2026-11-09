@@ -717,6 +717,17 @@ body {
     border-color: var(--accent-maroon);
 }
 
+.am-tag[hidden] {
+    display: none;
+}
+
+/* "Admin 2" seat number */
+.am-tag--no {
+    color: var(--accent-maroon);
+    background: var(--accent-light);
+    border-color: var(--accent-maroon);
+}
+
 .am-tag--active {
     color: #1e7e45;
     background: #e8f6ee;
@@ -1135,6 +1146,15 @@ body {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+/* Admin seat number under the name in the Who column ("Admin 2") */
+.act-no {
+    display: block;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    color: var(--text-light);
 }
 
 @media (max-width: 760px) {
@@ -7954,20 +7974,19 @@ body:has(#roomDeleteConfirm:not(.hidden)) {
     align-items: center;
     gap: 6px;
     min-height: 44px;
-    padding: 0.6rem 1.15rem;
-    /* Frosted, maroon-tinted glass: takes on the hero's colour instead of a solid dark block */
-    background: rgba(87, 0, 0, 0.34);
-    -webkit-backdrop-filter: blur(8px);
-    backdrop-filter: blur(8px);
-    border: 1.5px solid rgba(255, 255, 255, 0.5);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
-    border-radius: 8px;
+    padding: 0.6rem 1.4rem;
+    /* Solid maroon pill: fully opaque so it reads clearly on the gold side of the hero,
+       with no border or glow (just a soft neutral shadow for depth) */
+    background: #5c0a0a;
+    border: none;
+    box-shadow: 0 2px 6px rgba(40, 0, 0, 0.28);
+    border-radius: 999px;
     font-family: 'Poppins', sans-serif;
     font-size: 13.5px;
     font-weight: 600;
     color: #fff;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: background 0.15s, box-shadow 0.15s;
 }
 
 .ov-profile-hero .btn-edit-acc .material-symbols-outlined {
@@ -7975,8 +7994,8 @@ body:has(#roomDeleteConfirm:not(.hidden)) {
 }
 
 .ov-profile-hero .btn-edit-acc:hover {
-    background: rgba(87, 0, 0, 0.5);
-    border-color: rgba(255, 255, 255, 0.8);
+    background: #3f0000;
+    box-shadow: 0 3px 8px rgba(40, 0, 0, 0.35);
 }
 
 .ov-profile-hero .btn-edit-acc:focus-visible {
@@ -7989,10 +8008,10 @@ body:has(#roomDeleteConfirm:not(.hidden)) {
     align-items: center;
     gap: 6px;
     min-height: 44px;
-    padding: 0.6rem 1.15rem;
+    padding: 0.6rem 1.3rem;
     background: rgba(255, 255, 255, 0.9);
     border: none;
-    border-radius: 8px;
+    border-radius: 999px;
     font-family: 'Poppins', sans-serif;
     font-size: 12.5px;
     font-weight: 600;
@@ -8011,10 +8030,10 @@ body:has(#roomDeleteConfirm:not(.hidden)) {
 
 .ov-profile-hero .btn-cancel-acc {
     min-height: 44px;
-    padding: 0.6rem 1.15rem;
+    padding: 0.6rem 1.3rem;
     background: rgba(87, 0, 0, 0.62);
     border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 8px;
+    border-radius: 999px;
     font-family: 'Poppins', sans-serif;
     font-size: 12.5px;
     font-weight: 600;
