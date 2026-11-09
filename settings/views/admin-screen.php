@@ -313,6 +313,7 @@
                                     Block Overdue Borrowers
                                     <label class="ps-toggle" style="margin-left:auto">
                                         <input type="checkbox"
+                                            name="config[rule_overdue_block_enabled]" value="1"
                                             <?php echo (($arb_config['rule_overdue_block_enabled'] ?? '1') == '1') ? 'checked' : ''; ?>>
                                         <span class="ps-toggle-track"></span>
                                     </label>
@@ -325,6 +326,7 @@
                                     Stock-Based Rejection
                                     <label class="ps-toggle" style="margin-left:auto">
                                         <input type="checkbox"
+                                            name="config[rule_duplicate_block_enabled]" value="1"
                                             <?php echo (($arb_config['rule_duplicate_block_enabled'] ?? '0') == '1') ? 'checked' : ''; ?>>
                                         <span class="ps-toggle-track"></span>
                                     </label>
@@ -339,28 +341,42 @@
                             <h3><span class="material-symbols-outlined">tune</span> Thresholds &amp; Limits</h3>
                         </div>
                         <div class="ps-card-body">
-                            <div class="ps-form-group">
-                                <label class="ps-form-label">Maximum Borrow Days</label>
-                                <input class="ps-form-control" type="number" min="1" max="60"
-                                    value="<?php echo htmlspecialchars($arb_config['max_borrow_days'] ?? 7); ?>">
-                                <div class="ps-form-hint">Items must be returned within this many days.</div>
-                            </div>
-                            <div class="ps-form-group">
-                                <label class="ps-form-label">Max Items Per Borrower</label>
-                                <input class="ps-form-control" type="number" min="1" max="20"
-                                    value="<?php echo htmlspecialchars($arb_config['max_items_per_borrower'] ?? 3); ?>">
-                                <div class="ps-form-hint">Maximum number of items a user can have at once.</div>
-                            </div>
-                            <div class="ps-form-group">
-                                <label class="ps-form-label">Low Stock Threshold</label>
-                                <input class="ps-form-control" type="number" min="0" max="10"
-                                    value="<?php echo htmlspecialchars($arb_config['low_stock_threshold'] ?? 2); ?>">
-                                <div class="ps-form-hint">Trigger low-stock alert when quantity drops below this.</div>
-                            </div>
-                            <button type="button" class="ps-btn ps-btn--primary"
-                                style="width:100%;justify-content:center;margin-top:0.25rem">
-                                <span class="material-symbols-outlined">save</span> Save Configuration
-                            </button>
+                            <form id="arbConfigForm" autocomplete="off">
+                                <?= csrf_field() ?>
+                                <!-- toggles from the left card are also submitted via JS -->
+                                <div class="ps-form-group">
+                                    <label class="ps-form-label">Maximum Borrow Days</label>
+                                    <input class="ps-form-control" type="number" min="1" max="60"
+                                        name="config[max_borrow_days]"
+                                        value="<?php echo htmlspecialchars($arb_config['max_borrow_days'] ?? 7); ?>">
+                                    <div class="ps-form-hint">Items must be returned within this many days.</div>
+                                </div>
+                                <div class="ps-form-group">
+                                    <label class="ps-form-label">Max Items Per Borrower</label>
+                                    <input class="ps-form-control" type="number" min="1" max="20"
+                                        name="config[max_items_per_borrower]"
+                                        value="<?php echo htmlspecialchars($arb_config['max_items_per_borrower'] ?? 3); ?>">
+                                    <div class="ps-form-hint">Maximum number of items a user can have at once.</div>
+                                </div>
+                                <div class="ps-form-group">
+                                    <label class="ps-form-label">Low Stock Threshold</label>
+                                    <input class="ps-form-control" type="number" min="0" max="10"
+                                        name="config[low_stock_threshold]"
+                                        value="<?php echo htmlspecialchars($arb_config['low_stock_threshold'] ?? 2); ?>">
+                                    <div class="ps-form-hint">Trigger low-stock alert when quantity drops below this.</div>
+                                </div>
+                                <div class="ps-form-group">
+                                    <label class="ps-form-label">Buffer Time (Auto-Approve)</label>
+                                    <input class="ps-form-control" type="number" min="0" max="1440"
+                                        name="config[auto_approve_timeout_minutes]"
+                                        value="<?php echo htmlspecialchars($arb_config['auto_approve_timeout_minutes'] ?? 30); ?>">
+                                    <div class="ps-form-hint">Auto-approve Waiting requests after this many minutes. Set to 0 to disable.</div>
+                                </div>
+                                <button type="button" id="saveArbConfig" class="ps-btn ps-btn--primary"
+                                    style="width:100%;justify-content:center;margin-top:0.25rem">
+                                    <span class="material-symbols-outlined">save</span> Save Configuration
+                                </button>
+                            </form>
                         </div>
                     </div>
                 </div>

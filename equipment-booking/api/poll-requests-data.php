@@ -18,6 +18,10 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../../config/db.php';
 $conn = getDB();
 
+// ── Auto-approve buffer time tick ──────────────────────────────────────────
+require_once __DIR__ . '/../core/auto-approve-tick.php';
+equipment_auto_approve_tick($conn);
+
 $today = date('Y-m-d');
 
 // ── Auto-decline expired waiting requests ──────────────────────────────────

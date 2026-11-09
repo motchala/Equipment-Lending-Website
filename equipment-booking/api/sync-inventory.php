@@ -223,8 +223,24 @@ foreach ($sheet_names as $sheet_idx => $sheet_name) {
             $chk->close();
 
             if ($existing) {
+                // Subtract units currently out on loan so an active borrow is not
+                // wiped by a sync. "Out" = Approved/On Loan/Overdue with stock_applied=1.
+                $out_stmt = $conn->prepare(
+                    "SELECT COALESCE(SUM(COALESCE(borrow_qty,1)),0) AS units_out
+                       FROM tbl_requests
+                      WHERE equipment_name = ?
+                        AND status IN ('Approved','On Loan','Overdue')
+                        AND stock_applied = 1"
+                );
+                $out_stmt->bind_param('s', $item_name);
+                $out_stmt->execute();
+                $out_row = $out_stmt->get_result()->fetch_assoc();
+                $out_stmt->close();
+                $units_out   = (int)($out_row['units_out'] ?? 0);
+                $safe_qty    = max(0, $qty - $units_out);
+
                 $upd = $conn->prepare("UPDATE tbl_inventory SET quantity = ?, `condition` = ?, category = ?, synced_from_sheet = 1 WHERE item_id = ?");
-                $upd->bind_param('issi', $qty, $condition, $category, $existing['item_id']);
+                $upd->bind_param('issi', $safe_qty, $condition, $category, $existing['item_id']);
                 $upd->execute();
                 $upd->close();
                 $summary['updated']++;
@@ -266,8 +282,24 @@ foreach ($sheet_names as $sheet_idx => $sheet_name) {
             $chk->close();
 
             if ($existing) {
+                // Subtract units currently out on loan so an active borrow is not
+                // wiped by a sync. "Out" = Approved/On Loan/Overdue with stock_applied=1.
+                $out_stmt = $conn->prepare(
+                    "SELECT COALESCE(SUM(COALESCE(borrow_qty,1)),0) AS units_out
+                       FROM tbl_requests
+                      WHERE equipment_name = ?
+                        AND status IN ('Approved','On Loan','Overdue')
+                        AND stock_applied = 1"
+                );
+                $out_stmt->bind_param('s', $item_name);
+                $out_stmt->execute();
+                $out_row = $out_stmt->get_result()->fetch_assoc();
+                $out_stmt->close();
+                $units_out = (int)($out_row['units_out'] ?? 0);
+                $safe_qty  = max(0, $qty - $units_out);
+
                 $upd = $conn->prepare("UPDATE tbl_inventory SET quantity = ?, `condition` = ?, category = ?, synced_from_sheet = 1 WHERE item_id = ?");
-                $upd->bind_param('issi', $qty, $condition, $category, $existing['item_id']);
+                $upd->bind_param('issi', $safe_qty, $condition, $category, $existing['item_id']);
                 $upd->execute();
                 $upd->close();
                 $summary['updated']++;

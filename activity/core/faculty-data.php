@@ -87,6 +87,8 @@ function fact_eq_housekeeping(mysqli $conn): void
         $stmt->close();
     }
     BookingSchedule::tick($conn);
+    require_once __DIR__ . '/../../equipment-booking/core/auto-approve-tick.php';
+    equipment_auto_approve_tick($conn);
 }
 
 /** Catalogue photo per item name (tbl_requests only stores the name as text). */
