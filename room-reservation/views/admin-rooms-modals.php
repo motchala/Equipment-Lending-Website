@@ -84,6 +84,9 @@
             </div>
             <div class="ps-drawer-foot">
                 <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-room-drawer">Close</button>
+                <button class="ps-btn ps-btn--outline" type="button" id="ps-rr-reschedule-btn" data-rr-reschedule hidden>
+                    <span class="material-symbols-outlined">edit_calendar</span> Reschedule
+                </button>
                 <button class="ps-btn ps-btn--danger" type="button" id="ps-rr-cancel-btn" data-rr-cancel hidden>
                     <span class="material-symbols-outlined">cancel</span> Cancel reservation
                 </button>

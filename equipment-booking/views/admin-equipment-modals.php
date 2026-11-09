@@ -36,6 +36,10 @@
                     <label class="ps-form-label">Reason / Note <span style="font-size:11px;color:var(--text-light)">(required, min. 5 characters — kept in the arbitration log)</span></label>
                     <textarea class="ps-form-control" id="approve-reason" rows="2" placeholder="e.g. Item available, request meets policy..."></textarea>
                 </div>
+                <div class="ps-form-group">
+                    <label class="ps-form-label">Internal Note <span style="font-size:11px;color:var(--text-light)">(optional — admin only, not shown to faculty)</span></label>
+                    <textarea class="ps-form-control" id="approve-admin-note" rows="2" maxlength="1000" placeholder="e.g. Borrower warned about current condition of item..."></textarea>
+                </div>
             </div>
             <div class="ps-modal-foot">
                 <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-approve-modal">Cancel</button>

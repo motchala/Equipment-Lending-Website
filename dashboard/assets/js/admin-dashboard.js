@@ -2515,6 +2515,19 @@
                 const body = admEl('div', 'act-event-body');
                 body.appendChild(admEl('div', 'act-event-text', ev.text));
                 if (ev.meta) body.appendChild(admEl('div', 'act-event-meta', ev.meta)); // e.g. the rule that applied
+                if (ev.ref_type && ev.ref_id) {
+                    const jump = admEl('button', 'act-event-jump');
+                    jump.type = 'button';
+                    jump.setAttribute('data-ref-type', ev.ref_type);
+                    jump.setAttribute('data-ref-id', String(ev.ref_id));
+                    var labelText = 'View ' + (ev.ref_type === 'reservation' ? 'reservation' : (ev.ref_type === 'room' ? 'facility' : 'request')) + ' #' + ev.ref_id;
+                    jump.appendChild(document.createTextNode(labelText));
+                    const jumpIco = admIcon('open_in_new');
+                    jumpIco.style.fontSize = '12px';
+                    jumpIco.style.marginLeft = '4px';
+                    jump.appendChild(jumpIco);
+                    body.appendChild(jump);
+                }
                 li.appendChild(body);
                 if (cfg.showActor) {
                     // "Who" gets its own column so a wide timeline stays easy to scan.
@@ -3297,6 +3310,73 @@
             else if (which === 'me') window.psActivityOpen({ actor: 'me', range: '30d' });
         });
 
+        /* Jump from Activity feed event back to source record */
+        window.psJumpToRecord = function (type, id) {
+            if (!type || !id) return;
+            if (type === 'request') {
+                const nav = document.querySelector('.nav-item[data-tab="inventory"]');
+                if (nav) nav.click();
+                setTimeout(function () {
+                    const loanPanel = document.querySelector('#eqTabs .rq-filter-chip[data-eq-panel="eq-onloan"]');
+                    if (loanPanel) loanPanel.click();
+                    const filterAll = document.querySelector('#eqLoanFilter [data-loan-filter="all"]');
+                    if (filterAll) filterAll.click();
+                    setTimeout(function () {
+                        const row = document.querySelector('#eq-loan-table tr.eq-loan-row[data-id="' + id + '"]');
+                        if (row) {
+                            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            row.classList.add('notif-target-flash');
+                            setTimeout(function () { row.classList.remove('notif-target-flash'); }, 2000);
+                            const trigger = row.querySelector('[data-modal="ps-req-detail-modal"]') || row.querySelector('button');
+                            if (trigger) trigger.click();
+                        } else if (typeof showToast === 'function') {
+                            showToast('Request #' + id + ' not found in current records.');
+                        }
+                    }, 120);
+                }, 80);
+            } else if (type === 'reservation') {
+                const nav = document.querySelector('.nav-item[data-tab="rooms"]');
+                if (nav) nav.click();
+                setTimeout(function () {
+                    if (typeof switchRoomsTab === 'function') switchRoomsTab('rooms-reservations');
+                    const tabAll = document.querySelector('#rrTabs [data-rr-tab="all"]');
+                    if (tabAll) tabAll.click();
+                    setTimeout(function () {
+                        const row = document.querySelector('tr.ps-rr-row[data-rr-id="' + id + '"]');
+                        if (row) {
+                            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            row.classList.add('notif-target-flash');
+                            setTimeout(function () { row.classList.remove('notif-target-flash'); }, 2000);
+                            const trigger = row.querySelector('[data-rr-detail]');
+                            if (trigger) trigger.click();
+                        } else if (typeof showToast === 'function') {
+                            showToast('Reservation #' + id + ' not found in current records.');
+                        }
+                    }, 120);
+                }, 80);
+            } else if (type === 'room') {
+                const nav = document.querySelector('.nav-item[data-tab="rooms"]');
+                if (nav) nav.click();
+                setTimeout(function () {
+                    if (typeof switchRoomsTab === 'function') switchRoomsTab('rooms-active');
+                }, 80);
+            } else if (type === 'equipment' || type === 'item') {
+                const nav = document.querySelector('.nav-item[data-tab="inventory"]');
+                if (nav) nav.click();
+                setTimeout(function () {
+                    if (typeof window.psInventoryRevealRow === 'function') window.psInventoryRevealRow(id);
+                }, 80);
+            }
+        };
+
+        document.addEventListener('click', function (e) {
+            const jump = e.target.closest('.act-event-jump');
+            if (jump) {
+                e.preventDefault();
+                window.psJumpToRecord(jump.getAttribute('data-ref-type'), jump.getAttribute('data-ref-id'));
+            }
+        });
+
         /* Export exactly what the filters are showing (the server applies the same visibility rules). */
         document.getElementById('act-export').addEventListener('click', function () {
             const p = { actor: actorSel.value, filter: filter, range: rangeSel.value };
@@ -3395,6 +3475,154 @@
                 .catch(() => {
                     this.disabled = false;
                     this.textContent = 'Confirm Cancellation';
+                    alertEl.style.display = 'block';
+                    alertEl.style.background = '#ffeaea';
+                    alertEl.style.color = 'var(--danger)';
+                    alertEl.textContent = 'Network error. Please try again.';
+                });
+        });
+    }
+
+    /* ── Admin Reschedule Reservation Modal ──────────────────── */
+    function openAdminRescheduleRrModal(data) {
+        const modal = document.getElementById('adminRescheduleRrModal');
+        if (!modal) return;
+        const desc = document.getElementById('adminRescheduleRrDesc');
+        const alertEl = document.getElementById('admin-reschedule-rr-alert');
+        const idInp = document.getElementById('adminRescheduleRrId');
+        const roomSel = document.getElementById('adminRescheduleRoomId');
+        const dateInp = document.getElementById('adminRescheduleDate');
+        const startInp = document.getElementById('adminRescheduleStartTime');
+        const endInp = document.getElementById('adminRescheduleEndTime');
+        const notesInp = document.getElementById('adminRescheduleNotes');
+
+        alertEl.style.display = 'none';
+        idInp.value = data.rrId || '';
+        desc.textContent = 'Reschedule reservation for ' + (data.facultyName || 'faculty') + ' (' + (data.roomName || '') + ')';
+        if (roomSel && data.roomId) roomSel.value = data.roomId;
+        if (dateInp) dateInp.value = data.date || '';
+        if (startInp) startInp.value = (data.startTime || '').substring(0, 5);
+        if (endInp) endInp.value = (data.endTime || '').substring(0, 5);
+        if (notesInp) notesInp.value = data.notes || '';
+
+        modal.style.display = 'flex';
+    }
+
+    function closeAdminRescheduleRrModal() {
+        const modal = document.getElementById('adminRescheduleRrModal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    document.addEventListener('click', function (e) {
+        const btn = e.target.closest('[data-action="admin-reschedule-reservation"]');
+        if (!btn) return;
+        const row = btn.closest('tr[data-rr-id]');
+        const d = row ? row.dataset : btn.dataset;
+        openAdminRescheduleRrModal({
+            rrId: btn.dataset.rrId || (d ? d.rrId : ''),
+            roomId: btn.dataset.roomId || (row ? row.getAttribute('data-room-id') : ''),
+            roomName: btn.dataset.roomName || (d ? d.room : ''),
+            facultyName: btn.dataset.facultyName || (d ? d.who : ''),
+            date: btn.dataset.date || (d ? d.isoDate : ''),
+            startTime: btn.dataset.startTime || (d ? d.startTime : ''),
+            endTime: btn.dataset.endTime || (d ? d.endTime : ''),
+            notes: btn.dataset.notes || (d ? d.notes : '')
+        });
+    });
+
+    const closeAdminRescheduleRrBtn = document.getElementById('closeAdminRescheduleRrModal');
+    if (closeAdminRescheduleRrBtn) closeAdminRescheduleRrBtn.addEventListener('click', closeAdminRescheduleRrModal);
+    const cancelAdminRescheduleRrBtn = document.getElementById('cancelAdminRescheduleRrBtn');
+    if (cancelAdminRescheduleRrBtn) cancelAdminRescheduleRrBtn.addEventListener('click', closeAdminRescheduleRrModal);
+    const adminRescheduleRrBackdrop = document.getElementById('adminRescheduleRrBackdrop');
+    if (adminRescheduleRrBackdrop) adminRescheduleRrBackdrop.addEventListener('click', closeAdminRescheduleRrModal);
+
+    const submitAdminRescheduleRrBtn = document.getElementById('submitAdminRescheduleRrBtn');
+    if (submitAdminRescheduleRrBtn) {
+        submitAdminRescheduleRrBtn.addEventListener('click', function () {
+            const rrId = document.getElementById('adminRescheduleRrId').value;
+            const roomId = document.getElementById('adminRescheduleRoomId').value;
+            const resDate = document.getElementById('adminRescheduleDate').value;
+            const startTime = document.getElementById('adminRescheduleStartTime').value;
+            const endTime = document.getElementById('adminRescheduleEndTime').value;
+            const notes = document.getElementById('adminRescheduleNotes').value.trim();
+            const alertEl = document.getElementById('admin-reschedule-rr-alert');
+
+            if (!resDate || !startTime || !endTime) {
+                alertEl.style.display = 'block';
+                alertEl.style.background = '#ffeaea';
+                alertEl.style.color = 'var(--danger)';
+                alertEl.textContent = 'Please fill in date, start time, and end time.';
+                return;
+            }
+            if (startTime >= endTime) {
+                alertEl.style.display = 'block';
+                alertEl.style.background = '#ffeaea';
+                alertEl.style.color = 'var(--danger)';
+                alertEl.textContent = 'Start time must be before end time.';
+                return;
+            }
+
+            this.disabled = true;
+            this.textContent = 'Saving…';
+
+            fetch('room-reservation/api/edit-reservation.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    reservation_id: parseInt(rrId, 10),
+                    room_id: parseInt(roomId, 10),
+                    reservation_date: resDate,
+                    start_time: startTime,
+                    end_time: endTime,
+                    notes: notes,
+                    csrf_token: getCsrfToken()
+                })
+            })
+                .then(r => r.json())
+                .then(data => {
+                    this.disabled = false;
+                    this.textContent = 'Save & Notify';
+                    if (data.status !== 'success') {
+                        alertEl.style.display = 'block';
+                        alertEl.style.background = '#ffeaea';
+                        alertEl.style.color = 'var(--danger)';
+                        alertEl.textContent = data.message || data.error || 'Failed to reschedule.';
+                        return;
+                    }
+                    closeAdminRescheduleRrModal();
+                    showToast('Reservation rescheduled. Faculty member notified.');
+                    const row = document.querySelector('tr.ps-rr-row[data-rr-id="' + rrId + '"]');
+                    if (row && data.reservation) {
+                        const r = data.reservation;
+                        row.dataset.isoDate = r.date;
+                        row.dataset.startTime = r.start_time;
+                        row.dataset.endTime = r.end_time;
+                        row.dataset.room = r.room_name;
+                        row.dataset.notes = r.notes;
+                        const dateCell = row.querySelector('[data-col="datetime"]');
+                        if (dateCell) {
+                            dateCell.innerHTML = '<div class="eq-cell-name">' + r.date_fmt + '</div><div class="eq-cell-sub rm-nowrap">' + r.time_fmt + '</div>';
+                        }
+                        const facCell = row.querySelector('[data-col="facility"] .eq-cell-name');
+                        if (facCell) facCell.textContent = r.room_name;
+                        const reschedBtn = row.querySelector('.btn-reschedule-rr-admin');
+                        if (reschedBtn) {
+                            reschedBtn.dataset.roomId = r.room_id;
+                            reschedBtn.dataset.roomName = r.room_name;
+                            reschedBtn.dataset.date = r.date;
+                            reschedBtn.dataset.startTime = r.start_time;
+                            reschedBtn.dataset.endTime = r.end_time;
+                            reschedBtn.dataset.notes = r.notes;
+                        }
+                    }
+                    if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
+                    document.dispatchEvent(new CustomEvent('rr:rows-changed'));
+                })
+                .catch(() => {
+                    this.disabled = false;
+                    this.textContent = 'Save & Notify';
                     alertEl.style.display = 'block';
                     alertEl.style.background = '#ffeaea';
                     alertEl.style.color = 'var(--danger)';
@@ -4040,6 +4268,8 @@
             const dd = document.getElementById('approve-due-date');
             if (dd) dd.value = ctx.returnDate || '';
             if (approveReasonInput) approveReasonInput.value = '';
+            const approveAdminNoteEl = document.getElementById('approve-admin-note');
+            if (approveAdminNoteEl) approveAdminNoteEl.value = '';
             if (approveConfirmBtn) approveConfirmBtn.disabled = true;
             clearAlert('ps-approve-alert');
         }
@@ -4144,7 +4374,7 @@
             });
         }
 
-        function submitDecision(requestId, newStatus, reason, alertId, btn, busyLabel) {
+        function submitDecision(requestId, newStatus, reason, alertId, btn, busyLabel, adminNotes) {
             btn.disabled = true;
             btn.dataset.origLabel = btn.innerHTML;
             btn.textContent = busyLabel;
@@ -4154,6 +4384,7 @@
             formData.append('request_id', requestId);
             formData.append('new_status', newStatus);
             formData.append('override_reason', reason);
+            if (adminNotes) formData.append('admin_notes', adminNotes);
             formData.append('csrf_token', getCsrfToken());
 
             fetch('equipment-booking/api/admin-override.php', { method: 'POST', body: formData })
@@ -4226,11 +4457,13 @@
             approveConfirmBtn.addEventListener('click', function () {
                 const id = document.getElementById('approve-request-id').value;
                 const reason = (approveReasonInput.value || '').trim();
+                const adminNoteEl = document.getElementById('approve-admin-note');
+                const adminNote = adminNoteEl ? adminNoteEl.value.trim() : '';
                 if (reason.length < 5) {
                     showAlert('ps-approve-alert', 'Please enter a reason (min. 5 characters).');
                     return;
                 }
-                submitDecision(id, 'Approved', reason, 'ps-approve-alert', approveConfirmBtn, 'Approving…');
+                submitDecision(id, 'Approved', reason, 'ps-approve-alert', approveConfirmBtn, 'Approving…', adminNote);
             });
         }
         if (declineConfirmBtn) {
@@ -4957,6 +5190,26 @@ function psSelectFmt(btn) {
         var authorizerRow = el('ps-loan-detail-authorizer-row');
         if (authorizerRow) authorizerRow.hidden = !studentRequest;
         txt('ps-loan-detail-note', d.note);
+        var adminNote = (d.adminNote || '').trim();
+        var adminNoteSection = el('ps-loan-detail-admin-note-section');
+        if (adminNoteSection) {
+            if (adminNote !== '') {
+                adminNoteSection.hidden = false;
+                txt('ps-loan-detail-admin-note', adminNote);
+            } else {
+                adminNoteSection.hidden = true;
+            }
+        }
+        var noticeCount = parseInt(d.noticeCount || '0', 10);
+        var noticeSection = el('ps-loan-detail-notice-section');
+        if (noticeSection) {
+            if (noticeCount > 0) {
+                noticeSection.hidden = false;
+                txt('ps-loan-detail-notice', noticeCount + ' overdue notice' + (noticeCount === 1 ? '' : 's') + ' sent to borrower (last sent: ' + (d.noticeLast || 'recent') + ')');
+            } else {
+                noticeSection.hidden = true;
+            }
+        }
         txt('ps-loan-detail-handled-by', d.handledBy || 'Not recorded');
         if (typeof psOpenModal === 'function') psOpenModal('ps-loan-detail-drawer');
     }
@@ -5058,8 +5311,10 @@ function psSelectFmt(btn) {
             }
         }
 
-        // Cancel is only offered for Approved reservations that haven't ended yet (same rule as the table).
+        // Cancel / Reschedule is only offered for Approved reservations that haven't ended yet (same rule as the table).
         el('ps-rr-cancel-btn').hidden = row.dataset.cancellable !== '1';
+        var rBtn = el('ps-rr-reschedule-btn');
+        if (rBtn) rBtn.hidden = row.dataset.cancellable !== '1';
 
         // Review controls: Waiting requests (the table only flags the rows this admin may decide).
         setReviewUI(d.status === 'Waiting' && d.canReview === '1');
@@ -5149,6 +5404,22 @@ function psSelectFmt(btn) {
         var cancellable = decision === 'Approved' && endMs > Date.now();
         d.cancellable = cancellable ? '1' : '0';
         if (cancellable && viewBtn && !row.querySelector('.btn-cancel-rr-admin')) {
+            var rb = document.createElement('button');
+            rb.type = 'button';
+            rb.className = 'pr-tbl-btn btn-reschedule-rr-admin';
+            rb.style.cssText = 'background:#f3f4f6;color:#374151;border:1px solid #d1d5db;';
+            rb.setAttribute('data-action', 'admin-reschedule-reservation');
+            rb.setAttribute('data-rr-id', d.rrId);
+            rb.setAttribute('data-room-id', d.roomId || '');
+            rb.setAttribute('data-room-name', d.room || '');
+            rb.setAttribute('data-faculty-name', d.who || '');
+            rb.setAttribute('data-date', d.isoDate || '');
+            rb.setAttribute('data-start-time', d.startTime || '');
+            rb.setAttribute('data-end-time', d.endTime || '');
+            rb.setAttribute('data-notes', d.notes || '');
+            rb.textContent = 'Reschedule';
+            viewBtn.parentNode.insertBefore(rb, viewBtn);
+
             var cb = document.createElement('button');
             cb.type = 'button';
             cb.className = 'pr-tbl-btn cancel-r btn-cancel-rr-admin';
@@ -5223,6 +5494,14 @@ function psSelectFmt(btn) {
         var decideBtn = e.target.closest('[data-rr-decide]');
         if (decideBtn) {
             submitDecision(decideBtn.getAttribute('data-rr-decide'), decideBtn);
+            return;
+        }
+        if (e.target.closest('[data-rr-reschedule]') && currentRow) {
+            var rBtn = currentRow.querySelector('.btn-reschedule-rr-admin');
+            if (rBtn) {
+                if (typeof psCloseModal === 'function') psCloseModal('ps-room-drawer');
+                rBtn.click();
+            }
             return;
         }
         if (!e.target.closest('[data-rr-cancel]') || !currentRow) return;
@@ -5653,8 +5932,9 @@ function psSelectFmt(btn) {
             if (nav) {
                 nav.click();
                 // Defer sub-panel navigation until the tab panel has activated (next tick).
-                var loanFilter = go.getAttribute('data-dash-loan-filter');
-                var roomsTab   = go.getAttribute('data-dash-rooms-tab');
+                var loanFilter  = go.getAttribute('data-dash-loan-filter');
+                var roomsTab    = go.getAttribute('data-dash-rooms-tab');
+                var roomsFilter = go.getAttribute('data-dash-rooms-filter');
                 if (loanFilter || roomsTab) {
                     setTimeout(function () {
                         if (loanFilter) {
@@ -5669,6 +5949,12 @@ function psSelectFmt(btn) {
                         if (roomsTab) {
                             // Navigate to the correct Rooms sub-panel (e.g. Reservations).
                             if (typeof switchRoomsTab === 'function') switchRoomsTab(roomsTab);
+                            if (roomsFilter) {
+                                setTimeout(function () {
+                                    var tabBtn = document.querySelector('#rrTabs [data-rr-tab="' + roomsFilter + '"]');
+                                    if (tabBtn) tabBtn.click();
+                                }, 80);
+                            }
                         }
                     }, 80);
                 }
@@ -6406,6 +6692,24 @@ function psSelectFmt(btn) {
                 setNoticeSummary(1, d.idNumber);
                 setNoticeSummary(2, d.equipment + (d.qty && d.qty !== '1' ? ' \u00d7' + d.qty : ''));
                 setNoticeSummary(3, days + ' day' + (days === 1 ? '' : 's'));
+
+                // Show "notice already sent" warning banner inside the modal
+                var histAlert = document.getElementById('overdue-notice-history-alert');
+                var histText  = document.getElementById('overdue-notice-history-text');
+                var nCount    = parseInt(d.noticeCount || '0', 10);
+                if (histAlert && histText) {
+                    if (nCount > 0) {
+                        var nLast = d.noticeLast || '';
+                        histText.textContent = nCount === 1
+                            ? 'A notice was already sent to this borrower on ' + nLast + '. Sending another will deliver a second reminder.'
+                            : nCount + ' notices have already been sent to this borrower (last: ' + nLast + '). Sending another will deliver another reminder.';
+                        histAlert.style.display = '';
+                    } else {
+                        histAlert.style.display = 'none';
+                        histText.textContent = '';
+                    }
+                }
+
                 if (noticePreview) {
                     noticePreview.textContent = 'Dear ' + (d.borrower || 'Borrower') + ',\n\n'
                         + 'This is an official overdue-return notice from PUPSync Admin. '

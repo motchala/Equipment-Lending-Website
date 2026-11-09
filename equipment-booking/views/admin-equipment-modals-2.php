@@ -72,6 +72,10 @@
                     <div class="ps-req-sum-row"><span class="ps-rsl">Equipment</span><span class="ps-rsv">—</span></div>
                     <div class="ps-req-sum-row"><span class="ps-rsl">Days Overdue</span><span class="ps-rsv" style="color:var(--danger);font-weight:600">—</span></div>
                 </div>
+                <div id="overdue-notice-history-alert" style="display:none;padding:8px 12px;border-radius:6px;margin-bottom:1rem;background:#fef3c7;border:1px solid #f59e0b;color:#92400e;font-size:12px;">
+                    <span class="material-symbols-outlined" style="font-size:15px;vertical-align:middle;margin-right:4px;">info</span>
+                    <span id="overdue-notice-history-text"></span>
+                </div>
                 <div class="ps-form-group">
                     <label class="ps-form-label">Message Preview</label>
                     <div class="ps-notice-preview" id="overdue-notice-preview">Dear [Borrower Name],

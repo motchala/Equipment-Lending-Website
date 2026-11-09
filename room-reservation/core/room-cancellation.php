@@ -53,7 +53,7 @@ class RoomCancellation
       return ['success' => false, 'error' => 'Only Approved or Waiting reservations can be cancelled.'];
     }
 
-    // ── 1-hour cutoff enforcement ───────────────────────────────────
+    // ── 1-hour cutoff enforcement (faculty only; admins can cancel anytime before end) ──
     $resStart = new DateTime(
       $row['reservation_date'] . ' ' . $row['start_time'],
       new DateTimeZone('Asia/Manila')
@@ -61,7 +61,7 @@ class RoomCancellation
     $now      = new DateTime('now', new DateTimeZone('Asia/Manila'));
     $diffSecs = $resStart->getTimestamp() - $now->getTimestamp();
 
-    if (!$isWaiting && $diffSecs <= 3600) {
+    if ($actor !== 'admin' && !$isWaiting && $diffSecs <= 3600) {
       return [
         'success' => false,
         'error'   => 'Cancellations are not allowed within 1 hour of the reservation start time.',

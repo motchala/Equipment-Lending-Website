@@ -434,6 +434,7 @@
                                                 data-submitted-ts="<?php echo !empty($ar['request_date']) ? (int)strtotime($ar['request_date']) : 0; ?>"
                                                 data-can-review="<?php echo $ar_reviewable ? '1' : '0'; ?>"
                                                 data-cancellable="<?php echo $ar_cancellable ? '1' : '0'; ?>"
+                                                data-room-id="<?php echo (int)$ar['room_id']; ?>"
                                                 data-waitlist-count="<?php
                                                     $ar_wl_key = ($ar['room_id'] ?? '') . '|' . $ar['reservation_date'] . '|' . $ar['start_time'] . '|' . $ar['end_time'];
                                                     echo (int)($admin_room_waitlist_counts[$ar_wl_key] ?? 0);
@@ -470,6 +471,17 @@
                                                 <td data-col="actions">
                                                     <div class="eq-act-wrap">
                                                         <?php if ($ar_cancellable): ?>
+                                                            <button type="button" class="pr-tbl-btn btn-reschedule-rr-admin"
+                                                                style="background:#f3f4f6;color:#374151;border:1px solid #d1d5db;"
+                                                                data-action="admin-reschedule-reservation"
+                                                                data-rr-id="<?php echo (int)$ar['id']; ?>"
+                                                                data-room-id="<?php echo (int)$ar['room_id']; ?>"
+                                                                data-room-name="<?php echo htmlspecialchars($ar['room_name']); ?>"
+                                                                data-faculty-name="<?php echo htmlspecialchars($ar['faculty_name']); ?>"
+                                                                data-date="<?php echo htmlspecialchars($ar['reservation_date']); ?>"
+                                                                data-start-time="<?php echo htmlspecialchars($ar['start_time']); ?>"
+                                                                data-end-time="<?php echo htmlspecialchars($ar['end_time']); ?>"
+                                                                data-notes="<?php echo htmlspecialchars($ar['notes'] ?? ''); ?>">Reschedule</button>
                                                             <button type="button" class="pr-tbl-btn cancel-r btn-cancel-rr-admin"
                                                                 data-action="admin-cancel-reservation"
                                                                 data-rr-id="<?php echo (int)$ar['id']; ?>"
