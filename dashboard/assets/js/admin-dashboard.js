@@ -5632,12 +5632,25 @@ function psSelectFmt(btn) {
             var nav = document.querySelector('.nav-item[data-tab="' + tab + '"]');
             if (nav) {
                 nav.click();
+                // Defer sub-panel navigation until the tab panel has activated (next tick).
                 var loanFilter = go.getAttribute('data-dash-loan-filter');
-                if (loanFilter) {
-                    var loanPanel = document.querySelector('#eqTabs .rq-filter-chip[data-eq-panel="eq-onloan"]');
-                    if (loanPanel) loanPanel.click();
-                    var loanTab = document.querySelector('#eqLoanFilter [data-loan-filter="' + loanFilter + '"]');
-                    if (loanTab) loanTab.click();
+                var roomsTab   = go.getAttribute('data-dash-rooms-tab');
+                if (loanFilter || roomsTab) {
+                    setTimeout(function () {
+                        if (loanFilter) {
+                            // Navigate to Equipment > Loans tab, then apply the filter chip.
+                            var loanPanel = document.querySelector('#eqTabs .rq-filter-chip[data-eq-panel="eq-onloan"]');
+                            if (loanPanel) loanPanel.click();
+                            setTimeout(function () {
+                                var loanTab = document.querySelector('#eqLoanFilter [data-loan-filter="' + loanFilter + '"]');
+                                if (loanTab) loanTab.click();
+                            }, 80);
+                        }
+                        if (roomsTab) {
+                            // Navigate to the correct Rooms sub-panel (e.g. Reservations).
+                            if (typeof switchRoomsTab === 'function') switchRoomsTab(roomsTab);
+                        }
+                    }, 80);
                 }
             }
             return;

@@ -31,7 +31,7 @@ function dash_render(array $d): void
             'sub' => $d['pickup'] > 0 ? 'Awaiting claim scan' : 'Nothing to hand over',
             'go' => 'inventory',
             'chip' => '',
-            'loan_filter' => 'active',
+            'loan_filter' => 'pickup',
         ],
         [
             'tone' => 'ok',
@@ -67,6 +67,7 @@ function dash_render(array $d): void
                 ? $d['rooms_in_use'] . ' of ' . $d['rooms_bookable'] . ' in use'
                 : 'No bookable facilities yet',
             'go' => 'rooms',
+            'rooms_tab' => 'rooms-reservations',
             'chip' => '',
         ],
         [
@@ -95,7 +96,8 @@ function dash_render(array $d): void
                     <?php foreach ($kpis as $k): if (($k['group'] ?? 'loans') !== $gk) continue; ?>
                         <button type="button" class="dash-kpi dash-tone-<?php echo dash_h($k['tone']); ?>"
                             data-dash-go="<?php echo dash_h($k['go']); ?>"
-                            data-dash-loan-filter="<?php echo dash_h($k['loan_filter'] ?? ''); ?>">
+                            data-dash-loan-filter="<?php echo dash_h($k['loan_filter'] ?? ''); ?>"
+                            <?php if (!empty($k['rooms_tab'])): ?>data-dash-rooms-tab="<?php echo dash_h($k['rooms_tab']); ?>"<?php endif; ?>>
                             <span class="dash-kpi-label"><span class="dash-kpi-dot" aria-hidden="true"></span><?php echo dash_h($k['label']); ?></span>
                             <span class="dash-kpi-val"><?php echo (int)$k['val']; ?></span>
                             <span class="dash-kpi-sub"><?php echo dash_h($k['sub']); ?></span>
@@ -149,7 +151,8 @@ function dash_render(array $d): void
                         <li>
                             <button type="button" class="dash-attn-item dash-tone-<?php echo dash_h($a['tone']); ?>"
                                 data-dash-go="<?php echo dash_h($a['go']); ?>"
-                                data-dash-loan-filter="<?php echo dash_h($a['loan_filter'] ?? ''); ?>">
+                                data-dash-loan-filter="<?php echo dash_h($a['loan_filter'] ?? ''); ?>"
+                                <?php if (!empty($a['rooms_tab'])): ?>data-dash-rooms-tab="<?php echo dash_h($a['rooms_tab']); ?>"<?php endif; ?>>
                                 <span class="dash-attn-icon" aria-hidden="true"><span class="material-symbols-outlined"><?php echo dash_h($a['icon']); ?></span></span>
                                 <span class="dash-attn-text">
                                     <strong><?php echo dash_h($a['title']); ?></strong>

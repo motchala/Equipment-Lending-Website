@@ -118,7 +118,7 @@ function dash_collect(mysqli $conn): array
 
     // ── Equipment requests ───────────────────────────────────────────────
     $d['waiting']   = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_requests WHERE status='Waiting'");
-    $d['pickup']    = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_requests WHERE status='Approved'");
+    $d['pickup']    = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_requests WHERE status='Approved' AND NOT (COALESCE(booking_mode,'')='future' AND TIMESTAMP(borrow_date, COALESCE(borrow_time,'00:00:00')) > NOW())");
     $d['active']    = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_requests WHERE status='On Loan'");
     $d['due_today'] = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_requests WHERE status IN ('Approved','On Loan') AND return_date = ?", 's', [$today]);
     $d['overdue']   = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_requests WHERE status='Overdue'");
@@ -319,6 +319,7 @@ function dash_attention(array $d): array
             'title' => dash_pl($d['rooms_issues'], 'open facility issue'),
             'sub'   => 'Reported by faculty, not yet resolved',
             'go' => 'rooms',
+            'rooms_tab' => 'rooms-reservations',
             'chip' => ''
         ];
     }
