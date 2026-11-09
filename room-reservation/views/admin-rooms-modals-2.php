@@ -24,6 +24,7 @@
             <div class="form-card-body">
                 <div id="admin-cancel-rr-alert" style="display:none;padding:10px;border-radius:6px;margin-bottom:15px;font-size:.85rem;font-weight:500;"></div>
                 <p id="adminCancelRrDesc" style="font-size:.85rem;color:var(--text-light);margin-bottom:1rem;"></p>
+                <p id="adminCancelRrWlNote" style="display:none;font-size:.82rem;padding:8px 12px;border-radius:6px;background:#f0f4ff;color:#374151;margin-bottom:1rem;border-left:3px solid #6366f1;"></p>
                 <p style="font-size:.83rem;color:var(--text-light);margin-bottom:1rem;">
                     The faculty member will be notified by email. All faculty on the waitlist for this slot will also be notified that the slot is now available.
                 </p>

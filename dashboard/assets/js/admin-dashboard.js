@@ -3308,13 +3308,24 @@
 
 
     /* ── Admin Cancel Reservation Modal ─────────────────────── */
-    function openAdminCancelRrModal(rrId, roomName, facultyName) {
+    function openAdminCancelRrModal(rrId, roomName, facultyName, waitlistCount) {
         const modal = document.getElementById('adminCancelRrModal');
         const desc = document.getElementById('adminCancelRrDesc');
         const alertEl = document.getElementById('admin-cancel-rr-alert');
+        const wlNote = document.getElementById('adminCancelRrWlNote');
         document.getElementById('adminCancelRrId').value = rrId;
         alertEl.style.display = 'none';
         desc.textContent = 'Cancel reservation for ' + facultyName + ' in ' + roomName + '?';
+        if (wlNote) {
+            var wn = parseInt(waitlistCount, 10) || 0;
+            if (wn > 0) {
+                wlNote.textContent = wn + (wn === 1 ? ' faculty member is' : ' faculty members are') + ' on the waitlist for this slot and will be notified by email.';
+                wlNote.style.display = '';
+            } else {
+                wlNote.textContent = 'No faculty are currently on the waitlist for this slot.';
+                wlNote.style.display = '';
+            }
+        }
         modal.style.display = 'flex';
     }
 
@@ -3326,10 +3337,14 @@
     document.addEventListener('click', function (e) {
         const btn = e.target.closest('[data-action="admin-cancel-reservation"]');
         if (!btn) return;
+        // waitlist count lives on the nearest table row
+        var row = btn.closest('tr[data-rr-id]');
+        var wc = row ? (row.dataset.waitlistCount || '0') : '0';
         openAdminCancelRrModal(
             btn.dataset.rrId,
             btn.dataset.roomName,
-            btn.dataset.facultyName
+            btn.dataset.facultyName,
+            wc
         );
     });
 
@@ -3369,7 +3384,12 @@
                         return;
                     }
                     closeAdminCancelRrModal();
-                    showToast('Reservation cancelled. Faculty and waitlist notified.');
+                    var wn = parseInt(data.waitlist_notified, 10) || 0;
+                    var toastMsg = 'Reservation cancelled.';
+                    if (wn > 0) {
+                        toastMsg += ' ' + wn + (wn === 1 ? ' waitlisted faculty was' : ' waitlisted faculty were') + ' notified.';
+                    }
+                    showToast(toastMsg);
                     if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
                 })
                 .catch(() => {

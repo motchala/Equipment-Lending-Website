@@ -311,6 +311,23 @@
                     // Waiting = reservations for a later date. Any admin decides them; a request letter, when one
                     // was attached, opens from the row's details.
                     ?>
+
+                    <?php if (!empty($rooms_expired_count) && $rooms_expired_count > 0): ?>
+                    <div class="rr-expiry-banner" id="rrExpiryBanner" role="alert"
+                         style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;margin-bottom:12px;background:#fff8e1;border:1px solid #f59e0b;font-size:.85rem;color:#78350f;">
+                        <span class="material-symbols-outlined" style="font-size:18px;color:#f59e0b;flex-shrink:0;">schedule</span>
+                        <span>
+                            <?php echo $rooms_expired_count === 1
+                                ? '1 reservation was automatically declined this session because it was not reviewed in time.'
+                                : $rooms_expired_count . ' reservations were automatically declined this session because they were not reviewed in time.'; ?>
+                            They appear in the <strong>Declined</strong> tab.
+                        </span>
+                        <button type="button" aria-label="Dismiss" onclick="this.parentElement.style.display='none';"
+                            style="margin-left:auto;background:none;border:none;cursor:pointer;color:#92400e;padding:0;line-height:1;">
+                            <span class="material-symbols-outlined" style="font-size:18px;">close</span>
+                        </button>
+                    </div>
+                    <?php endif; ?>
                     <div class="pr-card">
                         <div class="pr-card-header">
                             <h3><span class="material-symbols-outlined">calendar_month</span> Reservations</h3>
@@ -416,7 +433,11 @@
                                                 data-arb-reason="<?php echo htmlspecialchars($ar['arb_reason'] ?? ''); ?>"
                                                 data-submitted-ts="<?php echo !empty($ar['request_date']) ? (int)strtotime($ar['request_date']) : 0; ?>"
                                                 data-can-review="<?php echo $ar_reviewable ? '1' : '0'; ?>"
-                                                data-cancellable="<?php echo $ar_cancellable ? '1' : '0'; ?>">
+                                                data-cancellable="<?php echo $ar_cancellable ? '1' : '0'; ?>"
+                                                data-waitlist-count="<?php
+                                                    $ar_wl_key = ($ar['room_id'] ?? '') . '|' . $ar['reservation_date'] . '|' . $ar['start_time'] . '|' . $ar['end_time'];
+                                                    echo (int)($admin_room_waitlist_counts[$ar_wl_key] ?? 0);
+                                                ?>">
                                                 <td data-col="facility">
                                                     <div class="eq-cell-name"><?php echo htmlspecialchars($ar['room_name']); ?></div>
                                                     <div class="eq-cell-sub"><?php echo htmlspecialchars($ar_where); ?></div>

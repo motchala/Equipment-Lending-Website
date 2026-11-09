@@ -106,4 +106,4 @@ if ($isAdmin) {
     admin_log_activity($conn, 'room', $label, null, ['action' => 'room_cancelled', 'ref_type' => 'reservation', 'ref_id' => $reservationId]);
 }
 
-echo json_encode(['success' => true]);
+echo json_encode(['success' => true, 'waitlist_notified' => (int)($result['waitlist_notified'] ?? 0)]);
