@@ -6551,4 +6551,195 @@ function psSelectFmt(btn) {
         }
     }());
 
+    /* ── Google Sheets Sync (Settings → Equipment tab) ──────────────────── */
+    (function () {
+        var urlInput  = document.getElementById('gsheetUrl');
+        var saveBtn   = document.getElementById('gsheetSaveUrl');
+        var syncBtn   = document.getElementById('gsheetSyncNow');
+        var resultEl  = document.getElementById('gsheetSyncResult');
+        var lastSyncEl = document.getElementById('gsheetLastSync');
+        if (!syncBtn) return;
+
+        var csrfToken = (function () {
+            var m = document.querySelector('meta[name="csrf-token"]');
+            if (m) return m.content;
+            var i = document.querySelector('input[name="csrf_token"]');
+            return i ? i.value : '';
+        }());
+
+        function showResult(msg, isError) {
+            if (!resultEl) return;
+            resultEl.style.display = '';
+            resultEl.style.background = isError ? '#fdecea' : '#e8f5e9';
+            resultEl.style.color = isError ? '#c62828' : '#2e7d32';
+            resultEl.textContent = msg;
+        }
+
+        // Save URL
+        if (saveBtn && urlInput) {
+            saveBtn.addEventListener('click', function () {
+                var fd = new FormData();
+                fd.append('action', 'save_url');
+                fd.append('csrf_token', csrfToken);
+                fd.append('url', urlInput.value.trim());
+                fetch('equipment-booking/api/sync-config.php', { method: 'POST', credentials: 'same-origin', body: fd })
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) {
+                        showResult(d.status === 'success' ? 'URL saved.' : (d.error || 'Could not save.'), d.status !== 'success');
+                    });
+            });
+        }
+
+        // Sync Now
+        syncBtn.addEventListener('click', function () {
+            syncBtn.disabled = true;
+            syncBtn.innerHTML = '<span class="material-symbols-outlined" style="animation:spin .8s linear infinite">sync</span> Syncing…';
+            if (resultEl) resultEl.style.display = 'none';
+
+            var fd = new FormData();
+            fd.append('csrf_token', csrfToken);
+            fetch('equipment-booking/api/sync-inventory.php', { method: 'POST', credentials: 'same-origin', body: fd })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    syncBtn.disabled = false;
+                    syncBtn.innerHTML = '<span class="material-symbols-outlined">sync</span> Sync Now';
+                    if (d.status === 'success') {
+                        var s = d.summary;
+                        var msg = 'Sync complete — ' + s.added + ' added, ' + s.updated + ' updated.';
+                        if (s.archived > 0) msg += ' ' + s.archived + ' item(s) removed from sheet (archived).';
+                        if (s.skipped_sheets && s.skipped_sheets.length) msg += ' Skipped: ' + s.skipped_sheets.join(', ') + '.';
+                        showResult(msg, false);
+                        if (lastSyncEl) lastSyncEl.textContent = 'Last synced: just now';
+                        // Refresh the inventory table in-place instead of a full reload.
+                        if (s.added > 0 || s.updated > 0 || s.archived > 0) {
+                            setTimeout(function () {
+                                fetch('admin-dashboard.php?fragment=inventory-tbody', {
+                                    credentials: 'same-origin',
+                                    cache: 'no-store'
+                                })
+                                .then(function (r) { return r.ok ? r.json() : null; })
+                                .then(function (frag) {
+                                    if (!frag || frag.status !== 'success') {
+                                        window.location.reload();
+                                        return;
+                                    }
+                                    var tbody = document.getElementById('inventory-body');
+                                    if (tbody) {
+                                        tbody.innerHTML = frag.active_html;
+                                        if (typeof window._setupInventoryListFn === 'function') {
+                                            window._setupInventoryListFn();
+                                        }
+                                    }
+                                })
+                                .catch(function () { window.location.reload(); });
+                            }, 800);
+                        }
+                    } else {
+                        showResult(d.error || 'Sync failed.', true);
+                    }
+                })
+                .catch(function () {
+                    syncBtn.disabled = false;
+                    syncBtn.innerHTML = '<span class="material-symbols-outlined">sync</span> Sync Now';
+                    showResult('Network error. Please try again.', true);
+                });
+        });
+
+        // Pending deletion actions
+        document.querySelectorAll('[data-pd-action]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var action = btn.dataset.pdAction;
+                var pdId   = btn.dataset.pdId;
+                var fd = new FormData();
+                fd.append('action', action === 'archive' ? 'pd_archive' : 'pd_keep');
+                fd.append('csrf_token', csrfToken);
+                fd.append('pd_id', pdId);
+                fetch('equipment-booking/api/sync-config.php', { method: 'POST', credentials: 'same-origin', body: fd })
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) {
+                        if (d.status === 'success') {
+                            var row = document.querySelector('.pd-row[data-pd-id="' + pdId + '"]');
+                            if (row) row.remove();
+                        }
+                    });
+            });
+        });
+    }());
+
+    // ── Live sync poller (always active — not gated on the Settings tab) ────────
+    // Checks every 5 s whether the Google Sheet changed; if yes, runs sync and
+    // swaps the inventory tbody in-place without a page reload.
+    (function startLiveSync() {
+        var syncing = false;
+
+        var csrfTokenForSync = (function () {
+            var m = document.querySelector('meta[name="csrf-token"]');
+            if (m) return m.content;
+            var i = document.querySelector('input[name="csrf_token"]');
+            return i ? i.value : '';
+        }());
+
+        function refreshInventoryTable() {
+            fetch('admin-dashboard.php?fragment=inventory-tbody', {
+                credentials: 'same-origin',
+                cache: 'no-store'
+            })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (frag) {
+                if (!frag || frag.status !== 'success') return;
+                var tbody = document.getElementById('inventory-body');
+                if (tbody) {
+                    tbody.innerHTML = frag.active_html;
+                    if (typeof window._setupInventoryListFn === 'function') {
+                        window._setupInventoryListFn();
+                    }
+                }
+            })
+            .catch(function () {});
+        }
+
+        function poll() {
+            if (syncing) return;
+            fetch('equipment-booking/api/check-sheet-modified.php', {
+                credentials: 'same-origin',
+                cache: 'no-store'
+            })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (d) {
+                if (!d || !d.changed) return;
+                syncing = true;
+                var fd = new FormData();
+                fd.append('csrf_token', csrfTokenForSync);
+                fetch('equipment-booking/api/sync-inventory.php', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    body: fd
+                })
+                .then(function (r) { return r.json(); })
+                .then(function (syncData) {
+                    syncing = false;
+                    if (!syncData || syncData.status !== 'success') return;
+                    var s = syncData.summary;
+                    // Always refresh the table when the sheet was detected as changed —
+                    // even if added/updated/archived are all 0 (Google export cache may
+                    // lag behind Ctrl+Z / Ctrl+Y for a cycle or two, but the DB is still
+                    // re-read fresh so the next render will reflect the true state).
+                    refreshInventoryTable();
+                    var parts = [];
+                    if (s.added    > 0) parts.push(s.added    + ' added');
+                    if (s.updated  > 0) parts.push(s.updated  + ' updated');
+                    if (s.archived > 0) parts.push(s.archived + ' archived');
+                    if (parts.length > 0 && typeof window.showToast === 'function') {
+                        window.showToast('Inventory synced: ' + parts.join(', ') + '.', 'success');
+                    }
+                })
+                .catch(function () { syncing = false; });
+            })
+            .catch(function () {});
+        }
+
+        setInterval(poll, 5000);
+        setTimeout(poll, 2000);
+    }());
+
 })();
