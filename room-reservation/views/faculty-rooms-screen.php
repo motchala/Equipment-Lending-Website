@@ -100,7 +100,7 @@
     <div class="fcty-toolbar">
         <div class="fcty-floor-tabs" id="fcty-floor-tabs" role="tablist" aria-label="Floors"></div>
         <label class="fcty-toggle">
-            <input type="checkbox" id="fcty-only-free">
+            <input type="checkbox" id="fcty-only-free" checked>
             <span class="fcty-toggle-track" aria-hidden="true"></span>
             <span>Available only</span>
         </label>

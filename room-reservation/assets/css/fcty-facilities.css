@@ -685,12 +685,6 @@
     box-shadow: var(--shadow-sm);
 }
 
-#rooms-browse .fcty-floor-count {
-    font-size: .75rem;
-    font-weight: 600;
-    opacity: .7;
-}
-
 /* Toggle */
 #rooms-browse .fcty-toggle {
     display: inline-flex;

@@ -8,7 +8,7 @@ declare(strict_types=1);
  * no hyphens) and routes here automatically from the unified verify endpoint.
  * No auth required — public endpoint, rate-limited by IP.
  *
- * POST fields (JSON): code, student_name, student_id
+ * POST fields (JSON): code, student_name
  * Returns: { valid, faculty_id, faculty_name, item_name, item_id,
  *            quantity, code_db_id } or { error }
  */
@@ -22,11 +22,10 @@ date_default_timezone_set('Asia/Manila');
 $body = json_decode((string)file_get_contents('php://input'), true);
 $code         = trim((string)($body['code']         ?? ''));
 $student_name = trim((string)($body['student_name'] ?? ''));
-$student_id   = trim((string)($body['student_id']   ?? ''));
 
-if (!$code || !$student_name || !$student_id) {
+if (!$code || !$student_name) {
     http_response_code(422);
-    echo json_encode(['error' => 'All fields are required.']);
+    echo json_encode(['error' => 'Code and student name are required.']);
     exit;
 }
 

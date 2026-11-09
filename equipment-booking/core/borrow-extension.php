@@ -13,7 +13,7 @@ declare(strict_types=1);
  *   (return moment = return_date + return_time, end of that day when no time was set.)
  *
  * HOW LONG
- *   Same choices as the Borrow form for how the loan was booked, counted from NOW
+ *   Extension choices are independent of new booking durations and are counted from NOW
  *   (see mode(): counter loans made with a faculty item code are hourly too):
  *     hourly ("today") loans   +1 / 2 / 3 / 5 hours, rounded up to
  *                              the next 5 minutes, never past closing time (BookingSchedule::DAY_END)
@@ -66,6 +66,9 @@ final class BorrowExtension
 {
     /** Extensions allowed per loan. */
     public const MAX_EXTENSIONS = 2;
+    private const EXTENSION_DAY_START = '07:00';
+    private const EXTENSION_HOURS = [1, 2, 3, 5];
+    private const EXTENSION_DAYS = [1, 2, 3];
 
     private static ?bool $ready = null;
 
@@ -220,12 +223,12 @@ final class BorrowExtension
         if (self::mode($row) === 'today') {
             // Hourly loan: more hours today, counted from now (office hours only)
             $day   = $now->format('Y-m-d');
-            $open  = new DateTimeImmutable($day . ' ' . BookingSchedule::DAY_START . ':00', $tz);
+            $open  = new DateTimeImmutable($day . ' ' . self::EXTENSION_DAY_START . ':00', $tz);
             $close = new DateTimeImmutable($day . ' ' . BookingSchedule::DAY_END . ':00', $tz);
             $base  = $now < $open ? $open : $now;
             $base  = (new DateTimeImmutable('@' . (int)(ceil($base->getTimestamp() / 300) * 300)))->setTimezone($tz);
 
-            foreach (BookingSchedule::allowedLengths('today') as $hours) {
+            foreach (self::EXTENSION_HOURS as $hours) {
                 $hours = (int)$hours;
                 $due   = $base->modify('+' . $hours . ' hours');
                 if ($due > $close) {
@@ -241,9 +244,9 @@ final class BorrowExtension
         if ($time === '') {
             $time = BookingSchedule::DAY_END;
         }
-        $time = max(BookingSchedule::DAY_START, min(BookingSchedule::DAY_END, $time));
+        $time = max(self::EXTENSION_DAY_START, min(BookingSchedule::DAY_END, $time));
 
-        foreach (BookingSchedule::allowedLengths('future') as $days) {
+        foreach (self::EXTENSION_DAYS as $days) {
             $days  = (int)$days;
             $due   = new DateTimeImmutable($now->modify('+' . $days . ' days')->format('Y-m-d') . ' ' . $time . ':00', $tz);
             $out[] = ['length' => $days, 'unit' => 'days', 'label' => '+' . $days . ($days === 1 ? ' day' : ' days'), 'due' => $due];

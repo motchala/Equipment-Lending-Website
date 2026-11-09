@@ -1,15 +1,16 @@
 ﻿/* ================================================================
    PUPSYNC — STUDENT PORTAL  (student-dashboard.js)
 
-   Flow (one page, no modal):
+   Flow (one page, with a building/floor/room picker for equipment):
      Home ─ pick a service
        └─ Details ─ faculty code + name + student ID + course   (verify)
-            ├─ Borrow, faculty code → photo grid of equipment  → submit → receipt + QR
-            ├─ Borrow, item code    → the one item, qty / time → submit → receipt + QR
+            ├─ Borrow, faculty code → photo grid → room picker → submit → receipt + QR
+            ├─ Borrow, item code    → item, qty / time, room picker → submit → receipt + QR
             └─ Facility             → building → floor → room  → reserve → result
 
    API contracts are unchanged:
      equipment-booking/api/verify-faculty-code.php   verify-item-code.php
+     equipment-booking/api/student-room-options.php
      equipment-booking/api/submit-student-borrow.php submit-item-borrow.php
      room-reservation/api/verify-room-code.php       submit-student-reserve.php
 ================================================================ */
@@ -19,9 +20,14 @@
     /* ── Constants ───────────────────────────────────────────── */
     /* Must match STUDENT_COURSES in shared/core/student-courses.php */
     var COURSES = ['BSIT', 'BSCpE', 'BSIE', 'BSBA', 'BSEEd', 'BSEd', 'BSPSY', 'DIT', 'DCET'];
-    var OPEN_MIN = 7 * 60;       /* rooms bookable 7:00 AM … */
-    var CLOSE_MIN = 20 * 60;     /* … 8:00 PM (server enforces the same) */
-    var STEP_MIN = 30;
+    var OPEN_MIN = 7 * 60;       /* room reservations open at 7:00 AM */
+    var CLOSE_MIN = 21 * 60;     /* … 9:00 PM (server enforces the same) */
+    var BORROW_OPEN_MIN = 7 * 60;
+    var BORROW_LAST_START_MIN = 20 * 60;
+    var STEP_MIN = 60;
+    var BORROW_HOURS = [1, 2, 3, 6];
+    var BORROW_ADVANCE_DAYS = 14;
+    var EQ_PAGE_SIZE = 20;
     var PURPOSES = ['Lecture', 'Lab session', 'Meeting', 'Exam', 'Seminar'];
     var QR_SRC = 'https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js';
     var RECEIPT_KEY = 'pup_last_receipt';
@@ -29,6 +35,7 @@
         verifyFaculty: 'equipment-booking/api/verify-faculty-code.php',
         verifyItem: 'equipment-booking/api/verify-item-code.php',
         verifyRoom: 'room-reservation/api/verify-room-code.php',
+        studentRooms: 'equipment-booking/api/student-room-options.php',
         borrow: 'equipment-booking/api/submit-student-borrow.php',
         itemBorrow: 'equipment-booking/api/submit-item-borrow.php',
         reserve: 'room-reservation/api/submit-student-reserve.php'
@@ -61,6 +68,112 @@
     function nowMin() { var n = new Date(); return n.getHours() * 60 + n.getMinutes(); }
     function icon(name) { return '<span class="material-symbols-outlined" aria-hidden="true">' + name + '</span>'; }
     function toInt(v, d) { var n = parseInt(v, 10); return isNaN(n) ? (d || 0) : n; }
+    function isSunday(dateStr) { return parseYmd(dateStr).getDay() === 0; }
+    function borrowDates() {
+        var dates = [];
+        for (var offset = 0; offset <= BORROW_ADVANCE_DAYS; offset++) {
+            var date = ymd(addDays(new Date(), offset));
+            if (offset > 0 && isSunday(date)) continue;
+            var available = offset !== 0 || (!isSunday(date) && nowMin() <= BORROW_LAST_START_MIN);
+            dates.push({
+                value: date,
+                available: available,
+                label: offset === 0 ? 'Today · ' + niceDate(date) : niceDate(date)
+            });
+        }
+        return dates;
+    }
+    function studentStartTimes(dateStr, duration) {
+        var isToday = dateStr === todayStr();
+        var start = isToday ? Math.max(BORROW_OPEN_MIN, Math.ceil(nowMin() / STEP_MIN) * STEP_MIN) : BORROW_OPEN_MIN;
+        var times = [];
+        for (var minute = start; minute <= BORROW_LAST_START_MIN && minute + duration * 60 <= CLOSE_MIN; minute += STEP_MIN) {
+            times.push(minToHHMM(minute));
+        }
+        return times;
+    }
+    function studentDateOptions() {
+        var dates = borrowDates();
+        var firstAvailable = dates.find(function (date) { return date.available; });
+        return '<option value="" disabled' + (!firstAvailable ? ' selected' : '') + '>Choose a borrowing date</option>' +
+            dates.map(function (date) {
+                return '<option value="' + date.value + '"' + (date.available ? '' : ' disabled') +
+                    (firstAvailable === date ? ' selected' : '') + '>' + esc(date.label) + '</option>';
+            }).join('');
+    }
+    function studentTimeOptions(dateStr, duration, selected) {
+        var times = dateStr ? studentStartTimes(dateStr, duration) : [];
+        var chosen = times.indexOf(selected) !== -1 ? selected : (times[0] || '');
+        var html = '<option value="" disabled' + (!chosen ? ' selected' : '') + '>Choose a start time</option>';
+        return html + times.map(function (time) {
+            return '<option value="' + time + '"' + (chosen === time ? ' selected' : '') + '>' + esc(minToLabel(hhmmToMin(time))) + '</option>';
+        }).join('');
+    }
+    function studentDurationOptions(dateStr, time, selected) {
+        var start = time ? hhmmToMin(time) : OPEN_MIN;
+        return '<option value="" disabled' + (!selected ? ' selected' : '') + '>Choose duration</option>' +
+            BORROW_HOURS.map(function (hours) {
+                var disabled = !dateStr || start + hours * 60 > CLOSE_MIN;
+                return '<option value="' + hours + '"' + (selected === hours ? ' selected' : '') +
+                    (disabled ? ' disabled' : '') + '>' + hours + ' ' + (hours === 1 ? 'hour' : 'hours') + '</option>';
+            }).join('');
+    }
+    function scheduleFields(prefix) {
+        return '<div class="st-row st-borrow-schedule">' +
+            '<div class="st-field"><label for="' + prefix + 'Date">Borrow date <span class="st-star">*</span>' +
+            ' <span class="material-symbols-outlined st-borrow-info" id="' + prefix + 'TodayInfo" title="" aria-label="" tabindex="0" hidden>error</span>' +
+            '</label><select class="st-input" id="' + prefix + 'Date">' + studentDateOptions() + '</select></div>' +
+            '<div class="st-field"><label for="' + prefix + 'StartTime">Start time <span class="st-star">*</span></label>' +
+            '<select class="st-input" id="' + prefix + 'StartTime"></select></div>' +
+            '<div class="st-field"><label for="' + prefix + 'Duration">Duration <span class="st-star">*</span></label>' +
+            '<select class="st-input" id="' + prefix + 'Duration">' + studentDurationOptions(todayStr(), '', 1) + '</select></div>' +
+            '</div>';
+    }
+    function syncStudentSchedule(prefix) {
+        var date = $(prefix + 'Date');
+        if (!date) return;
+        var today = borrowDates()[0];
+        var reason = isSunday(today.value) ? 'sunday' : nowMin() > BORROW_LAST_START_MIN ? 'closed' : '';
+        var state = today.value + ':' + reason;
+        if (date.getAttribute('data-schedule-state') === state) {
+            refreshStudentSchedule(prefix);
+            return;
+        }
+        var selected = date.value;
+        date.innerHTML = studentDateOptions();
+        var selectedDate = borrowDates().find(function (entry) { return entry.value === selected; });
+        if (selectedDate && selectedDate.available) date.value = selected;
+        date.setAttribute('data-schedule-state', state);
+        var info = $(prefix + 'TodayInfo');
+        if (info) {
+            var message = reason === 'sunday'
+                ? 'Same-day borrowing is unavailable on Sundays. Choose a later date.'
+                : 'Same-day borrowing is unavailable after 8:00 PM. Choose a later date.';
+            info.hidden = !reason;
+            info.title = reason ? message : '';
+            info.setAttribute('aria-label', reason ? message : '');
+        }
+        refreshStudentSchedule(prefix);
+    }
+    function refreshStudentSchedule(prefix) {
+        var date = $(prefix + 'Date');
+        var time = $(prefix + 'StartTime');
+        var duration = $(prefix + 'Duration');
+        if (!date || !time || !duration) return;
+        var previousTime = time.value;
+        var previousDuration = toInt(duration.value);
+        time.innerHTML = studentTimeOptions(date.value, previousDuration || 1, previousTime);
+        var selectedTime = time.value;
+        duration.innerHTML = studentDurationOptions(date.value, selectedTime, previousDuration);
+        if (duration.value === '' && duration.options.length > 1) {
+            duration.value = duration.options[1].value;
+        }
+    }
+    function scheduleReturn(date, time, duration) {
+        var endMinutes = hhmmToMin(time) + duration * 60;
+        return date + ' ' + minToHHMM(endMinutes);
+    }
+    function scheduleMode(date) { return date === todayStr() ? 'today' : 'future'; }
 
     /* Image paths come from the database as "uploads/…" or "assets/…". Anything else is ignored. */
     function safeImg(p) {
@@ -167,11 +280,13 @@
             inv: [],            /* equipment list (faculty-code borrow)            */
             invMap: {},         /* item_name → item                                */
             cart: {},           /* item_name → quantity                            */
+            eqPage: 1,          /* current equipment-grid page                       */
             done: [],           /* requests already accepted by the server          */
             where: null,        /* room / dates locked in after the first accept   */
             query: '',
             cat: '',
             fac: { buildings: [], bid: null, floor: 0, room: null },
+            roomPicker: { rooms: null, buildings: [], bid: null, floor: 0, target: '' },
             receipt: null
         };
     }
@@ -239,12 +354,11 @@
         hideAlert('detailsError');
         var code = $('facultyCode').value.trim();
         var name = $('studentName').value.trim();
-        var id = $('studentId').value.trim();
+        var id = '';
         var course = $('studentCourse').value.trim();
 
         if (!code) return showAlert('detailsError', 'Please enter the code.');
         if (!name) return showAlert('detailsError', 'Please enter your name.');
-        if (!id) return showAlert('detailsError', 'Please enter your Student ID.');
         if (!course) return showAlert('detailsError', 'Please select your course.');
 
         /* Code type: item codes are exactly 12 letters/digits (no hyphens); faculty codes are not.
@@ -290,6 +404,7 @@
         st.inv.forEach(function (i) { st.invMap[i.item_name] = i; });
         st.query = '';
         st.cat = '';
+        st.eqPage = 1;
 
         var cats = [];
         st.inv.forEach(function (i) { if (i.category && cats.indexOf(i.category) === -1) cats.push(i.category); });
@@ -310,7 +425,6 @@
                 '</div>';
         }
 
-        var t0 = todayStr(), t1 = ymd(addDays(new Date(), 1));
         flow(
             '<div class="st-pagehead">' +
             '<button type="button" class="st-link" data-action="back-details">' + icon('arrow_back') + 'Back</button>' +
@@ -319,26 +433,33 @@
             '</div>' +
             tools +
             '<div class="st-eq-grid" id="eqGrid"></div>' +
+            '<div class="st-pagination" id="eqPagination" hidden>' +
+            '<div class="st-pagination-info" id="eqPageInfo" aria-live="polite"></div>' +
+            '<nav class="st-pagination-controls" aria-label="Equipment pages">' +
+            '<button type="button" class="st-pagination-btn" data-action="eq-page-prev" aria-label="Previous page">' + icon('chevron_left') + '</button>' +
+            '<div class="st-pagination-numbers" id="eqPageNumbers"></div>' +
+            '<button type="button" class="st-pagination-btn" data-action="eq-page-next" aria-label="Next page">' + icon('chevron_right') + '</button>' +
+            '</nav></div>' +
             '<form class="st-card" id="borrowForm" novalidate>' +
             '<div class="st-card-head"><span class="st-tile" aria-hidden="true">' + icon('event') + '</span>' +
             '<div><h3 class="st-h2">Where and when</h3><p class="st-sub">Tell us where you will use it and for how long.</p></div></div>' +
             '<div class="st-alert is-error" id="flowError" role="alert" hidden></div>' +
-            '<div class="st-field"><label for="borrowRoom">Room / location <span class="st-star">*</span></label>' +
-            '<input type="text" class="st-input" id="borrowRoom" placeholder="e.g. B-205" autocomplete="off"></div>' +
-            '<div class="st-row">' +
-            '<div class="st-field"><label for="borrowDate">Borrow date <span class="st-star">*</span></label>' +
-            '<input type="date" class="st-input" id="borrowDate" min="' + t0 + '" value="' + t0 + '"></div>' +
-            '<div class="st-field"><label for="returnDate">Return date <span class="st-star">*</span></label>' +
-            '<input type="date" class="st-input" id="returnDate" min="' + t1 + '" value="' + t1 + '"></div>' +
-            '</div>' +
+            '<div class="st-field"><label for="borrowRoomPicker">Room / location <span class="st-star">*</span></label>' +
+            '<input type="hidden" id="borrowRoomId"><input type="hidden" id="borrowRoom">' +
+            '<button type="button" class="st-room-choice" id="borrowRoomPicker" data-action="open-student-room-picker" data-target="borrow">' +
+            icon('location_on') + '<span id="borrowRoomLabel">Choose a building and room</span>' + icon('expand_more') + '</button></div>' +
+            scheduleFields('borrow') +
             LETTER_HTML('borrowLetter', 'Recommended when borrowing on a later date. You can still submit without one.') +
             '<div class="st-alert is-note">' + icon('info') + '<span>Each item creates its own request. Your faculty will be notified.</span></div>' +
+            roomPickerHTML() +
             '</form>' +
             '<div class="st-submitbar">' +
             '<div class="st-submit-sum" id="eqSummary"></div>' +
             '<button type="button" class="st-btn st-btn-primary" id="btnSubmitBorrow" data-action="submit-borrow">' + icon('send') + 'Submit request</button>' +
             '</div>', 2);
 
+        refreshStudentSchedule('borrow');
+        syncStudentSchedule('borrow');
         renderEqGrid();
         updateSummary();
     }
@@ -384,9 +505,58 @@
             grid.innerHTML = '<div class="st-empty">' + icon('inventory_2') +
                 '<strong>' + (st.inv.length ? 'No equipment matches your search' : 'No equipment available right now') + '</strong>' +
                 '<span>' + (st.inv.length ? 'Try a different word or category.' : 'Please check with the Admin Office.') + '</span></div>';
+            renderEqPagination(0, 0, 1);
             return;
         }
-        grid.innerHTML = list.map(eqCardHTML).join('');
+        var pages = Math.ceil(list.length / EQ_PAGE_SIZE);
+        st.eqPage = Math.min(Math.max(st.eqPage, 1), pages);
+        var start = (st.eqPage - 1) * EQ_PAGE_SIZE;
+        var end = Math.min(start + EQ_PAGE_SIZE, list.length);
+        grid.innerHTML = list.slice(start, end).map(eqCardHTML).join('');
+        renderEqPagination(list.length, start, end);
+    }
+
+    function renderEqPagination(total, start, end) {
+        var pager = $('eqPagination');
+        var info = $('eqPageInfo');
+        var numbers = $('eqPageNumbers');
+        var previous = document.querySelector('[data-action="eq-page-prev"]');
+        var next = document.querySelector('[data-action="eq-page-next"]');
+        if (!pager || !numbers) return;
+        var pages = Math.max(1, Math.ceil(total / EQ_PAGE_SIZE));
+        pager.hidden = total <= 10;
+        if (info) info.textContent = total
+            ? 'Showing ' + (start + 1) + '\u2013' + end + ' of ' + total
+            : 'No results';
+        if (previous) previous.disabled = st.eqPage <= 1;
+        if (next) next.disabled = st.eqPage >= pages;
+        numbers.textContent = '';
+        var pageList = [1, pages, st.eqPage - 1, st.eqPage, st.eqPage + 1]
+            .filter(function (page, index, list) {
+                return page >= 1 && page <= pages && list.indexOf(page) === index;
+            })
+            .sort(function (a, b) { return a - b; });
+        var last = 0;
+        pageList.forEach(function (page) {
+            if (page - last > 1) {
+                var gap = document.createElement('span');
+                gap.className = 'st-pagination-gap';
+                gap.textContent = '\u2026';
+                numbers.appendChild(gap);
+            }
+            var button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'st-pagination-number' + (page === st.eqPage ? ' is-active' : '');
+            button.setAttribute('data-action', 'eq-page');
+            button.setAttribute('data-page', String(page));
+            button.setAttribute('aria-label', 'Page ' + page);
+            button.textContent = String(page);
+            if (page === st.eqPage) {
+                button.setAttribute('aria-current', 'page');
+            }
+            numbers.appendChild(button);
+            last = page;
+        });
     }
 
     function findCard(name) {
@@ -454,7 +624,7 @@
     }
 
     function lockWhere(lock) {
-        ['borrowRoom', 'borrowDate', 'returnDate', 'borrowLetter'].forEach(function (id) { var e = $(id); if (e) e.disabled = lock; });
+        ['borrowRoomId', 'borrowRoom', 'borrowRoomPicker', 'borrowDate', 'borrowStartTime', 'borrowDuration', 'borrowLetter'].forEach(function (id) { var e = $(id); if (e) e.disabled = lock; });
     }
 
     function submitBorrow() {
@@ -473,13 +643,27 @@
         }
 
         var room = st.where ? st.where.room : $('borrowRoom').value.trim();
-        var borrow = st.where ? st.where.borrow : $('borrowDate').value.trim();
-        var ret = st.where ? st.where.ret : $('returnDate').value.trim();
-        if (!room) return showAlert('flowError', 'Please enter the room / location.');
+        var roomId = st.where ? st.where.roomId : toInt($('borrowRoomId').value);
+        var borrow = st.where ? st.where.borrow : $('borrowDate').value;
+        var startTime = st.where ? st.where.startTime : $('borrowStartTime').value;
+        var duration = st.where ? st.where.duration : toInt($('borrowDuration').value);
+        var ret = st.where ? st.where.ret : scheduleReturn(borrow, startTime, duration);
+        if (!roomId || !room) return showAlert('flowError', 'Please choose a building and room.');
         if (!borrow) return showAlert('flowError', 'Please select a borrow date.');
-        if (!ret) return showAlert('flowError', 'Please select a return date.');
-        if (borrow < todayStr()) return showAlert('flowError', 'Borrow date cannot be in the past.');
-        if (ret <= borrow) return showAlert('flowError', 'Return date must be after the borrow date.');
+        if (!startTime || !duration) return showAlert('flowError', 'Please choose a start time and a duration.');
+        if (borrow < todayStr() || !borrowDates().some(function (date) { return date.value === borrow; })) {
+            return showAlert('flowError', 'Choose today or a non-Sunday date within the next two weeks.');
+        }
+        var selectedDate = borrowDates().find(function (date) { return date.value === borrow; });
+        if (selectedDate && !selectedDate.available) {
+            return showAlert('flowError', isSunday(borrow)
+                ? 'Same-day borrowing is unavailable on Sundays. Choose a later date.'
+                : 'Same-day borrowing is unavailable after 8:00 PM. Choose a later date.');
+        }
+        if (isSunday(borrow)) return showAlert('flowError', 'Equipment borrowing is unavailable on Sundays.');
+        if (!studentStartTimes(borrow, duration).includes(startTime)) {
+            return showAlert('flowError', 'Choose a start time that allows the selected borrowing duration.');
+        }
         var letter = pickLetter('borrowLetter', borrow);
         if (letter.error) return showAlert('flowError', letter.error);
 
@@ -503,16 +687,18 @@
                 student_id: v.student_id,
                 equipment_name: cur.name,
                 quantity: cur.qty,
-                room: room,
+                room_id: roomId,
+                booking_mode: scheduleMode(borrow),
                 borrow_date: borrow,
-                return_date: ret,
+                start_time: startTime,
+                duration: duration,
                 is_last_item: last
             }, letter.file).then(function (d) {
                 if (d.error) {
                     setBusy(btn, false);
                     updateSummary();
                     if (st.done.length) {
-                        st.where = { room: room, borrow: borrow, ret: ret };
+                        st.where = { room: room, roomId: roomId, borrow: borrow, startTime: startTime, duration: duration, ret: ret };
                     } else {
                         lockWhere(false);
                     }
@@ -525,7 +711,7 @@
                     equipment: cur.name, qty: cur.qty, request_id: d.request_id,
                     claim_token: d.claim_token || '', return_token: d.return_token || ''
                 });
-                st.where = { room: room, borrow: borrow, ret: ret };
+                st.where = { room: room, roomId: roomId, borrow: borrow, startTime: startTime, duration: duration, ret: ret };
                 i++;
                 next();
             });
@@ -555,12 +741,6 @@
     function renderItem() {
         var v = st.verified;
         var avail = toInt(v.quantity);
-        var now = new Date();
-        var later = new Date(now.getTime() + 2 * 3600000);
-        /* "End of class" only makes sense if it is still today */
-        var sameDay = ymd(later) === ymd(now);
-        var laterStr = pad(later.getHours()) + ':' + pad(later.getMinutes());
-
         flow(
             '<div class="st-pagehead st-narrow">' +
             '<button type="button" class="st-link" data-action="back-details">' + icon('arrow_back') + 'Back</button>' +
@@ -574,27 +754,20 @@
             '<p class="st-item-meta">' + esc(v.category || 'Equipment') + ' &middot; ' + avail + ' available</p>' +
             '<p class="st-hint">Pre-selected by your faculty.</p></div></div>' +
             '<div class="st-alert is-error" id="flowError" role="alert" hidden></div>' +
-            '<div class="st-row">' +
             '<div class="st-field"><label for="itemQty">Quantity <span class="st-star">*</span></label>' +
             '<input type="number" class="st-input" id="itemQty" min="1" max="' + avail + '" value="1" inputmode="numeric">' +
             '<p class="st-hint">Maximum: ' + avail + '</p></div>' +
-            '<div class="st-field"><label for="itemReturnTime">Return by <span class="st-star">*</span></label>' +
-            '<select class="st-input" id="itemReturnTime">' +
-            (sameDay ? '<option value="' + laterStr + '">End of class (~2 hours &middot; ' + minToLabel(hhmmToMin(laterStr)) + ')</option>' : '') +
-            '<option value="17:00">End of day (5:00 PM)</option>' +
-            '<option value="custom">Custom time&hellip;</option></select>' +
-            '<input type="time" class="st-input" id="itemReturnCustom" min="00:01" style="margin-top:8px" hidden></div>' +
-            '</div>' +
-            '<div class="st-field"><label for="itemRoom">Room / location <span class="st-star">*</span></label>' +
-            '<input type="text" class="st-input" id="itemRoom" placeholder="e.g. B-205" autocomplete="off"></div>' +
+            scheduleFields('item') +
+            '<div class="st-field"><label for="itemRoomPicker">Room / location <span class="st-star">*</span></label>' +
+            '<input type="hidden" id="itemRoomId"><input type="hidden" id="itemRoom">' +
+            '<button type="button" class="st-room-choice" id="itemRoomPicker" data-action="open-student-room-picker" data-target="item">' +
+            icon('location_on') + '<span id="itemRoomLabel">Choose a building and room</span>' + icon('expand_more') + '</button></div>' +
             '<div class="st-actions">' +
             '<button type="button" class="st-btn st-btn-ghost" data-action="back-details">Back</button>' +
             '<button type="submit" class="st-btn st-btn-primary" id="btnSubmitItem">' + icon('send') + 'Submit request</button>' +
-            '</div></form>', 2);
-
-        $('itemReturnTime').addEventListener('change', function () {
-            $('itemReturnCustom').hidden = this.value !== 'custom';
-        });
+            '</div>' + roomPickerHTML() + '</form>', 2);
+        refreshStudentSchedule('item');
+        syncStudentSchedule('item');
     }
 
     function submitItem() {
@@ -603,15 +776,29 @@
         if (!v) return showAlert('flowError', 'Session expired. Please go back and verify again.');
         var avail = toInt(v.quantity);
         var qty = toInt($('itemQty').value, 0);
-        var sel = $('itemReturnTime').value;
-        var custom = $('itemReturnCustom').value.trim();
+        var borrow = $('itemDate').value;
+        var startTime = $('itemStartTime').value;
+        var duration = toInt($('itemDuration').value);
         var room = $('itemRoom').value.trim();
+        var roomId = toInt($('itemRoomId').value);
 
         if (!qty || qty < 1) return showAlert('flowError', 'Please enter a valid quantity.');
         if (qty > avail) return showAlert('flowError', 'Quantity exceeds available stock (' + avail + ').');
-        var returnTime = sel === 'custom' ? custom : sel;
-        if (!returnTime || !/^\d{2}:\d{2}$/.test(returnTime)) return showAlert('flowError', 'Please select or enter a valid return time.');
-        if (!room) return showAlert('flowError', 'Please enter the room or location.');
+        if (!borrow || !startTime || !duration) return showAlert('flowError', 'Please choose a borrowing date, start time, and duration.');
+        if (!borrowDates().some(function (date) { return date.value === borrow; })) {
+            return showAlert('flowError', 'Choose today or a non-Sunday date within the next two weeks.');
+        }
+        var selectedDate = borrowDates().find(function (date) { return date.value === borrow; });
+        if (selectedDate && !selectedDate.available) {
+            return showAlert('flowError', isSunday(borrow)
+                ? 'Same-day borrowing is unavailable on Sundays. Choose a later date.'
+                : 'Same-day borrowing is unavailable after 8:00 PM. Choose a later date.');
+        }
+        if (!studentStartTimes(borrow, duration).includes(startTime)) {
+            return showAlert('flowError', 'Choose a start time that allows the selected borrowing duration.');
+        }
+        if (!roomId || !room) return showAlert('flowError', 'Please choose a building and room.');
+        var returnDate = scheduleReturn(borrow, startTime, duration);
 
         var btn = $('btnSubmitItem');
         setBusy(btn, true, 'Submitting…');
@@ -624,15 +811,17 @@
             item_name: v.item_name,
             item_id: v.item_id,
             quantity: qty,
-            room: room,
-            return_time: returnTime
+            room_id: roomId,
+            booking_mode: scheduleMode(borrow),
+            borrow_date: borrow,
+            start_time: startTime,
+            duration: duration
         }).then(function (d) {
             if (d.error) { setBusy(btn, false); return showAlert('flowError', d.error); }
-            var today = todayStr();
             var receipt = {
                 kind: 'borrow',
                 student_name: v.student_name, student_id: v.student_id, faculty_name: v.faculty_name,
-                room: room, borrow_date: today, return_date: today + ' ' + returnTime,
+                room: room, borrow_date: borrow, return_date: returnDate,
                 items: [{
                     equipment: v.item_name, qty: qty, request_id: d.request_id,
                     claim_token: d.claim_token || '', return_token: d.return_token || ''
@@ -746,7 +935,7 @@
         var tabs = b.floorList.length > 1
             ? '<div class="st-floors" role="tablist" aria-label="Floors">' + b.floorList.map(function (f, i) {
                 return '<button type="button" class="st-floor" role="tab" data-action="floor" data-i="' + i + '" aria-selected="' + (i === st.fac.floor ? 'true' : 'false') + '">' +
-                    '<span>' + esc(f.label) + '</span><span class="st-floor-n">' + f.rooms.length + '</span></button>';
+                    '<span>' + esc(f.label) + '</span></button>';
             }).join('') + '</div>'
             : '';
 
@@ -782,6 +971,113 @@
             }
         }
         return null;
+    }
+
+    function roomPickerHTML() {
+        return '<div class="st-room-picker" id="studentRoomPicker" role="dialog" aria-modal="true" aria-labelledby="studentRoomPickerTitle" hidden>' +
+            '<div class="st-room-picker-card">' +
+            '<div class="st-room-picker-head"><div><h2 id="studentRoomPickerTitle">Choose a room</h2>' +
+            '<p class="st-sub">Select a building, floor, and room.</p></div>' +
+            '<button type="button" class="st-icon-btn" data-action="close-student-room-picker" aria-label="Close room selector">' + icon('close') + '</button></div>' +
+            '<div class="st-room-picker-content" id="studentRoomPickerContent" aria-live="polite"></div>' +
+            '</div></div>';
+    }
+
+    function openStudentRoomPicker(target) {
+        if (target !== 'borrow' && target !== 'item') return;
+        st.roomPicker.target = target;
+        st.roomPicker.bid = null;
+        st.roomPicker.floor = 0;
+        st.roomPicker.rooms = null;
+        var modal = $('studentRoomPicker');
+        if (!modal) return;
+        modal.hidden = false;
+        document.body.classList.add('st-room-picker-open');
+        modal.querySelector('[data-action="close-student-room-picker"]').focus();
+        $('studentRoomPickerContent').innerHTML = '<div class="st-room-picker-status"><span class="st-spin"></span><span>Loading available rooms…</span></div>';
+        fetch(URLS.studentRooms, { credentials: 'same-origin' })
+            .then(readReply)
+            .then(function (data) {
+                if (data.error) throw new Error(data.error);
+                st.roomPicker.rooms = Array.isArray(data.rooms) ? data.rooms : [];
+                st.roomPicker.buildings = buildBuildings(st.roomPicker.rooms);
+                renderStudentRoomPicker();
+            })
+            .catch(function (error) {
+                $('studentRoomPickerContent').innerHTML =
+                    '<div class="st-room-picker-status is-error"><span>' + esc(error.message || 'Could not load available rooms.') + '</span>' +
+                    '<button type="button" class="st-btn st-btn-soft st-btn-sm" data-action="retry-student-room-picker">' + icon('refresh') + 'Try again</button></div>';
+            });
+    }
+
+    function renderStudentRoomPicker() {
+        var content = $('studentRoomPickerContent');
+        if (!content) return;
+        var bs = st.roomPicker.buildings;
+        if (!bs.length) {
+            content.innerHTML = '<div class="st-empty">' + icon('meeting_room') +
+                '<strong>No rooms are currently available</strong><span>Please check with the Admin Office.</span></div>';
+            return;
+        }
+        var building = null;
+        for (var i = 0; i < bs.length; i++) {
+            if (bs[i].id === st.roomPicker.bid) { building = bs[i]; break; }
+        }
+        if (!building) {
+            content.innerHTML = '<p class="st-room-picker-label">Choose a building</p><div class="st-panels">' + bs.map(function (b) {
+                var src = safeImg(b.image);
+                return '<button type="button" class="st-panel" data-action="student-room-building" data-id="' + esc(b.id) + '">' +
+                    (src ? '<img class="st-panel-img" src="' + esc(src) + '" alt="" data-fallback="panel">' : '') +
+                    '<span class="st-panel-shade"></span><span class="st-panel-letter" aria-hidden="true">' + esc(b.letter) + '</span>' +
+                    '<span class="st-panel-info"><span class="st-panel-name">' + esc(b.base) +
+                    (b.tag ? '<em class="st-tag">' + esc(b.tag) + '</em>' : '') + '</span>' +
+                    '<span class="st-panel-meta">' + plural(b.rooms, 'room') + ' available · ' + plural(b.floorList.length, 'floor') + '</span></span>' +
+                    '<span class="st-panel-go" aria-hidden="true">' + icon('arrow_forward') + '</span></button>';
+            }).join('') + '</div>';
+            return;
+        }
+
+        var floor = building.floorList[st.roomPicker.floor] || building.floorList[0];
+        var tabs = building.floorList.length > 1
+            ? '<div class="st-floors" role="tablist" aria-label="Floors">' + building.floorList.map(function (f, index) {
+                return '<button type="button" class="st-floor" role="tab" data-action="student-room-floor" data-i="' + index +
+                    '" aria-selected="' + (index === st.roomPicker.floor ? 'true' : 'false') + '">' +
+                    '<span>' + esc(f.label) + '</span></button>';
+            }).join('') + '</div>'
+            : '';
+        content.innerHTML = '<button type="button" class="st-link st-room-picker-back" data-action="student-room-back">' +
+            icon('arrow_back') + 'Buildings</button><h3 class="st-room-picker-label">' + esc(building.name) + '</h3>' +
+            tabs + '<div class="st-rooms" role="tabpanel" aria-label="Rooms on this floor">' +
+            (floor ? floor.rooms.map(function (room) {
+                var seats = room.seating_capacity != null && toInt(room.seating_capacity) > 0
+                    ? ' · ' + plural(toInt(room.seating_capacity), 'seat') : '';
+                return '<button type="button" class="st-room" data-action="student-room-select" data-id="' + toInt(room.room_id) + '">' +
+                    '<span class="st-room-name">' + esc(room.room_name) + '</span>' +
+                    '<span class="st-room-meta"><span class="st-dot"></span>Available' + seats + '</span></button>';
+            }).join('') : '') + '</div>';
+    }
+
+    function selectStudentRoom(roomId) {
+        var room = null;
+        for (var i = 0; i < st.roomPicker.rooms.length; i++) {
+            if (toInt(st.roomPicker.rooms[i].room_id) === roomId) { room = st.roomPicker.rooms[i]; break; }
+        }
+        if (!room) return;
+        var prefix = st.roomPicker.target === 'borrow' ? 'borrow' : 'item';
+        $(prefix + 'RoomId').value = String(room.room_id);
+        $(prefix + 'Room').value = room.room_name;
+        $(prefix + 'RoomPicker').querySelector('span:nth-child(2)').textContent =
+            room.building_name + ' · ' + room.room_name;
+        closeStudentRoomPicker();
+    }
+
+    function closeStudentRoomPicker() {
+        var modal = $('studentRoomPicker');
+        if (modal) modal.hidden = true;
+        document.body.classList.remove('st-room-picker-open');
+        var target = st.roomPicker.target === 'borrow' ? 'borrow' : 'item';
+        var trigger = $(target + 'RoomPicker');
+        if (trigger) trigger.focus();
     }
 
     function startOptions(dateStr) {
@@ -934,7 +1230,7 @@
             '<p>Room reservation #' + esc(String(res.reservation_id)) + '</p>' +
             (note ? '<p>' + esc(note) + '</p>' : '') + '</div>' +
             '<div class="st-card"><dl class="st-summary">' +
-            row('Student', f.student_name + ' · ' + f.student_id) +
+            row('Student', f.student_name + (f.student_id ? ' · ' + f.student_id : '')) +
             row('Authorized by', f.faculty_name) +
             row('Room', (res.room_name || '') + (f.building ? ' — ' + f.building : '')) +
             row('Date', niceDate(f.reservation_date)) +
@@ -1018,7 +1314,7 @@
             '<p>' + (many ? plural(r.items.length, 'item') + ' approved via faculty authorization.' : 'Approved via faculty authorization.') +
             ' Show the QR codes below to the admin.</p></div>' +
             '<div class="st-card"><dl class="st-summary">' +
-            row('Student', r.student_name + ' · ' + r.student_id) +
+            row('Student', r.student_name + (r.student_id ? ' · ' + r.student_id : '')) +
             row('Authorized by', r.faculty_name) +
             row('Room', r.room) +
             row('Borrow', fmtWhen(r.borrow_date)) +
@@ -1071,6 +1367,7 @@
     }
 
     function onClick(e) {
+        if (e.target.id === 'studentRoomPicker') return closeStudentRoomPicker();
         var t = e.target.closest('[data-action]');
         if (!t) return;
         var a = t.getAttribute('data-action');
@@ -1089,6 +1386,7 @@
             /* equipment */
             case 'eq-cat':
                 st.cat = t.getAttribute('data-cat') || '';
+                st.eqPage = 1;
                 Array.prototype.forEach.call($('eqCats').querySelectorAll('.st-chip'), function (c) {
                     c.setAttribute('aria-pressed', c === t ? 'true' : 'false');
                 });
@@ -1101,6 +1399,29 @@
                 if (name) { delete st.cart[name]; refreshCard(name, '[data-action="eq-add"]'); }
                 return;
             case 'submit-borrow': return submitBorrow();
+            case 'eq-page-prev':
+                st.eqPage = Math.max(1, st.eqPage - 1);
+                return renderEqGrid();
+            case 'eq-page-next':
+                st.eqPage++;
+                return renderEqGrid();
+            case 'eq-page':
+                st.eqPage = toInt(t.getAttribute('data-page'), 1);
+                return renderEqGrid();
+            case 'open-student-room-picker': return openStudentRoomPicker(t.getAttribute('data-target'));
+            case 'close-student-room-picker': return closeStudentRoomPicker();
+            case 'retry-student-room-picker': return openStudentRoomPicker(st.roomPicker.target);
+            case 'student-room-building':
+                st.roomPicker.bid = t.getAttribute('data-id');
+                st.roomPicker.floor = 0;
+                return renderStudentRoomPicker();
+            case 'student-room-back':
+                st.roomPicker.bid = null;
+                return renderStudentRoomPicker();
+            case 'student-room-floor':
+                st.roomPicker.floor = toInt(t.getAttribute('data-i'));
+                return renderStudentRoomPicker();
+            case 'student-room-select': return selectStudentRoom(toInt(t.getAttribute('data-id')));
 
             /* facility */
             case 'building': return openBuilding(t.getAttribute('data-id'));
@@ -1117,7 +1438,7 @@
 
     function onInput(e) {
         var t = e.target;
-        if (t.id === 'eqSearch') { st.query = t.value; renderEqGrid(); }
+        if (t.id === 'eqSearch') { st.query = t.value; st.eqPage = 1; renderEqGrid(); }
     }
 
     function onChange(e) {
@@ -1127,6 +1448,11 @@
             if (name) setQty(name, t.value);
         } else if (t.id === 'borrowDate') {
             syncLetter('borrowLetter', t.value);
+            syncStudentSchedule('borrow');
+        } else if (t.id === 'borrowStartTime' || t.id === 'borrowDuration') {
+            syncStudentSchedule('borrow');
+        } else if (t.id === 'itemDate' || t.id === 'itemStartTime' || t.id === 'itemDuration') {
+            syncStudentSchedule('item');
         } else if (t.id === 'reserveDate' || t.id === 'reserveStart') {
             onReserveFieldChange(t);
         }
@@ -1138,6 +1464,12 @@
         if (f.id === 'borrowForm') { e.preventDefault(); submitBorrow(); }
         else if (f.id === 'itemForm') { e.preventDefault(); submitItem(); }
         else if (f.id === 'reserveForm') { e.preventDefault(); submitReserve(); }
+    }
+
+    function onKeyDown(e) {
+        if (e.key === 'Escape' && $('studentRoomPicker') && !$('studentRoomPicker').hidden) {
+            closeStudentRoomPicker();
+        }
     }
 
     /* ══════════════════════════════════════════════════════════
@@ -1156,6 +1488,11 @@
         document.addEventListener('input', onInput);
         document.addEventListener('change', onChange);
         document.addEventListener('submit', onSubmit);
+        document.addEventListener('keydown', onKeyDown);
+        window.setInterval(function () {
+            syncStudentSchedule('borrow');
+            syncStudentSchedule('item');
+        }, 30000);
 
         /* A photo that fails to load removes itself; the placeholder icon underneath shows instead.
            (error events do not bubble, so this listens in the capture phase.) */

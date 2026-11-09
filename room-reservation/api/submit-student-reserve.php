@@ -7,7 +7,7 @@
  *
  * POST body (JSON):
  *   code_db_id, faculty_id, faculty_name,
- *   student_name, student_id,
+ *   student_name, optional student_id,
  *   room_id, reservation_date, start_time, end_time,
  *   purpose, attendees, notes (optional)
  * Sent as multipart/form-data instead when a request letter is attached (later-date
@@ -42,7 +42,7 @@ $notes        = trim($body['notes']               ?? '');
 
 // ── Input validation ──────────────────────────────────────────────────────
 if (
-    !$code_db_id || !$faculty_id || !$student_name || !$student_id ||
+    !$code_db_id || !$faculty_id || !$student_name ||
     !$room_id || !$res_date || !$start_time || !$end_time || !$purpose
 ) {
     echo json_encode(['error' => 'All required fields must be filled in.']);
@@ -256,7 +256,7 @@ if ($fac_row && !empty($fac_row['email'])) {
                 </tr>
                 <tr>
                     <td style="padding:10px 14px;color:#666;">Student</td>
-                    <td style="padding:10px 14px;color:#222;font-weight:700;">' . htmlspecialchars($student_name) . ' &nbsp;&middot;&nbsp; ' . htmlspecialchars($student_id) . '</td>
+                    <td style="padding:10px 14px;color:#222;font-weight:700;">' . htmlspecialchars($student_name) . ($student_id !== '' ? ' &nbsp;&middot;&nbsp; ' . htmlspecialchars($student_id) : '') . '</td>
                 </tr>
                 <tr style="background:#f9f5f5;">
                     <td style="padding:10px 14px;color:#666;">Room</td>

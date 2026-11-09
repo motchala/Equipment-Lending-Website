@@ -5,14 +5,14 @@ declare(strict_types=1);
  *
  * Student submits the item-code borrow form.
  * - Item is pre-locked to the code's item
- * - borrow_date = today, return_date = today (same-day borrow)
- * - return_time stored in return_time column
+ * - Uses a validated today / future borrowing window
  * - Marks code as used, auto-regenerates new code for next student
  * - Inserts into faculty notification feed
  *
  * POST fields (JSON): code_db_id, faculty_id, faculty_name,
- *                     student_name, student_id, item_name, item_id,
- *                     quantity, room, return_time (HH:MM)
+ *                     student_name, optional student_id, item_name, item_id,
+ *                     quantity, room_id, booking_mode, borrow_date,
+ *                     start_time (HH:MM), duration (hours)
  * Returns: { success, request_id, return_token } or { error }
  */
 require_once __DIR__ . '/../../config/security-headers.php';
@@ -32,11 +32,15 @@ $student_id   = trim((string)($body['student_id']   ?? ''));
 $item_name    = trim((string)($body['item_name']    ?? ''));
 $item_id      = (int)($body['item_id']    ?? 0);
 $quantity     = (int)($body['quantity']   ?? 1);
-$room         = trim((string)($body['room']         ?? ''));
-$return_time  = trim((string)($body['return_time']  ?? ''));
+$room_id      = (int)($body['room_id']      ?? 0);
+$booking_mode = trim((string)($body['booking_mode'] ?? ''));
+$borrow_date  = trim((string)($body['borrow_date']  ?? ''));
+$start_time   = trim((string)($body['start_time']   ?? ''));
+$duration     = (int)($body['duration'] ?? 0);
 
-if (!$code_db_id || !$faculty_id || !$student_name || !$student_id ||
-    !$item_name || $item_id <= 0 || !$room || !$return_time) {
+if (!$code_db_id || !$faculty_id || !$student_name ||
+    !$item_name || $item_id <= 0 || $room_id <= 0 ||
+    !$booking_mode || !$borrow_date || !$start_time || !$duration) {
     echo json_encode(['error' => 'All fields are required.']);
     exit;
 }
@@ -47,18 +51,11 @@ if ($quantity < 1) {
     exit;
 }
 
-// Validate return_time format HH:MM
-if (!preg_match('/^\d{2}:\d{2}$/', $return_time)) {
-    echo json_encode(['error' => 'Invalid return time.']);
-    exit;
-}
-
-$today = date('Y-m-d');
-
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../shared/core/faculty-id.php';
 require_once __DIR__ . '/../../notifications/core/faculty-data.php';
 require_once __DIR__ . '/../core/booking-schedule.php';
+require_once __DIR__ . '/../../shared/core/student-room-options.php';
 
 $conn = getDB();
 $conn->set_charset('utf8mb4');
@@ -88,37 +85,59 @@ try {
         exit;
     }
 
-    // Check item still has enough stock
-    $stock = $conn->prepare(
-        "SELECT quantity FROM tbl_inventory WHERE item_id = ? AND is_archived = 0 LIMIT 1 FOR UPDATE"
-    );
-    if (!$stock) throw new RuntimeException('Could not check stock.');
-    $stock->bind_param('i', $item_id);
-    $stock->execute();
-    $stock_row = $stock->get_result()->fetch_assoc();
-    $stock->close();
-
-    if (!$stock_row || (int)$stock_row['quantity'] < $quantity) {
+    $selected_room = student_room_find($conn, $room_id);
+    if (!$selected_room) {
         $conn->rollback();
-        echo json_encode(['error' => 'Not enough stock available. Only ' . ((int)($stock_row['quantity'] ?? 0)) . ' unit(s) remaining.']);
+        echo json_encode(['error' => 'That room is no longer available. Please choose another room.']);
         exit;
     }
+    $room = $selected_room['room_name'];
+
+    $schedule = BookingSchedule::parse($conn, [
+        'booking_mode' => $booking_mode,
+        'borrow_date' => $borrow_date,
+        'start_time' => $start_time,
+        'duration' => $duration,
+    ], $item_name, $quantity);
+    if (!$schedule['ok']) {
+        $conn->rollback();
+        echo json_encode(['error' => $schedule['error']]);
+        exit;
+    }
+    $booking = $schedule['data'];
+    if (BookingSchedule::freeUnits($conn, $item_name, $booking['start_ts'], $booking['end_ts']) < $quantity) {
+        $conn->rollback();
+        echo json_encode(['error' => 'That equipment is already booked for the selected time. Please choose another time.']);
+        exit;
+    }
+    $roomConflict = BookingSchedule::roomConflictMessage($conn, $room_id, $booking['start_ts'], $booking['end_ts'], $faculty_id);
+    if ($roomConflict) {
+        $conn->rollback();
+        echo json_encode(['error' => $roomConflict]);
+        exit;
+    }
+    $borrow_date = $booking['borrow_date'];
+    $return_date = $booking['return_date'];
+    $borrow_time = $booking['borrow_time'];
+    $return_time = $booking['return_time'];
+    $booking_mode = $booking['mode'];
 
     // Insert as Waiting — tokens and inventory decrement happen at approval time
     // (auto-approve-tick.php or admin-override.php), not at insert time.
     $ins = $conn->prepare(
         "INSERT INTO tbl_requests
-            (faculty_name, faculty_id, equipment_name, instructor, room,
-             borrow_date, return_date, borrow_qty, return_time,
+            (faculty_name, faculty_id, equipment_name, instructor, room, room_id,
+             borrow_date, return_date, borrow_time, return_time, borrow_qty, booking_mode,
+             stock_applied,
              status, request_date,
              submitted_by_name, submitted_by_id, submitted_as)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Waiting', NOW(), ?, ?, 'student')"
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'Waiting', NOW(), ?, ?, 'student')"
     );
     if (!$ins) throw new RuntimeException('Could not save request.');
     $ins->bind_param(
-        'ssssssissss',
-        $faculty_name, $faculty_id, $item_name, $faculty_name, $room,
-        $today, $today, $quantity, $return_time,
+        'sssssissssisss',
+        $faculty_name, $faculty_id, $item_name, $faculty_name, $room, $room_id,
+        $borrow_date, $return_date, $borrow_time, $return_time, $quantity, $booking_mode,
         $student_name, $student_id
     );
     if (!$ins->execute()) throw new RuntimeException('Insert failed: ' . $ins->error);
@@ -156,9 +175,11 @@ try {
     fnotif_ensure_admin_notice_table($conn);
     $title   = 'Item Code Used: ' . $item_name;
     $qty_str = $quantity . ' unit' . ($quantity === 1 ? '' : 's');
-    $message = $student_name . ' (' . $student_id . ') borrowed ' . $qty_str
-        . ' of ' . $item_name . ' using your item code today. '
-        . 'Return expected by ' . $return_time . '. Room/Location: ' . $room . '.';
+    $student_label = $student_name . ($student_id !== '' ? ' (' . $student_id . ')' : '');
+    $message = $student_label . ' requested ' . $qty_str
+        . ' of ' . $item_name . ' using your item code for ' . $borrow_date . ' from '
+        . substr($borrow_time, 0, 5) . ' to ' . substr($return_time, 0, 5)
+        . '. Room/Location: ' . $room . '.';
     $admin_name = 'PUPSync System';
     $admin_id   = 0;
     $notice = $conn->prepare(
@@ -175,6 +196,9 @@ try {
     echo json_encode([
         'success'      => true,
         'request_id'   => $request_id,
+        'borrow_date'  => $borrow_date,
+        'return_date'  => $return_date,
+        'return_time'  => $return_time,
         'return_token' => null,
         'claim_token'  => $claim_token,
     ]);

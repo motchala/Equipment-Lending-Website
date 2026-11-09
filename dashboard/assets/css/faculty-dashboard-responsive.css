@@ -1255,7 +1255,7 @@ html {
         display: none !important;
     }
 
-    /* the fixed-size, paged cards print in full */
+    /* Print all card rows, including those hidden by pagination. */
     #panel-activity .fact-item.is-paged-out {
         display: flex !important;
     }
