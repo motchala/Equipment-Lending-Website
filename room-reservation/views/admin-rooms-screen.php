@@ -40,44 +40,46 @@
                             </button>
                         </div>
 
-                        <!-- Body wrapper — matches equipment form padding -->
+                        <!-- Body wrapper -->
                         <div class="form-card-body">
                             <form method="POST" id="roomForm">
                                 <?= csrf_field() ?>
                                 <input type="hidden" name="room_id" id="room-form-id"
                                     value="<?php echo $edit_room ? (int)$edit_room['room_id'] : ''; ?>">
+                                <!-- sort_order preserved as hidden so the server doesn't clear it on update -->
+                                <input type="hidden" name="sort_order" id="rf-sort"
+                                    value="<?php echo $edit_room ? (int)$edit_room['sort_order'] : 0; ?>">
+                                <!-- floor_label preserved as hidden so existing labels aren't wiped on update -->
+                                <input type="hidden" name="floor_label" id="rf-floor-label"
+                                    value="<?php echo $edit_room ? htmlspecialchars($edit_room['floor_label'] ?? '') : ''; ?>">
 
-                                <!-- Building | Room name -->
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label for="rf-building">Building <span class="req-star" aria-label="required">*</span></label>
-                                        <select name="building_id" id="rf-building" class="form-control-custom" required>
-                                            <option value="">Select building</option>
-                                            <?php foreach ($rooms_buildings as $bid => $b): ?>
-                                                <option value="<?php echo (int)$bid; ?>"
-                                                    data-floors="<?php echo max(1, (int)$b['floor_count']); ?>"
-                                                    <?php echo ($edit_room && (int)$edit_room['building_id'] === $bid) ? 'selected' : ''; ?>>
-                                                    <?php echo htmlspecialchars($b['name']); ?>
-                                                </option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="rf-name">Facility name <span class="req-star" aria-label="required">*</span></label>
-                                        <input type="text" name="room_name" id="rf-name" class="form-control-custom"
-                                            value="<?php echo $edit_room ? htmlspecialchars($edit_room['room_name']) : ''; ?>"
-                                            placeholder="e.g. Computer Lab 1" required>
-                                    </div>
+                                <div class="form-group">
+                                    <label for="rf-building">Building <span class="req-star" aria-label="required">*</span></label>
+                                    <select name="building_id" id="rf-building" class="form-control-custom" required>
+                                        <option value="">Select building</option>
+                                        <?php foreach ($rooms_buildings as $bid => $b): ?>
+                                            <option value="<?php echo (int)$bid; ?>"
+                                                data-floors="<?php echo max(1, (int)$b['floor_count']); ?>"
+                                                <?php echo ($edit_room && (int)$edit_room['building_id'] === $bid) ? 'selected' : ''; ?>>
+                                                <?php echo htmlspecialchars($b['name']); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
                                 </div>
 
-                                <!-- Floor | Status -->
+                                <div class="form-group">
+                                    <label for="rf-name">Facility name <span class="req-star" aria-label="required">*</span></label>
+                                    <input type="text" name="room_name" id="rf-name" class="form-control-custom"
+                                        value="<?php echo $edit_room ? htmlspecialchars($edit_room['room_name']) : ''; ?>"
+                                        placeholder="e.g. Computer Lab 1" required>
+                                </div>
+
                                 <div class="form-row">
                                     <div class="form-group">
                                         <label for="rf-floor">Floor <span class="req-star" aria-label="required">*</span></label>
                                         <input type="number" name="floor_number" id="rf-floor" class="form-control-custom" min="1" max="20"
                                             value="<?php echo $edit_room ? (int)$edit_room['floor_number'] : 1; ?>" required>
-                                        <!-- Filled by psSyncRoomFloorLimit(): the max follows the selected building's floor count -->
-                                        <p class="rf-hint rf-floor-hint" id="rf-floor-hint" aria-live="polite">Select a building to see how many floors it has.</p>
+                                        <p class="rf-hint rf-floor-hint" id="rf-floor-hint" aria-live="polite">Select a building first.</p>
                                     </div>
                                     <div class="form-group">
                                         <label for="rf-status">Status</label>
@@ -91,11 +93,9 @@
                                         </select>
                                     </div>
                                 </div>
-                                <p class="rf-hint rf-hint-flush">Maintenance and Not Bookable facilities can&rsquo;t be reserved.</p>
 
-                                <!-- Features -->
                                 <?php
-                                $preset_amenities = ['WiFi', 'A/C', 'Projector', 'PA System', 'Running Water', 'Safety Kit', 'Whiteboard', 'Smart TV'];
+                                $preset_amenities  = ['WiFi', 'A/C', 'Projector', 'PA System', 'Running Water', 'Safety Kit', 'Whiteboard', 'Smart TV'];
                                 $checked_amenities = [];
                                 if ($edit_room && !empty($edit_room['amenities'])) {
                                     $decoded = json_decode($edit_room['amenities'], true);
@@ -115,34 +115,10 @@
                                     </div>
                                 </div>
 
-                                <!-- Rarely needed -->
-                                <details class="rf-more" id="room-more-opts"
-                                    <?php echo ($edit_room && (!empty($edit_room['floor_label']) || (int)$edit_room['sort_order'] > 0)) ? 'open' : ''; ?>>
-                                    <summary>More options</summary>
-                                    <div class="form-row">
-                                        <div class="form-group">
-                                            <label for="rf-floor-label">Floor name</label>
-                                            <input type="text" name="floor_label" id="rf-floor-label" class="form-control-custom"
-                                                value="<?php echo $edit_room ? htmlspecialchars($edit_room['floor_label'] ?? '') : ''; ?>"
-                                                placeholder="e.g. Ground Floor">
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="rf-sort">Display order</label>
-                                            <input type="number" name="sort_order" id="rf-sort" class="form-control-custom" min="0"
-                                                value="<?php echo $edit_room ? (int)$edit_room['sort_order'] : 0; ?>">
-                                        </div>
-                                    </div>
-                                    <p class="rf-hint">Floor name replaces the number in lists. Lower display order appears first.</p>
-                                </details>
-
-                                <!-- Row 6: Submit button -->
+                                <!-- hidden inner submit — footer button is the real one -->
                                 <button type="submit" id="room-form-submit-inner"
                                     name="<?php echo $edit_room ? 'update_room' : 'add_room'; ?>"
                                     class="btn-submit-form">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
-                                        <polyline points="20 6 9 17 4 12" />
-                                    </svg>
                                     <span id="room-submit-inner-label"><?php echo $edit_room ? 'Update Facility' : 'Add Facility'; ?></span>
                                 </button>
                             </form>
@@ -199,6 +175,20 @@
                             }));
                             if ($rm_resv_approved > 0): ?>
                                 <span class="pr-tab-badge" style="background:var(--text-light);"><?php echo $rm_resv_approved; ?></span>
+                            <?php endif; ?>
+                        </button>
+                    </div>
+                    <!-- Archived tab — pushed to the right by the flex space-between on .rm-tabbar -->
+                    <div class="pr-sub-tabs">
+                        <button type="button" class="pr-sub-tab" data-rooms-tab="rooms-archived"
+                            title="Facilities hidden from faculty and students">
+                            <span class="material-symbols-outlined rm-tab-ico" aria-hidden="true">inventory_2</span>
+                            Archived
+                            <?php if (!empty($rooms_archived)): ?>
+                                <span class="pr-tab-badge" id="roomsArchivedBadge"
+                                    style="background:var(--text-light);"><?php echo count($rooms_archived); ?></span>
+                            <?php else: ?>
+                                <span class="pr-tab-badge" id="roomsArchivedBadge" style="display:none;background:var(--text-light);">0</span>
                             <?php endif; ?>
                         </button>
                     </div>
@@ -515,6 +505,32 @@
                     </div>
                     <script src="room-reservation/assets/js/admin-rooms-reservations-table.js?v=<?php echo @filemtime(PS_ROOT . '/room-reservation/assets/js/admin-rooms-reservations-table.js'); ?>"></script>
                 </div><!-- /#rooms-reservations-panel -->
+
+                <!-- ARCHIVED FACILITIES -->
+                <div class="rooms-sub-panel" id="rooms-archived-panel">
+                    <div class="pr-card">
+                        <div class="pr-card-header">
+                            <h3><span class="material-symbols-outlined">inventory_2</span> Archived Facilities</h3>
+                        </div>
+                        <div style="padding: .75rem 1.25rem 0; font-size: .82rem; color: var(--text-light); border-bottom: 1px solid var(--khaki-border); padding-bottom: .75rem;">
+                            Archived facilities are completely hidden from faculty and students — they cannot be browsed, booked, or found in any listing.
+                            They can be restored at any time.<?php if ($is_super_admin): ?> Super admins can also permanently delete them once archived.<?php endif; ?>
+                        </div>
+                        <div class="pr-tbl-wrap">
+                            <table class="pr-table rm-table" id="roomsArchivedTable">
+                                <thead>
+                                    <tr>
+                                        <th>Facility</th>
+                                        <th style="width:220px;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="rooms-archived-body">
+                                    <?php echo ps_render_archived_tbody($rooms_archived, $is_super_admin); ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div><!-- /#rooms-archived-panel -->
 
                 
 

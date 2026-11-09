@@ -1,3 +1,34 @@
+    <!-- ================================================================
+         MODAL: ARCHIVE FACILITY CONFIRM
+         Replaces the browser confirm() — triggered by any
+         a[href*="archive_room="] click in the Rooms panel.
+    ================================================================ -->
+    <div class="ps-modal-backdrop" id="ps-archive-room-modal" style="z-index:660;">
+        <div class="ps-modal ps-modal--sm">
+            <div class="ps-modal-head">
+                <div class="ps-modal-head-icon" style="background:#f59e0b;color:#fff;">
+                    <span class="material-symbols-outlined">inventory_2</span>
+                </div>
+                <h3>Archive facility?</h3>
+                <button type="button" class="ps-modal-close" data-action="ps-close-modal"
+                    data-modal="ps-archive-room-modal" aria-label="Close">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="ps-modal-body">
+                <p style="margin:0 0 .6rem;font-size:13.5px;font-weight:600;color:var(--text-dark);" id="ps-archive-room-name">—</p>
+                <p style="margin:0;font-size:13px;color:var(--text-light);">This facility will be hidden from faculty and students. You can restore it any time from the <strong>Archived</strong> tab.</p>
+            </div>
+            <div class="ps-modal-foot">
+                <button type="button" class="ps-btn ps-btn--ghost"
+                    data-action="ps-close-modal" data-modal="ps-archive-room-modal">Cancel</button>
+                <button type="button" class="ps-btn ps-btn--primary" id="ps-archive-room-confirm-btn">
+                    <span class="material-symbols-outlined">inventory_2</span> Archive
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- DRAWER: ROOM RESERVATION DETAILS (Rooms > Reservations). Same shell/CSS as the
          approvals drawer; Cancel hands off to the existing admin cancel-reservation modal. -->
     <div class="ps-modal-backdrop ps-drawer-backdrop" id="ps-room-drawer">

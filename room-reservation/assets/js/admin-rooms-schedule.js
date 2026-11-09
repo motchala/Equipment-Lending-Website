@@ -571,17 +571,15 @@
                             if (el) el.value = d.roomFloorNum || '1';
                             if (window.psSyncRoomFloorLimit) window.psSyncRoomFloorLimit(false);
 
-                            el = form.querySelector('input[name="floor_label"]');
+                            /* Keep hidden floor_label + sort_order in sync with row data */
+                            el = document.getElementById('rf-floor-label');
                             if (el) el.value = d.roomFloorLabel || '';
+
+                            el = document.getElementById('rf-sort');
+                            if (el) el.value = d.roomSort || '0';
 
                             el = form.querySelector('select[name="status"]');
                             if (el) el.value = d.roomStatus || 'Available';
-
-                            el = form.querySelector('input[name="sort_order"]');
-                            if (el) el.value = d.roomSort || '0';
-
-                            el = document.getElementById('room-more-opts');
-                            if (el) el.open = !!(d.roomFloorLabel || (d.roomSort && d.roomSort !== '0'));
 
                             var amenities = [];
                             try {
@@ -657,8 +655,10 @@
                             el = form.querySelector('input[name="floor_number"]');
                             if (el) el.value = '1';
                             if (window.psSyncRoomFloorLimit) window.psSyncRoomFloorLimit(false);
-                            el = form.querySelector('input[name="floor_label"]');
+                            el = document.getElementById('rf-floor-label');
                             if (el) el.value = '';
+                            el = document.getElementById('rf-sort');
+                            if (el) el.value = '0';
                             el = form.querySelector('select[name="status"]');
                             if (el) el.value = 'Available';
                             el = form.querySelector('input[name="sort_order"]');
