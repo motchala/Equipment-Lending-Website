@@ -717,17 +717,6 @@ body {
     border-color: var(--accent-maroon);
 }
 
-.am-tag[hidden] {
-    display: none;
-}
-
-/* "Admin 2" seat number */
-.am-tag--no {
-    color: var(--accent-maroon);
-    background: var(--accent-light);
-    border-color: var(--accent-maroon);
-}
-
 .am-tag--active {
     color: #1e7e45;
     background: #e8f6ee;
@@ -1148,7 +1137,7 @@ body {
     text-overflow: ellipsis;
 }
 
-/* Admin seat number under the name in the Who column ("Admin 2") */
+/* Admin seat label under the name in the Who column ("Admin 2" / "Super Admin 1") */
 .act-no {
     display: block;
     font-size: 10.5px;

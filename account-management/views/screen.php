@@ -370,7 +370,6 @@
                                 <h3 class="am-d-name" id="am-d-name"></h3>
                                 <p class="am-d-email" id="am-d-email"></p>
                                 <div class="am-tags">
-                                    <span class="am-tag am-tag--no" id="am-d-no" hidden></span>
                                     <span class="am-tag" id="am-d-role"></span>
                                     <span class="am-tag" id="am-d-status"></span>
                                 </div>

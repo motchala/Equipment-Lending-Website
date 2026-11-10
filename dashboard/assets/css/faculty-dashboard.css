@@ -10987,7 +10987,7 @@ body .side-nav .side-nav-user .side-nav-user-name {
 
 /* ── MY ACTIVITY (faculty) ─────────────────────────────────────────────
    Layout, top to bottom:
-     1. Summary strip   Active loans · Overdue · Pending · Room reservations
+     1. Next steps      what needs you right now, most urgent first (the Home tab already shows the counts)
      2. Right now       Equipment card | Room reservations card
      3. History         one table, filtered All / Equipment / Rooms
 
@@ -10995,7 +10995,7 @@ body .side-nav .side-nav-user .side-nav-user-name {
      [tile]  Title ............................ status pill
              When (the line that matters most)
              Where · extras                        (one line; hover shows the rest)
-             [Claim QR] [Return QR] [Extend] ... [Cancel]      <- the action bar
+             [Claim QR] [Return QR] [Extend] ........ [Cancel]      <- the action bar (only the buttons it has)
 
    The Equipment and Room reservations cards are a FIXED size (header, body, footer) and show
    5 rows per page; the page navigation is in the card footer, like every other paginated table.
@@ -11003,9 +11003,9 @@ body .side-nav .side-nav-user .side-nav-user-name {
    Where every button lives (a button only ever appears in its own place):
      page header, top right        Download Report
      header of a card / table      filters and search
-     action bar of a row           four fixed slots: Claim QR | Return QR | Extend | Cancel, Withdraw or
-                                   Leave waitlist (far right). A slot that does not apply stays empty, so
-                                   the same button is always in the same spot from row to row.
+     action bar of a row           the buttons the row has, packed left: Claim QR, Return QR, Extend; then
+                                   Cancel, Withdraw or Leave waitlist alone at the far right.
+     Next steps entries            no buttons: they point at the row that has the button
      history table, last column    Action: Join waitlist
      footer of a card / table      page navigation
 
@@ -11036,84 +11036,173 @@ body .side-nav .side-nav-user .side-nav-user-name {
     color: var(--color-secondary);
 }
 
-/* ── Summary: four cards ─────────────────────────────────────────
-   Label on top, big number, one short note. (The Home tab's key figures are
-   icon + number buttons; this is deliberately a different layout.)
-   The thin bar on the left carries the status colour only: green loans,
-   amber pending, red overdue (grey while nothing is overdue). */
-#panel-activity .fact-stats {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 16px;
+/* ── Next steps ──────────────────────────────────────────────────
+   Replaces the summary cards (the Home tab already shows those numbers). One quiet list of what
+   needs the faculty member right now, most urgent first. The icon tile carries the same status
+   colours as the pills (red overdue, amber due / waiting, green ready to collect, brand for the rest);
+   everything else is neutral text. An entry has no action button: it points at the row below. */
+#panel-activity .fact-todo-card {
     margin-bottom: 20px;
 }
 
-#panel-activity .fact-stat {
-    --tone: var(--color-primary);
-    position: relative;
+#panel-activity .fact-todo-list {
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    min-width: 0;
-    padding: 16px 18px 16px 24px;
-    background: var(--color-surface-lowest);
-    border: 1px solid var(--color-outline-variant);
-    border-radius: 14px;
-    box-shadow: var(--shadow-sm);
+    margin: 0;
+    padding: 6px 10px 10px;
+    list-style: none;
 }
 
-#panel-activity .fact-stat::before {
-    content: '';
-    position: absolute;
-    top: 14px;
-    bottom: 14px;
-    left: 0;
-    width: 4px;
-    border-radius: 0 4px 4px 0;
-    background: var(--tone);
+#panel-activity .fact-todo-list[hidden],
+#panel-activity .fact-todo[hidden],
+#panel-activity .fact-todo-clear[hidden] {
+    display: none;
 }
 
-#panel-activity .fact-stat.is-ok {
-    --tone: var(--color-success);
+#panel-activity .fact-todo:not([hidden])~.fact-todo:not([hidden]) {
+    border-top: 1px solid color-mix(in srgb, var(--color-outline-variant) 60%, transparent);
 }
 
-#panel-activity .fact-stat.is-wait {
-    --tone: var(--color-warning);
+#panel-activity .fact-todo {
+    --tone: var(--color-primary);
 }
 
-#panel-activity .fact-stat.is-bad {
-    --tone: var(--color-secondary);
-}
-
-#panel-activity .fact-stat.is-bad.is-alert {
+#panel-activity .fact-todo.is-bad {
     --tone: var(--color-error);
 }
 
-#panel-activity .fact-stat-label {
-    font-size: 0.6875rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--color-secondary);
+#panel-activity .fact-todo.is-wait {
+    --tone: var(--color-warning);
 }
 
-#panel-activity .fact-stat-value {
-    font-family: var(--font-display);
-    font-size: 1.875rem;
-    font-weight: 700;
-    line-height: 1.1;
-    letter-spacing: -0.02em;
+#panel-activity .fact-todo.is-ok {
+    --tone: var(--color-success);
+}
+
+#panel-activity .fact-todo-btn {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    padding: 10px 12px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+#panel-activity .fact-todo-btn:hover {
+    background: var(--color-surface-container);
+}
+
+#panel-activity .fact-todo-btn:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: -2px;
+}
+
+#panel-activity .fact-todo-icon {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+    color: var(--tone);
+    background: color-mix(in srgb, var(--tone) 13%, transparent);
+}
+
+#panel-activity .fact-todo-icon .material-symbols-outlined {
+    font-size: 20px;
+}
+
+#panel-activity .fact-todo-text {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+}
+
+#panel-activity .fact-todo-title {
+    overflow: hidden;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    line-height: 1.3;
     color: var(--color-on-surface);
-    font-variant-numeric: tabular-nums;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-#panel-activity .fact-stat.is-alert .fact-stat-value {
-    color: var(--color-error);
-}
-
-#panel-activity .fact-stat-note {
+#panel-activity .fact-todo-sub {
+    display: -webkit-box;
+    overflow: hidden;
     font-size: 0.78rem;
+    line-height: 1.4;
     color: var(--color-secondary);
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+#panel-activity .fact-todo-go {
+    flex: none;
+    color: var(--color-secondary);
+}
+
+#panel-activity .fact-todo-go .material-symbols-outlined {
+    font-size: 20px;
+}
+
+/* "Show N more" under the list: a quiet text link, not a full-height table footer */
+#panel-activity .fact-todo-foot {
+    justify-content: center;
+    min-height: 44px;
+    padding: 6px 20px;
+}
+
+/* Nothing needs action: say so, and offer the two things they can do next */
+#panel-activity .fact-todo-clear {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 20px;
+}
+
+#panel-activity .fact-todo-clear>.material-symbols-outlined {
+    font-size: 28px;
+    color: var(--color-success);
+}
+
+#panel-activity .fact-todo-clear-text {
+    flex: 1 1 200px;
+    min-width: 0;
+}
+
+#panel-activity .fact-todo-clear-text .fact-empty-title {
+    margin: 0;
+}
+
+#panel-activity .fact-todo-clear-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+/* The row (or card) a Next steps entry just pointed at */
+#panel-activity .fact-item.is-flash {
+    border-radius: 10px;
+    background-color: color-mix(in srgb, var(--color-primary) 8%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 20%, transparent);
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+#panel-activity .fact-card.is-flash {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 25%, transparent);
+    transition: box-shadow 0.3s ease;
 }
 
 /* ── Cards (same gold-framed card as the Home tab) ───────────── */
@@ -11413,28 +11502,28 @@ body .side-nav .side-nav-user .side-nav-user-name {
     font-size: 13px;
 }
 
-/* The action bar: four fixed slots, left to right. A button is only ever in its own slot, and a
-   slot with no button stays empty, so Cancel is always at the far right, Extend always third... */
+/* The action bar: only the buttons this row really has, packed to the left in a fixed order
+   (Claim QR, Return QR, Extend). The way out (Cancel / Withdraw / Leave waitlist) is always last and
+   sits at the far right, so it is never next to the main action. No empty slots, no floating buttons. */
 #panel-activity .fact-item-actions {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 118px));
-    justify-content: space-between;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
     gap: 8px;
-    margin-top: 6px;
+    margin-top: 8px;
 }
 
 #panel-activity .fact-slot {
     display: flex;
     min-width: 0;
-    min-height: 28px;
 }
 
 #panel-activity .fact-slot-end {
-    justify-content: flex-end;
+    margin-left: auto;
 }
 
 #panel-activity .fact-slot>.fact-btn {
-    width: 100%;
+    min-width: 96px;
 }
 
 /* Icon tile (equipment photo / room icon) */
@@ -11556,6 +11645,17 @@ body .side-nav .side-nav-user .side-nav-user-name {
 #panel-activity .fact-btn-ghost:hover:not(:disabled) {
     background: var(--color-surface-container);
     border-color: var(--color-outline);
+}
+
+#panel-activity .fact-btn-ghost.is-primary {
+    color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 7%, var(--color-surface-lowest));
+    border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-outline-variant));
+}
+
+#panel-activity .fact-btn-ghost.is-primary:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--color-primary) 14%, var(--color-surface-lowest));
+    border-color: var(--color-primary);
 }
 
 #panel-activity .fact-btn-ghost.is-danger {

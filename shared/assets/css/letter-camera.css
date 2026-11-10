@@ -1,0 +1,401 @@
+/* letter-camera.css - the "Take a photo of the letter" button and camera dialog.
+   Uses the system's own colour variables (faculty: --color-*, student portal: --st-*), so it
+   matches the maroon / cream / gold look of each page and follows the faculty dark theme. */
+
+.pslc-overlay,
+.pslc-trigger {
+    --pslc-brand: var(--color-primary-container, var(--st-maroon, #800000));
+    --pslc-brand-deep: var(--st-maroon-deep, #570000);
+    --pslc-on-brand: var(--color-on-primary, #ffffff);
+    --pslc-accent: var(--color-primary, var(--st-maroon, #800000));
+    --pslc-surface: var(--color-surface, var(--st-cream, #fff8f7));
+    --pslc-card: var(--color-surface-lowest, var(--st-card, #ffffff));
+    --pslc-soft: var(--color-surface-container, var(--st-tint, #f8ecec));
+    --pslc-soft-low: var(--color-surface-low, var(--st-maroon-soft, #fdf1f1));
+    --pslc-line: var(--color-outline-variant, var(--st-line-strong, #ddbdbd));
+    --pslc-ink: var(--color-on-surface, var(--st-ink, #1f1414));
+    --pslc-muted: var(--color-on-surface-variant, var(--st-muted, #5c3d3d));
+    --pslc-gold: var(--accent-gold-deep, var(--st-gold-deep, #b8913a));
+    --pslc-gold-light: var(--accent-gold-light, var(--st-gold-light, #ecd48f));
+    --pslc-font: var(--font-sans, var(--st-font, 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif));
+    --pslc-display: var(--font-display, var(--st-display, 'Hanken Grotesk', 'Inter', system-ui, sans-serif));
+    --pslc-ease: cubic-bezier(.16, 1, .3, 1);
+}
+
+html.pslc-lock,
+html.pslc-lock body {
+    overflow: hidden;
+}
+
+/* ── The button that sits under a letter upload field ─────────────────────── */
+.pslc-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    margin-top: 10px;
+    padding: 12px 16px;
+    border: 1.5px solid color-mix(in srgb, var(--pslc-brand) 38%, transparent);
+    border-radius: 12px;
+    background: var(--pslc-soft);
+    color: var(--pslc-accent);
+    font-family: var(--pslc-font);
+    font-size: .875rem;
+    font-weight: 700;
+    line-height: 1.2;
+    cursor: pointer;
+    transition: background .2s var(--pslc-ease), border-color .2s var(--pslc-ease), box-shadow .2s var(--pslc-ease), transform .2s var(--pslc-ease);
+}
+
+.pslc-trigger .material-symbols-outlined {
+    font-size: 20px;
+}
+
+.pslc-trigger:hover {
+    background: color-mix(in srgb, var(--pslc-brand) 12%, var(--pslc-soft));
+    border-color: var(--pslc-brand);
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--pslc-brand) 16%, transparent);
+}
+
+.pslc-trigger:active {
+    transform: translateY(1px);
+}
+
+.pslc-trigger:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--pslc-brand) 35%, transparent);
+    outline-offset: 2px;
+}
+
+.pslc-trigger[hidden],
+.pslc-trigger:disabled {
+    display: none;
+}
+
+/* ── The camera dialog ─────────────────────────────────────────────────────── */
+.pslc-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(28, 0, 0, .58);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    font-family: var(--pslc-font);
+}
+
+.pslc-overlay[hidden] {
+    display: none;
+}
+
+.pslc-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: min(640px, 100%);
+    max-height: 100%;
+    overflow: hidden;
+    border-radius: 20px;
+    background: var(--pslc-surface);
+    color: var(--pslc-ink);
+    box-shadow: 0 14px 40px rgba(128, 0, 0, .22), 0 4px 14px rgba(0, 0, 0, .14);
+    animation: pslc-in .22s var(--pslc-ease) both;
+}
+
+/* the gold edge along the top, like the system's other dialogs */
+.pslc-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--pslc-gold) 0%, var(--pslc-gold-light) 50%, var(--pslc-gold) 100%);
+    z-index: 2;
+}
+
+@keyframes pslc-in {
+    from { opacity: 0; transform: translateY(10px) scale(.98); }
+    to { opacity: 1; transform: none; }
+}
+
+.pslc-head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 22px 18px 14px 20px;
+}
+
+.pslc-tile {
+    display: inline-grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--pslc-brand) 10%, transparent);
+    color: var(--pslc-accent);
+}
+
+.pslc-titles {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.pslc-head h3 {
+    margin: 0;
+    font-family: var(--pslc-display);
+    font-size: 1.08rem;
+    font-weight: 700;
+    line-height: 1.25;
+    color: var(--pslc-ink);
+}
+
+.pslc-sub {
+    margin: 2px 0 0;
+    font-size: .82rem;
+    line-height: 1.35;
+    color: var(--pslc-muted);
+}
+
+.pslc-x {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--pslc-muted);
+    cursor: pointer;
+    transition: background .2s var(--pslc-ease), color .2s var(--pslc-ease);
+}
+
+.pslc-x:hover {
+    background: var(--pslc-soft);
+    color: var(--pslc-ink);
+}
+
+/* the camera view / the photo just taken */
+.pslc-stage {
+    position: relative;
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 220px;
+    max-height: 58vh;
+    margin: 0 20px;
+    overflow: hidden;
+    border-radius: 16px;
+    border: 1px solid color-mix(in srgb, var(--pslc-brand) 30%, transparent);
+    background: #1a0b0b;
+}
+
+/* gold viewfinder corners while the camera is live */
+.pslc-stage::after {
+    content: '';
+    position: absolute;
+    inset: 14px;
+    pointer-events: none;
+    --g: var(--pslc-gold-light);
+    background:
+        linear-gradient(var(--g), var(--g)) top left / 28px 3px no-repeat,
+        linear-gradient(var(--g), var(--g)) top left / 3px 28px no-repeat,
+        linear-gradient(var(--g), var(--g)) top right / 28px 3px no-repeat,
+        linear-gradient(var(--g), var(--g)) top right / 3px 28px no-repeat,
+        linear-gradient(var(--g), var(--g)) bottom left / 28px 3px no-repeat,
+        linear-gradient(var(--g), var(--g)) bottom left / 3px 28px no-repeat,
+        linear-gradient(var(--g), var(--g)) bottom right / 28px 3px no-repeat,
+        linear-gradient(var(--g), var(--g)) bottom right / 3px 28px no-repeat;
+    opacity: .9;
+}
+
+.pslc-stage:not(.is-live)::after {
+    display: none;
+}
+
+.pslc-video,
+.pslc-shot {
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-height: 58vh;
+    object-fit: contain;
+}
+
+.pslc-video[hidden],
+.pslc-shot[hidden] {
+    display: none;
+}
+
+.pslc-flash {
+    position: absolute;
+    inset: 0;
+    background: #fff;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.pslc-flash.is-on {
+    animation: pslc-flash .35s ease-out;
+}
+
+@keyframes pslc-flash {
+    from { opacity: .85; }
+    to { opacity: 0; }
+}
+
+.pslc-msg {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    text-align: center;
+    color: #f6e9e9;
+    font-size: .92rem;
+    line-height: 1.55;
+}
+
+.pslc-msg[hidden] {
+    display: none;
+}
+
+.pslc-tip {
+    margin: 14px 20px 0;
+    padding: 10px 14px;
+    border-radius: 12px;
+    border-left: 3px solid var(--pslc-gold);
+    background: var(--pslc-soft);
+    color: var(--pslc-muted);
+    font-size: .84rem;
+    line-height: 1.45;
+}
+
+.pslc-tip[hidden] {
+    display: none;
+}
+
+.pslc-foot {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 16px 20px 20px;
+}
+
+.pslc-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 10px 20px;
+    border-radius: 12px;
+    border: 1px solid transparent;
+    font-family: var(--pslc-font);
+    font-size: .875rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .2s var(--pslc-ease), border-color .2s var(--pslc-ease), box-shadow .2s var(--pslc-ease), opacity .2s;
+}
+
+.pslc-btn .material-symbols-outlined {
+    font-size: 20px;
+}
+
+.pslc-btn[hidden] {
+    display: none;
+}
+
+.pslc-btn:disabled {
+    opacity: .55;
+    cursor: default;
+}
+
+.pslc-btn--primary {
+    background: var(--pslc-brand);
+    color: var(--pslc-on-brand);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--pslc-brand) 28%, transparent);
+}
+
+.pslc-btn--primary:hover:not(:disabled) {
+    background: var(--pslc-brand-deep);
+}
+
+.pslc-btn--ghost {
+    background: transparent;
+    border-color: var(--pslc-line);
+    color: var(--pslc-muted);
+    font-weight: 600;
+}
+
+.pslc-btn--ghost:hover {
+    background: var(--pslc-soft);
+    border-color: color-mix(in srgb, var(--pslc-brand) 40%, var(--pslc-line));
+    color: var(--pslc-ink);
+}
+
+.pslc-btn:focus-visible,
+.pslc-x:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--pslc-brand) 38%, transparent);
+    outline-offset: 2px;
+}
+
+/* ── Phones: the dialog fills the screen and the buttons are easy to reach ──── */
+@media (max-width: 600px) {
+    .pslc-overlay {
+        padding: 0;
+        align-items: stretch;
+    }
+
+    .pslc-card {
+        width: 100%;
+        height: 100%;
+        border-radius: 0;
+    }
+
+    .pslc-head {
+        padding: 20px 12px 12px 16px;
+    }
+
+    .pslc-stage {
+        margin: 0;
+        max-height: none;
+        border-radius: 0;
+        border-left: 0;
+        border-right: 0;
+    }
+
+    .pslc-video,
+    .pslc-shot {
+        max-height: none;
+    }
+
+    .pslc-tip {
+        margin: 12px 16px 0;
+    }
+
+    .pslc-foot {
+        flex-direction: column-reverse;
+        padding: 14px 16px calc(18px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .pslc-btn {
+        width: 100%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pslc-card,
+    .pslc-flash.is-on {
+        animation: none;
+    }
+}

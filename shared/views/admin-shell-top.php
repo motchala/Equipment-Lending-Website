@@ -22,12 +22,79 @@
     <link rel="stylesheet" href="shared/assets/css/logout-modal.css?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/css/logout-modal.css'); ?>">
     <?php role_splash_head(); ?>
     <script>
-        /* Keep the default dashboard from appearing while the restored tab loads. */
+        /* Refresh behaviour (admin interface)
+           - Soft refresh (F5 / reload button): stay on the screen you are on; an open edit form is dropped.
+           - Hard refresh (Ctrl+Shift+R / Ctrl+F5): back to the Dashboard (first screen).
+           Also keeps the default dashboard from appearing while the restored tab loads. */
         (function() {
-            var params = new URLSearchParams(window.location.search);
-            var tab = null;
+            var TABS = ['rooms', 'faculty', 'admins', 'activity', 'inventory', 'settings', 'imports'];
+            var loc = window.location;
 
-            if (params.has('edit_item')) {
+            var nav = (window.performance && performance.getEntriesByType) ? performance.getEntriesByType('navigation')[0] : null;
+            var isReload = nav ? nav.type === 'reload' : !!(performance.navigation && performance.navigation.type === 1);
+            window._adminIsReload = isReload;
+
+            // Remember a hard-refresh shortcut so the page that loads next knows about it.
+            document.addEventListener('keydown', function(e) {
+                var k = (e.key || '').toLowerCase();
+                if (((e.ctrlKey || e.metaKey) && ((e.shiftKey && k === 'r') || k === 'f5')) || (e.shiftKey && k === 'f5')) {
+                    try { sessionStorage.setItem('adminHardRefresh', String(Date.now())); } catch (_) {}
+                }
+            }, true);
+
+            var hard = false;
+            try {
+                var stamp = parseInt(sessionStorage.getItem('adminHardRefresh'), 10);
+                hard = isReload && stamp > 0 && (Date.now() - stamp) < 15000;
+                sessionStorage.removeItem('adminHardRefresh');
+            } catch (_) {}
+
+            // The screen you were on is also kept in sessionStorage, as a backup for the #tab- part of the URL.
+            // Only a refresh may use it; opening the page any other way starts on the Dashboard.
+            var stored = null;
+            try {
+                stored = sessionStorage.getItem('adminCurrentTab');
+                if (!isReload || hard) sessionStorage.removeItem('adminCurrentTab');
+            } catch (_) {}
+            window._adminStoredTab = (isReload && !hard) ? stored : null;
+
+            // Hard refresh: forget the screen and any leftover URL state, land on the Dashboard.
+            if (hard) {
+                try { sessionStorage.removeItem('adminSubView'); } catch (_) {}
+                if (loc.search || loc.hash) {
+                    window._adminLeaving = true;
+                    loc.replace(loc.pathname);
+                }
+                return;
+            }
+
+            var params = new URLSearchParams(loc.search);
+            var hash = loc.hash;
+            var hashTab = hash.indexOf('#tab-') === 0 ? hash.slice(5) : null;
+
+            // The screen to come back to after a soft refresh: the #tab- in the URL, else the remembered one.
+            var restore = isReload ? (hashTab || window._adminStoredTab) : null;
+
+            // Soft refresh while an edit form is open: reload once more without it (same screen, form closed).
+            if (isReload && (params.has('edit_item') || params.has('edit_room'))) {
+                var wasEquipment = params.has('edit_item');
+                params.delete('edit_item');
+                params.delete('edit_room');
+                if (restore) {
+                    params.delete('view');
+                    params.delete('tab');
+                    if (!hashTab) { hash = '#tab-' + restore; }
+                } else if (wasEquipment) { hash = '#tab-inventory'; }
+                var qs = params.toString();
+                window._adminLeaving = true;
+                loc.replace(loc.pathname + (qs ? '?' + qs : '') + hash);
+                return;
+            }
+
+            var tab = null;
+            if (restore) {
+                tab = restore;                       // the screen you were on beats leftover URL params
+            } else if (params.has('edit_item')) {
                 tab = 'inventory';
             } else {
                 var view = params.get('view');
@@ -36,15 +103,11 @@
                 } else if (params.get('tab') === 'rooms') {
                     tab = 'rooms';
                 } else {
-                    var hash = window.location.hash;
-                    if (hash.indexOf('#tab-') === 0) tab = hash.slice(5);
+                    tab = hashTab;
                 }
             }
 
-            if (['rooms', 'faculty', 'admins', 'activity', 'inventory', 'settings', 'imports'].indexOf(tab) === -1) return;
-            try {
-                if (sessionStorage.getItem('adminHardRefresh') === '1') return;
-            } catch (_) {}
+            if (TABS.indexOf(tab) === -1) return;
             window._preJumpTab = tab;
             document.documentElement.classList.add('admin-tab-pending');
         })();

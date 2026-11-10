@@ -87,7 +87,7 @@
         barBell = $('#rxmBell', bar); barBadge = $('#rxmBadge', bar); barAvatar = $('#rxmAvatar', bar);
 
         $('#rxmDl', bar).addEventListener('click', function () {
-            var orig = $('#panel-activity .fact-btn-ghost');
+            var orig = $('#panel-activity [data-fact-print]');
             if (orig) orig.click();
         });
         barBell.addEventListener('click', function () {

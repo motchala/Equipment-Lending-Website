@@ -52,6 +52,7 @@ if (($_GET['view'] ?? '') === 'activity') {
         'status' => fact_render_rooms_status($activity),
         'body'  => fact_render_rooms_body($activity),
         'rows'  => fact_render_room_history_rows($activity),
+        'todo'  => fact_todo_render_items(fact_room_todo($activity)),
         'stats' => fact_room_stats($activity),
     ]);
     $conn->close();

@@ -17,7 +17,7 @@ $uid = $_SESSION['faculty_id'];
 // ── My Activity feed (?view=activity) ─────────────────────────────────────
 // The equipment half of the faculty "My Activity" screen, already rendered by the
 // same functions the dashboard uses on first paint (core/faculty-activity.php, fact_eq_*):
-//   { body: html, rows: html, stats: { loans, overdue, pending } }
+//   { status: html, body: html, rows: html, todo: html (this half's "Next steps" entries), stats: {...} }
 if (($_GET['view'] ?? '') === 'activity') {
     require_once __DIR__ . '/../../activity/core/faculty-data.php';
     $root_url = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'], 3)), '/') . '/';
@@ -28,6 +28,7 @@ if (($_GET['view'] ?? '') === 'activity') {
         'status' => fact_eq_render_status($activity),
         'body'   => fact_eq_render_body($activity, $root_url),
         'rows'   => fact_eq_render_history_rows($activity, $root_url),
+        'todo'   => fact_todo_render_items(fact_eq_todo($activity)),
         'stats'  => fact_eq_stats($activity),
     ], JSON_INVALID_UTF8_SUBSTITUTE);
     $conn->close();

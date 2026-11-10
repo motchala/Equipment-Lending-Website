@@ -89,6 +89,18 @@ if (!function_exists('admin_no_ensure')) {
     }
 }
 
+if (!function_exists('admin_no_label')) {
+    /** "Super Admin 1", "Admin 2" ... one label, role included (so the word Admin is never repeated). '' when unnumbered. */
+    function admin_no_label($role, $no): string
+    {
+        $n = (int)$no;
+        if ($n < 1) {
+            return '';
+        }
+        return ($role === 'Super Admin' ? 'Super Admin ' : 'Admin ') . $n;
+    }
+}
+
 if (!function_exists('admin_no_next')) {
     /** The number the next new admin gets: the lowest free one from 2 to 5 (then 1), or 0 when all five are taken. */
     function admin_no_next(mysqli $conn): int

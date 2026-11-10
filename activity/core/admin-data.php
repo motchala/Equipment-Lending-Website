@@ -194,7 +194,7 @@ if (!function_exists('adm_act_specs')) {
                 'where'      => implode(' AND ', $where),
                 'types'      => $types,
                 'params'     => $params,
-                'cols'       => 't.admin_id, COALESCE(a.fullName, t.admin_name) AS actor_name, ' . (!empty($q['has_admin_no']) ? 'a.admin_no' : 'NULL') . ' AS actor_no, t.category, t.action, t.summary, t.ref_type, t.ref_id, UNIX_TIMESTAMP(t.created_at) AS ts',
+                'cols'       => 't.admin_id, COALESCE(a.fullName, t.admin_name) AS actor_name, ' . (!empty($q['has_admin_no']) ? 'a.admin_no' : 'NULL') . ' AS actor_no, a.role AS actor_role, t.category, t.action, t.summary, t.ref_type, t.ref_id, UNIX_TIMESTAMP(t.created_at) AS ts',
                 'order'      => 't.created_at DESC, t.id DESC',
                 'map'        => static function (array $r): array {
                     [$chip, $tab]  = adm_act_category_meta($r['category']);
@@ -204,7 +204,8 @@ if (!function_exists('adm_act_specs')) {
                         'actor_type' => 'admin',
                         'actor_id'   => (int)$r['admin_id'],
                         'actor_name' => (string)$r['actor_name'],
-                        'actor_no'   => (int)($r['actor_no'] ?? 0),   // "Admin N" seat number (0 = none)
+                        'actor_no'   => (int)($r['actor_no'] ?? 0),   // seat number (0 = none)
+                        'actor_label' => admin_no_label((string)($r['actor_role'] ?? ''), $r['actor_no'] ?? 0),   // "Super Admin 1" / "Admin 2"
                         'category'   => $chip,
                         'icon'       => $icon,
                         'tone'       => $tone,

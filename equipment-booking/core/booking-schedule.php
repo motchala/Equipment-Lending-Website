@@ -801,6 +801,9 @@ final class BookingSchedule
                     <input type="file" id="request_document" name="request_document"
                         accept=".pdf,.jpg,.jpeg,.png,.webp">
                 </label>
+                <button type="button" class="pslc-trigger" data-letter-camera="request_document">
+                    <span class="material-symbols-outlined" aria-hidden="true">photo_camera</span> Take a photo of the letter
+                </button>
                 <p class="bm-hint">Recommended for bookings on a later date. You can still submit without one.</p>
             </div>
         </div>';

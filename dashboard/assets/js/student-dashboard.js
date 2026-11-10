@@ -223,6 +223,7 @@
         return '<div class="st-field" id="' + id + 'Wrap" hidden>' +
             '<label for="' + id + '">Request letter <span class="st-hint" style="display:inline">(recommended)</span></label>' +
             '<input type="file" class="st-input" id="' + id + '" accept=".pdf,.jpg,.jpeg,.png,.webp">' +
+            '<button type="button" class="pslc-trigger" data-letter-camera="' + id + '"><span class="material-symbols-outlined" aria-hidden="true">photo_camera</span> Take a photo of the letter</button>' +
             '<p class="st-hint">' + text + ' PDF, JPG, PNG or WEBP, up to 5 MB.</p></div>';
     };
     function syncLetter(id, dateStr) {
