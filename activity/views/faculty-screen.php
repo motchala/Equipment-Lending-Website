@@ -7,19 +7,25 @@
                 /* ── My Activity ─────────────────────────────────────────────
                    Three layers, top to bottom:
 
-                     1. Summary         four cards: Active loans · Overdue · Pending · Room reservations
-                                        (same words and numbers as the Home tab's key figures)
+                     1. Next steps      what needs the faculty member right now, most urgent first: overdue
+                                        returns, loans due today, approved items to collect, requests still
+                                        waiting for a decision (the Home tab already shows the counts, so
+                                        this screen does not repeat them). Built from the real requests by
+                                        fact_eq_todo() / fact_room_todo(). Each entry points at the row
+                                        below that has the button; when nothing needs action it says so
+                                        and offers Borrow / Reserve a room.
                      2. Right now       Equipment card | Room reservations card
-                                        each one: In progress / Upcoming (rooms also: Waitlist).
-                                        Both cards are a fixed size and show 5 rows per page, with
-                                        the page navigation in the card footer.
+                                        each one: In progress / Upcoming (rooms also: Waiting for approval,
+                                        Waitlist). Both cards are a fixed size and show 5 rows per page,
+                                        with the page navigation in the card footer.
                      3. History         one table for both, filtered All / Equipment / Rooms
                                         (filters and search in the header, page navigation in the footer)
 
                    Where every button lives (so a button is only ever in one place):
                      page header, top right        Download Report
-                     row action bar (Equipment     four fixed slots, left to right:
-                       and Room rows)                Claim QR · Return QR · Extend · Cancel / Withdraw / Leave waitlist
+                     row action bar (Equipment     only the buttons the row really has, packed left to right:
+                       and Room rows)                Claim QR · Return QR · Extend, then the way out
+                                                     (Cancel / Withdraw / Leave waitlist) at the far right
                      history table, last column    Action: Join waitlist
                      card / table footer           page navigation
 
@@ -34,10 +40,9 @@
                      Pending = amber · Approved = green · Overdue / Declined = red
                      Returned / Completed / Cancelled = grey
                 ─────────────────────────────────────────────────────────────── */
-                $act_eq         = fact_eq_load($conn, (string) $_SESSION['faculty_id']);
-                $act_eq_stats   = fact_eq_stats($act_eq);
-                $act_rooms      = fact_load_rooms($conn, (string) $_SESSION['faculty_id']);
-                $act_room_stats = fact_room_stats($act_rooms);
+                $act_eq    = fact_eq_load($conn, (string) $_SESSION['faculty_id']);
+                $act_rooms = fact_load_rooms($conn, (string) $_SESSION['faculty_id']);
+                $act_todo  = array_merge(fact_eq_todo($act_eq), fact_room_todo($act_rooms));
                 ?>
 
                 <!-- ── Header ───────────────────────────────────────────── -->
@@ -51,34 +56,32 @@
                     </button>
                 </header>
 
-                <!-- ── Summary: four cards ──────────────────────────────── -->
-                <div class="fact-stats" role="group" aria-label="Activity summary">
-                    <div class="fact-stat <?php echo $act_eq_stats['pickup'] > 0 ? 'is-wait' : 'is-ok'; ?>">
-                        <span class="fact-stat-label">Ready for pickup</span>
-                        <span class="fact-stat-value" data-fact-stat="pickup"><?php echo (int) $act_eq_stats['pickup']; ?></span>
-                        <span class="fact-stat-note">Approved, not yet claimed</span>
+                <!-- ── Next steps: what needs you right now (replaces the summary cards) ── -->
+                <section class="fact-card fact-todo-card" id="factTodo" aria-labelledby="factTodoTitle">
+                    <header class="fact-card-head">
+                        <div class="fact-card-heading">
+                            <h3 class="fact-card-title" id="factTodoTitle">Next steps</h3>
+                            <p class="fact-card-sub">What needs you right now, most urgent first.</p>
+                        </div>
+                    </header>
+                    <ul class="fact-todo-list" id="factTodoList" data-max="<?php echo (int) FACT_TODO_MAX; ?>"<?php echo $act_todo ? '' : ' hidden'; ?>><?php echo fact_todo_render($act_todo); ?></ul>
+                    <!-- More entries than fit: the list shows the most urgent few, this reveals the rest -->
+                    <footer class="fact-card-foot fact-todo-foot" id="factTodoMore"<?php echo count($act_todo) > FACT_TODO_MAX ? '' : ' hidden'; ?>>
+                        <button type="button" class="fact-linkbtn" id="factTodoMoreBtn" aria-expanded="false">Show <?php echo max(0, count($act_todo) - FACT_TODO_MAX); ?> more</button>
+                    </footer>
+                    <!-- Shown by the page script whenever the list above is empty (also after a live refresh) -->
+                    <div class="fact-todo-clear" id="factTodoClear"<?php echo $act_todo ? ' hidden' : ''; ?>>
+                        <span class="material-symbols-outlined" aria-hidden="true">task_alt</span>
+                        <div class="fact-todo-clear-text">
+                            <p class="fact-empty-title">You're all caught up</p>
+                            <p class="fact-empty-sub">Nothing needs your action right now.</p>
+                        </div>
+                        <div class="fact-todo-clear-actions">
+                            <button type="button" class="fact-btn fact-btn-ghost" data-icon="add_shopping_cart" data-action="go-tab" data-tab="lending" data-lending="browse">Borrow equipment</button>
+                            <button type="button" class="fact-btn fact-btn-ghost" data-icon="meeting_room" data-action="go-tab" data-tab="rooms">Reserve a room</button>
+                        </div>
                     </div>
-                    <div class="fact-stat is-ok">
-                        <span class="fact-stat-label">Active loans</span>
-                        <span class="fact-stat-value" data-fact-stat="loans"><?php echo (int) $act_eq_stats['loans']; ?></span>
-                        <span class="fact-stat-note">Item in your hands</span>
-                    </div>
-                    <div class="fact-stat is-bad<?php echo $act_eq_stats['overdue'] > 0 ? ' is-alert' : ''; ?>">
-                        <span class="fact-stat-label">Overdue</span>
-                        <span class="fact-stat-value" data-fact-stat="overdue"><?php echo (int) $act_eq_stats['overdue']; ?></span>
-                        <span class="fact-stat-note">Past the return time</span>
-                    </div>
-                    <div class="fact-stat is-wait">
-                        <span class="fact-stat-label">Pending</span>
-                        <span class="fact-stat-value" data-fact-stat="pending"><?php echo (int) $act_eq_stats['pending']; ?></span>
-                        <span class="fact-stat-note">Awaiting approval</span>
-                    </div>
-                    <div class="fact-stat">
-                        <span class="fact-stat-label">Room reservations</span>
-                        <span class="fact-stat-value" data-fact-stat="reserved"><?php echo fact_h($act_room_stats['reserved']); ?></span>
-                        <span class="fact-stat-note">Active, out of the limit</span>
-                    </div>
-                </div>
+                </section>
 
                 <!-- ── Right now: Equipment | Room reservations ─────────── -->
                 <div class="fact-grid">

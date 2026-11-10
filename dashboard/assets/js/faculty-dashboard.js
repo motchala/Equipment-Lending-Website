@@ -5730,12 +5730,15 @@
    MY ACTIVITY  (faculty)  --  behaviour for #panel-activity
 
    1. History table   filter All / Equipment / Rooms, search, paging
-   2. Show all        expands the Currently borrowing / Upcoming lists
+   2. Cards           Equipment and Room reservations show 5 rows per page
    3. Download Report prints the whole record (CSS un-pages it)
    4. Live refresh    Rooms:     room-reservation/api/poll-reservations.php?view=activity
                       Equipment: equipment-booking/api/poll-requests.php?view=activity
-                      Each swaps its card, its rows in the history table and its numbers
-                      in the summary strip (same renderers as the first page load).
+                      Each swaps its card, its rows in the history table and its own entries in
+                      the Next steps list (same renderers as the first page load).
+   4b. Next steps     the list at the top: both halves' entries are merged, sorted (most urgent
+                      first) and capped at data-max; clicking an entry scrolls to the row that has
+                      the real button (paging the card to it) and flashes it.
                       Runs when the tab is opened, after a booking / cancellation,
                       the moment the 5 s requests poll sees a status change (e.g. admin
                       confirms a return), and every 30 s while the tab is visible.
@@ -5995,15 +5998,82 @@
         /* ── 4. Live refresh (equipment + rooms) ─────────────────── */
         var inFlight = { rooms: false, equipment: false };
 
-        function setStat(name, value) {
-            var el = panel.querySelector('[data-fact-stat="' + name + '"]');
-            if (!el) return;
-            el.textContent = value;
-            if (name === 'overdue') {
-                var box = el.closest('.fact-stat');
-                if (box) box.classList.toggle('is-alert', Number(value) > 0);
+        /* ── Next steps: merge both halves, most urgent first ─────
+           Each half owns its own entries (data-src), so a refresh of one never loses the other's.
+           All of them stay in the list; only the first data-max are shown. */
+        var todoList = $('factTodoList');
+        var todoClear = $('factTodoClear');
+        var todoMore = $('factTodoMore');
+        var todoMoreBtn = $('factTodoMoreBtn');
+        var TODO_MAX = todoList ? (parseInt(todoList.dataset.max, 10) || 5) : 5;
+        var todoExpanded = false;
+
+        function renderTodo(src, html) {
+            if (!todoList) return;
+            if (typeof html === 'string') {
+                todoList.querySelectorAll('li.fact-todo[data-src="' + src + '"]').forEach(function (li) { li.remove(); });
+                todoList.insertAdjacentHTML('beforeend', html);
+            }
+            var items = Array.prototype.slice.call(todoList.querySelectorAll('li.fact-todo'));
+            items.sort(function (a, b) {
+                return ((parseInt(a.dataset.prio, 10) || 9) - (parseInt(b.dataset.prio, 10) || 9))
+                    || ((parseInt(a.dataset.ts, 10) || 0) - (parseInt(b.dataset.ts, 10) || 0));
+            });
+            items.forEach(function (li, i) {
+                li.hidden = !todoExpanded && i >= TODO_MAX;
+                todoList.appendChild(li);
+            });
+            todoList.hidden = items.length === 0;
+            if (todoClear) todoClear.hidden = items.length > 0;
+            /* Never cut the list off silently: say how many more there are */
+            var extra = items.length - TODO_MAX;
+            if (todoMore) todoMore.hidden = extra <= 0;
+            if (todoMoreBtn) {
+                todoMoreBtn.textContent = todoExpanded ? 'Show fewer' : 'Show ' + Math.max(0, extra) + ' more';
+                todoMoreBtn.setAttribute('aria-expanded', todoExpanded ? 'true' : 'false');
             }
         }
+
+        if (todoMoreBtn) {
+            todoMoreBtn.addEventListener('click', function () {
+                todoExpanded = !todoExpanded;
+                renderTodo('', undefined);
+            });
+        }
+
+        /* An entry points at the row that has the button: page the card to it, scroll, flash */
+        function goToRow(target) {
+            var m = /^(eq|rr):(\d+)$/.exec(target || '');
+            var el = null;
+            if (m) {
+                var card = m[1] === 'eq' ? cards.equipment : cards.rooms;
+                var sel = m[1] === 'eq' ? '.fact-item[data-req-id="' + m[2] + '"]' : '.fact-item[data-rr-id="' + m[2] + '"]';
+                el = card.body ? card.body.querySelector(sel) : null;
+                if (el) {
+                    var all = Array.prototype.slice.call(card.body.querySelectorAll('.fact-item'));
+                    card.page = Math.floor(all.indexOf(el) / CARD_PER_PAGE) + 1;
+                    paginateCard(card);
+                } else {
+                    el = $(m[1] === 'eq' ? 'factEquipment' : 'factRooms');
+                }
+            } else if (target === 'history-room') {
+                var roomTab = panel.querySelector('[data-fact-kind="room"]');
+                if (roomTab) roomTab.click();
+                el = $('factHistory');
+            } else {
+                el = $('factRooms');
+            }
+            if (!el) return;
+            var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            el.scrollIntoView({ behavior: calm ? 'auto' : 'smooth', block: 'center' });
+            el.classList.add('is-flash');
+            setTimeout(function () { el.classList.remove('is-flash'); }, 1800);
+        }
+
+        panel.addEventListener('click', function (e) {
+            var go = e.target.closest('[data-fact-goto]');
+            if (go) goToRow(go.dataset.factGoto);
+        });
 
         /* Swap a card's status line and rows, then page them again (the current page is kept) */
         function swapCard(card, data) {
@@ -6038,7 +6108,7 @@
             load(API_ROOMS, 'rooms', function (data) {
                 swapCard(cards.rooms, data);
                 if (typeof data.rows === 'string') swapHistory('room', data.rows);
-                if (data.stats) setStat('reserved', data.stats.reserved);
+                renderTodo('rooms', data.todo);
             });
         }
 
@@ -6046,12 +6116,7 @@
             load(API_EQUIP, 'equipment', function (data) {
                 swapCard(cards.equipment, data);
                 if (typeof data.rows === 'string') swapHistory('equipment', data.rows);
-                if (data.stats) {
-                    setStat('pickup',  data.stats.pickup);
-                    setStat('loans',   data.stats.loans);
-                    setStat('overdue', data.stats.overdue);
-                    setStat('pending', data.stats.pending);
-                }
+                renderTodo('equipment', data.todo);
             });
         }
 

@@ -22,8 +22,11 @@
  *   Upcoming           Waiting, or Approved that has not started yet
  *   History            Returned, Declined or Cancelled
  *   Due moment         return_date + return_time (end of that day when no time was set)
- *   Counts             Active loans = Approved, Overdue = Overdue, Pending = Waiting.
- *                      These are the same three numbers the Home tab shows.
+ *   Counts             Ready for pickup = Approved, Active loans = On Loan, Overdue = Overdue,
+ *                      Pending = Waiting. These are the numbers the Home tab shows; this screen
+ *                      no longer repeats them as cards (see "Next steps" below).
+ *   Next steps         fact_eq_todo(): the short list at the top of the screen, built from the rules
+ *                      above (overdue, due today, ready to collect, waiting for a decision).
  *   Overdue            blocks new BORROW requests (arbitration "overdue borrower" rule),
  *                      never room reservations.
  *   Cancel             offered on Upcoming requests that have not started (Pending, or Approved more than
@@ -377,7 +380,9 @@ function fact_eq_load(mysqli $conn, string $faculty_id): array
 }
 
 /**
- * Numbers for the summary strip.
+ * The four equipment numbers (the Home tab's key figures). My Activity no longer draws them as
+ * cards; fact_eq_render_status() still reads the overdue count, and the live-refresh endpoint
+ * still returns them.
  *
  * @param array<string, mixed> $d result of fact_eq_load()
  * @return array{loans:int, overdue:int, pending:int}
@@ -527,11 +532,11 @@ function fact_eq_action_slots(array $it, string $kind, string $status): array
         $slots['claim'] = fact_action_btn('Claim QR', 'qr_code_2', [
             'action' => 'show-claim-qr', 'token' => fact_s($it, 'bundle_claim_token'),
             'bundle-claim' => 1, 'equipment' => fact_s($it, 'bundle_claim_label'),
-        ], ['title' => 'Show the claim QR for the whole bundle', 'aria' => 'Claim bundle QR']);
+        ], ['primary' => true, 'title' => 'Show the claim QR for the whole bundle', 'aria' => 'Claim bundle QR']);
     } elseif ($status === 'Approved' && fact_s($it, 'claim_token') !== '') {
         $slots['claim'] = fact_action_btn('Claim QR', 'qr_code_2', [
             'action' => 'show-claim-qr', 'token' => fact_s($it, 'claim_token'), 'equipment' => fact_s($it, 'name'),
-        ], ['title' => 'Show the claim QR for this item']);
+        ], ['primary' => true, 'title' => 'Show the claim QR for this item']);
     }
 
     if ($kind === 'live') {
@@ -548,14 +553,14 @@ function fact_eq_action_slots(array $it, string $kind, string $status): array
                     'token'         => fact_s($it, 'bundle_return_token'),
                     'equipment'     => 'Bundle (' . fact_i($it, 'bundle_count') . ' items)',
                     'bundle-return' => 1,
-                ], ['title' => 'Show the return QR for this bundle']);
+                ], ['primary' => true, 'title' => 'Show the return QR for this bundle']);
             } elseif (!$isBundleItem && fact_s($it, 'token') !== '') {
                 // Solo item: show its own Return QR
                 $slots['return'] = fact_action_btn('Return QR', 'qr_code_scanner', [
                     'action'    => 'show-return-qr',
                     'token'     => fact_s($it, 'token'),
                     'equipment' => fact_s($it, 'name'),
-                ], ['title' => 'Show the return QR for this item']);
+                ], ['primary' => true, 'title' => 'Show the return QR for this item']);
             }
             // Non-leader bundle items: no Return QR button (leader covers them)
         }
@@ -708,4 +713,144 @@ function fact_eq_render_history_rows(array $d, string $rootUrl): string
             . '</tr>';
     }
     return $html;
+}
+
+/**
+ * The equipment half of the "Next steps" list at the top of My Activity (the list itself, its
+ * rules and the room half are described in core/room-quota.php).
+ *
+ * Rows that belong together are one entry, not several: a bundle is one entry (it has one Claim QR /
+ * one Return QR), and all requests still waiting are one entry. Each entry points at the row that
+ * carries the real button (the bundle's first row, same as the QR buttons).
+ *
+ * @param array<string, mixed> $d result of fact_eq_load()
+ * @return list<array<string, mixed>>
+ */
+function fact_eq_todo(array $d): array
+{
+    $tz     = new DateTimeZone('Asia/Manila');
+    $now    = new DateTimeImmutable('now', $tz);
+    $nowTs  = $now->getTimestamp();
+    $today  = $now->format('Y-m-d');
+    $open   = array_merge(
+        is_array($d['live'] ?? null) ? $d['live'] : [],
+        is_array($d['upcoming'] ?? null) ? $d['upcoming'] : []
+    );
+
+    $overdue = $due = $collect = $pending = [];
+    foreach ($open as $it) {
+        if (!is_array($it)) {
+            continue;
+        }
+        /** @var array<string, mixed> $it */
+        $status  = fact_s($it, 'status');
+        $batch   = fact_s($it, 'batch_id');
+        $bundle  = fact_i($it, 'bundle_count') > 1 && $batch !== '';
+        $retKey  = $bundle ? 'b' . $batch : 'i' . fact_i($it, 'id');
+        $claim   = fact_s($it, 'bundle_claim_token');
+        $claimKey = $claim !== '' ? 'c' . $claim : 'i' . fact_i($it, 'id');
+
+        if ($status === 'Overdue') {
+            $overdue[$retKey][] = $it;
+        } elseif ($status === 'On Loan' && fact_s($it, 'due_date') <= $today) {
+            $due[$retKey][] = $it;
+        } elseif ($status === 'Approved' && fact_i($it, 'start_ts') - $nowTs <= 86400) {
+            $collect[$claimKey][] = $it;
+        } elseif ($status === 'Waiting') {
+            $pending[$bundle ? 'b' . $batch : 'i' . fact_i($it, 'id')][] = $it;
+        }
+    }
+
+    /** The row that carries the group's QR button: the bundle leader when there is one, else the first. */
+    $leader = static function (array $rows, string $flag): int {
+        foreach ($rows as $r) {
+            if (!empty($r[$flag])) {
+                return fact_i($r, 'id');
+            }
+        }
+        return fact_i($rows[0], 'id');
+    };
+    $names = static fn(array $rows): string => fact_todo_names(array_column($rows, 'name'));
+
+    $out = [];
+
+    // 1 · Overdue: the one thing that blocks new borrowing
+    foreach ($overdue as $rows) {
+        $late    = max(array_map(static fn(array $r): int => $nowTs - fact_i($r, 'due_ts'), $rows));
+        $canExt  = (bool)array_filter($rows, static fn(array $r): bool => !empty($r['can_extend']));
+        $atLimit = !$canExt && (bool)array_filter($rows, static fn(array $r): bool => !empty($r['extend_limit']));
+        $text    = [fact_eq_late_label($late), 'New borrowing is blocked until it is returned'];
+        if ($canExt) {
+            $text[] = 'You can also ask for more time';
+        } elseif ($atLimit) {
+            $text[] = 'Extension limit reached';
+        }
+        $out[] = fact_todo_item(
+            'equipment', 1, 'bad', 'schedule',
+            'Return ' . $names($rows) . ' now',
+            implode(' · ', $text),
+            'eq:' . $leader($rows, 'bundle_return_leader'),
+            min(array_map(static fn(array $r): int => fact_i($r, 'due_ts'), $rows))
+        );
+    }
+
+    // 2 · On loan and due back today
+    foreach ($due as $rows) {
+        $dueTs   = min(array_map(static fn(array $r): int => fact_i($r, 'due_ts'), $rows));
+        $dueTime = fact_s($rows[0], 'due_time');
+        foreach ($rows as $r) {
+            if (fact_i($r, 'due_ts') === $dueTs) {
+                $dueTime = fact_s($r, 'due_time');
+            }
+        }
+        $out[] = fact_todo_item(
+            'equipment', 2, 'wait', 'assignment_return',
+            'Return ' . $names($rows) . ($dueTime !== '' ? ' by ' . fact_time($dueTime) : ' today'),
+            'Due today · Show your Return QR to the admin when you hand it back',
+            'eq:' . $leader($rows, 'bundle_return_leader'),
+            $dueTs
+        );
+    }
+
+    // 3 · Approved, not collected yet (already started, or starting within a day)
+    foreach ($collect as $rows) {
+        $startTs  = min(array_map(static fn(array $r): int => fact_i($r, 'start_ts'), $rows));
+        $started  = $startTs <= $nowTs;
+        $when     = '';
+        if (!$started) {
+            $first = $rows[0];
+            foreach ($rows as $r) {
+                if (fact_i($r, 'start_ts') === $startTs) {
+                    $first = $r;
+                }
+            }
+            $day  = fact_day_label($now, new DateTimeImmutable(fact_s($first, 'start_date'), $tz));
+            $day  = in_array($day, ['Today', 'Tomorrow'], true) ? strtolower($day) : $day;
+            $when = 'starts ' . $day . (fact_s($first, 'start_time') !== '' ? ', ' . fact_time(fact_s($first, 'start_time')) : '');
+        }
+        $out[] = fact_todo_item(
+            'equipment', 3, 'ok', 'qr_code_2',
+            'Collect ' . $names($rows),
+            'Approved' . ($started ? ' and ready' : ' · ' . $when) . ' · Show your Claim QR to the admin',
+            'eq:' . $leader($rows, 'bundle_claim_leader'),
+            $startTs
+        );
+    }
+
+    // 4 · Still waiting for a decision (one entry for all of them)
+    if ($pending) {
+        $groups = array_values($pending);
+        usort($groups, static fn(array $a, array $b): int => fact_i($a[0], 'start_ts') <=> fact_i($b[0], 'start_ts'));
+        $n      = count($groups);
+        $firstR = $groups[0][0];
+        $out[]  = fact_todo_item(
+            'equipment', 4, 'wait', 'hourglass_top',
+            $n === 1 ? $names($groups[0]) . ' is waiting for review' : $n . ' equipment requests are waiting for review',
+            'An admin will approve or decline ' . ($n === 1 ? 'it' : 'them') . ' · You can cancel ' . ($n === 1 ? 'it' : 'them') . ' until ' . ($n === 1 ? 'it starts' : 'they start'),
+            'eq:' . fact_i($firstR, 'id'),
+            fact_i($firstR, 'start_ts')
+        );
+    }
+
+    return $out;
 }

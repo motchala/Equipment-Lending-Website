@@ -431,18 +431,20 @@ function fact_render_group(string $label, array $itemsHtml): string
 /*
  * ── Where every button on My Activity lives ────────────────────────────────
  *   Page header, top right        Download Report                        (nothing else)
+ *   Next steps list               no action buttons: each entry only points at the row below
+ *                                 where the real button is (it scrolls to it and flashes it)
  *   Card / table header           filters and search                     (nothing else)
- *   Row action bar, bottom of     four fixed slots, left to right, and each button only ever
- *   every Equipment / Room row    appears in its own slot:
- *                                   claim   Claim QR
- *                                   return  Return QR
+ *   Row action bar, bottom of     the buttons that apply to this row, packed to the left in this
+ *   every Equipment / Room row    order, with the way OUT always last, pushed to the far right:
+ *                                   claim   Claim QR            (main action, tinted)
+ *                                   return  Return QR           (main action, tinted)
  *                                   extend  Extend
- *                                   end     Cancel / Withdraw / Leave waitlist  (far right)
+ *                                   end     Cancel / Withdraw / Leave waitlist
  *   History table, last column    Action: Join waitlist
  *   Card / table footer           page navigation (previous, numbers, next)
- * A slot that does not apply to a row stays empty, so the same button is always in the same
- * spot from one row to the next. A button that is not allowed right now (too late to cancel,
- * extension limit reached) stays in its slot, greyed out, with the reason on hover.
+ * A slot that does not apply to a row is simply not drawn (no empty gaps). A button that is not
+ * allowed right now (too late to cancel, extension limit reached) stays on the row, greyed out,
+ * with the reason on hover.
  */
 
 /**
@@ -450,7 +452,7 @@ function fact_render_group(string $label, array $itemsHtml): string
  * drawn by CSS from data-icon) so the page scripts can swap it for "Cancelling…" and back.
  *
  * @param array<string, string|int> $data  data-* attributes the page scripts read
- * @param array{danger?: bool, disabled?: bool, title?: string, aria?: string} $opt
+ * @param array{danger?: bool, primary?: bool, disabled?: bool, title?: string, aria?: string} $opt
  */
 function fact_action_btn(string $label, string $icon, array $data = [], array $opt = []): string
 {
@@ -461,7 +463,8 @@ function fact_action_btn(string $label, string $icon, array $data = [], array $o
     $disabled = !empty($opt['disabled']);
     $title    = (string)($opt['title'] ?? '');
     $aria     = (string)($opt['aria'] ?? '');
-    return '<button type="button" class="fact-btn fact-btn-ghost' . (!empty($opt['danger']) ? ' is-danger' : '') . '"'
+    return '<button type="button" class="fact-btn fact-btn-ghost' . (!empty($opt['danger']) ? ' is-danger' : '')
+        . (!empty($opt['primary']) ? ' is-primary' : '') . '"'
         . ' data-icon="' . fact_h($icon) . '"' . $attrs
         . ($disabled ? ' disabled aria-disabled="true"' : '')
         . ($title !== '' ? ' title="' . fact_h($title) . '"' : '')
@@ -470,7 +473,8 @@ function fact_action_btn(string $label, string $icon, array $data = [], array $o
 }
 
 /**
- * The action bar at the bottom of a row: the four slots above, always in the same order.
+ * The action bar at the bottom of a row: the slots above, always in the same order. A slot with no
+ * button is left out, so the bar is only as wide as the buttons the row really has.
  *
  * @param array{claim?: string, return?: string, extend?: string, end?: string} $slots ready-made buttons
  */
@@ -478,7 +482,10 @@ function fact_render_actions(array $slots): string
 {
     $html = '<div class="fact-item-actions" role="group" aria-label="Actions">';
     foreach (['claim', 'return', 'extend', 'end'] as $slot) {
-        $html .= '<span class="fact-slot fact-slot-' . $slot . '">' . ($slots[$slot] ?? '') . '</span>';
+        if (($slots[$slot] ?? '') === '') {
+            continue;
+        }
+        $html .= '<span class="fact-slot fact-slot-' . $slot . '">' . $slots[$slot] . '</span>';
     }
     return $html . '</div>';
 }
@@ -727,8 +734,8 @@ function fact_render_room_history_rows(array $d): string
 }
 
 /**
- * Values for the room tile in the summary strip (plus the older "next booking" pair,
- * which the live-refresh endpoint still returns).
+ * Room numbers (the summary cards were removed from My Activity because the Home tab already shows
+ * them; the live-refresh endpoint still returns these, so other callers keep working).
  *
  * @param array<string, mixed> $d result of fact_load_rooms()
  * @return array{reserved: string, reserved_sub: string, next: string, next_sub: string, active: int, student_active: int}
@@ -770,4 +777,210 @@ function fact_room_stats(array $d): array
         'active'       => $active,
         'student_active' => $studentActive,
     ];
+}
+
+/* ----------------------------------------------------------------------------
+ * Next steps: the short "what needs you right now" list at the top of My Activity
+ *
+ * It replaces the four summary cards (the Home tab already shows those numbers). Every entry is built
+ * from the faculty member's real requests and says what is going on AND what they can do about it,
+ * in the system's own rules and words. Most urgent first:
+ *   1  Overdue equipment        return it (borrowing is blocked until then); extend if allowed
+ *   2  Loan due back today      return it with the Return QR
+ *   3  Approved equipment       collect it with the Claim QR (started, or starting within a day)
+ *   4  Waiting for a decision   equipment (admin approves / declines) and room requests
+ *                               (an admin must decide before 12:01 AM on the date, else auto-declined)
+ *   5  Good to know             a room in use now, waitlist entries, declined slots you can still waitlist
+ * The equipment half is built in activity/core/faculty-data.php (fact_eq_todo), the room half below
+ * (fact_room_todo). Both feed the same list: first paint in activity/views/faculty-screen.php, live
+ * refresh through the two ?view=activity endpoints (each returns its own entries as "todo").
+ * An entry has no action button of its own: it points at the row (data-fact-goto) that has the button.
+ * -------------------------------------------------------------------------- */
+
+if (!defined('FACT_TODO_MAX')) {
+    /** How many entries show at once (the page script reads the same number from the list's data-max). */
+    define('FACT_TODO_MAX', 5);
+}
+
+/**
+ * One entry.
+ *
+ * @param string $src    'equipment' or 'rooms' (which half owns it, so a refresh can swap just its own)
+ * @param int    $prio   1 (most urgent) to 5 (good to know)
+ * @param string $tone   bad | wait | ok | info  (same colours as the status pills)
+ * @param string $target 'eq:12' request row, 'rr:5' reservation row, 'rooms' the room card, 'history-room'
+ * @return array{src:string, prio:int, tone:string, icon:string, title:string, text:string, target:string, ts:int}
+ */
+function fact_todo_item(string $src, int $prio, string $tone, string $icon, string $title, string $text, string $target, int $ts = 0): array
+{
+    return ['src' => $src, 'prio' => $prio, 'tone' => $tone, 'icon' => $icon,
+            'title' => $title, 'text' => $text, 'target' => $target, 'ts' => $ts];
+}
+
+/** "Projector", "Projector and HDMI Cable", "Projector and 2 more" */
+function fact_todo_names(array $names): string
+{
+    $clean = [];
+    foreach ($names as $name) {
+        $name = trim(is_scalar($name) ? (string)$name : '');
+        if ($name !== '' && !in_array($name, $clean, true)) {
+            $clean[] = $name;
+        }
+    }
+    $n = count($clean);
+    if ($n === 0) {
+        return 'your equipment';
+    }
+    if ($n === 1) {
+        return $clean[0];
+    }
+    return $n === 2 ? $clean[0] . ' and ' . $clean[1] : $clean[0] . ' and ' . ($n - 1) . ' more';
+}
+
+/**
+ * Most urgent first; entries of the same urgency by whichever is soonest.
+ *
+ * @param list<array<string, mixed>> $items
+ * @return list<array<string, mixed>>
+ */
+function fact_todo_sort(array $items): array
+{
+    usort($items, static fn(array $a, array $b): int => [fact_i($a, 'prio'), fact_i($a, 'ts')] <=> [fact_i($b, 'prio'), fact_i($b, 'ts')]);
+    return $items;
+}
+
+/**
+ * The <li> markup for a list of entries. Entries from index $visible on are drawn hidden (the page
+ * script applies the same rule after a live refresh).
+ *
+ * @param list<array<string, mixed>> $items
+ */
+function fact_todo_render_items(array $items, int $visible = PHP_INT_MAX): string
+{
+    $html = '';
+    foreach (array_values($items) as $i => $it) {
+        $html .= '<li class="fact-todo is-' . fact_h(fact_s($it, 'tone')) . '"'
+            . ' data-src="' . fact_h(fact_s($it, 'src')) . '"'
+            . ' data-prio="' . fact_i($it, 'prio') . '" data-ts="' . fact_i($it, 'ts') . '"'
+            . ($i >= $visible ? ' hidden' : '') . '>'
+            . '<button type="button" class="fact-todo-btn" data-fact-goto="' . fact_h(fact_s($it, 'target')) . '"'
+            . ' title="Show it in the list below">'
+            . '<span class="fact-todo-icon">' . fact_icon(fact_s($it, 'icon')) . '</span>'
+            . '<span class="fact-todo-text"><strong class="fact-todo-title">' . fact_h(fact_s($it, 'title')) . '</strong>'
+            . '<span class="fact-todo-sub">' . fact_h(fact_s($it, 'text')) . '</span></span>'
+            . '<span class="fact-todo-go" aria-hidden="true">' . fact_icon('chevron_right') . '</span>'
+            . '</button></li>';
+    }
+    return $html;
+}
+
+/**
+ * First paint of the Next steps list: both halves merged, sorted, and capped at FACT_TODO_MAX.
+ *
+ * @param list<array<string, mixed>> $items
+ */
+function fact_todo_render(array $items): string
+{
+    return fact_todo_render_items(fact_todo_sort($items), FACT_TODO_MAX);
+}
+
+/**
+ * Next steps that come from room reservations.
+ *
+ * @param array<string, mixed> $d result of fact_load_rooms()
+ * @return list<array<string, mixed>>
+ */
+function fact_room_todo(array $d): array
+{
+    $tz    = new DateTimeZone('Asia/Manila');
+    $now   = new DateTimeImmutable('now', $tz);
+    $today = $now->format('Y-m-d');
+    $out   = [];
+
+    $live     = is_array($d['live'] ?? null) ? $d['live'] : [];
+    $pending  = is_array($d['pending'] ?? null) ? $d['pending'] : [];
+    $waitlist = is_array($d['waitlist'] ?? null) ? $d['waitlist'] : [];
+    $history  = is_array($d['history'] ?? null) ? $d['history'] : [];
+
+    // 4 · Requests for a later date wait for an admin. The deadline is real: 12:01 AM on the reservation
+    // date (room-expiry.php), after which an undecided request is declined automatically.
+    $pending = array_values(array_filter($pending, 'is_array'));
+    usort($pending, static fn(array $a, array $b): int => fact_i($a, 'start_ts') <=> fact_i($b, 'start_ts'));
+    if ($pending) {
+        $first = $pending[0];
+        $n     = count($pending);
+        $date  = DateTimeImmutable::createFromFormat('Y-m-d', fact_s($first, 'date'), $tz);
+        $by    = $date !== false && fact_s($first, 'date') > $today
+            ? 'before ' . fact_day_label($now, $date, false)
+            : 'before it starts';
+        $out[] = fact_todo_item(
+            'rooms', 4, 'wait', 'hourglass_top',
+            $n === 1 ? fact_s($first, 'room') . ' is waiting for approval' : $n . ' room requests are waiting for approval',
+            'An admin has to decide ' . $by . ', otherwise it is declined automatically · You can withdraw ' . ($n === 1 ? 'it' : 'them') . ' any time',
+            'rr:' . fact_i($first, 'id'),
+            fact_i($first, 'start_ts')
+        );
+    }
+
+    // 5 · A room in use right now
+    $live = array_values(array_filter($live, 'is_array'));
+    if ($live) {
+        $it = $live[0];
+        $out[] = fact_todo_item(
+            'rooms', 5, 'ok', 'meeting_room',
+            fact_s($it, 'room') . ' is yours until ' . fact_time(fact_s($it, 'end')),
+            'In use now · ' . fact_s($it, 'where'),
+            'rr:' . fact_i($it, 'id'),
+            fact_i($it, 'start_ts')
+        );
+    }
+
+    // 5 · Slots the faculty member is waiting on
+    $waitlist = array_values(array_filter($waitlist, 'is_array'));
+    $waiting  = [];
+    foreach ($waitlist as $w) {
+        $waiting[fact_i($w, 'room_id') . '|' . fact_s($w, 'date') . '|' . fact_s($w, 'start') . '|' . fact_s($w, 'end')] = true;
+    }
+    if ($waitlist) {
+        $w     = $waitlist[0];
+        $n     = count($waitlist);
+        $date  = DateTimeImmutable::createFromFormat('Y-m-d', fact_s($w, 'date'), $tz);
+        $slot  = ($date !== false ? fact_day_label($now, $date) . ', ' : '') . fact_time(fact_s($w, 'start')) . ' – ' . fact_time(fact_s($w, 'end'));
+        $out[] = fact_todo_item(
+            'rooms', 5, 'info', 'notifications',
+            $n === 1 ? 'On the waitlist for ' . fact_s($w, 'room') : 'On the waitlist for ' . $n . ' room slots',
+            ($n === 1 ? $slot . ' · ' : '') . 'We will notify you if ' . ($n === 1 ? 'the slot' : 'one') . ' opens up',
+            'rooms',
+            fact_i($w, 'start_ts')
+        );
+    }
+
+    // 5 · Declined reservations that are still ahead and not on the waitlist yet (History has "Join waitlist")
+    $open = [];
+    foreach ($history as $it) {
+        if (!is_array($it) || fact_s($it, 'state') !== 'declined' || empty($it['future'])) {
+            continue;
+        }
+        $key = fact_i($it, 'room_id') . '|' . fact_s($it, 'date') . '|' . fact_s($it, 'start') . '|' . fact_s($it, 'end');
+        if (!isset($waiting[$key])) {
+            $open[] = $it;
+        }
+    }
+    if ($open) {
+        usort($open, static fn(array $a, array $b): int => fact_i($a, 'start_ts') <=> fact_i($b, 'start_ts'));
+        $it   = $open[0];
+        $n    = count($open);
+        $date = DateTimeImmutable::createFromFormat('Y-m-d', fact_s($it, 'date'), $tz);
+        $out[] = fact_todo_item(
+            'rooms', 5, 'info', 'event_busy',
+            $n === 1
+                ? fact_s($it, 'room') . ($date !== false ? ' on ' . fact_day_label($now, $date, false) : '') . ' was declined'
+                : $n . ' room reservations were declined for dates still ahead',
+            'Join the waitlist in History to be told if the slot opens up',
+            'history-room',
+            fact_i($it, 'start_ts')
+        );
+    }
+
+    return $out;
 }

@@ -735,8 +735,7 @@ html.rx-mobile #panel-home .fdb-btn--primary {
 }
 
 /* The four stat cards become ONE card */
-html.rx-mobile #panel-home .fdb-kpis,
-html.rx-mobile #panel-activity .fact-stats {
+html.rx-mobile #panel-home .fdb-kpis {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
     gap: 0 !important;
@@ -747,8 +746,7 @@ html.rx-mobile #panel-activity .fact-stats {
     overflow: hidden !important;
 }
 
-html.rx-mobile #panel-home .fdb-kpi,
-html.rx-mobile #panel-activity .fact-stat {
+html.rx-mobile #panel-home .fdb-kpi {
     position: relative !important;
     display: flex !important;
     align-items: center !important;
@@ -764,19 +762,15 @@ html.rx-mobile #panel-activity .fact-stat {
 }
 
 html.rx-mobile #panel-home .fdb-kpi::before,
-html.rx-mobile #panel-activity .fact-stat::before,
-html.rx-mobile #panel-home .fdb-kpi::after,
-html.rx-mobile #panel-activity .fact-stat::after {
+html.rx-mobile #panel-home .fdb-kpi::after {
     display: none !important;
 }
 
-html.rx-mobile #panel-home .fdb-kpi:nth-child(odd),
-html.rx-mobile #panel-activity .fact-stat:nth-child(odd) {
+html.rx-mobile #panel-home .fdb-kpi:nth-child(odd) {
     border-right: 1px solid var(--rxm-line) !important;
 }
 
-html.rx-mobile #panel-home .fdb-kpi:nth-child(-n+4),
-html.rx-mobile #panel-activity .fact-stat:nth-child(-n+2) {
+html.rx-mobile #panel-home .fdb-kpi:nth-child(-n+4) {
     border-bottom: 1px solid var(--rxm-line) !important;
 }
 
@@ -916,10 +910,22 @@ html.rx-mobile #panel-home .fcc-code-value {
 --------------------------------------------------------------- */
 /* (the old page heading + Download button are replaced by the top-bar title and download icon) */
 
-html.rx-mobile #panel-activity .fact-stat {
-    flex-direction: column !important;
-    align-items: flex-start !important;
-    gap: 2px !important;
+/* Next steps: same white list as the cards below, no card shell */
+html.rx-mobile #panel-activity .fact-todo-card {
+    margin: 0 0 22px !important;
+}
+
+html.rx-mobile #panel-activity #factTodo>*:not(.fact-card-head) {
+    margin: 0 !important;
+    border-radius: var(--rxm-r) !important;
+}
+
+html.rx-mobile #panel-activity .fact-todo-list {
+    padding: 6px !important;
+}
+
+html.rx-mobile #panel-activity .fact-todo-clear {
+    padding: 16px !important;
 }
 
 html.rx-mobile #panel-activity .fact-grid {

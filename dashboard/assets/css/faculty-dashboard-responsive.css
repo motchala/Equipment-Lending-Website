@@ -1073,10 +1073,6 @@ html {
     #panel-activity .fact-grid {
         grid-template-columns: minmax(0, 1fr);
     }
-
-    #panel-activity .fact-stats {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
 }
 
 @media (max-width: 760px) {
@@ -1084,8 +1080,12 @@ html {
         flex-direction: column;
     }
 
-    #panel-activity .fact-stats {
-        gap: 12px;
+    #panel-activity .fact-todo-list {
+        padding: 4px 6px 8px;
+    }
+
+    #panel-activity .fact-todo-clear {
+        padding: 14px 16px;
     }
 
     #panel-activity .fact-card-head {
@@ -1213,6 +1213,20 @@ html {
         gap: 6px;
     }
 
+    /* On a phone the buttons share the row evenly (big, equal tap targets) instead of leaving gaps */
+    #panel-activity .fact-slot {
+        flex: 1 1 0;
+    }
+
+    #panel-activity .fact-slot-end {
+        margin-left: 0;
+    }
+
+    #panel-activity .fact-slot>.fact-btn {
+        width: 100%;
+        min-width: 0;
+    }
+
     #panel-activity .fact-item-actions .fact-btn {
         padding: 0 4px;
         font-size: 0.7rem;
@@ -1222,16 +1236,18 @@ html {
         display: none;
     }
 
-    #panel-activity .fact-stat {
-        padding: 14px 14px 14px 20px;
+    #panel-activity .fact-todo-btn {
+        gap: 10px;
+        padding: 10px 8px;
     }
 
-    #panel-activity .fact-stat-value {
-        font-size: 1.5rem;
-    }
-
-    #panel-activity .fact-stat-note {
+    #panel-activity .fact-todo-go {
         display: none;
+    }
+
+    #panel-activity .fact-todo-clear-actions,
+    #panel-activity .fact-todo-clear-actions .fact-btn {
+        width: 100%;
     }
 }
 
@@ -1244,6 +1260,7 @@ html {
 /* ── Print: the whole record, no controls, no paging ─────────── */
 @media print {
 
+    #panel-activity .fact-todo-card,
     #panel-activity .fact-btn,
     #panel-activity .fact-linkbtn,
     #panel-activity .fact-note,
