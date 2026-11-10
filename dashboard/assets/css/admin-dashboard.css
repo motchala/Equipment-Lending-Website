@@ -717,6 +717,17 @@ body {
     border-color: var(--accent-maroon);
 }
 
+.am-tag[hidden] {
+    display: none;
+}
+
+/* "Admin 2" seat number */
+.am-tag--no {
+    color: var(--accent-maroon);
+    background: var(--accent-light);
+    border-color: var(--accent-maroon);
+}
+
 .am-tag--active {
     color: #1e7e45;
     background: #e8f6ee;
@@ -1137,7 +1148,7 @@ body {
     text-overflow: ellipsis;
 }
 
-/* Admin seat label under the name in the Who column ("Admin 2" / "Super Admin 1") */
+/* Admin seat number under the name in the Who column ("Admin 2") */
 .act-no {
     display: block;
     font-size: 10.5px;
@@ -13949,4 +13960,184 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
 
 .eq-loan-section-label .material-symbols-outlined {
     font-size: 15px;
+}
+
+/* =====================================================================
+   Faculty tab: generated temporary password (no typing) + the
+   "Account created" card that shows it one last time
+   ===================================================================== */
+.fac-gen-row {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+}
+
+.fac-gen-row .fac-gen-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-family: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    user-select: all;
+    -webkit-user-select: all;
+}
+
+.fac-gen-btn {
+    flex: 0 0 auto;
+    width: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid var(--khaki-border);
+    border-radius: 10px;
+    background: var(--primary-white);
+    color: var(--text-light);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.1s;
+}
+
+.fac-gen-btn .material-symbols-outlined {
+    font-size: 19px;
+}
+
+.fac-gen-btn:hover {
+    border-color: var(--accent-maroon);
+    background: var(--accent-light);
+    color: var(--accent-maroon);
+}
+
+.fac-gen-btn:active {
+    transform: translateY(1px);
+}
+
+.fac-gen-btn:focus-visible {
+    outline: 2px solid var(--accent-maroon);
+    outline-offset: 2px;
+}
+
+/* Copy is the main action next to the password, so it carries the maroon */
+.fac-gen-copy {
+    background: var(--accent-maroon);
+    border-color: var(--accent-maroon);
+    color: #fff;
+}
+
+.fac-gen-copy:hover {
+    background: var(--accent-dark);
+    border-color: var(--accent-dark);
+    color: #fff;
+}
+
+.fac-gen-btn.is-copied,
+.fac-gen-btn.is-copied:hover {
+    background: var(--success);
+    border-color: var(--success);
+    color: #fff;
+}
+
+.fac-gen-btn.is-spinning .material-symbols-outlined {
+    animation: fac-gen-spin 0.5s ease-out;
+}
+
+@keyframes fac-gen-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.fac-gen-hint {
+    display: block;
+    margin-top: 6px;
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: var(--text-light);
+}
+
+/* "Account created": the same card, now holding the sign-in details (stays until Done is pressed) */
+.fac-created-card.fac-created-card--creds {
+    max-width: 400px;
+    text-align: left;
+}
+
+.fac-created-card--creds .fac-created-icon,
+.fac-created-card--creds .fac-created-title,
+.fac-created-card--creds .fac-created-sub {
+    text-align: center;
+}
+
+.fac-created-creds {
+    display: grid;
+    gap: 8px;
+    margin: 1rem 0 0.8rem;
+}
+
+.fac-created-cred {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas: "label btn" "value btn";
+    align-items: center;
+    column-gap: 10px;
+    row-gap: 1px;
+    padding: 9px 10px 9px 12px;
+    border: 1px solid var(--khaki-border);
+    border-radius: 10px;
+    background: var(--secondary-cream);
+}
+
+.fac-created-cred-label {
+    grid-area: label;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--text-light);
+}
+
+.fac-created-cred-val {
+    grid-area: value;
+    min-width: 0;
+    font-family: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text-dark);
+    overflow-wrap: anywhere;
+    user-select: all;
+    -webkit-user-select: all;
+}
+
+.fac-created-cred .fac-gen-btn {
+    grid-area: btn;
+    width: 36px;
+    height: 36px;
+}
+
+.fac-created-note {
+    display: flex;
+    gap: 8px;
+    margin: 0 0 1rem;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-light);
+}
+
+.fac-created-note .material-symbols-outlined {
+    font-size: 17px;
+    color: var(--accent-maroon);
+    margin-top: 1px;
+    flex-shrink: 0;
+}
+
+.fac-created-done {
+    width: 100%;
+    justify-content: center;
+    padding: 0.65rem 1rem;
+    font-size: 13px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fac-gen-btn.is-spinning .material-symbols-outlined {
+        animation: none;
+    }
 }

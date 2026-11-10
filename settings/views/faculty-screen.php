@@ -122,9 +122,7 @@
                                 data-field="backup_email">
                                 <?php echo $masked_backup ?: '— Not provided'; ?>
                             </span>
-                            <?php if (!$backup_locked): ?>
-                                <button class="btn-inline-action" data-action="open-backup-email-modal">Add</button>
-                            <?php endif; ?>
+                            <button class="btn-inline-action" data-action="open-backup-email-modal"><?php echo $backup_locked ? 'Edit' : 'Add'; ?></button>
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Password</span>

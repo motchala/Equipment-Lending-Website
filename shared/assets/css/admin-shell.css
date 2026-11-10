@@ -1,3 +1,9 @@
         html.admin-tab-pending #panel-dashboard {
             display: none !important;
         }
+
+        /* While a restored screen is being activated, keep the app hidden so neither the Dashboard
+           nor the Dashboard's sidebar highlight shows for a split second. Removed by admin-shell-bottom.php. */
+        html.admin-tab-pending .app-body {
+            visibility: hidden;
+        }

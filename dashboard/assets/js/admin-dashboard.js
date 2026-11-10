@@ -231,8 +231,6 @@
     function _switchTabDOM(tabName, clickedEl) {
         const panel = document.getElementById('panel-' + tabName);
         if (!panel) return;
-        // Remember the screen for a soft refresh (backup for the #tab- part of the URL; see admin-shell-top.php)
-        try { sessionStorage.setItem('adminCurrentTab', tabName); } catch (_) { }
         // If the pre-paint script already activated this panel (no flash), skip
         // the remove-all/re-add cycle so the slideIn animation doesn't re-fire.
         const alreadyActive = panel && panel.classList.contains('active');
@@ -338,26 +336,6 @@
         if (panel) panel.classList.add('active');
         const btn = tabsWrap && tabsWrap.querySelector('[data-sett-panel="' + panelId + '"]');
         if (btn) btn.classList.add('active');
-        if (panel) _saveSubView('settings', panelId);
-    }
-
-    /* ── Sub-tab memory for a soft refresh (F5) ─────────────────
-       Settings and Facilities keep their open sub-tab per browser tab.
-       Cleared by a hard refresh (see the head script in admin-shell-top.php). */
-    function _saveSubView(key, val) {
-        try {
-            const s = JSON.parse(sessionStorage.getItem('adminSubView') || '{}');
-            s[key] = val;
-            sessionStorage.setItem('adminSubView', JSON.stringify(s));
-        } catch (_) { }
-    }
-
-    function _restoreSubViews(tab) {
-        try {
-            const s = JSON.parse(sessionStorage.getItem('adminSubView') || '{}');
-            if (tab === 'settings' && s.settings && document.getElementById(s.settings)) switchSettMainTab(s.settings);
-            if (tab === 'rooms' && s.rooms && document.getElementById(s.rooms + '-panel')) switchRoomsTab(s.rooms);
-        } catch (_) { }
     }
 
     /* ── Borrow History toggle ───────────────────────────────── */
@@ -383,7 +361,6 @@
         const activeBtn = roomsPanel.querySelector('[data-rooms-tab="' + tabName + '"]');
         if (activePanel) activePanel.classList.add('active');
         if (activeBtn) activeBtn.classList.add('active');
-        if (activePanel) _saveSubView('rooms', tabName);
     }
 
     /* switchSettTab (legacy Settings-overlay tab helper) removed —
@@ -2021,10 +1998,10 @@
     const facSubmitBtn = document.getElementById('fac-submit-btn');
     const facFormAlert = document.getElementById('fac-form-alert');
     const facPasswordInput = document.getElementById('fac-password');
-    const facPasswordStrength = document.getElementById('fac-password-strength');
-    const facPasswordStrengthMeter = document.getElementById('fac-password-strength-meter');
-    const facPasswordStrengthFill = document.getElementById('fac-password-strength-fill');
-    const facPasswordStrengthLabel = document.getElementById('fac-password-strength-label');
+    const facPwCopyBtn = document.getElementById('fac-pw-copy');
+    const facPwRegenBtn = document.getElementById('fac-pw-regen');
+    const facGenHint = document.getElementById('fac-gen-hint');
+    const FAC_GEN_HINT_DEFAULT = facGenHint ? facGenHint.textContent : '';
 
     function _getFacPasswordStrength(password) {
         if (password.length < 8) return null;
@@ -2060,41 +2037,128 @@
         return { level: 4, label: 'Very strong' };
     }
 
-    function _updateFacPasswordStrength() {
-        if (!facPasswordInput || !facPasswordStrength || !facPasswordStrengthMeter ||
-            !facPasswordStrengthFill || !facPasswordStrengthLabel) return;
+    /* ── Generated temporary password ───────────────────────────
+       Nobody types a password for a new faculty account: one is generated here with the
+       browser's secure random source (Web Crypto, never Math.random). It is 12 characters from
+       an unambiguous alphabet (no 0/O, 1/l/I) with at least one upper-case letter, lower-case
+       letter, digit and symbol, and it is re-rolled until it rates Strong or better.
+       The server still checks it (create-faculty-account.php) and flags the new account so its
+       owner must replace the password on first sign-in (faculty-setup.php). */
+    const FAC_PW_LENGTH = 12;
+    const FAC_PW_SETS = [
+        'ABCDEFGHJKLMNPQRSTUVWXYZ',
+        'abcdefghijkmnopqrstuvwxyz',
+        '23456789',
+        '!@#$%&*?'
+    ];
 
-        const password = facPasswordInput.value;
-        if (password.length < 8) {
-            facPasswordStrength.hidden = true;
-            facPasswordStrengthMeter.setAttribute('aria-valuenow', '0');
-            facPasswordStrengthMeter.setAttribute('aria-valuetext', password ? 'Enter at least 8 characters' : 'No password entered');
-            facPasswordStrengthFill.style.width = '0%';
-            facPasswordStrengthLabel.textContent = '';
-            return;
+    // Unbiased random integer in [0, max)
+    function _facRandInt(max) {
+        const buf = new Uint32Array(1);
+        const limit = Math.floor(0x100000000 / max) * max;
+        do { window.crypto.getRandomValues(buf); } while (buf[0] >= limit);
+        return buf[0] % max;
+    }
+
+    function _facGeneratePassword() {
+        if (!window.crypto || !window.crypto.getRandomValues) return null;
+        const all = FAC_PW_SETS.join('');
+        for (let attempt = 0; attempt < 50; attempt++) {
+            const chars = FAC_PW_SETS.map(function (set) { return set[_facRandInt(set.length)]; });
+            while (chars.length < FAC_PW_LENGTH) chars.push(all[_facRandInt(all.length)]);
+            for (let i = chars.length - 1; i > 0; i--) {          // Fisher-Yates shuffle
+                const j = _facRandInt(i + 1);
+                const tmp = chars[i]; chars[i] = chars[j]; chars[j] = tmp;
+            }
+            const pw = chars.join('');
+            const rated = _getFacPasswordStrength(pw);
+            if (rated && rated.level >= 3) return pw;
         }
+        return null;
+    }
 
-        const levels = [
-            { label: 'Very weak', color: '#e53e3e' },
-            { label: 'Weak', color: '#dd6b20' },
-            { label: 'Fair', color: '#d69e2e' },
-            { label: 'Strong', color: '#38a169' },
-            { label: 'Very strong', color: '#2b6cb0' }
-        ];
-        const result = _getFacPasswordStrength(password);
-        const strength = result.level;
-        const level = levels[strength];
-        facPasswordStrength.hidden = false;
-        facPasswordStrengthMeter.setAttribute('aria-valuenow', String(strength));
-        facPasswordStrengthMeter.setAttribute('aria-valuetext', level.label);
-        facPasswordStrengthFill.style.width = (strength + 1) * 20 + '%';
-        facPasswordStrengthFill.style.backgroundColor = level.color;
-        facPasswordStrengthLabel.textContent = result.label;
-        facPasswordStrengthLabel.style.color = level.color;
+    function _facSetGeneratedPassword() {
+        if (!facPasswordInput) return;
+        const pw = _facGeneratePassword();
+        facPasswordInput.value = pw || '';
+        if (facSubmitBtn) facSubmitBtn.disabled = !pw;
+        if (facGenHint) {
+            facGenHint.textContent = pw
+                ? FAC_GEN_HINT_DEFAULT
+                : 'This browser cannot generate a secure password. Please use an up-to-date browser.';
+        }
+    }
+
+    // Copy text: the Clipboard API where the page is secure (https / localhost), otherwise the
+    // classic select-and-copy trick, so it also works when the site is opened by a LAN address.
+    function _facCopyFallback(text) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.top = '-1000px';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        ta.setSelectionRange(0, text.length);
+        let ok = false;
+        try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+        document.body.removeChild(ta);
+        return ok ? Promise.resolve() : Promise.reject(new Error('copy failed'));
+    }
+
+    function _facCopyText(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+            return navigator.clipboard.writeText(text).catch(function () { return _facCopyFallback(text); });
+        }
+        return _facCopyFallback(text);
+    }
+
+    // The button briefly turns green with a tick, so there is no doubt it worked.
+    function _facFlashCopied(btn) {
+        const icon = btn.querySelector('.material-symbols-outlined');
+        const label = btn.getAttribute('data-label') || btn.getAttribute('aria-label') || 'Copy';
+        btn.setAttribute('data-label', label);
+        btn.classList.add('is-copied');
+        if (icon) icon.textContent = 'check';
+        btn.title = 'Copied!';
+        btn.setAttribute('aria-label', 'Copied');
+        clearTimeout(btn._facCopyTimer);
+        btn._facCopyTimer = setTimeout(function () {
+            btn.classList.remove('is-copied');
+            if (icon) icon.textContent = 'content_copy';
+            btn.title = label;
+            btn.setAttribute('aria-label', label);
+        }, 1600);
     }
 
     if (facPasswordInput) {
-        facPasswordInput.addEventListener('input', _updateFacPasswordStrength);
+        _facSetGeneratedPassword();
+
+        if (facPwCopyBtn) {
+            facPwCopyBtn.addEventListener('click', function () {
+                const pw = facPasswordInput.value;
+                if (!pw) return;
+                _facCopyText(pw).then(function () {
+                    _facFlashCopied(facPwCopyBtn);
+                }).catch(function () {
+                    // Could not copy automatically: leave the password selected so Ctrl+C works.
+                    facPasswordInput.focus();
+                    facPasswordInput.select();
+                    if (facGenHint) facGenHint.textContent = 'Could not copy automatically. The password is selected: press Ctrl+C.';
+                });
+            });
+        }
+
+        if (facPwRegenBtn) {
+            facPwRegenBtn.addEventListener('click', function () {
+                _facSetGeneratedPassword();
+                if (facGenHint && facPasswordInput.value) facGenHint.textContent = FAC_GEN_HINT_DEFAULT;
+                facPwRegenBtn.classList.remove('is-spinning');
+                void facPwRegenBtn.offsetWidth;                  // restart the little spin
+                facPwRegenBtn.classList.add('is-spinning');
+            });
+        }
     }
 
     function _showFacAlert(msg, isError) {
@@ -2111,26 +2175,62 @@
         facFormAlert.textContent = '';
     }
 
-    /* After a successful create: show a small "Account created" overlay for a moment, then
-       load the Faculty tab fresh so the form, the list and its count are all back to a clean
-       state (the new account is simply part of the server-printed list).
-       FAC_CREATED_OVERLAY_MS must match the .fac-created-bar animation (2s) in admin-dashboard.css. */
-    const FAC_CREATED_OVERLAY_MS = 2000;
+    /* After a successful create, an "Account created" card shows the sign-in details (PUPSync email
+       and the temporary password, each with a copy button). This is the last time the password is
+       visible: faculty passwords cannot be looked up or reset later, so the card stays until Done is
+       pressed. Done then returns to a clean Faculty tab with a freshly generated password and the
+       new account already in the list. */
     let _facReloading = false;
 
     // Put the Create Account button back to its normal, clickable state.
     function _facResetSubmitBtn() {
         if (!facSubmitBtn) return;
-        facSubmitBtn.disabled = false;
+        facSubmitBtn.disabled = !(facPasswordInput && facPasswordInput.value);
         facSubmitBtn.innerHTML = '<span class="material-symbols-outlined">person_add</span> Create Account';
     }
 
-    function _facAccountCreated(fullname) {
+    function _facCredRow(label, value) {
+        const row = document.createElement('div');
+        row.className = 'fac-created-cred';
+
+        const lab = document.createElement('span');
+        lab.className = 'fac-created-cred-label';
+        lab.textContent = label;
+
+        const val = document.createElement('code');
+        val.className = 'fac-created-cred-val';
+        val.textContent = value;                                  // text, never parsed as HTML
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'fac-gen-btn';
+        btn.title = 'Copy ' + label.toLowerCase();
+        btn.setAttribute('aria-label', 'Copy ' + label.toLowerCase());
+        btn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">content_copy</span>';
+        btn.addEventListener('click', function () {
+            _facCopyText(value).then(function () {
+                _facFlashCopied(btn);
+            }).catch(function () {
+                const range = document.createRange();
+                range.selectNodeContents(val);
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+            });
+        });
+
+        row.appendChild(lab);
+        row.appendChild(val);
+        row.appendChild(btn);
+        return row;
+    }
+
+    function _facAccountCreated(fullname, email, tempPassword) {
         _facReloading = true;
 
         // Empty the form right away so no browser can restore typed values (the password
-        // included) after the reload.
-        ['fac-email', 'fac-faculty-id', 'fac-first', 'fac-last', 'fac-password', 'fac-confirm']
+        // included) after a reload. The card below is now the only place the password lives.
+        ['fac-email', 'fac-faculty-id', 'fac-first', 'fac-last', 'fac-password']
             .forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.value = '';
@@ -2140,34 +2240,67 @@
 
         const ov = document.createElement('div');
         ov.className = 'fac-created-overlay';
-        ov.setAttribute('role', 'status');
-        ov.setAttribute('aria-live', 'polite');
-        ov.innerHTML =
-            '<div class="fac-created-card">' +
+        ov.setAttribute('role', 'dialog');
+        ov.setAttribute('aria-modal', 'true');
+        ov.setAttribute('aria-labelledby', 'fac-created-title');
+
+        const card = document.createElement('div');
+        card.className = 'fac-created-card fac-created-card--creds';
+        card.innerHTML =
             '<span class="fac-created-icon"><span class="material-symbols-outlined">check</span></span>' +
-            '<div class="fac-created-title">Account created</div>' +
-            '<div class="fac-created-sub"></div>' +
-            '<span class="fac-created-bar"></span>' +
-            '</div>';
-        ov.querySelector('.fac-created-sub').textContent = fullname; // text, never parsed as HTML
+            '<div class="fac-created-title" id="fac-created-title">Account created</div>' +
+            '<div class="fac-created-sub"></div>';
+        card.querySelector('.fac-created-sub').textContent = fullname;
+
+        const creds = document.createElement('div');
+        creds.className = 'fac-created-creds';
+        if (email) creds.appendChild(_facCredRow('PUPSync email', email));
+        creds.appendChild(_facCredRow('Temporary password', tempPassword));
+        card.appendChild(creds);
+
+        const note = document.createElement('p');
+        note.className = 'fac-created-note';
+        note.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">info</span><span></span>';
+        note.lastChild.textContent = 'Copy the password now. It is not shown again. ' +
+            'They will choose their own password the first time they sign in, and the account stays locked until they do.';
+        card.appendChild(note);
+
+        const done = document.createElement('button');
+        done.type = 'button';
+        done.className = 'ps-btn ps-btn--primary fac-created-done';
+        done.textContent = 'Done';
+        card.appendChild(done);
+
+        ov.appendChild(card);
         document.body.appendChild(ov);
 
-        setTimeout(function () {
+        function trapTab(e) {
+            if (e.key !== 'Tab') return;
+            const items = Array.prototype.slice.call(card.querySelectorAll('button'));
+            if (!items.length) return;
+            const first = items[0], last = items[items.length - 1];
+            if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+            else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+        document.addEventListener('keydown', trapTab);
+
+        done.addEventListener('click', function () {
+            document.removeEventListener('keydown', trapTab);
             // Unlock the button first: the click handler's .finally() skips its reset while
-            // _facReloading is true, so nothing else ever re-enables it. Doing it up front
-            // also means an error further down can never leave it stuck on "Creating...".
+            // _facReloading is true, so nothing else ever re-enables it.
             _facReloading = false;
+            _facSetGeneratedPassword();
             _facResetSubmitBtn();
-            // Switch to Faculty tab in-place — no page reload needed.
             document.body.removeChild(ov);
+            // Switch to Faculty tab in-place — no page reload needed.
             _switchTabDOM('faculty');
-            // Reset the create-account form so it's blank for the next account.
-            var form = document.getElementById('fac-create-form') || document.getElementById('facCreateForm');
-            if (form) form.reset();
-            _updateFacPasswordStrength();
             // Refresh the faculty list from the server so the new account appears immediately.
             if (typeof window.adminRefreshFacultyList === 'function') window.adminRefreshFacultyList();
-        }, FAC_CREATED_OVERLAY_MS);
+        });
+
+        // Land on the first copy button: copying is the one thing this card is for.
+        const firstCopy = card.querySelector('.fac-gen-btn');
+        (firstCopy || done).focus();
     }
 
     if (facSubmitBtn) {
@@ -2175,12 +2308,10 @@
             _clearFacAlert();
 
             const email = (document.getElementById('fac-email')?.value || '').trim();
-            const facultyId = (document.getElementById('fac-faculty-id')?.value || '').trim();
             const _nm = _facReadNames();
             const firstName = _nm.first;
             const lastName = _nm.last;
-            const password = document.getElementById('fac-password')?.value || '';
-            const confirm = document.getElementById('fac-confirm')?.value || '';
+            const password = facPasswordInput ? facPasswordInput.value : '';
 
             // Client-side pre-checks
             if (!_facRegistryMatch) {
@@ -2193,17 +2324,7 @@
                 _showFacAlert('Last name is required.', true); return;
             }
             if (!password) {
-                _showFacAlert('Password is required.', true); return;
-            }
-            if (password.length < 8) {
-                _showFacAlert('Password must be at least 8 characters.', true); return;
-            }
-            const passwordStrength = _getFacPasswordStrength(password);
-            if (passwordStrength.level < 2) {
-                _showFacAlert('Password is too weak. Use a stronger password rated Fair or higher.', true); return;
-            }
-            if (password !== confirm) {
-                _showFacAlert('Passwords do not match.', true); return;
+                _showFacAlert('The password could not be generated. Reload the page and try again.', true); return;
             }
             if (_facEmailEdited && email && !/^[^\s@]+@pupsync\.edu$/i.test(email)) {
                 _showFacAlert('The PUPSync email must be a valid address ending in @pupsync.edu.', true);
@@ -2217,8 +2338,7 @@
                 csrf_token: getCsrfToken(),
                 first_name: firstName,
                 last_name: lastName,
-                password: password,
-                confirm_password: confirm
+                password: password
             });
             // Only an email the admin changed by hand is sent; otherwise the server derives it.
             if (_facEmailEdited && email) body.append('pupsync_email', email);
@@ -2231,7 +2351,7 @@
                 .then(res => res.json())
                 .then(data => {
                     if (data.status === 'success') {
-                        _facAccountCreated([firstName, lastName].filter(Boolean).join(' '));
+                        _facAccountCreated([firstName, lastName].filter(Boolean).join(' '), data.email || email, password);
                     } else {
                         _showFacAlert(data.message || 'An error occurred.', true);
                     }
@@ -2240,7 +2360,7 @@
                     _showFacAlert('Network error. Please try again.', true);
                 })
                 .finally(() => {
-                    if (_facReloading) return; // stay locked until the "Account created" overlay finishes
+                    if (_facReloading) return; // stay locked until the "Account created" card is dismissed
                     _facResetSubmitBtn();
                 });
         });
@@ -2559,7 +2679,7 @@
                     if (ev.actor_type === 'auto') who.appendChild(admEl('span', 'act-pill', 'Automatic'));
                     else {
                         who.appendChild(document.createTextNode(ev.actor_name));
-                        if (ev.actor_label) who.appendChild(admEl('span', 'act-no', ev.actor_label));
+                        if (ev.actor_no) who.appendChild(admEl('span', 'act-no', 'Admin ' + ev.actor_no));
                     }
                     li.appendChild(who);
                 }
@@ -2740,18 +2860,13 @@
 
         /* ── seats (header counter + Add button) ──────────────── */
         /* The Activity page's "Who" list mirrors the admin accounts, so changes here show up there at once. */
-        function adminLabel(role, no) {
-            const n = parseInt(no, 10) || 0;
-            return n > 0 ? (role === 'Super Admin' ? 'Super Admin ' : 'Admin ') + n : role;
-        }
-
-        function syncActorOption(id, name, adminNo, role) {
+        function syncActorOption(id, name, adminNo) {
             const sel = document.getElementById('act-actor');
             if (!sel || !id) return;
             let opt = Array.from(sel.options).find(function (o) { return o.value === String(id); });
             if (name === null) { if (opt) opt.remove(); return; }
             if (!opt) { opt = document.createElement('option'); opt.value = String(id); sel.appendChild(opt); }
-            opt.textContent = name + (parseInt(adminNo, 10) > 0 ? ' (' + adminLabel(role, adminNo) + ')' : '');
+            opt.textContent = name + (parseInt(adminNo, 10) > 0 ? ' (Admin ' + parseInt(adminNo, 10) + ')' : '');
         }
 
         function updateSeats(count, remaining) {
@@ -2851,13 +2966,38 @@
             const role = item.getAttribute('data-role');
             const until = parseInt(item.getAttribute('data-locked-until'), 10) || 0;
             const you = item.getAttribute('data-you') === '1';
+            // Reset tag visibility at the start so switching between admins starts clean
+            const _noTagReset = document.getElementById('am-d-no');
+            const _roleTagReset = document.getElementById('am-d-role');
+            if (_noTagReset) _noTagReset.hidden = true;
+            if (_roleTagReset) _roleTagReset.hidden = false;
             const manage = item.getAttribute('data-manage') === '1';
 
             document.getElementById('am-d-avatar').textContent = initials(name);
             document.getElementById('am-d-name').textContent = name;
             document.getElementById('am-d-email').textContent = item.getAttribute('data-email');
-            // One badge: "Super Admin 1" / "Admin 2" (just the role when the account has no number)
-            setTag(document.getElementById('am-d-role'), adminLabel(role, item.getAttribute('data-admin-no')), role === 'Super Admin' ? 'super' : '');
+            const adminNo = parseInt(item.getAttribute('data-admin-no'), 10) || 0;
+            const noTag = document.getElementById('am-d-no');
+            const roleTagEl = document.getElementById('am-d-role');
+            if (noTag) {
+                if (role === 'Super Admin') {
+                    // Super Admin: show only the role tag ("Super Admin"), no number tag
+                    noTag.hidden = true;
+                    setTag(roleTagEl, role, 'super');
+                } else if (adminNo) {
+                    // Regular admin with a seat number: show "Admin N", hide the plain "Admin" role tag
+                    noTag.hidden = false;
+                    setTag(noTag, 'Admin ' + adminNo, 'no');
+                    roleTagEl.hidden = true;
+                } else {
+                    // No number assigned yet: show the plain "Admin" role tag only
+                    noTag.hidden = true;
+                    setTag(roleTagEl, role, '');
+                    roleTagEl.hidden = false;
+                }
+            } else {
+                setTag(roleTagEl, role, role === 'Super Admin' ? 'super' : '');
+            }
             if (until) setTag(document.getElementById('am-d-status'), 'Locked until ' + admShortDate(until), 'locked', 'lock');
             else setTag(document.getElementById('am-d-status'), 'Active', 'active');
 
@@ -3072,7 +3212,7 @@
                         created: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: ADM_TZ })
                     });
                     list.insertBefore(item, listEmpty);
-                    syncActorOption(data.id, fullName, data.admin_no, role);
+                    syncActorOption(data.id, fullName, data.admin_no);
                     refreshListEmpty();
                     if (typeof data.accounts_remaining === 'number') updateSeats(5 - data.accounts_remaining, data.accounts_remaining);
                     closeModal(addModal);
@@ -3132,7 +3272,7 @@
                 item.querySelector('.am-avatar').textContent = initials(r.data.full_name);
                 item.querySelector('.am-item-name').firstChild.textContent = r.data.full_name;
                 item.querySelector('.am-item-email').textContent = r.data.email;
-                syncActorOption(item.getAttribute('data-id'), r.data.full_name, item.getAttribute('data-admin-no'), item.getAttribute('data-role'));
+                syncActorOption(item.getAttribute('data-id'), r.data.full_name, item.getAttribute('data-admin-no'));
                 if (item === current) renderDetail(item);
                 closeModal(editModal);
                 showToast(r.data.signed_out ? 'Saved. They have been signed out everywhere.' : 'Admin details saved.', 'success');
@@ -3913,10 +4053,15 @@
 
     /* ── Handle URL view param on load ──────────────────────── */
     function initView() {
-        // Refresh handling lives in the head script (admin-shell-top.php): a hard refresh
-        // (Ctrl+Shift+R / Ctrl+F5) and a soft refresh with an edit form open both reload
-        // the page once more with a clean URL, so there is nothing to restore here.
-        if (window._adminLeaving) return;
+        // Hard-refresh flag: Ctrl+Shift+R / Ctrl+F5 sets this before the page unloads.
+        // On load we honour it by skipping hash restore, effectively landing on Dashboard.
+        try {
+            if (sessionStorage.getItem('adminHardRefresh') === '1') {
+                sessionStorage.removeItem('adminHardRefresh');
+                history.replaceState({ tab: 'dashboard' }, '');
+                return; // leave the default dashboard panel active
+            }
+        } catch (_) { }
 
         const params = new URLSearchParams(window.location.search);
         const view = params.get('view');
@@ -3925,21 +4070,6 @@
         // ── Hash-based restore (F5 / normal reload) ───────────────────────
         const hash = window.location.hash; // e.g. '#tab-inventory'
         const hashTab = hash.startsWith('#tab-') ? hash.slice(5) : null;
-
-        // Soft refresh: the screen you were on (hash) beats leftover URL params, and its sub-tab comes back too.
-        const restoreTab = window._adminIsReload ? (hashTab || window._adminStoredTab) : null;
-        if (restoreTab) {
-            if (restoreTab !== 'dashboard') {
-                _switchTabDOM(restoreTab, false);
-                if (restoreTab === 'activity' && typeof window.psActivityReady === 'function') window.psActivityReady();
-                if (restoreTab === 'admins' && typeof window.psAdminsPanelReady === 'function') window.psAdminsPanelReady();
-                _restoreSubViews(restoreTab);
-                history.replaceState({ tab: restoreTab }, '', window.location.pathname + window.location.search + '#tab-' + restoreTab);
-            } else {
-                history.replaceState({ tab: 'dashboard' }, '');
-            }
-            return;
-        }
 
         // URL params take priority over hash (they come from PHP redirects/links
         // and carry more context, e.g. edit_item). Hash is the F5 restore path.
@@ -4010,6 +4140,17 @@
         // Expose helpers for inline AJAX scripts in admin-dashboard.php
         window._setupInventoryListFn = setupInventoryList;
         window._exitEditModeFn = _exitEditMode;
+
+        // Hard-refresh detection: set flag on Ctrl+Shift+R / Ctrl+F5 so initView
+        // can skip hash restore and land on Dashboard (mimics a true fresh load).
+        document.addEventListener('keydown', function (e) {
+            if ((e.ctrlKey || e.metaKey) && (
+                (e.shiftKey && (e.key === 'r' || e.key === 'R')) ||
+                e.key === 'F5'
+            )) {
+                try { sessionStorage.setItem('adminHardRefresh', '1'); } catch (_) { }
+            }
+        });
 
         restoreState();
 

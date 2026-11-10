@@ -84,7 +84,6 @@ if (!admin_is_super_admin($conn)) {
 $first_name          = trim($_POST['first_name'] ?? '');
 $last_name           = trim($_POST['last_name'] ?? '');
 $password_raw        = $_POST['password'] ?? '';
-$confirm_raw         = $_POST['confirm_password'] ?? '';
 
 // -- Validation: first_name ---------------------------------------------------
 if ($first_name === '' || strlen($first_name) > 100) {
@@ -189,9 +188,6 @@ if (strlen($password_raw) < 8) {
 if (faculty_password_strength_level($password_raw) < 2) {
     send_json(422, 'error', 'Password is too weak. Use a stronger password rated Fair or higher.');
 }
-if ($password_raw !== $confirm_raw) {
-    send_json(422, 'error', 'Passwords do not match.');
-}
 
 // -- Duplicate checks: email and Faculty ID -------------------------------------
 $dup_stmt = $conn->prepare("SELECT faculty_id FROM tbl_users WHERE email = ? LIMIT 1");
@@ -240,7 +236,13 @@ try {
     $inserted = false;
     $errno = 0;
     $errmsg = '';
-    $ins_stmt = $conn->prepare("INSERT INTO tbl_users (fullname, faculty_id, email, backup_email, password, role) VALUES (?, ?, ?, ?, ?, ?)");
+    // New accounts start LOCKED: the generated password only works for the first sign-in, where the
+    // owner is sent to faculty-setup.php to choose their own (see account-management/core/faculty-first-login.php).
+    require_once __DIR__ . '/../core/faculty-first-login.php';
+    if (!faculty_fl_ensure_schema($conn)) {
+        send_json(500, 'error', 'Could not create account because the database needs a one-time update. Please try again, or contact the developer.');
+    }
+    $ins_stmt = $conn->prepare("INSERT INTO tbl_users (fullname, faculty_id, email, backup_email, password, role, must_change_password) VALUES (?, ?, ?, ?, ?, ?, 1)");
     if (!$ins_stmt) {
         throw new RuntimeException('INSERT prepare failed: ' . $conn->error);
     }
@@ -318,6 +320,7 @@ http_response_code(201);
 echo json_encode([
     'status' => 'success',
     'faculty_id' => $faculty_id,
+    'email' => $pupsync_email,
     'class_meetings' => $class_meetings,
     'message' => 'Faculty account created successfully.' . ($class_meetings > 0 ? ' ' . $class_meetings . ' weekly class meetings were added to their class schedule.' : '')
 ]);

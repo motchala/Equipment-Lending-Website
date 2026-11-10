@@ -21,7 +21,7 @@
     <!-- Shared logout confirmation dialog + loading state -->
     <link rel="stylesheet" href="shared/assets/css/logout-modal.css?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/css/logout-modal.css'); ?>">
     <?php role_splash_head(); ?>
-    <script>
+    <script nonce="<?php echo $csp_nonce; ?>">
         /* Refresh behaviour (admin interface)
            - Soft refresh (F5 / reload button): stay on the screen you are on; an open edit form is dropped.
            - Hard refresh (Ctrl+Shift+R / Ctrl+F5): back to the Dashboard (first screen).
@@ -35,7 +35,7 @@
             window._adminIsReload = isReload;
 
             // Remember a hard-refresh shortcut so the page that loads next knows about it.
-            document.addEventListener('keydown', function(e) {
+            window.addEventListener('keydown', function(e) {
                 var k = (e.key || '').toLowerCase();
                 if (((e.ctrlKey || e.metaKey) && ((e.shiftKey && k === 'r') || k === 'f5')) || (e.shiftKey && k === 'f5')) {
                     try { sessionStorage.setItem('adminHardRefresh', String(Date.now())); } catch (_) {}
@@ -110,6 +110,8 @@
             if (TABS.indexOf(tab) === -1) return;
             window._preJumpTab = tab;
             document.documentElement.classList.add('admin-tab-pending');
+            // Safety net: never leave the page hidden if the reveal script below fails to run.
+            setTimeout(function() { document.documentElement.classList.remove('admin-tab-pending'); }, 5000);
         })();
     </script>
     <link rel="stylesheet" href="shared/assets/css/admin-shell.css?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/css/admin-shell.css'); ?>">

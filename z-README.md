@@ -11,7 +11,7 @@ This guide has two parts: **[Set it up](#set-it-up-on-a-computer)** (no coding n
 | Who | How they get in | What they do |
 |---|---|---|
 | **Student** | No account. They enter a code from their faculty on the Student Portal. | Borrow equipment or reserve a facility |
-| **Faculty** | Account created by a Super Admin | Borrow equipment, reserve rooms, track everything in My Activity, give codes to students |
+| **Faculty** | Account created by a Super Admin, with a generated password they must replace on first sign-in | Borrow equipment, reserve rooms, track everything in My Activity, give codes to students |
 | **Admin** | Account created by a Super Admin | Review requests, scan QR codes, manage equipment and facilities |
 | **Super Admin** | Seed account or created by another Super Admin | Everything an Admin does, plus faculty and admin accounts, imports and rules |
 
@@ -36,7 +36,7 @@ Everyone signs in on the same page (`landing-page.php`). The system works out wh
 **For admins**
 - A **Dashboard** with what needs attention, an **Activity** timeline of every decision, notifications, and exports.
 - **Equipment** (catalog and loans) and **Facilities** (rooms, reservations, issues, archive).
-- Super Admin only: **Faculty** accounts, **Admins** (up to 5), and **Imports** (sidebar, under Data) for the faculty registry. (**Equipment Inventory** and **Rooms Assigned** import cards are there too, but they are not built yet.)
+- Super Admin only: **Faculty** accounts (the password is generated automatically, with a copy button), **Admins** (up to 5), and **Imports** (sidebar, under Data) for the faculty registry. (**Equipment Inventory** and **Rooms Assigned** import cards are there too, but they are not built yet.)
 - Both portals have a built-in **Help & Support** page inside Settings.
 
 ---
@@ -198,6 +198,9 @@ CREATE DATABASE `lending_db`
   COLLATE utf8mb4_general_ci;
 USE `lending_db`;
 ```
+
+### First sign-in lock (new faculty accounts)
+The Faculty tab generates a random temporary password in the browser (Web Crypto) and saves the account with `tbl_users.must_change_password = 1`. While that flag is set, `faculty_session_guard()` (`auth/core/admin-auth.php`, runs on every request) sends pages to `faculty-setup.php` and answers API calls with a 403 (`setup_required`). The setup screen has two steps (new password, then department, mobile number and an optional backup email) and saves them together through `account-management/api/first-login-setup.php`, which also clears the flag, so it is never asked again. Only `faculty-setup.php`, that endpoint and `auth/api/logout.php` stay open while locked (`FACULTY_FIRST_LOGIN_ALLOWED` in `account-management/core/faculty-first-login.php`). Accounts that existed before this feature keep the default `0` and are never locked. Faculty passwords cannot be reset by an admin, so the generated password is shown on the "Account created" card until the Super Admin presses Done.
 
 ### Security rules to keep
 - A Content-Security-Policy is set on every page (with a nonce for inline scripts) or by `config/security-headers.php`. Avoid inline `style=""` and inline event handlers in new code.
