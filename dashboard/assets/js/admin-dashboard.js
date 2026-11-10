@@ -231,6 +231,8 @@
     function _switchTabDOM(tabName, clickedEl) {
         const panel = document.getElementById('panel-' + tabName);
         if (!panel) return;
+        // Remember the screen for a soft refresh (backup for the #tab- part of the URL; see admin-shell-top.php)
+        try { sessionStorage.setItem('adminCurrentTab', tabName); } catch (_) { }
         // If the pre-paint script already activated this panel (no flash), skip
         // the remove-all/re-add cycle so the slideIn animation doesn't re-fire.
         const alreadyActive = panel && panel.classList.contains('active');
@@ -336,6 +338,26 @@
         if (panel) panel.classList.add('active');
         const btn = tabsWrap && tabsWrap.querySelector('[data-sett-panel="' + panelId + '"]');
         if (btn) btn.classList.add('active');
+        if (panel) _saveSubView('settings', panelId);
+    }
+
+    /* ── Sub-tab memory for a soft refresh (F5) ─────────────────
+       Settings and Facilities keep their open sub-tab per browser tab.
+       Cleared by a hard refresh (see the head script in admin-shell-top.php). */
+    function _saveSubView(key, val) {
+        try {
+            const s = JSON.parse(sessionStorage.getItem('adminSubView') || '{}');
+            s[key] = val;
+            sessionStorage.setItem('adminSubView', JSON.stringify(s));
+        } catch (_) { }
+    }
+
+    function _restoreSubViews(tab) {
+        try {
+            const s = JSON.parse(sessionStorage.getItem('adminSubView') || '{}');
+            if (tab === 'settings' && s.settings && document.getElementById(s.settings)) switchSettMainTab(s.settings);
+            if (tab === 'rooms' && s.rooms && document.getElementById(s.rooms + '-panel')) switchRoomsTab(s.rooms);
+        } catch (_) { }
     }
 
     /* ── Borrow History toggle ───────────────────────────────── */
@@ -361,6 +383,7 @@
         const activeBtn = roomsPanel.querySelector('[data-rooms-tab="' + tabName + '"]');
         if (activePanel) activePanel.classList.add('active');
         if (activeBtn) activeBtn.classList.add('active');
+        if (activePanel) _saveSubView('rooms', tabName);
     }
 
     /* switchSettTab (legacy Settings-overlay tab helper) removed —
@@ -2536,7 +2559,7 @@
                     if (ev.actor_type === 'auto') who.appendChild(admEl('span', 'act-pill', 'Automatic'));
                     else {
                         who.appendChild(document.createTextNode(ev.actor_name));
-                        if (ev.actor_no) who.appendChild(admEl('span', 'act-no', 'Admin ' + ev.actor_no));
+                        if (ev.actor_label) who.appendChild(admEl('span', 'act-no', ev.actor_label));
                     }
                     li.appendChild(who);
                 }
@@ -2717,13 +2740,18 @@
 
         /* ── seats (header counter + Add button) ──────────────── */
         /* The Activity page's "Who" list mirrors the admin accounts, so changes here show up there at once. */
-        function syncActorOption(id, name, adminNo) {
+        function adminLabel(role, no) {
+            const n = parseInt(no, 10) || 0;
+            return n > 0 ? (role === 'Super Admin' ? 'Super Admin ' : 'Admin ') + n : role;
+        }
+
+        function syncActorOption(id, name, adminNo, role) {
             const sel = document.getElementById('act-actor');
             if (!sel || !id) return;
             let opt = Array.from(sel.options).find(function (o) { return o.value === String(id); });
             if (name === null) { if (opt) opt.remove(); return; }
             if (!opt) { opt = document.createElement('option'); opt.value = String(id); sel.appendChild(opt); }
-            opt.textContent = name + (parseInt(adminNo, 10) > 0 ? ' (Admin ' + parseInt(adminNo, 10) + ')' : '');
+            opt.textContent = name + (parseInt(adminNo, 10) > 0 ? ' (' + adminLabel(role, adminNo) + ')' : '');
         }
 
         function updateSeats(count, remaining) {
@@ -2828,13 +2856,8 @@
             document.getElementById('am-d-avatar').textContent = initials(name);
             document.getElementById('am-d-name').textContent = name;
             document.getElementById('am-d-email').textContent = item.getAttribute('data-email');
-            const adminNo = parseInt(item.getAttribute('data-admin-no'), 10) || 0;
-            const noTag = document.getElementById('am-d-no');
-            if (noTag) {
-                noTag.hidden = !adminNo;
-                if (adminNo) setTag(noTag, 'Admin ' + adminNo, 'no');
-            }
-            setTag(document.getElementById('am-d-role'), role, role === 'Super Admin' ? 'super' : '');
+            // One badge: "Super Admin 1" / "Admin 2" (just the role when the account has no number)
+            setTag(document.getElementById('am-d-role'), adminLabel(role, item.getAttribute('data-admin-no')), role === 'Super Admin' ? 'super' : '');
             if (until) setTag(document.getElementById('am-d-status'), 'Locked until ' + admShortDate(until), 'locked', 'lock');
             else setTag(document.getElementById('am-d-status'), 'Active', 'active');
 
@@ -3049,7 +3072,7 @@
                         created: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: ADM_TZ })
                     });
                     list.insertBefore(item, listEmpty);
-                    syncActorOption(data.id, fullName, data.admin_no);
+                    syncActorOption(data.id, fullName, data.admin_no, role);
                     refreshListEmpty();
                     if (typeof data.accounts_remaining === 'number') updateSeats(5 - data.accounts_remaining, data.accounts_remaining);
                     closeModal(addModal);
@@ -3109,7 +3132,7 @@
                 item.querySelector('.am-avatar').textContent = initials(r.data.full_name);
                 item.querySelector('.am-item-name').firstChild.textContent = r.data.full_name;
                 item.querySelector('.am-item-email').textContent = r.data.email;
-                syncActorOption(item.getAttribute('data-id'), r.data.full_name, item.getAttribute('data-admin-no'));
+                syncActorOption(item.getAttribute('data-id'), r.data.full_name, item.getAttribute('data-admin-no'), item.getAttribute('data-role'));
                 if (item === current) renderDetail(item);
                 closeModal(editModal);
                 showToast(r.data.signed_out ? 'Saved. They have been signed out everywhere.' : 'Admin details saved.', 'success');
@@ -3890,15 +3913,10 @@
 
     /* ── Handle URL view param on load ──────────────────────── */
     function initView() {
-        // Hard-refresh flag: Ctrl+Shift+R / Ctrl+F5 sets this before the page unloads.
-        // On load we honour it by skipping hash restore, effectively landing on Dashboard.
-        try {
-            if (sessionStorage.getItem('adminHardRefresh') === '1') {
-                sessionStorage.removeItem('adminHardRefresh');
-                history.replaceState({ tab: 'dashboard' }, '');
-                return; // leave the default dashboard panel active
-            }
-        } catch (_) { }
+        // Refresh handling lives in the head script (admin-shell-top.php): a hard refresh
+        // (Ctrl+Shift+R / Ctrl+F5) and a soft refresh with an edit form open both reload
+        // the page once more with a clean URL, so there is nothing to restore here.
+        if (window._adminLeaving) return;
 
         const params = new URLSearchParams(window.location.search);
         const view = params.get('view');
@@ -3907,6 +3925,21 @@
         // ── Hash-based restore (F5 / normal reload) ───────────────────────
         const hash = window.location.hash; // e.g. '#tab-inventory'
         const hashTab = hash.startsWith('#tab-') ? hash.slice(5) : null;
+
+        // Soft refresh: the screen you were on (hash) beats leftover URL params, and its sub-tab comes back too.
+        const restoreTab = window._adminIsReload ? (hashTab || window._adminStoredTab) : null;
+        if (restoreTab) {
+            if (restoreTab !== 'dashboard') {
+                _switchTabDOM(restoreTab, false);
+                if (restoreTab === 'activity' && typeof window.psActivityReady === 'function') window.psActivityReady();
+                if (restoreTab === 'admins' && typeof window.psAdminsPanelReady === 'function') window.psAdminsPanelReady();
+                _restoreSubViews(restoreTab);
+                history.replaceState({ tab: restoreTab }, '', window.location.pathname + window.location.search + '#tab-' + restoreTab);
+            } else {
+                history.replaceState({ tab: 'dashboard' }, '');
+            }
+            return;
+        }
 
         // URL params take priority over hash (they come from PHP redirects/links
         // and carry more context, e.g. edit_item). Hash is the F5 restore path.
@@ -3977,17 +4010,6 @@
         // Expose helpers for inline AJAX scripts in admin-dashboard.php
         window._setupInventoryListFn = setupInventoryList;
         window._exitEditModeFn = _exitEditMode;
-
-        // Hard-refresh detection: set flag on Ctrl+Shift+R / Ctrl+F5 so initView
-        // can skip hash restore and land on Dashboard (mimics a true fresh load).
-        document.addEventListener('keydown', function (e) {
-            if ((e.ctrlKey || e.metaKey) && (
-                (e.shiftKey && (e.key === 'r' || e.key === 'R')) ||
-                e.key === 'F5'
-            )) {
-                try { sessionStorage.setItem('adminHardRefresh', '1'); } catch (_) { }
-            }
-        });
 
         restoreState();
 

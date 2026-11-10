@@ -23,7 +23,7 @@
                                     if (params.get('edit_room')) {
                                         params.delete('edit_room');
                                         const qs = params.toString();
-                                        window.history.replaceState({}, '', window.location.pathname + (qs ? '?' + qs : ''));
+                                        window.history.replaceState({}, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
                                     }
                                 }
 

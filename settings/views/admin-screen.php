@@ -30,7 +30,17 @@
             </div>
             <div class="ov-hero-body">
                 <div class="ov-hero-name"><?php echo htmlspecialchars($admin_name); ?></div>
-                <div class="ov-hero-role"><?php echo $is_super_admin ? 'Super Admin' : 'Admin'; ?> &middot; PUPSync Biñan Campus</div>
+                <?php
+                // "Super Admin 1" / "Admin 2": this account's seat number from the admin list
+                $my_role_label = $is_super_admin ? 'Super Admin' : 'Admin';
+                foreach ($admin_accounts_list as $_me) {
+                    if (strtolower($_me['email'] ?? '') === strtolower((string)$admin_email)) {
+                        $my_role_label = admin_no_label($admin_role, $_me['admin_no'] ?? 0) ?: $my_role_label;
+                        break;
+                    }
+                }
+                ?>
+                <div class="ov-hero-role"><?php echo htmlspecialchars($my_role_label); ?> &middot; PUPSync Biñan Campus</div>
                 <div class="ov-hero-badge">
                     <span class="material-symbols-outlined">verified</span>
                     Active &middot; <?php echo $is_super_admin ? 'Super Admin Access' : 'Admin Access'; ?>
