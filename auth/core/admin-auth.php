@@ -206,28 +206,48 @@ function faculty_session_guard(): void
     }
 
     require_once __DIR__ . '/../../config/db.php';
+    require_once __DIR__ . '/../../account-management/core/faculty-first-login.php';
     $conn = getDB();
 
-    $stmt = $conn->prepare('SELECT 1 FROM tbl_users WHERE faculty_id = ? LIMIT 1');
-    if (!$stmt) {
+    // One lookup answers two questions: does the account still exist, and is it still waiting for its
+    // first-sign-in setup (must_change_password)? An older database without that column is upgraded on
+    // the spot (faculty_fl_ensure_schema) and the lookup is repeated once.
+    $must_change = null;   // null = account not found
+    $lookup_ok   = false;
+    for ($try = 0; $try < 2 && !$lookup_ok; $try++) {
+        try {
+            $stmt = $conn->prepare('SELECT must_change_password FROM tbl_users WHERE faculty_id = ? LIMIT 1');
+            if (!$stmt) {
+                throw new RuntimeException('prepare failed');
+            }
+            $stmt->bind_param('s', $faculty_id);
+            if (!$stmt->execute()) {
+                $stmt->close();
+                throw new RuntimeException('execute failed');
+            }
+            $res = $stmt->get_result();
+            $row = ($res && $res->num_rows > 0) ? $res->fetch_assoc() : null;
+            $stmt->close();
+            $must_change = $row ? (int)$row['must_change_password'] : null;
+            $lookup_ok   = true;
+        } catch (Throwable $e) {
+            if ($try === 0 && faculty_fl_ensure_schema($conn)) {
+                continue;      // column was missing: it exists now, ask again
+            }
+            return;            // fail open on a database hiccup, as before
+        }
+    }
+    if (!$lookup_ok) {
         return;
     }
-    $stmt->bind_param('s', $faculty_id);
-    if (!$stmt->execute()) {
-        $stmt->close();
-        return;
-    }
-    $stmt->store_result();
-    $exists = $stmt->num_rows > 0;
-    $stmt->close();
 
-    if (!$exists) {
+    if ($must_change === null) {
         // A faculty member can set their own Faculty ID once (it replaces the id
         // they were created with). If that happened in another tab or device, this
         // session still holds the old id: find the account by email and follow it.
         $email = (string)($_SESSION['faculty_email'] ?? '');
         if ($email !== '') {
-            $st = $conn->prepare('SELECT faculty_id FROM tbl_users WHERE email = ? LIMIT 1');
+            $st = $conn->prepare('SELECT faculty_id, must_change_password FROM tbl_users WHERE email = ? LIMIT 1');
             if ($st) {
                 $st->bind_param('s', $email);
                 if ($st->execute()) {
@@ -236,12 +256,45 @@ function faculty_session_guard(): void
                     if ($row) {
                         $st->close();
                         $_SESSION['faculty_id'] = (string)$row['faculty_id'];
-                        return;
+                        $must_change = (int)$row['must_change_password'];
                     }
                 }
-                $st->close();
+                if ($must_change === null) {
+                    $st->close();
+                }
             }
         }
-        faculty_session_end('This faculty account is no longer available. Please contact your administrator.');
+        if ($must_change === null) {
+            faculty_session_end('This faculty account is no longer available. Please contact your administrator.');
+            return;
+        }
+    }
+
+    // ── First sign-in lock ─────────────────────────────────────────────────
+    // A brand-new account (created by a Super Admin with a generated password) can do nothing
+    // until its owner has chosen their own password: pages go to the setup screen, API calls get a
+    // 403. Only the setup screen, its save endpoint and log out stay reachable.
+    if ($must_change === 1) {
+        $script = faculty_fl_current_script();
+        if (in_array($script, FACULTY_FIRST_LOGIN_ALLOWED, true)) {
+            return;
+        }
+        $setup_url = faculty_fl_web_base() . 'account-management/faculty-setup.php';
+        // Scripts in the site root are the page entry points; everything in a module's api/ folder is an endpoint.
+        if (strpos($script, '/') === false || faculty_fl_is_page_request()) {
+            header('Location: ' . $setup_url);
+            exit;
+        }
+        http_response_code(403);
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success'        => false,
+            'status'         => 'error',
+            'setup_required' => true,
+            'redirect'       => $setup_url,
+            'msg'            => 'Finish setting up your account first.',
+            'message'        => 'Finish setting up your account first.',
+        ]);
+        exit;
     }
 }

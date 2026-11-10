@@ -1297,7 +1297,8 @@ CREATE TABLE `tbl_users` (
   `emergency_name` varchar(120) DEFAULT NULL,
   `emergency_relationship` varchar(50) DEFAULT NULL,
   `emergency_phone` varchar(20) DEFAULT NULL,
-  `role` varchar(50) DEFAULT 'Regular Faculty'
+  `role` varchar(50) DEFAULT 'Regular Faculty',
+  `must_change_password` tinyint(1) NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --

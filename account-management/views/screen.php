@@ -100,51 +100,34 @@
                     </div>
 
                     <div class="fac-edit-section">
-                        Password
+                        Temporary password
                         <span class="fac-info">
-                            <button type="button" class="fac-info-trigger" aria-label="Password requirements"
+                            <button type="button" class="fac-info-trigger" aria-label="About the temporary password"
                                 aria-expanded="false" aria-controls="fac-password-guidance" aria-describedby="fac-password-guidance">
                                 <span class="material-symbols-outlined" aria-hidden="true">info</span>
                             </button>
                             <span class="fac-info-popover" id="fac-password-guidance" role="tooltip">
-                                Passwords must contain at least 8 characters and be rated Fair or stronger. Avoid common words, repeated characters, and predictable sequences. Both password fields must match.
+                                A random password is generated for every new account, so there is nothing to type. Copy it and give it to the faculty member. The account stays locked until they replace it with their own password the first time they sign in.
                             </span>
                         </span>
                     </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="fac-password">Password <span class="req-star">*</span></label>
-                            <div class="fac-pw-wrap">
-                                <input type="password" id="fac-password" name="password"
-                                    class="form-control-custom" maxlength="128" required
-                                    placeholder="Min. 8 characters">
-                                <button type="button" class="fac-pw-toggle" tabindex="-1"
-                                    data-target="fac-password" aria-label="Toggle password">
-                                    <span class="material-symbols-outlined" style="font-size:17px">visibility</span>
-                                </button>
-                            </div>
-                            <div class="fac-password-strength" id="fac-password-strength" hidden>
-                                <div class="fac-password-strength-track" id="fac-password-strength-meter"
-                                    role="meter" aria-label="Password strength" aria-valuemin="0"
-                                    aria-valuemax="4" aria-valuenow="0" aria-valuetext="No password entered">
-                                    <span class="fac-password-strength-fill" id="fac-password-strength-fill"></span>
-                                </div>
-                                <span class="fac-password-strength-label" id="fac-password-strength-label"
-                                    aria-live="polite"></span>
-                            </div>
+                    <div class="form-group">
+                        <label for="fac-password">Generated password</label>
+                        <div class="fac-gen-row">
+                            <input type="text" id="fac-password" name="password"
+                                class="form-control-custom fac-gen-input" readonly aria-readonly="true"
+                                autocomplete="off" spellcheck="false" aria-describedby="fac-gen-hint"
+                                placeholder="Generating&hellip;">
+                            <button type="button" class="fac-gen-btn fac-gen-copy" id="fac-pw-copy"
+                                title="Copy password" aria-label="Copy password">
+                                <span class="material-symbols-outlined" aria-hidden="true">content_copy</span>
+                            </button>
+                            <button type="button" class="fac-gen-btn" id="fac-pw-regen"
+                                title="Generate a different password" aria-label="Generate a different password">
+                                <span class="material-symbols-outlined" aria-hidden="true">autorenew</span>
+                            </button>
                         </div>
-                        <div class="form-group">
-                            <label for="fac-confirm">Confirm <span class="req-star">*</span></label>
-                            <div class="fac-pw-wrap">
-                                <input type="password" id="fac-confirm" name="confirm_password"
-                                    class="form-control-custom" maxlength="128" required
-                                    placeholder="Re-enter password">
-                                <button type="button" class="fac-pw-toggle" tabindex="-1"
-                                    data-target="fac-confirm" aria-label="Toggle password">
-                                    <span class="material-symbols-outlined" style="font-size:17px">visibility</span>
-                                </button>
-                            </div>
-                        </div>
+                        <small class="fac-gen-hint" id="fac-gen-hint" aria-live="polite">Copy it before you create the account. It is shown once more on the confirmation, and never again.</small>
                     </div>
 
                     <div id="fac-form-alert" class="alert-banner hidden" role="alert"></div>
@@ -370,6 +353,7 @@
                                 <h3 class="am-d-name" id="am-d-name"></h3>
                                 <p class="am-d-email" id="am-d-email"></p>
                                 <div class="am-tags">
+                                    <span class="am-tag am-tag--no" id="am-d-no" hidden></span>
                                     <span class="am-tag" id="am-d-role"></span>
                                     <span class="am-tag" id="am-d-status"></span>
                                 </div>

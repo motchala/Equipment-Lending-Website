@@ -819,41 +819,31 @@ if ($action === 'change_password') {
 
 /* ══════════════════════════════════════════════════════════════════
    ACTION: update_backup_email
-   Adds backup email ONCE - cannot be updated after first save
+   Adds, changes or clears the backup email (it is never locked)
 ══════════════════════════════════════════════════════════════════ */
 if ($action === 'update_backup_email') {
     $backup_email = trim($_POST['backup_email'] ?? '');
 
-    // Check if backup email already exists
-    $existing = mysqli_fetch_assoc(mysqli_query(
-        $conn,
-        "SELECT backup_email FROM tbl_users WHERE faculty_id='$uid' LIMIT 1"
-    ));
-
-    if (!empty($existing['backup_email'])) {
-        echo json_encode([
-            'success' => false,
-            'msg' => 'Backup email cannot be changed once set. Please contact admin if you need to update it.'
-        ]);
-        exit;
-    }
-
-    if (empty($backup_email)) {
-        echo json_encode(['success' => false, 'msg' => 'Please enter a backup email address.']);
-        exit;
-    }
-
-    if (!filter_var($backup_email, FILTER_VALIDATE_EMAIL)) {
-        echo json_encode(['success' => false, 'msg' => 'Invalid email format.']);
-        exit;
+    // Leaving it empty removes the backup email; anything else must be a valid address.
+    if ($backup_email !== '') {
+        if (strlen($backup_email) > 254 || !filter_var($backup_email, FILTER_VALIDATE_EMAIL)) {
+            echo json_encode(['success' => false, 'msg' => 'Invalid email format.']);
+            exit;
+        }
+        $own = mysqli_fetch_assoc(mysqli_query($conn, "SELECT email FROM tbl_users WHERE faculty_id='$uid' LIMIT 1"));
+        if ($own && strtolower($backup_email) === strtolower((string)$own['email'])) {
+            echo json_encode(['success' => false, 'msg' => 'Your backup email must be different from your PUPSync email.']);
+            exit;
+        }
     }
 
     $backup_esc = mysqli_real_escape_string($conn, $backup_email);
+    $backup_sql = $backup_email === '' ? 'NULL' : "'$backup_esc'";
 
-    if (mysqli_query($conn, "UPDATE tbl_users SET backup_email='$backup_esc' WHERE faculty_id='$uid'")) {
+    if (mysqli_query($conn, "UPDATE tbl_users SET backup_email=$backup_sql WHERE faculty_id='$uid'")) {
         echo json_encode([
             'success' => true,
-            'msg' => 'Backup email added successfully! This cannot be changed later.',
+            'msg' => $backup_email === '' ? 'Backup email removed.' : 'Backup email saved.',
             'backup_email' => $backup_email
         ]);
     } else {

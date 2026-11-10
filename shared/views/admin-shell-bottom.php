@@ -1,4 +1,4 @@
-    <script>
+    <script nonce="<?php echo $csp_nonce; ?>">
         /* Activate the restored panel before revealing the content area. */
         (function() {
             var tab = window._preJumpTab;
