@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/config/db.php';
+require_once __DIR__ . '/../config/db.php';
 $conn = getDB();
 header('Content-Type: text/plain');
 $r = $conn->query('SELECT id, equipment_name, status, submitted_as, booking_mode FROM tbl_requests ORDER BY id DESC LIMIT 10');
