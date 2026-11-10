@@ -882,6 +882,7 @@
             '<label class="fcty-drop" id="fcty-drop" for="fcty-res-doc">' + icon('upload_file') +
             '<span><strong>Upload a file</strong><small>JPG, PNG or PDF \u00b7 max 5 MB</small></span></label>' +
             '<input type="file" id="fcty-res-doc" class="fcty-sr-only" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf">' +
+            '<button type="button" class="pslc-trigger" id="fcty-doc-cam" data-letter-camera="fcty-res-doc">' + icon('photo_camera') + 'Take a photo of the letter</button>' +
             '<div class="fcty-file" id="fcty-file" hidden></div>' +
             '<p class="fcty-hint" id="fcty-doc-hint"></p>' +
             '</div>' +
@@ -947,7 +948,7 @@
         var DOC_MAX = 5 * 1024 * 1024;
         var DOC_HINT = 'Recommended for reservations on a later date. You can still submit without one.';
         function isLaterDate() { return st.date > ymd(now); }
-        var elDoc = $('fcty-res-doc'), elDrop = $('fcty-drop'), elFile = $('fcty-file'), elDocHint = $('fcty-doc-hint');
+        var elDoc = $('fcty-res-doc'), elDrop = $('fcty-drop'), elFile = $('fcty-file'), elDocHint = $('fcty-doc-hint'), elCam = $('fcty-doc-cam');
 
         function fileKind(f) {
             var n = (f.name || '').toLowerCase();
@@ -967,6 +968,7 @@
             if (!f) {
                 docFile = null; elDoc.value = '';
                 elFile.hidden = true; elDrop.hidden = false; docMessage('');
+                if (elCam) elCam.hidden = false;
                 return;
             }
             var kind = fileKind(f);
@@ -978,6 +980,7 @@
                 '<span class="fcty-file-size">' + fmtSize(f.size) + '</span>' +
                 '<button type="button" class="fcty-icon-btn" id="fcty-file-remove" aria-label="Remove file">' + icon('close') + '</button>';
             elFile.hidden = false; elDrop.hidden = true;
+            if (elCam) elCam.hidden = true;
             $('fcty-file-remove').addEventListener('click', function () { setDoc(null); });
         }
         docMessage('');

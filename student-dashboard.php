@@ -35,6 +35,7 @@ require_once __DIR__ . '/auth/core/role-splash.php';
 
     <!-- PUPSync Student Styles -->
     <link rel="stylesheet" href="dashboard/assets/css/student-dashboard.css">
+    <link rel="stylesheet" href="shared/assets/css/letter-camera.css">
     <?php role_splash_head(); ?>
 </head>
 
@@ -174,6 +175,7 @@ require_once __DIR__ . '/auth/core/role-splash.php';
     <footer class="st-foot">PUPSync &middot; Polytechnic University of the Philippines &ndash; Bi&ntilde;an Campus</footer>
 
     <!-- PUPSync Student JS -->
+    <script src="shared/assets/js/letter-camera.js"></script>
     <script src="dashboard/assets/js/student-dashboard.js"></script>
 
 </body>
