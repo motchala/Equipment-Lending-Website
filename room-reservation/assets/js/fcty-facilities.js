@@ -47,9 +47,9 @@
     var DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     var WEEK_ORDER = [1, 2, 3, 4, 5, 6];      /* Mon → Sat (Sunday is closed) */
     var CLOSED_DAY = 0;                        /* Sunday: no reservations       */
-    var TL_START_MIN = 8 * 60;                 /* schedule timelines: 8 AM …    */
+    var TL_START_MIN = 7 * 60;                 /* schedule timelines: 7 AM (classes start then) ... */
     var TL_END_MIN = 20 * 60;                  /* … 8 PM                        */
-    var TL_TICKS = [[8, '8 AM', 0], [10, '10 AM', 1], [12, '12 PM', 0], [14, '2 PM', 1], [16, '4 PM', 0], [18, '6 PM', 1], [20, '8 PM', 0]];   /* [hour, label, minor] */
+    var TL_TICKS = [[7, '7 AM', 0], [10, '10 AM', 1], [13, '1 PM', 0], [16, '4 PM', 1], [20, '8 PM', 0]];   /* [hour, label, minor] */
 
     var STATUS_UI = {
         'Available': { cls: 'status-available', text: 'Available' },
@@ -93,6 +93,29 @@
         if (nc) parts.push(plural(nc, 'class', 'classes'));
         if (nr) parts.push(plural(nr, 'reservation'));
         return parts.length ? parts.join(' \u00b7 ') : 'Free all day';
+    }
+
+    /* What is still OPEN in a day: the gaps (at least 30 min) between everything that blocks the room.
+       list = the day's classes + reservations, from/to in minutes. Returns [[startMin, endMin], ...]. */
+    function freeWindows(list, from, to) {
+        var out = [], cursor = from;
+        sortByStart(list).forEach(function (b) {
+            var s = timeToMin(b.start), e = timeToMin(b.end);
+            if (e <= cursor) return;
+            if (s > cursor && s - cursor >= 30) out.push([cursor, Math.min(s, to)]);
+            cursor = Math.max(cursor, e);
+        });
+        if (to - cursor >= 30) out.push([cursor, to]);
+        return out.filter(function (w) { return w[1] > w[0]; });
+    }
+
+    var DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    /* '8 AM' / '12 PM' for an hour, '8-11 AM' / '11 AM-2 PM' for a block */
+    function hourLabel(h) { return (h % 12 === 0 ? 12 : h % 12) + (h >= 12 ? ' PM' : ' AM'); }
+    function clockShort(m) { var h = Math.floor(m / 60), mm = m % 60; return (h % 12 === 0 ? 12 : h % 12) + (mm ? ':' + pad(mm) : ''); }
+    function rangeShort(start, end) {
+        var a = timeToMin(start), b = timeToMin(end), ap = a >= 720 ? 'PM' : 'AM', bp = b >= 720 ? 'PM' : 'AM';
+        return clockShort(a) + (ap !== bp ? ' ' + ap : '') + '\u2013' + clockShort(b) + ' ' + bp;
     }
 
     function apiBase() {
@@ -501,6 +524,8 @@
         roomOverlay.querySelectorAll('.fcty-schedule-panel').forEach(function (p) {
             p.classList.toggle('active', p.dataset.schedulePanel === name);
         });
+        var dlg = roomOverlay.querySelector('.fcty-dialog');
+        if (dlg) dlg.classList.toggle('is-tt', name === 'weekly');   /* the timetable needs room to breathe */
     }
 
     function note(text) {
@@ -584,6 +609,93 @@
             var w = el.getAttribute('data-w');
             if (w !== null) el.style.width = w + '%';
         });
+        root.querySelectorAll('[data-t]').forEach(function (el) {
+            el.style.top = el.getAttribute('data-t') + '%';
+            var h = el.getAttribute('data-h');
+            if (h !== null) el.style.height = h + '%';
+        });
+    }
+
+    /* ── This week: a timetable (Mon-Sat x 7 AM-8 PM) of everything that blocks the room ──
+       Classes (Rooms Assigned import) and approved reservations of every faculty, one block each,
+       with who is using the room. Empty space is open time. */
+    var ttSel = '';        /* selected block: 'YYYY-MM-DD|HH:MM|HH:MM' */
+    var ttIndex = {};      /* key -> { s, date } for the detail line */
+
+    function ttPct(min) {
+        var c = Math.min(SCHOOL_END_MIN, Math.max(SCHOOL_START_MIN, min));
+        return (c - SCHOOL_START_MIN) / (SCHOOL_END_MIN - SCHOOL_START_MIN) * 100;
+    }
+
+    function ttDetailHTML(key) {
+        var it = ttIndex[key];
+        if (!it) return 'Tap a block to see who is using the room.';
+        var s = it.s, cls = isClass(s), st = reservationState(ymd(it.date), s, new Date());
+        var state = cls && st.label === 'Ongoing' ? 'In class' : st.label;
+        return '<span class="fcty-tt-tag ' + (cls ? 'is-class' : 'is-res') + '">' + (cls ? 'Class' : 'Reservation') + '</span> ' +
+            '<strong>' + esc(s.title || decodeHtml(String(s.label || ''))) + '</strong>' +
+            '<span class="fcty-tt-meta">' + esc(longDate(it.date)) + ' \u00b7 ' + timeRange(s.start, s.end) +
+            (s.who ? ' \u00b7 ' + esc(s.who) : '') + ' \u00b7 ' + state + '</span>';
+    }
+
+    function weekTimetableHTML(monday, week, now) {
+        var today = ymd(now), nowMin = now.getHours() * 60 + now.getMinutes();
+        var heads = '<div class="fcty-tt-corner" aria-hidden="true"></div>', cols = '', hours = '';
+        ttIndex = {};
+        for (var h = SCHOOL_START_MIN / 60; h < SCHOOL_END_MIN / 60; h++) {
+            hours += '<span data-t="' + ttPct(h * 60) + '">' + hourLabel(h) + '</span>';
+        }
+        WEEK_ORDER.forEach(function (d) {
+            var date = addDays(monday, (d + 6) % 7), ds = ymd(date), isToday = ds === today;
+            heads += '<div class="fcty-tt-head' + (isToday ? ' is-today' : '') + (ds < today ? ' is-past' : '') + '">' +
+                '<strong>' + DAY_SHORT[d] + '</strong><span>' + esc(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })) + '</span></div>';
+            var blocks = sortByStart(week[DAY_KEYS[d]]).map(function (s) {
+                var key = ds + '|' + s.start + '|' + s.end, cls = isClass(s);
+                ttIndex[key] = { s: s, date: date };
+                var st = reservationState(ds, s, now);
+                var a = ttPct(timeToMin(s.start)), b = ttPct(timeToMin(s.end));
+                var mins = timeToMin(s.end) - timeToMin(s.start);
+                var name = s.title || decodeHtml(String(s.label || '')), who = s.who || '';
+                return '<button type="button" class="fcty-tt-block ' + (cls ? 'is-class' : 'is-res') + ' ' + st.cls +
+                    (mins <= 60 ? ' is-short' : '') + (key === ttSel ? ' is-selected' : '') + '" data-t="' + a + '" data-h="' + Math.max(1, b - a) +
+                    '" data-key="' + esc(key) + '" title="' + esc(timeRange(s.start, s.end) + ' \u00b7 ' + name + (who ? ' \u00b7 ' + who : '')) + '">' +
+                    '<span class="fcty-tt-time">' + rangeShort(s.start, s.end) + '</span>' +
+                    '<span class="fcty-tt-name">' + esc(name) + '</span>' +
+                    (who ? '<span class="fcty-tt-who">' + esc(who) + '</span>' : '') + '</button>';
+            }).join('');
+            var nowLine = isToday && nowMin >= SCHOOL_START_MIN && nowMin <= SCHOOL_END_MIN
+                ? '<div class="fcty-tt-now" data-t="' + ttPct(nowMin) + '"></div>' : '';
+            cols += '<div class="fcty-tt-col' + (isToday ? ' is-today' : '') + '">' + blocks + nowLine + '</div>';
+        });
+        return '<div class="fcty-tt" role="group" aria-label="Weekly timetable">' +
+            '<p class="fcty-week-range">' + longDate(monday) + ' \u2013 ' + longDate(addDays(monday, 5)) + '</p>' +
+            '<div class="fcty-tt-scroll"><div class="fcty-tt-grid">' + heads +
+            '<div class="fcty-tt-hours" aria-hidden="true">' + hours + '</div>' + cols + '</div></div>' +
+            '<div class="fcty-tt-legend" aria-hidden="true"><span><i class="is-class"></i>Class</span>' +
+            '<span><i class="is-res"></i>Reservation</span><span><i class="is-open"></i>Open</span></div>' +
+            '<div class="fcty-tt-detail" id="fcty-tt-detail" aria-live="polite">' + ttDetailHTML(ttSel) + '</div></div>';
+    }
+
+    function onTimetableClick(e) {
+        var b = e.target.closest ? e.target.closest('.fcty-tt-block') : null;
+        if (!b) return;
+        ttSel = b.getAttribute('data-key');
+        roomOverlay.querySelectorAll('.fcty-tt-block').forEach(function (x) { x.classList.toggle('is-selected', x === b); });
+        var d = $('fcty-tt-detail');
+        if (d) d.innerHTML = ttDetailHTML(ttSel);
+    }
+
+    /* "Open today": what is still free between now and closing */
+    function openTodayHTML(list, now) {
+        var nowMin = now.getHours() * 60 + now.getMinutes();
+        if (nowMin >= SCHOOL_END_MIN) return '';
+        var ws = freeWindows(list, Math.max(SCHOOL_START_MIN, Math.ceil(nowMin / 30) * 30), SCHOOL_END_MIN);
+        return '<div class="fcty-open"><span class="fcty-open-title">' + icon('event_available') + 'Open today</span>' +
+            (ws.length
+                ? '<div class="fcty-open-chips">' + ws.map(function (w) {
+                    return '<span class="fcty-open-chip">' + minToLabel(w[0]) + ' \u2013 ' + minToLabel(w[1]) + '</span>';
+                }).join('') + '</div>'
+                : '<p class="fcty-open-none">Nothing open for the rest of today.</p>') + '</div>';
     }
 
     /* Everything that changes what the schedule looks like as time passes */
@@ -617,14 +729,10 @@
         var todays = isClosedDay(now) ? [] : sortByStart(week[DAY_KEYS[now.getDay()]]);
         $('fcty-modal-daily-list').innerHTML = isClosedDay(now)
             ? note('Closed on Sundays \u2014 reservations resume ' + longDate(nextOpenDay(now)) + '.')
-            : dayDropdownHTML('daily', now, todays, now);
+            : dayDropdownHTML('daily', now, todays, now) + openTodayHTML(todays, now);
 
         var monday = parseYmd(schedule.monday);
-        $('fcty-modal-weekly-grid').innerHTML =
-            '<p class="fcty-week-range">' + longDate(monday) + ' \u2013 ' + longDate(addDays(monday, 5)) + '</p>' +
-            WEEK_ORDER.map(function (d) {
-                return dayDropdownHTML('weekly', addDays(monday, (d + 6) % 7), sortByStart(week[DAY_KEYS[d]]), now);
-            }).join('');
+        $('fcty-modal-weekly-grid').innerHTML = weekTimetableHTML(monday, week, now);
 
         positionTimeline(roomOverlay);
         if (!schedule.blocked) applyAvailabilityBadge(todays);
@@ -714,6 +822,7 @@
 
         schedule = null;
         dayOpen = {};
+        ttSel = '';
         $('fcty-modal-daily-list').innerHTML = note('Loading schedule\u2026');
         $('fcty-modal-weekly-grid').innerHTML = '';
         setScheduleTab('daily');
@@ -794,10 +903,11 @@
        RESERVE — two-pane booking experience
        Left: live summary + day timeline.  Right: guided form.
     ══════════════════════════════════════════════════════════ */
-    function timeOptions(from, to, selected) {
+    /* disabledFn(minute) -> true greys an option out (taken by a class / reservation, or already past) */
+    function timeOptions(from, to, selected, disabledFn) {
         var html = '';
         for (var m = from; m <= to; m += 30) {
-            html += '<option value="' + minToHHMM(m) + '"' + (m === selected ? ' selected' : '') + '>' + minToLabel(m) + '</option>';
+            html += '<option value="' + minToHHMM(m) + '"' + (m === selected ? ' selected' : '') + (disabledFn && disabledFn(m) ? ' disabled' : '') + '>' + minToLabel(m) + '</option>';
         }
         return html;
     }
@@ -856,6 +966,7 @@
             }).join('') +
             '</div>' +
             '<div class="fcty-tl-note" id="fcty-tl-note"></div>' +
+            '<div class="fcty-open fcty-open-form" id="fcty-open" aria-live="polite"></div>' +
             '</div>' +
             '</aside>' +
 
@@ -935,7 +1046,7 @@
             }
             if (!lim) return;
 
-            if (!isFull()) { lim.hidden = true; btnSubmit.disabled = false; btnSubmit.title = ''; return; }
+            if (!isFull()) { lim.hidden = true; syncSubmit(); return; }
 
             btnSubmit.disabled = true;
             btnSubmit.title = 'Room limit reached';
@@ -1031,6 +1142,42 @@
             });
         }
 
+        /* The day's classes + reservations decide what is open: only a free slot can be reserved */
+        var touched = false;   /* has the user chosen anything yet? (until then the form jumps to the first open time) */
+        function isToday() { return st.date === ymd(now); }
+        function earliestStart() { return isToday() ? Math.max(SCHOOL_START_MIN, Math.ceil((nowMin + 1) / 30) * 30) : SCHOOL_START_MIN; }
+        function rangeFree(a, b) {
+            return !dayBookings().some(function (x) { return a < timeToMin(x.end) && b > timeToMin(x.start); });
+        }
+        function openWindows() {
+            return !weekData || isClosedDay(parseYmd(st.date)) ? [] : freeWindows(dayBookings(), earliestStart(), SCHOOL_END_MIN);
+        }
+        function jumpToFirstOpen() {
+            var ws = openWindows().filter(function (w) { return w[1] > st.start; });
+            if (!ws.length) return;
+            st.start = Math.max(ws[0][0], earliestStart());
+            st.end = Math.min(ws[0][1], st.start + 60);
+        }
+        function syncSubmit() {
+            var taken = !!weekData && clashes().length > 0;
+            btnSubmit.disabled = isFull() || taken;
+            btnSubmit.title = isFull() ? 'Room limit reached' : (taken ? 'That time is not available. Pick one of the open times.' : '');
+        }
+        function renderOpen() {
+            var el = $('fcty-open');
+            if (!el) return;
+            if (!weekData || isClosedDay(parseYmd(st.date))) { el.innerHTML = ''; return; }
+            var ws = openWindows();
+            el.innerHTML = '<span class="fcty-open-title">' + icon('event_available') + 'Open on ' + DAY_NAMES[parseYmd(st.date).getDay()] + '</span>' +
+                (ws.length
+                    ? '<div class="fcty-open-chips">' + ws.map(function (w) {
+                        var on = st.start >= w[0] && st.end <= w[1];
+                        return '<button type="button" class="fcty-open-chip' + (on ? ' is-on' : '') + '" data-s="' + w[0] + '" data-e="' + w[1] + '">' +
+                            minToLabel(w[0]) + ' \u2013 ' + minToLabel(w[1]) + '</button>';
+                    }).join('') + '</div>'
+                    : '<p class="fcty-open-none">Nothing open this day. Try another date.</p>');
+        }
+
         function pct(min) {
             var c = Math.min(SCHOOL_END_MIN, Math.max(SCHOOL_START_MIN, min));
             return (c - SCHOOL_START_MIN) / (SCHOOL_END_MIN - SCHOOL_START_MIN) * 100;
@@ -1039,9 +1186,11 @@
         /* ── Rendering ── */
         function syncControls() {
             /* Start / end selects (end must be after start) */
-            elStart.innerHTML = timeOptions(SCHOOL_START_MIN, SCHOOL_END_MIN - 30, st.start);
+            elStart.innerHTML = timeOptions(SCHOOL_START_MIN, SCHOOL_END_MIN - 30, st.start, function (m) {
+                return !rangeFree(m, m + 30) || (isToday() && m <= nowMin);
+            });
             if (st.end <= st.start) st.end = Math.min(SCHOOL_END_MIN, st.start + 60);
-            elEnd.innerHTML = timeOptions(st.start + 30, SCHOOL_END_MIN, st.end);
+            elEnd.innerHTML = timeOptions(st.start + 30, SCHOOL_END_MIN, st.end, function (m) { return !rangeFree(st.start, m); });
 
             /* Date chips */
             var dateChips = $('fcty-date-chips');
@@ -1051,7 +1200,7 @@
             var dur = st.end - st.start;
             setPressed($('fcty-dur-chips'), function (c) { return +c.dataset.min === dur; });
             $('fcty-dur-chips').querySelectorAll('.fcty-chip').forEach(function (c) {
-                c.disabled = st.start + (+c.dataset.min) > SCHOOL_END_MIN;
+                c.disabled = st.start + (+c.dataset.min) > SCHOOL_END_MIN || !rangeFree(st.start, st.start + (+c.dataset.min));
             });
 
             /* Purpose chips */
@@ -1100,6 +1249,9 @@
                 noteEl.innerHTML = icon('check_circle') + 'This time is free.';
             }
 
+            renderOpen();
+            syncSubmit();
+
             /* Server-side conflict notice (only if the local check didn't already flag it) */
             if (serverClash && !clash.length) {
                 setAlert(elAvail, 'warn', 'warning', serverClass
@@ -1120,10 +1272,13 @@
                 .then(function (w) {
                     if (ymd(mondayOf(parseYmd(st.date))) !== wk) return;   /* date changed meanwhile */
                     weekData = w;
+                    if (!touched && clashes().length) jumpToFirstOpen();   /* start on a time that is actually open */
+                    syncControls();
                     renderSummary();
                 })
                 .catch(function () {
                     weekData = {};
+                    syncControls();
                     renderSummary();
                 });
         }
@@ -1145,7 +1300,8 @@
         function changed(dateChanged) {
             serverClash = false; serverClass = '';
             elMsg.hidden = true;
-            if (dateChanged) { refresh(); loadWeek(); } else refresh();
+            touched = true;
+            if (dateChanged) { weekData = null; refresh(); loadWeek(); } else refresh();
             clearTimeout(availTimer);
             availTimer = setTimeout(serverCheck, 450);
         }
@@ -1180,6 +1336,13 @@
             st.end = Math.min(SCHOOL_END_MIN, st.start + (+c.dataset.min));
             changed(false);
         });
+        $('fcty-open').addEventListener('click', function (e) {
+            var c = e.target.closest('.fcty-open-chip');
+            if (!c || c.tagName !== 'BUTTON') return;
+            st.start = +c.dataset.s;
+            st.end = Math.min(+c.dataset.e, st.start + 60);
+            changed(false);
+        });
         $('fcty-purpose-chips').addEventListener('click', function (e) {
             var c = e.target.closest('.fcty-chip');
             if (!c) return;
@@ -1200,6 +1363,7 @@
             if (!purpose) return fail('Add a purpose \u2014 pick one above or type your own.');
             if (st.end <= st.start) return fail('End time must be after the start time.');
             if (isClosedDay(parseYmd(st.date))) return fail('Reservations are not available on Sundays. Please choose another day.');
+            if (weekData && clashes().length) return fail('That time is already taken. Pick one of the open times.');
 
             btnSubmit.disabled = true;
             btnSubmit.textContent = 'Submitting\u2026';
@@ -1220,8 +1384,8 @@
             })
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
-                    btnSubmit.disabled = isFull();
                     btnSubmit.innerHTML = confirmHTML;
+                    syncSubmit();
                     if (data.error) {
                         fail(data.error);
                         if (data.limit_reached) loadQuota();   /* sync the chip + lock the button */
@@ -1241,8 +1405,8 @@
                     showDone(data);
                 })
                 .catch(function () {
-                    btnSubmit.disabled = isFull();
                     btnSubmit.innerHTML = confirmHTML;
+                    syncSubmit();
                     fail('Network error. Please try again.');
                 });
         });
@@ -1517,7 +1681,7 @@
             t.addEventListener('click', function () { setScheduleTab(this.dataset.scheduleTab); });
         });
         $('fcty-modal-daily-list').addEventListener('click', onDayToggle);
-        $('fcty-modal-weekly-grid').addEventListener('click', onDayToggle);
+        $('fcty-modal-weekly-grid').addEventListener('click', onTimetableClick);
         $('fcty-modal-reserve').addEventListener('click', function () {
             if (!currentRoom || this.disabled) return;
             openReservationForm(currentRoom.room);

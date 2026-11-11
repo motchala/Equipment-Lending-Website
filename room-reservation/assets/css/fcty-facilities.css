@@ -3233,3 +3233,337 @@ textarea.fcty-input {
 .fcty-tl-block.is-class {
     background: repeating-linear-gradient(45deg, rgba(255, 255, 255, .62) 0 3px, rgba(255, 255, 255, .28) 3px 6px);
 }
+
+/* ── This week: timetable (Mon-Sat x 7 AM-8 PM) ────────────────────────────────────────────
+   One block per class / reservation, positioned by JS from data-t (top %) and data-h (height %).
+   13 hourly rows of 44px. Empty space is open time. */
+.fcty-dialog.is-tt {
+    max-width: min(920px, 100%);
+}
+
+.fcty-tt {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.fcty-tt-scroll {
+    max-height: 460px;
+    overflow: auto;
+    border: 1px solid var(--fcty-line);
+    border-radius: 12px;
+    background: var(--fcty-card);
+}
+
+.fcty-tt-grid {
+    display: grid;
+    grid-template-columns: 52px repeat(6, minmax(104px, 1fr));
+    min-width: 680px;
+}
+
+.fcty-tt-corner,
+.fcty-tt-head {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    background: var(--fcty-soft);
+    border-bottom: 1px solid var(--fcty-line);
+}
+
+.fcty-tt-corner {
+    left: 0;
+    z-index: 5;
+}
+
+.fcty-tt-head {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    padding: 7px 4px;
+    border-left: 1px solid var(--fcty-line);
+    font-size: .75rem;
+    color: var(--fcty-muted);
+}
+
+.fcty-tt-head strong {
+    font-size: .8125rem;
+    color: var(--fcty-ink);
+}
+
+.fcty-tt-head.is-today {
+    background: color-mix(in srgb, var(--fcty-brand) 12%, var(--fcty-soft));
+}
+
+.fcty-tt-head.is-today strong {
+    color: var(--fcty-brand);
+}
+
+.fcty-tt-head.is-past {
+    opacity: .65;
+}
+
+.fcty-tt-hours,
+.fcty-tt-col {
+    position: relative;
+    height: 572px;
+}
+
+.fcty-tt-hours {
+    position: sticky;
+    left: 0;
+    z-index: 3;
+    background: var(--fcty-card);
+}
+
+.fcty-tt-hours span {
+    position: absolute;
+    left: 0;
+    right: 6px;
+    padding-top: 3px;
+    text-align: right;
+    font-size: .6875rem;
+    color: var(--fcty-muted);
+}
+
+.fcty-tt-col {
+    border-left: 1px solid var(--fcty-line);
+    background-image: linear-gradient(to bottom, color-mix(in srgb, var(--fcty-line) 75%, transparent) 1px, transparent 1px);
+    background-size: 100% calc(100% / 13);
+}
+
+.fcty-tt-col.is-today {
+    background-color: color-mix(in srgb, var(--fcty-brand) 5%, transparent);
+}
+
+.fcty-tt-block {
+    position: absolute;
+    left: 3px;
+    right: 3px;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-height: 22px;
+    padding: 4px 6px;
+    overflow: hidden;
+    border: 1px solid transparent;
+    border-left-width: 3px;
+    border-radius: 8px;
+    font: inherit;
+    font-size: .6875rem;
+    line-height: 1.25;
+    text-align: left;
+    color: var(--fcty-ink);
+    cursor: pointer;
+}
+
+.fcty-tt-block.is-class {
+    background: color-mix(in srgb, var(--fcty-class, #1f6f8b) 16%, var(--fcty-card));
+    border-color: var(--fcty-class, #1f6f8b);
+}
+
+.fcty-tt-block.is-res {
+    background: color-mix(in srgb, var(--fcty-brand) 14%, var(--fcty-card));
+    border-color: var(--fcty-brand);
+}
+
+.fcty-tt-block.is-ongoing {
+    box-shadow: 0 0 0 2px var(--fcty-booked);
+}
+
+.fcty-tt-block.is-past {
+    opacity: .55;
+}
+
+.fcty-tt-block.is-selected,
+.fcty-tt-block:focus-visible {
+    outline: 2px solid var(--fcty-ink);
+    outline-offset: 1px;
+    z-index: 2;
+}
+
+.fcty-tt-time {
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.fcty-tt-name {
+    font-weight: 600;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+}
+
+.fcty-tt-who {
+    color: var(--fcty-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.fcty-tt-block.is-short .fcty-tt-who {
+    display: none;
+}
+
+.fcty-tt-block.is-short .fcty-tt-name {
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+}
+
+.fcty-tt-now {
+    position: absolute;
+    left: 0;
+    right: 0;
+    z-index: 3;
+    height: 2px;
+    background: var(--fcty-booked);
+    pointer-events: none;
+}
+
+.fcty-tt-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    font-size: .75rem;
+    color: var(--fcty-muted);
+}
+
+.fcty-tt-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.fcty-tt-legend i {
+    width: 12px;
+    height: 12px;
+    border-radius: 4px;
+    border: 1px solid var(--fcty-line);
+}
+
+.fcty-tt-legend i.is-class {
+    background: color-mix(in srgb, var(--fcty-class, #1f6f8b) 30%, var(--fcty-card));
+    border-color: var(--fcty-class, #1f6f8b);
+}
+
+.fcty-tt-legend i.is-res {
+    background: color-mix(in srgb, var(--fcty-brand) 28%, var(--fcty-card));
+    border-color: var(--fcty-brand);
+}
+
+.fcty-tt-detail {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 8px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--fcty-soft);
+    font-size: .8125rem;
+    color: var(--fcty-muted);
+}
+
+.fcty-tt-detail strong {
+    color: var(--fcty-ink);
+}
+
+.fcty-tt-meta {
+    flex-basis: 100%;
+}
+
+.fcty-tt-tag {
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: .6875rem;
+    font-weight: 700;
+}
+
+.fcty-tt-tag.is-class {
+    background: color-mix(in srgb, var(--fcty-class, #1f6f8b) 16%, transparent);
+    color: var(--fcty-class, #1f6f8b);
+}
+
+.fcty-tt-tag.is-res {
+    background: color-mix(in srgb, var(--fcty-brand) 14%, transparent);
+    color: var(--fcty-brand);
+}
+
+/* ── Open times (Today list, and the booking form's side panel) ───────────────────────── */
+.fcty-open {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.fcty-open-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: .75rem;
+    font-weight: 700;
+    letter-spacing: .02em;
+    text-transform: uppercase;
+    color: var(--fcty-available);
+}
+
+.fcty-open-title .material-symbols-outlined {
+    font-size: 18px;
+}
+
+.fcty-open-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.fcty-open-chip {
+    padding: 4px 10px;
+    border: 1px solid color-mix(in srgb, var(--fcty-available) 45%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--fcty-available) 12%, transparent);
+    color: var(--fcty-available);
+    font: inherit;
+    font-size: .75rem;
+    font-weight: 600;
+}
+
+button.fcty-open-chip {
+    cursor: pointer;
+}
+
+.fcty-open-none {
+    margin: 0;
+    font-size: .8125rem;
+    color: var(--fcty-muted);
+}
+
+/* inside the booking form's maroon timeline panel */
+.fcty-open-form .fcty-open-title,
+.fcty-open-form .fcty-open-none {
+    color: rgba(255, 255, 255, .85);
+}
+
+.fcty-open-form .fcty-open-chip {
+    border-color: rgba(255, 255, 255, .35);
+    background: rgba(255, 255, 255, .12);
+    color: #fff;
+}
+
+.fcty-open-form .fcty-open-chip:hover,
+.fcty-open-form .fcty-open-chip:focus-visible {
+    background: rgba(255, 255, 255, .24);
+}
+
+.fcty-open-form .fcty-open-chip.is-on {
+    background: #fff;
+    border-color: #fff;
+    color: var(--fcty-brand);
+}
+
+.fcty-btn:disabled[title] {
+    cursor: not-allowed;
+}

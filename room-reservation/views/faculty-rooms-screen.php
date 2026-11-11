@@ -139,9 +139,9 @@
                 </span>
             </div>
 
-            <h4 class="fcty-sched-title" id="fcty-sched-title">Current reservations</h4>
+            <h4 class="fcty-sched-title" id="fcty-sched-title">Who is using this room</h4>
 
-            <div class="fcty-seg" role="tablist" aria-label="Current reservations">
+            <div class="fcty-seg" role="tablist" aria-label="Room schedule">
                 <button class="fcty-seg-btn active" type="button" data-schedule-tab="daily"
                     role="tab" aria-selected="true">Today</button>
                 <button class="fcty-seg-btn" type="button" data-schedule-tab="weekly"

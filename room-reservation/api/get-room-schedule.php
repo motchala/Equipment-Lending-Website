@@ -1,8 +1,9 @@
 <?php
 /**
  * room-reservation/api/get-room-schedule.php
- * Returns approved reservations for a given room, grouped by day of week,
- * in the format expected by fcty-facilities.js schedule rendering.
+ * Returns a room's week - its approved reservations AND its weekly classes (the imported
+ * Rooms Assigned list) - grouped by day of week, in the format expected by
+ * fcty-facilities.js schedule rendering (Today list, This week timetable, booking form).
  *
  * GET params:
  *   room_id     — int, required
@@ -16,7 +17,8 @@
  *   seating_capacity: int|null,
  *   status: string,
  *   week: {
- *     mon: [ { start: "HH:MM", end: "HH:MM", label: "Faculty Name — Purpose" }, ... ],
+ *     mon: [ { start: "HH:MM", end: "HH:MM", label: "Faculty Name — Purpose",
+ *              kind: "class"|"reservation", title: "...", who: "..." }, ... ],
  *     tue: [...], wed: [...], thu: [...], fri: [...], sat: [...], sun: [...]
  *   }
  * }
@@ -76,74 +78,15 @@ if (!$room_info) {
     exit();
 }
 
-// ── Fetch approved reservations for this room in the requested week ────────
-$res_stmt = $conn->prepare(
-    "SELECT reservation_date,
-            TIME_FORMAT(start_time, '%H:%i') AS start,
-            TIME_FORMAT(end_time,   '%H:%i') AS end,
-            faculty_name, submitted_by_name, purpose, submitted_as
-       FROM tbl_room_reservations
-      WHERE room_id = ?
-        AND reservation_date BETWEEN ? AND ?
-        AND status = 'Approved'
-      ORDER BY reservation_date ASC, start_time ASC"
-);
-$res_stmt->bind_param('iss', $room_id, $week_monday, $week_sunday);
-$res_stmt->execute();
-$res_result = $res_stmt->get_result();
-
-// Map PHP date('D') → JS day key
-$day_map = [
-    'Mon' => 'mon', 'Tue' => 'tue', 'Wed' => 'wed',
-    'Thu' => 'thu', 'Fri' => 'fri', 'Sat' => 'sat', 'Sun' => 'sun',
-];
-
-$week = ['mon'=>[],'tue'=>[],'wed'=>[],'thu'=>[],'fri'=>[],'sat'=>[],'sun'=>[]];
-
-while ($row = $res_result->fetch_assoc()) {
-    $day_abbr = date('D', strtotime($row['reservation_date']));
-    $day_key  = $day_map[$day_abbr] ?? null;
-    if (!$day_key) continue;
-
-    // Label: show faculty name and purpose (student reservations show student via faculty)
-    if ($row['submitted_as'] === 'student' && !empty($row['submitted_by_name'])) {
-        $label = htmlspecialchars($row['submitted_by_name'])
-               . ' (via ' . htmlspecialchars($row['faculty_name']) . ')'
-               . ' &mdash; ' . htmlspecialchars($row['purpose']);
-    } else {
-        $label = htmlspecialchars($row['faculty_name'])
-               . ' &mdash; ' . htmlspecialchars($row['purpose']);
-    }
-
-    $week[$day_key][] = [
-        'start' => $row['start'],
-        'end'   => $row['end'],
-        'label' => $label,
-    ];
-}
-$res_stmt->close();
-
-// Weekly class meetings (imported timetable) occupy the room on the same weekday every week
+// ── The room's week: approved reservations + the weekly classes (Rooms Assigned import) ──
+// Both block the room, so both are listed (see core/room-week.php). Entries carry
+// kind: 'class' | 'reservation', plus title / who as plain text for the timetable.
 try {
-    require_once __DIR__ . '/../core/class-schedule.php';
-    $class_day_keys = [1 => 'mon', 2 => 'tue', 3 => 'wed', 4 => 'thu', 5 => 'fri', 6 => 'sat'];
-    foreach (cs_room_week_rows($conn, $room_id) as $c) {
-        $k = $class_day_keys[(int)$c['day_of_week']] ?? null;
-        if ($k === null) continue;
-        $who = trim((string)($c['faculty_name'] ?? ''));
-        $week[$k][] = [
-            'start' => $c['start_hm'],
-            'end'   => $c['end_hm'],
-            'label' => htmlspecialchars(cs_class_label($c)) . ' &mdash; ' . ($who !== '' ? htmlspecialchars($who) : 'no instructor yet'),
-            'kind'  => 'class',
-        ];
-    }
-    foreach ($week as &$day_list) {
-        usort($day_list, static function (array $a, array $b): int { return strcmp($a['start'], $b['start']); });
-    }
-    unset($day_list);
+    require_once __DIR__ . '/../core/room-week.php';
+    $week = rw_week($conn, $room_id, $week_monday, 'faculty');
 } catch (Throwable $e) {
-    error_log('get-room-schedule.php: class meetings failed - ' . $e->getMessage());
+    error_log('get-room-schedule.php: week failed - ' . $e->getMessage());
+    $week = ['mon'=>[],'tue'=>[],'wed'=>[],'thu'=>[],'fri'=>[],'sat'=>[],'sun'=>[]];
 }
 
 echo json_encode([
