@@ -5,9 +5,12 @@ declare(strict_types=1);
  *
  * The one endpoint behind the faculty Equipment tab's borrow flow (pick one or many items,
  * then fill in the Borrow modal). Checks each item against BookingSchedule (time window,
- * availability, room conflicts) and files it as 'Waiting'. Same-day requests are then decided
- * by the auto-approve tick; later-date requests wait for an admin.
- * Returns JSON — no page redirect, enabling live UI updates.
+ * availability, room conflicts), files each one as 'Waiting', then decides them right away with the
+ * same rules as every other way of borrowing (core/request-decision.php):
+ *   - same day   : decided on the spot. Items approved together share ONE Claim QR.
+ *   - later date : waits for an admin; declined automatically at 12:01 AM on the borrow date if
+ *                  nobody decides.
+ * Returns JSON - no page redirect, enabling live UI updates.
  *
  * Accepts either:
  *   - application/json                      (no request letter), or
@@ -25,7 +28,8 @@ declare(strict_types=1);
  *   collector_type "faculty" | "student", collector_name string (student only)
  *
  * Returns:
- *   { ok: true,  submitted: [{name, request_id, status}], failed: [{name, error}] }
+ *   { ok: true,  submitted: [{name, request_id, status, reason}], failed: [{name, error}] }
+ *                status is the real outcome: Approved | Waiting | Declined
  *   { ok: false, error: string }
  *
  * Depth 2 → config prefix: __DIR__ . '/../../config/…'
@@ -230,9 +234,35 @@ foreach ($raw_items as $raw) {
         }
     }
 
-    // Request stays Waiting — admin/super admin reviews and approves.
-    $submitted[] = ['name' => $name, 'request_id' => $request_id, 'status' => 'Waiting'];
+    $submitted[] = ['name' => $name, 'request_id' => $request_id, 'status' => 'Waiting', 'reason' => ''];
 }
+
+// ── Decide every item of the cart now (same rules as every other way of submitting) ──────
+//   same day   -> Approved (items of one cart share ONE Claim QR) or Declined, on the spot
+//   later date -> Waiting for an admin; declined automatically at 12:01 AM on the borrow date
+//                if nobody decides
+require_once __DIR__ . '/../core/request-decision.php';
+$decisions = equipment_decide_on_submit($conn, array_column($submitted, 'request_id'));
+foreach ($submitted as &$s) {
+    $d = $decisions[(int)$s['request_id']] ?? null;
+    if ($d) {
+        $s['status'] = $d['status'];
+        $s['reason'] = $d['reason'];
+    }
+}
+unset($s);
+
+// An item declined at the moment of submitting is not saved (existing rule): report it as "could not be
+// filed" with the reason, so the Borrow modal keeps it selected and shows why, exactly like a failed check.
+$filed = [];
+foreach ($submitted as $s) {
+    if ($s['status'] === 'Declined') {
+        $failed[] = ['name' => $s['name'], 'error' => $s['reason'] !== '' ? $s['reason'] : 'This request could not be accepted.'];
+    } else {
+        $filed[] = $s;
+    }
+}
+$submitted = $filed;
 
 // Nothing was filed: do not leave an orphaned letter file behind.
 if ($letter_path !== null && !$submitted) {

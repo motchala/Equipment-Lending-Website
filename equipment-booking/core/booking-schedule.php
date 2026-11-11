@@ -126,38 +126,117 @@ final class BookingSchedule
     // Housekeeping (runs on dashboard loads / polls)
     // ═════════════════════════════════════════════════════════════════════════
 
-    /** Time-aware overdue marking + start-of-booking stock activation. */
+    /**
+     * Housekeeping on every dashboard load / poll:
+     *   - a loan that is OUT (On Loan) and past its return moment becomes Overdue;
+     *   - an Approved booking nobody collected, whose borrow period is over, ends as a no-show;
+     *   - Approved bookings that start now take their units off the shelf.
+     */
     public static function tick(mysqli $conn): void
     {
         $ready = self::ensureSchema($conn);
-        $today = date('Y-m-d');
-        $now   = date('H:i:s');
 
         try {
+            self::markOverdue($conn, $ready);
+            self::expireNoShows($conn, $ready);
             if ($ready) {
-                $stmt = $conn->prepare(
-                    "UPDATE tbl_requests SET status = 'Overdue'
-                      WHERE status = 'Approved'
-                        AND (return_date < ?
-                             OR (return_date = ? AND return_time IS NOT NULL AND return_time < ?))"
-                );
-                if ($stmt) {
-                    $stmt->bind_param('sss', $today, $today, $now);
-                    $stmt->execute();
-                    $stmt->close();
-                }
                 self::activateDue($conn);
-            } else {
-                $stmt = $conn->prepare("UPDATE tbl_requests SET status = 'Overdue' WHERE status = 'Approved' AND return_date < ?");
-                if ($stmt) {
-                    $stmt->bind_param('s', $today);
-                    $stmt->execute();
-                    $stmt->close();
-                }
             }
         } catch (\Throwable $e) {
-            error_log('BookingSchedule::tick — ' . $e->getMessage());
+            error_log('BookingSchedule::tick - ' . $e->getMessage());
         }
+    }
+
+    /**
+     * SQL condition (no leading AND) that is true when the return moment has passed.
+     * Time-aware when the booking columns exist: the return time on the return date, or the end of
+     * that day when no time was set. Always three string parameters: today, today, now.
+     */
+    private static function pastReturnSql(bool $ready): string
+    {
+        return $ready
+            ? '(return_date < ? OR (return_date = ? AND return_time IS NOT NULL AND return_time < ?))'
+            : '(return_date < ? AND ? = ? )';
+    }
+
+    /**
+     * Only a loan that is physically OUT (status On Loan: the admin scanned the Claim QR) can be
+     * overdue. Before the On Loan status existed this flagged Approved rows instead, which meant an
+     * item nobody collected showed as overdue while a real unreturned loan never did.
+     */
+    public static function markOverdue(mysqli $conn, ?bool $ready = null): void
+    {
+        $ready = $ready ?? self::ensureSchema($conn);
+        $today = date('Y-m-d');
+        $now   = date('H:i:s');
+        $stmt  = $conn->prepare("UPDATE tbl_requests SET status = 'Overdue' WHERE status = 'On Loan' AND " . self::pastReturnSql($ready));
+        if ($stmt) {
+            // Without the booking columns only the date can be compared; the 2nd/3rd values are equal so the clause reduces to "return_date < today"
+            $a = $today; $b = $ready ? $today : 'x'; $c = $ready ? $now : 'x';
+            $stmt->bind_param('sss', $a, $b, $c);
+            $stmt->execute();
+            $stmt->close();
+        }
+    }
+
+    /**
+     * An Approved booking that was never collected and whose borrow period is now over is a
+     * no-show: it is Cancelled with that reason (not "Overdue": nothing is out), and any units it
+     * had taken off the shelf go back.
+     *
+     * @return int how many bookings were closed by this call
+     */
+    public static function expireNoShows(mysqli $conn, ?bool $ready = null): int
+    {
+        $ready  = $ready ?? self::ensureSchema($conn);
+        $today  = date('Y-m-d');
+        $now    = date('H:i:s');
+        $reason = 'Not collected – the borrow period ended before it was picked up.';
+        $rule   = 'rule_no_show';
+        $closed = 0;
+
+        $sel = $conn->prepare(
+            "SELECT id, equipment_name, borrow_qty, stock_applied FROM tbl_requests
+              WHERE status = 'Approved' AND " . self::pastReturnSql($ready)
+        );
+        if (!$sel) {
+            return 0;
+        }
+        $a = $today; $b = $ready ? $today : 'x'; $c = $ready ? $now : 'x';
+        $sel->bind_param('sss', $a, $b, $c);
+        $sel->execute();
+        $rows = $sel->get_result()->fetch_all(MYSQLI_ASSOC);
+        $sel->close();
+
+        foreach ($rows as $row) {
+            $id  = (int)$row['id'];
+            $upd = $conn->prepare(
+                "UPDATE tbl_requests SET status = 'Cancelled', arbitration_rule = ?, reason = ?, stock_applied = 0
+                  WHERE id = ? AND status = 'Approved'"
+            );
+            if (!$upd) {
+                continue;
+            }
+            $upd->bind_param('ssi', $rule, $reason, $id);
+            $upd->execute();
+            $won = $upd->affected_rows === 1;
+            $upd->close();
+            if (!$won) {
+                continue;   // collected or cancelled a moment ago
+            }
+            $closed++;
+            if ((int)($row['stock_applied'] ?? 0) === 1) {
+                $back = $conn->prepare('UPDATE tbl_inventory SET quantity = quantity + ? WHERE item_name = ?');
+                if ($back) {
+                    $q    = max(1, (int)$row['borrow_qty']);
+                    $name = (string)$row['equipment_name'];
+                    $back->bind_param('is', $q, $name);
+                    $back->execute();
+                    $back->close();
+                }
+            }
+        }
+        return $closed;
     }
 
     /**
@@ -466,7 +545,7 @@ final class BookingSchedule
                       FROM tbl_inventory i
                       LEFT JOIN (SELECT equipment_name, SUM(borrow_qty) AS out_qty
                                    FROM tbl_requests
-                                  WHERE status IN ('Approved','Overdue') AND stock_applied = 1
+                                  WHERE status IN ('Approved','On Loan','Overdue') AND stock_applied = 1
                                   GROUP BY equipment_name) x ON x.equipment_name = i.item_name
                      WHERE i.is_archived = 0";
         } else {
@@ -474,7 +553,7 @@ final class BookingSchedule
                       FROM tbl_inventory i
                       LEFT JOIN (SELECT equipment_name, COUNT(*) AS out_qty
                                    FROM tbl_requests
-                                  WHERE status IN ('Approved','Overdue')
+                                  WHERE status IN ('Approved','On Loan','Overdue')
                                   GROUP BY equipment_name) x ON x.equipment_name = i.item_name
                      WHERE i.is_archived = 0";
         }
@@ -500,7 +579,7 @@ final class BookingSchedule
                FROM tbl_requests
               WHERE equipment_name = ? AND id <> ?
                 AND (
-                      (status = 'Approved'
+                      (status IN ('Approved','On Loan')
                         AND TIMESTAMP(borrow_date, COALESCE(borrow_time, '00:00:00')) < ?
                         AND TIMESTAMP(return_date, COALESCE(return_time, '23:59:59')) > ?)
                    OR (status = 'Overdue' AND ? < ?)

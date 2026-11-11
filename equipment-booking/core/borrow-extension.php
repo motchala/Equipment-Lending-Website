@@ -9,7 +9,8 @@ declare(strict_types=1);
  *
  * WHO CAN EXTEND
  *   The faculty member who holds the loan, once its return moment has been reached:
- *   status Overdue, or Approved with the return moment already behind us.
+ *   status On Loan (collected) with the return moment behind us, or Overdue. An Approved booking
+ *   that was never collected cannot be extended: nothing is out, and it ends as a no-show.
  *   (return moment = return_date + return_time, end of that day when no time was set.)
  *
  * HOW LONG
@@ -206,7 +207,7 @@ final class BorrowExtension
         if ($status === 'Overdue') {
             return true;
         }
-        return $status === 'Approved' && self::dueAt($row) <= $now;
+        return $status === 'On Loan' && self::dueAt($row) <= $now;
     }
 
     /**
@@ -326,7 +327,8 @@ final class BorrowExtension
     private static function notDueMessage(array $row): string
     {
         return match ((string)$row['status']) {
-            'Approved' => 'You can extend this item once its return time has arrived.',
+            'On Loan'  => 'You can extend this item once its return time has arrived.',
+            'Approved' => 'This item has not been collected yet, so there is nothing to extend.',
             'Returned' => 'This item has already been returned.',
             default    => 'This item is not currently on loan, so it cannot be extended.',
         };
@@ -462,11 +464,11 @@ final class BorrowExtension
 
             $upd = $conn->prepare(
                 "UPDATE tbl_requests
-                    SET return_date = ?, return_time = ?, status = 'Approved',
+                    SET return_date = ?, return_time = ?, status = 'On Loan',
                         extension_count = extension_count + 1, reason = ?,
                         original_return_date = ?, original_return_time = ?,
                         extension_late_seconds = extension_late_seconds + ?
-                  WHERE id = ? AND faculty_id = ? AND status IN ('Overdue','Approved')"
+                  WHERE id = ? AND faculty_id = ? AND status IN ('Overdue','On Loan')"
             );
             if (!$upd) {
                 throw new \RuntimeException('prepare update failed: ' . $conn->error);

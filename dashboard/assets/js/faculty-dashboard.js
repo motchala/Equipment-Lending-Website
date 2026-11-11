@@ -3986,7 +3986,7 @@
 
         // Fire toast exactly once when we detect the transition active → used
         if (isUsed && window._fccLastUsed === false) {
-            showToast('✅ Code used by ' + _fccEsc(data.used_by_name) + '. A borrow request was auto-approved.', 'success');
+            showToast('✅ Code used by ' + _fccEsc(data.used_by_name) + '. Their borrow request was submitted.', 'success');
         }
         window._fccLastUsed = isUsed;
 

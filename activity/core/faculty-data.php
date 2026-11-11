@@ -50,10 +50,6 @@ require_once __DIR__ . '/../../equipment-booking/core/borrow-extension.php';
 require_once __DIR__ . '/../../equipment-booking/core/borrow-cancellation.php';
 require_once __DIR__ . '/../../room-reservation/core/room-quota.php';
 
-if (!defined('FACT_EQ_REASON_EXPIRED')) {
-    define('FACT_EQ_REASON_EXPIRED', 'Request expired – borrow date has already passed');
-}
-
 /** Same icon fallback the Home tab uses when an item has no catalogue photo. */
 if (!function_exists('actEquipIcon')) {
     function actEquipIcon(string $name): string
@@ -74,24 +70,18 @@ if (!function_exists('actEquipIcon')) {
 }
 
 /**
- * Housekeeping that has to run before the numbers are read: expired requests are
- * declined and overdue / start-of-booking states are brought up to date. The dashboard
+ * Housekeeping that has to run before the numbers are read: undecided requests past
+ * their deadline are declined and overdue / start-of-booking states are brought up to date. The dashboard
  * runs it on every page load; the live refresh runs it so a state change shows up
  * without reloading the page.
  */
 function fact_eq_housekeeping(mysqli $conn): void
 {
-    $today  = date('Y-m-d');
-    $reason = FACT_EQ_REASON_EXPIRED;
-    $stmt   = $conn->prepare("UPDATE tbl_requests SET status='Declined', reason=? WHERE status='Waiting' AND borrow_date < ?");
-    if ($stmt) {
-        $stmt->bind_param('ss', $reason, $today);
-        $stmt->execute();
-        $stmt->close();
-    }
-    BookingSchedule::tick($conn);
+    // Undecided requests past their deadline are declined; missed same-day requests are decided
     require_once __DIR__ . '/../../equipment-booking/core/auto-approve-tick.php';
     equipment_auto_approve_tick($conn);
+    // On Loan past the return time -> Overdue; uncollected bookings -> no-show; start-of-booking stock
+    BookingSchedule::tick($conn);
 }
 
 /** Catalogue photo per item name (tbl_requests only stores the name as text). */
@@ -779,7 +769,7 @@ function fact_eq_todo(array $d): array
         $late    = max(array_map(static fn(array $r): int => $nowTs - fact_i($r, 'due_ts'), $rows));
         $canExt  = (bool)array_filter($rows, static fn(array $r): bool => !empty($r['can_extend']));
         $atLimit = !$canExt && (bool)array_filter($rows, static fn(array $r): bool => !empty($r['extend_limit']));
-        $text    = [fact_eq_late_label($late), 'New borrowing is blocked until it is returned'];
+        $text    = [fact_eq_late_label($late), 'Still out · return it to the admin'];
         if ($canExt) {
             $text[] = 'You can also ask for more time';
         } elseif ($atLimit) {
@@ -843,10 +833,16 @@ function fact_eq_todo(array $d): array
         usort($groups, static fn(array $a, array $b): int => fact_i($a[0], 'start_ts') <=> fact_i($b[0], 'start_ts'));
         $n      = count($groups);
         $firstR = $groups[0][0];
+        // Real rule (core/request-decision.php): a later-date request waits for an admin and is declined
+        // automatically at 12:01 AM on its borrow date if nobody decides.
+        $startD = DateTimeImmutable::createFromFormat('Y-m-d', fact_s($firstR, 'start_date'), $tz);
+        $by     = $startD !== false && fact_s($firstR, 'start_date') > $today
+            ? 'before ' . fact_day_label($now, $startD, false)
+            : 'before it starts';
         $out[]  = fact_todo_item(
             'equipment', 4, 'wait', 'hourglass_top',
             $n === 1 ? $names($groups[0]) . ' is waiting for review' : $n . ' equipment requests are waiting for review',
-            'An admin will approve or decline ' . ($n === 1 ? 'it' : 'them') . ' · You can cancel ' . ($n === 1 ? 'it' : 'them') . ' until ' . ($n === 1 ? 'it starts' : 'they start'),
+            'An admin has to decide ' . $by . ', otherwise ' . ($n === 1 ? 'it is' : 'they are') . ' declined automatically · You can cancel ' . ($n === 1 ? 'it' : 'them') . ' until ' . ($n === 1 ? 'it starts' : 'they start'),
             'eq:' . fact_i($firstR, 'id'),
             fact_i($firstR, 'start_ts')
         );

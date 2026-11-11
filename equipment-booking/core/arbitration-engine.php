@@ -50,6 +50,7 @@ class ArbitrationEngine
     public const RULE_OVERRIDE         = 'override';
     public const RULE_ERROR            = 'arbitration_error';
     public const RULE_SCHEDULE_CONFLICT = 'rule_schedule_conflict';
+    public const RULE_NO_SHOW           = 'rule_no_show';
 
     // ── Public entry point ───────────────────────────────────────────────────
 
@@ -434,6 +435,46 @@ class ArbitrationEngine
     // ── Private helper methods (stubs) ───────────────────────────────────────
 
     /**
+     * The checks that apply to EVERY equipment borrow request, whichever way it was submitted
+     * (single item, cart, student with a faculty code, item code) and whether it is for today or a
+     * later date. request-decision.php runs this first so the rules are identical everywhere.
+     *
+     *   - overdue block      (only when rule_overdue_block_enabled = 1)
+     *   - duplicate block    (only when rule_duplicate_block_enabled = 1)
+     *   - archived item      always: an archived item cannot be borrowed
+     *
+     * @return array{rule:string, reason:string}|null  null = nothing blocks it
+     */
+    public static function preflight(mysqli $conn, int $request_id): ?array
+    {
+        $config  = self::loadConfig($conn);
+        $request = self::fetchRequest($conn, $request_id);
+        if ($request === null) {
+            return null;
+        }
+        $faculty_id     = (string)$request['faculty_id'];
+        $equipment_name = (string)$request['equipment_name'];
+
+        if (($config['rule_overdue_block_enabled'] ?? '0') === '1' && self::checkOverdueBlock($conn, $faculty_id)) {
+            return ['rule' => self::RULE_OVERDUE_BLOCK, 'reason' => 'You have an overdue item. Please return it before borrowing again.'];
+        }
+        if (($config['rule_duplicate_block_enabled'] ?? '0') === '1'
+            && self::checkDuplicateBlock($conn, $faculty_id, $equipment_name, $request_id)) {
+            return ['rule' => self::RULE_DUPLICATE_BLOCK, 'reason' => 'You already have an active request for this equipment.'];
+        }
+        if (isset($request['is_archived']) && (int)$request['is_archived'] === 1) {
+            return ['rule' => self::RULE_ARCHIVED, 'reason' => 'This item is no longer available for borrowing.'];
+        }
+        return null;
+    }
+
+    /** Write a decision (status + rule + reason + arbitration log row) for a request. */
+    public static function record(mysqli $conn, int $request_id, string $status, string $rule, string $reason): void
+    {
+        self::writeDecision($conn, $request_id, $status, $rule, $reason);
+    }
+
+    /**
      * Read all rows from tbl_arbitration_config into a key→value map.
      *
      * @param  mysqli $conn Active DB connection
@@ -548,7 +589,7 @@ class ArbitrationEngine
             "SELECT 1 FROM tbl_requests
                 WHERE faculty_id = ?
                     AND equipment_name = ?
-                    AND status IN ('Approved', 'Waiting')
+                    AND status IN ('Approved', 'On Loan', 'Waiting')
                     AND id != ?
                 LIMIT 1"
         );

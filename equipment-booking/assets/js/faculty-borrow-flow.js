@@ -762,7 +762,13 @@
                 /* items the server accepted leave the selection, so a retry never files them twice */
                 done.forEach(function (d) { removeItem(d.name, true); });
                 if (!failed.length) {
-                    toast(done.length === 1 ? 'Borrow request submitted.' : done.length + ' borrow requests submitted.');
+                    /* say what actually happened: a same-day request is decided on the spot, a later-date one waits for an admin */
+                    var nApproved = done.filter(function (d) { return d.status === 'Approved'; }).length;
+                    var nWaiting = done.length - nApproved;
+                    var parts = [];
+                    if (nApproved) parts.push(nApproved + (nApproved === 1 ? ' request' : ' requests') + ' approved \u2013 show your Claim QR to the admin');
+                    if (nWaiting) parts.push(nWaiting + ' waiting for admin review');
+                    toast(parts.join(' \u00b7 ') || 'Borrow request submitted.');
                     resetForm();
                     closeModal();
                 } else {

@@ -100,7 +100,8 @@ function bm_fail(string $msg): void
 // ── Auto-decline expired & mark overdue ───────────────────────────────────
 // One shared routine (activity/core/faculty-data.php) so this page and the
 // My Activity live refresh apply exactly the same rules:
-//   - a Waiting request whose borrow date has passed is declined ("Request expired")
-//   - overdue marking is time-aware (hourly bookings) and Later bookings take their stock when they start
+//   - a Waiting request nobody decided is declined at 12:01 AM on its borrow date
+//   - an On Loan item past its return time becomes Overdue; an Approved booking nobody collected
+//     is closed as a no-show; Later bookings take their stock when they start
 $today = date('Y-m-d');
 fact_eq_housekeeping($conn);

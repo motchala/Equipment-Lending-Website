@@ -788,8 +788,8 @@ function fact_room_stats(array $d): array
  *   1  Overdue equipment        return it (borrowing is blocked until then); extend if allowed
  *   2  Loan due back today      return it with the Return QR
  *   3  Approved equipment       collect it with the Claim QR (started, or starting within a day)
- *   4  Waiting for a decision   equipment (admin approves / declines) and room requests
- *                               (an admin must decide before 12:01 AM on the date, else auto-declined)
+ *   4  Waiting for a decision   later-date equipment AND room requests: an admin must decide before
+ *                               12:01 AM on the date, otherwise it is declined automatically
  *   5  Good to know             a room in use now, waitlist entries, declined slots you can still waitlist
  * The equipment half is built in activity/core/faculty-data.php (fact_eq_todo), the room half below
  * (fact_room_todo). Both feed the same list: first paint in activity/views/faculty-screen.php, live

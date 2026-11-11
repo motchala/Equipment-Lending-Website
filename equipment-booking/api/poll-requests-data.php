@@ -18,25 +18,17 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../../config/db.php';
 $conn = getDB();
 
-// ── Auto-approve buffer time tick ──────────────────────────────────────────
+// ── Deadline tick: decide missed same-day requests, decline undecided ones past their deadline ──────────────────────────────────────────
 require_once __DIR__ . '/../core/auto-approve-tick.php';
 equipment_auto_approve_tick($conn);
 
 $today = date('Y-m-d');
 
-// ── Auto-decline expired waiting requests ──────────────────────────────────
-$conn->prepare("
-    UPDATE tbl_requests
-    SET status = 'Declined', reason = 'Request expired – borrow date has already passed'
-    WHERE status = 'Waiting' AND borrow_date < ?
-")->bind_param('s', $today) && true; // silent
-
-// ── Auto-mark overdue ──────────────────────────────────────────────────────
-$conn->query("
-    UPDATE tbl_requests
-    SET status = 'Overdue'
-    WHERE status = 'Approved' AND return_date < '$today'
-");
+// -- Status housekeeping (one shared routine, see core/request-decision.php) ----
+// The tick above already declined undecided requests past their deadline (12:01 AM on the
+// borrow date). This marks loans that are out and past their return time as Overdue, closes
+// bookings nobody collected, and applies stock for bookings that have started.
+BookingSchedule::tick($conn);
 
 // ── Stats ──────────────────────────────────────────────────────────────────
 $stats = [];
