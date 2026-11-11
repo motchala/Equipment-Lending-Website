@@ -16,6 +16,7 @@
         <button class="rq-sub-tab" data-sett-panel="sett-prefs">Preferences</button>
         <?php if ($is_super_admin): ?>
             <button class="rq-sub-tab" data-sett-panel="sett-equipment">Equipment</button>
+            <button class="rq-sub-tab" data-sett-panel="sett-arbitration">Arbitration</button>
         <?php endif; ?>
         <button class="rq-sub-tab" data-sett-panel="sett-help">Help &amp; FAQ</button>
     </div>
@@ -397,6 +398,8 @@
                 </div>
             </div>
         </div><!-- /sett-equipment -->
+
+        <?php require __DIR__ . '/admin-arbitration-panel.php'; /* Arbitration rules (Super Admin only, UI only) */ ?>
 
     <?php endif; ?>
 

@@ -18,6 +18,7 @@
     <!-- Mobile/tablet adaptations; must load after admin-dashboard.css -->
     <link rel="stylesheet" href="dashboard/assets/css/admin-dashboard-responsive.css?v=<?php echo @filemtime('dashboard/assets/css/admin-dashboard-responsive.css'); ?>">
     <link rel="stylesheet" href="settings/assets/css/admin-imports.css?v=<?php echo @filemtime('settings/assets/css/admin-imports.css'); ?>">
+    <link rel="stylesheet" href="settings/assets/css/admin-arbitration.css?v=<?php echo @filemtime('settings/assets/css/admin-arbitration.css'); ?>">
     <!-- Shared logout confirmation dialog + loading state -->
     <link rel="stylesheet" href="shared/assets/css/logout-modal.css?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/css/logout-modal.css'); ?>">
     <?php role_splash_head(); ?>

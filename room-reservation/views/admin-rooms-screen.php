@@ -170,12 +170,13 @@
                         <button type="button" class="pr-sub-tab" data-rooms-tab="rooms-reservations">
                             <span class="material-symbols-outlined rm-tab-ico" aria-hidden="true">event_available</span> Reservations
                             <?php
-                            $rm_resv_approved = count(array_filter($admin_room_reservations ?? [], function ($r) {
-                                return ($r['status'] ?? '') === 'Approved';
+                            // The badge is the review queue: reservations waiting for an admin decision.
+                            // (It used to count every Approved reservation ever made, which only ever grew.)
+                            $rm_resv_pending = count(array_filter($admin_room_reservations ?? [], function ($r) {
+                                return ($r['status'] ?? '') === 'Waiting';
                             }));
-                            if ($rm_resv_approved > 0): ?>
-                                <span class="pr-tab-badge" style="background:var(--text-light);"><?php echo $rm_resv_approved; ?></span>
-                            <?php endif; ?>
+                            ?>
+                            <span class="pr-tab-badge" id="rrNavBadge" title="Reservations waiting for review"<?php echo $rm_resv_pending > 0 ? '' : ' hidden'; ?>><?php echo $rm_resv_pending; ?></span>
                         </button>
                     </div>
                     <!-- Archived tab — pushed to the right by the flex space-between on .rm-tabbar -->
@@ -290,6 +291,7 @@
 
                 <!-- RESERVATIONS -->
                 <div class="rooms-sub-panel" id="rooms-reservations-panel">
+                    <link rel="stylesheet" href="room-reservation/assets/css/admin-rooms-reservations.css?v=<?php echo @filemtime(PS_ROOT . '/room-reservation/assets/css/admin-rooms-reservations.css'); ?>">
                     <?php
                     // Table rows start in "most recent request first" order (the sort dropdown re-orders them live).
                     $rr_rows = $admin_room_reservations ?? [];
@@ -298,8 +300,11 @@
                         $tb = !empty($b['request_date']) ? (int)strtotime($b['request_date']) : 0;
                         return ($tb <=> $ta) ?: ((int)$b['id'] <=> (int)$a['id']);
                     });
-                    // Waiting = reservations for a later date. Any admin decides them; a request letter, when one
-                    // was attached, opens from the row's details.
+                    // Every reservation sits in exactly ONE tab, following its life:
+                    //   Pending (Waiting, later date)  ->  Upcoming  ->  In use now  ->  Completed
+                    //   ...or it ends early as Cancelled / Declined.
+                    // The tab (phase) is worked out in admin-rooms-reservations-table.js from the status plus the
+                    // Manila clock, so a reservation moves between tabs by itself as time passes.
                     ?>
 
                     <?php if (!empty($rooms_expired_count) && $rooms_expired_count > 0): ?>
@@ -329,18 +334,23 @@
                             </div>
                         </div>
                         <div class="rr-status-bar">
-                            <div class="rr-tabs" id="rrTabs" role="group" aria-label="Filter reservations by status">
-                                <button type="button" class="rm-chip rr-tab" data-rr-tab="all" aria-pressed="true">
+                            <div class="rr-tabs" id="rrTabs" role="group" aria-label="Filter reservations by stage">
+                                <button type="button" class="rm-chip rr-tab" data-rr-tab="all" aria-pressed="false">
                                     All <span class="rr-tab-count"></span>
                                 </button>
-                                <button type="button" class="rm-chip rr-tab rr-active-chip" data-rr-tab="active" aria-pressed="false">
-                                    <span class="material-symbols-outlined" aria-hidden="true">schedule</span> Active <span class="rr-tab-count"></span>
-                                </button>
+                                <span class="rr-tab-sep" aria-hidden="true"></span>
                                 <button type="button" class="rm-chip rr-tab" data-rr-tab="Waiting" aria-pressed="false">
-                                    Waiting <span class="rr-tab-count"></span>
+                                    Pending <span class="rr-tab-count"></span>
                                 </button>
-                                <button type="button" class="rm-chip rr-tab" data-rr-tab="Approved" aria-pressed="false">
-                                    Approved <span class="rr-tab-count"></span>
+                                <button type="button" class="rm-chip rr-tab" data-rr-tab="upcoming" aria-pressed="false">
+                                    Upcoming <span class="rr-tab-count"></span>
+                                </button>
+                                <button type="button" class="rm-chip rr-tab rr-active-chip" data-rr-tab="active" aria-pressed="false">
+                                    In use now <span class="rr-tab-count"></span>
+                                </button>
+                                <span class="rr-tab-sep" aria-hidden="true"></span>
+                                <button type="button" class="rm-chip rr-tab" data-rr-tab="completed" aria-pressed="false">
+                                    Completed <span class="rr-tab-count"></span>
                                 </button>
                                 <button type="button" class="rm-chip rr-tab" data-rr-tab="Cancelled" aria-pressed="false">
                                     Cancelled <span class="rr-tab-count"></span>
@@ -361,6 +371,7 @@
                                 </button>
                             </div>
                         </div>
+                        <p class="rr-hint" id="rrHint" aria-live="polite"></p>
                         <div class="pr-tbl-wrap">
                             <table class="pr-table rm-table" id="rrTable">
                                 <thead>
@@ -378,9 +389,11 @@
                                             <td colspan="5" class="rm-empty-cell">No reservations yet.</td>
                                         </tr>
                                         <?php else: foreach ($rr_rows as $ar):
+                                            // First-paint badge. The table script re-draws the whole Status cell from the
+                                            // row's data-* attributes, so this only matters for the instant before it runs.
                                             $ar_badge = 'ps-badge--active';
                                             if ($ar['status'] === 'Declined')  $ar_badge = 'ps-badge--overdue';
-                                            if ($ar['status'] === 'Cancelled') $ar_badge = 'ps-badge--returned';
+                                            if ($ar['status'] === 'Cancelled') $ar_badge = 'ps-badge--cancelled';
                                             if ($ar['status'] === 'Waiting')   $ar_badge = 'ps-badge--waiting';
                                             // Every Waiting row is the admin's to decide.
                                             $ar_reviewable = $ar['status'] === 'Waiting';
@@ -395,6 +408,21 @@
                                             // Cancellable: Approved AND the reservation end hasn't passed yet
                                             $ar_end_ts  = !empty($ar['end_time']) ? strtotime($ar['reservation_date'] . ' ' . $ar['end_time']) : 0;
                                             $ar_cancellable = $ar['status'] === 'Approved' && $ar_end_ts > time();
+
+                                            // Cancelled rows keep the OLD approval text in `reason` (cancelling never writes one),
+                                            // so it is not offered as if it were a cancellation reason.
+                                            $ar_is_cancelled   = $ar['status'] === 'Cancelled';
+                                            $ar_reason_out     = $ar_is_cancelled ? '' : (string)($ar['reason'] ?? '');
+                                            $ar_arb_reason_out = $ar_is_cancelled ? '' : (string)($ar['arb_reason'] ?? '');
+                                            $ar_cancel_by      = $ar_is_cancelled ? (!empty($ar['cancelled_by_requester']) ? 'requester' : 'admin') : '';
+                                            $ar_cancel_at      = ($ar_is_cancelled && !empty($ar['cancelled_at'])) ? date('M d, Y g:i A', strtotime($ar['cancelled_at'])) : '';
+
+                                            // Second line under the requester: what the room is for (decision-ready at a glance).
+                                            $ar_line2 = [];
+                                            if (trim((string)($ar['purpose'] ?? '')) !== '') $ar_line2[] = trim((string)$ar['purpose']);
+                                            if ((int)($ar['attendees'] ?? 0) > 1)            $ar_line2[] = (int)$ar['attendees'] . ' attendees';
+                                            if ($ar_is_stud)                                  $ar_line2[] = 'via ' . $ar['faculty_name'];
+                                            $ar_line2_txt = $ar_line2 ? implode(' · ', $ar_line2) : '—';
                                         ?>
                                             <tr class="ps-rr-row<?php echo $ar_doc ? ' has-doc' : ''; ?>"
                                                 data-rr-id="<?php echo (int)$ar['id']; ?>"
@@ -409,9 +437,12 @@
                                                 data-purpose="<?php echo htmlspecialchars($ar['purpose'] ?? ''); ?>"
                                                 data-attendees="<?php echo (int)($ar['attendees'] ?? 0); ?>"
                                                 data-status="<?php echo htmlspecialchars($ar['status']); ?>"
-                                                data-reason="<?php echo htmlspecialchars($ar['reason'] ?? ''); ?>"
+                                                data-reason="<?php echo htmlspecialchars($ar_reason_out); ?>"
                                                 data-notes="<?php echo htmlspecialchars($ar['notes'] ?? ''); ?>"
                                                 data-submitted="<?php echo !empty($ar['request_date']) ? date('M d, Y g:i A', strtotime($ar['request_date'])) : ''; ?>"
+                                                data-submitted-raw="<?php echo htmlspecialchars((string)($ar['request_date'] ?? '')); ?>"
+                                                data-cancelled-at="<?php echo htmlspecialchars($ar_cancel_at); ?>"
+                                                data-cancelled-by="<?php echo $ar_cancel_by; ?>"
                                                 data-doc-url="<?php echo $ar_doc ? htmlspecialchars($ar_doc['url']) : ''; ?>"
                                                 data-doc-open-url="<?php echo $ar_doc ? htmlspecialchars($ar_doc['open_url']) : ''; ?>"
                                                 data-doc-name="<?php echo $ar_doc ? htmlspecialchars($ar_doc['name']) : ''; ?>"
@@ -420,7 +451,7 @@
                                                 data-start-time="<?php echo htmlspecialchars($ar['start_time']); ?>"
                                                 data-end-time="<?php echo htmlspecialchars($ar['end_time']); ?>"
                                                 data-arb-rule="<?php echo htmlspecialchars($ar['arb_rule'] ?? ''); ?>"
-                                                data-arb-reason="<?php echo htmlspecialchars($ar['arb_reason'] ?? ''); ?>"
+                                                data-arb-reason="<?php echo htmlspecialchars($ar_arb_reason_out); ?>"
                                                 data-submitted-ts="<?php echo !empty($ar['request_date']) ? (int)strtotime($ar['request_date']) : 0; ?>"
                                                 data-can-review="<?php echo $ar_reviewable ? '1' : '0'; ?>"
                                                 data-cancellable="<?php echo $ar_cancellable ? '1' : '0'; ?>"
@@ -438,25 +469,11 @@
                                                     <div class="eq-cell-sub rm-nowrap"><?php echo htmlspecialchars($ar_time); ?></div>
                                                 </td>
                                                 <td data-col="who">
-                                                    <div class="eq-cell-name"><?php echo htmlspecialchars($ar_name); ?><?php if ($ar_doc && $ar['status'] === 'Waiting'): ?><a class="rm-clip" href="<?php echo htmlspecialchars($ar_doc['open_url']); ?>" target="_blank" rel="noopener noreferrer" title="<?php echo htmlspecialchars($ar_doc['name']); ?>"><span class="material-symbols-outlined">attach_file</span></a><?php endif; ?></div>
-                                                    <div class="eq-cell-sub"><?php echo htmlspecialchars($ar_sub); ?></div>
+                                                    <div class="eq-cell-name"><?php echo htmlspecialchars($ar_name); ?><?php if ($ar_is_stud): ?> <span class="rr-tag" title="Reserved by a student through a faculty account">Student</span><?php endif; ?></div>
+                                                    <div class="eq-cell-sub rr-ellip" title="<?php echo htmlspecialchars($ar_line2_txt); ?>"><?php echo htmlspecialchars($ar_line2_txt); ?></div>
                                                 </td>
-                                                <td data-col="col4">
-                                                    <?php if ($ar['status'] === 'Waiting'): ?>
-                                                        <?php if ($ar_doc): ?>
-                                                            <a class="ps-doc-chip ps-doc-chip--<?php echo $ar_doc['kind']; ?>" href="<?php echo htmlspecialchars($ar_doc['open_url']); ?>" target="_blank" rel="noopener noreferrer" title="<?php echo htmlspecialchars($ar_doc['name']); ?>"><span class="material-symbols-outlined"><?php echo ps_doc_icon($ar_doc['kind']); ?></span><span class="ps-doc-chip__name"><?php echo htmlspecialchars($ar_doc['name']); ?></span><span class="material-symbols-outlined ps-doc-chip__open">open_in_new</span></a>
-                                                        <?php else: ?>
-                                                            <span class="ps-doc-chip ps-doc-chip--none"><span class="material-symbols-outlined">block</span> None</span>
-                                                        <?php endif; ?>
-                                                    <?php elseif ($ar['status'] === 'Declined'): ?>
-                                                        <div class="eq-cell-sub" style="color:var(--danger)"><?php echo htmlspecialchars($ar['reason'] ?? '—'); ?></div>
-                                                    <?php elseif ($ar['status'] === 'Approved'): ?>
-                                                        <div class="eq-cell-sub"><?php echo htmlspecialchars($ar['notes'] ?? '—'); ?></div>
-                                                    <?php elseif ($ar['status'] === 'Cancelled'): ?>
-                                                        <div class="eq-cell-sub"><?php echo htmlspecialchars($ar['reason'] ?? '—'); ?></div>
-                                                    <?php else: ?>
-                                                        <div class="eq-cell-sub"><?php echo htmlspecialchars($ar['purpose'] ?? '—'); ?></div>
-                                                    <?php endif; ?>
+                                                <td data-col="status">
+                                                    <span class="ps-badge ps-badge--dot <?php echo $ar_badge; ?>"><?php echo htmlspecialchars($ar['status']); ?></span>
                                                 </td>
                                                 <td data-col="actions">
                                                     <div class="eq-act-wrap">
@@ -478,7 +495,7 @@
                                                                 data-room-name="<?php echo htmlspecialchars($ar['room_name']); ?>"
                                                                 data-faculty-name="<?php echo htmlspecialchars($ar['faculty_name']); ?>">Cancel</button>
                                                         <?php endif; ?>
-                                                        <button type="button" class="pr-tbl-btn review" data-rr-detail><?php echo $ar_reviewable ? 'Review' : 'View'; ?></button>
+                                                        <button type="button" class="pr-tbl-btn review<?php echo $ar_reviewable ? ' is-primary' : ''; ?>" data-rr-detail><?php echo $ar_reviewable ? 'Review' : 'View'; ?></button>
                                                     </div>
                                                 </td>
                                             </tr>
