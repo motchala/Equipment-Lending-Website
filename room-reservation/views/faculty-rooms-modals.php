@@ -1,36 +1,28 @@
     <!-- ── Choose a Room Modal ─────────────────────────────────────────────
-         Opened from the Room field of the Borrow Request modal. Shows only rooms the
-         admin left Available; rooms another faculty has reserved for the chosen date and
-         time stay visible but cannot be picked. The content is built by RoomPicker in
-         faculty-dashboard.js. -->
-    <div class="modal-backdrop rp-backdrop" id="roomPickModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="roomPickTitle">
-        <div class="modal-box rp-box">
+         Opened from the Room field of the Borrow modal. Same steps as the student portal:
+         pick a building (with its photo), then a floor, then a room. Only rooms the admin
+         left Available are listed; a room another faculty has reserved for the chosen date
+         and time stays visible but cannot be picked. "Outside" and the faculty's own room
+         reservations are offered on the first step. Content is built by faculty-borrow-flow.js. -->
+    <div class="modal-backdrop bf-rp-backdrop" id="bfRoomPicker" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="bfRpTitle">
+        <div class="modal-box bf-rp-box">
             <div class="modal-header bm-head">
                 <span class="bm-tile" aria-hidden="true"><span class="material-symbols-outlined">meeting_room</span></span>
                 <div class="bm-heading">
-                    <h3 id="roomPickTitle">Choose a room</h3>
-                    <p class="bm-sub" id="roomPickSub">Where will the equipment be used?</p>
+                    <h3 id="bfRpTitle">Choose a room</h3>
+                    <p class="bm-sub" id="bfRpSub">Select a building, floor and room.</p>
                 </div>
-                <button type="button" class="modal-close-btn" data-rp-close aria-label="Close">
+                <button type="button" class="modal-close-btn" data-bf="rp-close" aria-label="Close room selector">
                     <span class="material-symbols-outlined">close</span>
                 </button>
             </div>
-            <div class="rp-tools">
-                <label class="rp-search">
-                    <span class="material-symbols-outlined" aria-hidden="true">search</span>
-                    <input type="search" id="roomPickSearch" placeholder="Search rooms" autocomplete="off" aria-label="Search rooms">
-                </label>
-                <div class="rp-tabs" id="roomPickTabs" role="tablist" aria-label="Buildings" hidden></div>
-            </div>
-            <div class="rp-scroll" id="roomPickBody" aria-live="polite"></div>
-            <div class="rp-foot">
-                <div class="rp-legend" aria-hidden="true">
-                    <span class="rp-key"><i class="rp-dot rp-dot--free"></i>Free</span>
-                    <span class="rp-key"><i class="rp-dot rp-dot--taken"></i>Reserved</span>
+            <div class="bf-rp-body" id="bfRpBody" aria-live="polite"></div>
+            <div class="bf-rp-foot">
+                <div class="bf-rp-legend" aria-hidden="true">
+                    <span><i class="bf-dot bf-dot--free"></i>Free</span>
+                    <span><i class="bf-dot bf-dot--taken"></i>Reserved</span>
                 </div>
-                <span class="rp-count" id="roomPickCount"></span>
-                <button type="button" class="btn-cancel-acc" data-rp-close>Cancel</button>
+                <button type="button" class="btn-cancel-acc" data-bf="rp-close">Cancel</button>
             </div>
         </div>
-    </div><!-- /roomPickModal -->
-
+    </div><!-- /bfRoomPicker -->

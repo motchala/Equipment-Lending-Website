@@ -36,7 +36,7 @@ Everyone signs in on the same page (`landing-page.php`). The system works out wh
 **For admins**
 - A **Dashboard** with what needs attention, an **Activity** timeline of every decision, notifications, and exports.
 - **Equipment** (catalog and loans) and **Facilities** (rooms, reservations, issues, archive).
-- Super Admin only: **Faculty** accounts (the password is generated automatically, with a copy button), **Admins** (up to 5), and **Imports** (sidebar, under Data) for the faculty registry. (**Equipment Inventory** and **Rooms Assigned** import cards are there too, but they are not built yet.)
+- Super Admin only: **Faculty** accounts (the password is generated automatically, with a copy button), **Admins** (up to 5), and **Imports** (sidebar, under Data) for the faculty registry and the **Rooms Assigned** class schedule (an XLSX with each class's faculty, room and meeting times; it is separate from the registry and blocks those rooms for reservations). The **Equipment Inventory** import card is there too, but it is not built yet.
 - Both portals have a built-in **Help & Support** page inside Settings.
 
 ---

@@ -5,7 +5,7 @@ declare(strict_types=1);
 /**
  * booking-schedule.php
  *
- * Scheduling rules for equipment borrowing (Borrow Request modal).
+ * Scheduling rules for equipment borrowing (the Borrow modal on the faculty Equipment tab).
  *
  *  - Today bookings:  hourly start time (7:00 AM through 8:00 PM) + duration in hours
  *                     (1 / 2 / 3 / 6). No request letter.
@@ -241,7 +241,8 @@ final class BookingSchedule
         $statusSql = $availableOnly ? "AND r.status = 'Available'" : '';
         $res = $conn->query(
             "SELECT r.room_id, r.room_name, r.floor_number, r.floor_label, r.status,
-                    b.building_id, b.name AS building_name, b.wing, c.campus_name
+                    b.building_id, b.building_key, b.image_path AS building_image,
+                    b.name AS building_name, b.wing, c.campus_name
                FROM tbl_rooms r
                JOIN tbl_buildings b ON b.building_id = r.building_id
                JOIN tbl_campuses  c ON c.campus_id   = b.campus_id
@@ -256,6 +257,8 @@ final class BookingSchedule
                 $out[$bid] = [
                     'building_id' => $bid,
                     'name'        => $row['building_name'],
+                    'key'         => (string)($row['building_key'] ?? ''),
+                    'image'       => (string)($row['building_image'] ?? ''),
                     'wing'        => (string)($row['wing'] ?? ''),
                     'campus'      => (string)$row['campus_name'],
                     'floors'      => [],
@@ -683,129 +686,5 @@ final class BookingSchedule
         }
         $ts = strtotime('2000-01-01 ' . $t);
         return $ts ? date('g:i A', $ts) : '';
-    }
-
-    // ═════════════════════════════════════════════════════════════════════════
-    // HTML helpers used by the Borrow Request modal
-    // ═════════════════════════════════════════════════════════════════════════
-
-    private static function h(string $s): string
-    {
-        return htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
-    }
-
-    /**
-     * Room picker field: a button that shows the chosen room and opens the "Choose a room"
-     * modal (#roomPickModal in faculty-dashboard.php, one shared by every form). The modal is
-     * built in the browser from window.BOOKING_META.rooms, which holds only rooms the admin has
-     * left Available, and marks the ones another faculty has reserved for the chosen window.
-     * The chosen value goes in the hidden room_id field: a room id, or "outside".
-     */
-    public static function renderRoomPicker(string $id): string
-    {
-        $id = self::h($id);
-        return '
-        <div class="form-group bm-room" data-bm-room>
-            <span class="form-label" id="' . $id . 'Label">Room</span>
-            <input type="hidden" name="room_id" value="" data-bm-room-input>
-            <button type="button" class="bm-room-trigger" id="' . $id . '" data-bm-room-trigger
-                aria-haspopup="dialog" aria-labelledby="' . $id . 'Label ' . $id . 'Value">
-                <span class="bm-room-ico" aria-hidden="true"><span class="material-symbols-outlined">meeting_room</span></span>
-                <span class="bm-room-value" id="' . $id . 'Value" data-bm-room-value><span class="bm-room-ph">Choose a room</span></span>
-                <span class="material-symbols-outlined bm-room-chev" aria-hidden="true">chevron_right</span>
-            </button>
-            <p class="bm-hint" data-bm-room-hint hidden></p>
-        </div>';
-    }
-
-    /**
-     * The shared "when / how long / how many" block. JS (faculty-dashboard.js, BorrowSchedule)
-     * fills the time list and the length chips from window.BOOKING_META.
-     * A "Later date" booking also shows an optional request letter field (never shown for "Today").
-     */
-    public static function renderSchedule(string $p): string
-    {
-        $p = self::h($p);
-        $qty = '
-                <div class="form-group bm-qty" data-bm-future-only hidden>
-                    <span class="form-label">Quantity</span>
-                    <div class="bm-stepper" data-bm-qty-wrap>
-                        <button type="button" data-bm-qty-dec aria-label="Decrease quantity"><span class="material-symbols-outlined">remove</span></button>
-                        <input type="number" name="qty" value="1" min="1" max="1" inputmode="numeric" data-bm-qty aria-label="Quantity">
-                        <button type="button" data-bm-qty-inc aria-label="Increase quantity"><span class="material-symbols-outlined">add</span></button>
-                    </div>
-                    <p class="bm-hint" data-bm-qty-hint></p>
-                </div>';
-        return '
-        <div class="bm-sched" data-bm-sched id="' . $p . 'Sched">
-            <input type="hidden" name="booking_mode" value="today" data-bm-mode-input>
-            <input type="hidden" name="duration" value="" data-bm-duration-input>
-
-            <div class="form-group">
-                <span class="form-label">When do you need it?</span>
-                <div class="bm-seg" role="tablist" aria-label="When do you need it?">
-                    <span class="bm-seg-option" data-bm-today-wrapper role="presentation">
-                        <button type="button" class="bm-seg-btn active" role="tab" aria-selected="true" data-bm-mode="today">
-                            <span class="material-symbols-outlined">bolt</span> Today
-                            <span class="material-symbols-outlined bm-mode-info" data-bm-today-info aria-hidden="true" hidden>error</span>
-                        </button>
-                    </span>
-                    <button type="button" class="bm-seg-btn" role="tab" aria-selected="false" data-bm-mode="future">
-                        <span class="material-symbols-outlined">event</span> Later date
-                    </button>
-                </div>
-            </div>
-
-            <label class="bm-switch-row" data-bm-outnow hidden>
-                <span class="bm-switch-text">
-                    <strong>Out right now</strong>
-                    <small>Book it ahead for a later date. It is checked against the schedule, not today\'s stock.</small>
-                </span>
-                <span class="bm-switch">
-                    <input type="checkbox" data-bm-outnow-toggle checked>
-                    <span class="bm-switch-track" aria-hidden="true"></span>
-                </span>
-            </label>
-
-            <div class="bm-sched-fields" data-bm-fields>
-                <div class="bm-when">
-                    <div class="form-group bm-when-date" data-bm-future-only hidden>
-                        <label class="form-label" for="' . $p . 'Date">Borrow date</label>
-                        <select id="' . $p . 'Date" name="borrow_date" class="form-input bm-select" data-bm-date></select>
-                    </div>
-                    <div class="form-group bm-when-time">
-                        <label class="form-label" for="' . $p . 'Time">Start time</label>
-                        <select id="' . $p . 'Time" name="start_time" class="form-input bm-select" data-bm-time></select>
-                    </div>
-                </div>
-                <p class="bm-hint bm-date-hint" data-bm-date-hint data-bm-future-only hidden></p>
-
-                <div class="form-group">
-                    <span class="form-label" data-bm-length-label>For how long?</span>
-                    <div class="bm-chips" data-bm-chips role="radiogroup" aria-label="For how long?"></div>
-                </div>
-' . $qty . '
-
-                <div class="bm-summary" data-bm-summary aria-live="polite"></div>
-                <p class="bm-avail" data-bm-avail aria-live="polite"></p>
-            </div>
-
-            <div class="form-group bm-letter" data-bm-future-only hidden>
-                <span class="form-label">Request letter <span class="bm-opt">Recommended</span></span>
-                <label class="bm-drop" for="request_document">
-                    <span class="material-symbols-outlined bm-drop-icon" aria-hidden="true">upload_file</span>
-                    <span class="bm-drop-text">
-                        <strong data-bm-drop-title>Choose a file or drag it here</strong>
-                        <small>PDF, JPG, PNG or WEBP &middot; max 5 MB</small>
-                    </span>
-                    <input type="file" id="request_document" name="request_document"
-                        accept=".pdf,.jpg,.jpeg,.png,.webp">
-                </label>
-                <button type="button" class="pslc-trigger" data-letter-camera="request_document">
-                    <span class="material-symbols-outlined" aria-hidden="true">photo_camera</span> Take a photo of the letter
-                </button>
-                <p class="bm-hint">Recommended for bookings on a later date. You can still submit without one.</p>
-            </div>
-        </div>';
     }
 }

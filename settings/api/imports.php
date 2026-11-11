@@ -12,13 +12,14 @@ declare(strict_types=1);
  *   action=unlock    current_password -> opens the unlock (10 min, sliding)
  *   action=lock      closes it
  *   -- everything below needs the unlock; otherwise HTTP 403 { code: "locked" } --
- *   action=overview  counts + last import for the faculty list
- *   action=list      kind=faculty -> the imported entries
- *   action=files     kind=faculty -> history of original files
+ *   action=overview  counts + last import for the faculty list and for the rooms assigned
+ *   action=list      kind=faculty|rooms -> the imported entries
+ *   action=files     kind=faculty|rooms -> history of original files
  *   action=file      kind, id, disposition=inline|attachment -> streams the original file
  *
  * Importing itself is done by account-management/api/upload-faculty-registry(-file).php /
- * parse-faculty-registry-xlsx.php, which apply the same unlock check.
+ * parse-faculty-registry-xlsx.php (Faculty Registry) and settings/api/rooms-import.php (Rooms Assigned),
+ * which apply the same unlock check.
  * (The Equipment Inventory card on the Imports tab is a placeholder: no import is built yet.)
  */
 
@@ -27,6 +28,7 @@ ini_set('display_errors', '0');
 require_once __DIR__ . '/../../config/security-headers.php';
 require_once __DIR__ . '/../../config/session.php';
 require_once __DIR__ . '/../../account-management/core/faculty-registry-files.php';
+require_once __DIR__ . '/../core/rooms-import.php';
 require_once __DIR__ . '/../../shared/core/imports-lock.php';
 
 header('Content-Type: application/json');
@@ -58,7 +60,7 @@ if (!admin_is_super_admin($conn)) {
     frf_respond(403, ['status' => 'error', 'code' => 'forbidden', 'error' => 'Super Admin only.']);
 }
 
-/** The lists Imports manages (today: the faculty registry only). */
+/** The lists Imports manages (the faculty registry and the rooms assigned). */
 function imp_kind(string $kind): ?array
 {
     if ($kind === 'faculty') {
@@ -67,6 +69,14 @@ function imp_kind(string $kind): ?array
             'ensure'      => 'frf_ensure_table',
             'path'        => 'frf_stored_path',
             'fallback'    => 'faculty-registry',
+        ];
+    }
+    if ($kind === 'rooms') {
+        return [
+            'files_table' => 'tbl_rooms_import_files',
+            'ensure'      => 'ria_ensure_table',
+            'path'        => 'ria_stored_path',
+            'fallback'    => 'rooms-assigned',
         ];
     }
     return null;
@@ -143,6 +153,32 @@ switch ($action) {
         $f['rows']      = $r ? (int)($r['row_count'] ?? 0) : 0;
         $out['faculty'] = $f;
 
+        // Rooms assigned: count = rooms that have classes, extra = faculty with classes, rows = rows in the last file,
+        // chip_count = weekly class meetings (what the card's badge counts)
+        ria_ensure_table($conn);
+        $rm = ['count' => 0, 'extra' => 0, 'rows' => 0, 'chip_count' => 0, 'last_at' => '', 'last_by' => '', 'files' => 0, 'last_file' => ''];
+        if (imp_table_exists($conn, 'tbl_class_schedule')) {
+            $q = $conn->query("SELECT COUNT(*) AS m, COUNT(DISTINCT room_code) AS r, COUNT(DISTINCT NULLIF(name_key, '')) AS f, MAX(created_at) AS last_at FROM tbl_class_schedule");
+            if ($q && ($r = $q->fetch_assoc())) {
+                $rm['chip_count'] = (int)$r['m'];
+                $rm['count']      = (int)$r['r'];
+                $rm['extra']      = (int)$r['f'];
+                $rm['last_at']    = (string)($r['last_at'] ?? '');
+            }
+        }
+        $q = $conn->query('SELECT COUNT(*) AS c FROM tbl_rooms_import_files');
+        $rm['files'] = $q ? (int)$q->fetch_assoc()['c'] : 0;
+        $q = $conn->query("SELECT original_name, row_count, uploaded_by, imported_at FROM tbl_rooms_import_files WHERE status = 'imported' ORDER BY imported_at DESC, id DESC LIMIT 1");
+        if ($q && ($r = $q->fetch_assoc())) {
+            $rm['last_file'] = (string)$r['original_name'];
+            $rm['rows']      = (int)($r['row_count'] ?? 0);
+            $rm['last_by']   = (string)$r['uploaded_by'];
+            if (!empty($r['imported_at'])) {
+                $rm['last_at'] = (string)$r['imported_at'];
+            }
+        }
+        $out['rooms'] = $rm;
+
         frf_respond(200, ['status' => 'success', 'remaining' => imports_remaining()] + $out);
 
     case 'list':
@@ -164,6 +200,10 @@ switch ($action) {
                         'is_newly_hired' => (bool)$row['is_newly_hired'],
                     ];
                 }
+            }
+        } elseif ($kind === 'rooms') {
+            if (imp_table_exists($conn, 'tbl_class_schedule')) {
+                $entries = ria_list_entries($conn);
             }
         } else {
             frf_respond(422, ['status' => 'error', 'code' => 'input', 'error' => 'Unknown list.']);
