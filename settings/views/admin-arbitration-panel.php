@@ -8,7 +8,7 @@
  *
  * UI ONLY: nothing here is saved yet. Fields are pre-filled from tbl_arbitration_config
  * where a key already exists, otherwise from the rule the system uses today.
- * Saving is intentionally not wired (see settings/assets/js/admin-arbitration.js).
+ * Priority faculty starts empty (no storage yet). Saving is intentionally not wired (see settings/assets/js/admin-arbitration.js).
  *
  * Styles : settings/assets/css/admin-arbitration.css  (all classes are arb-*)
  * Script : settings/assets/js/admin-arbitration.js    (UI behaviour only)
@@ -34,6 +34,21 @@ $arb_num = static function (string $key, int $default) use ($arb_cfg): int {
 $arb_bool = static function (string $key, bool $default) use ($arb_cfg): bool {
     return isset($arb_cfg[$key]) ? $arb_cfg[$key] === '1' : $default;
 };
+
+/* ── Faculty available to mark as Priority (read-only) ────────────────────── */
+$arb_faculty = [];
+if (isset($conn) && $conn instanceof mysqli) {
+    $arb_fres = @$conn->query("SELECT faculty_id, fullname, department FROM tbl_users WHERE COALESCE(role, '') <> 'Student Representative' ORDER BY fullname ASC");
+    if ($arb_fres) {
+        while ($arb_frow = $arb_fres->fetch_assoc()) {
+            $arb_faculty[] = [
+                'id'   => (string)$arb_frow['faculty_id'],
+                'name' => (string)$arb_frow['fullname'],
+                'dept' => (string)($arb_frow['department'] ?? ''),
+            ];
+        }
+    }
+}
 
 /* ── Small renderers (keep the markup below readable) ─────────────────────── */
 $arb_e = static function (string $s): string {
@@ -125,7 +140,7 @@ $arb_chips = static function (string $prefix, string $title, string $sub, array 
             <button type="button" class="arb-preset" data-arb-preset="standard">
                 <span class="material-symbols-outlined">balance</span>
                 <span class="arb-preset__title">Standard</span>
-                <span class="arb-preset__sub">Everyday limits. Overdue and duplicate requests are blocked.</span>
+                <span class="arb-preset__sub">Everyday limits. Borrowers with an overdue item are blocked.</span>
             </button>
             <button type="button" class="arb-preset" data-arb-preset="busy">
                 <span class="material-symbols-outlined">event_busy</span>
@@ -137,37 +152,6 @@ $arb_chips = static function (string $prefix, string $title, string $sub, array 
                 <span class="arb-preset__title">Relaxed</span>
                 <span class="arb-preset__sub">Semester break. Higher limits and longer loans.</span>
             </button>
-        </div>
-    </div>
-
-    <!-- Pause bookings -->
-    <div class="sett-card arb-card arb-card--full">
-        <div class="sett-card-head">
-            <span class="material-symbols-outlined">pause_circle</span>
-            <h3>Pause bookings</h3>
-        </div>
-        <div class="sett-card-body">
-            <div class="arb-grid arb-grid--inner">
-                <div>
-                    <?php
-                    $arb_toggle('pause_equipment', 'Pause new equipment requests', 'Faculty cannot submit new borrow requests. Loans already out are not affected.', $arb_bool('pause_equipment', false));
-                    $arb_toggle('pause_rooms', 'Pause new room reservations', 'Faculty cannot reserve rooms. Existing reservations stay as they are.', $arb_bool('pause_rooms', false));
-                    ?>
-                </div>
-                <div class="arb-pause-extra">
-                    <div class="form-group">
-                        <label class="sett-field-lbl" for="arb-pause_message">Message shown to faculty</label>
-                        <textarea class="form-control-custom arb-textarea" id="arb-pause_message" data-arb-key="pause_message"
-                            rows="3" maxlength="160" placeholder="e.g. Bookings are paused during enrollment week."><?php echo $arb_e($arb_cfg['pause_message'] ?? ''); ?></textarea>
-                        <div class="arb-counter"><span id="arbPauseCount">0</span> / 160</div>
-                    </div>
-                    <div class="form-group">
-                        <label class="sett-field-lbl" for="arb-pause_until">Resume automatically on <span class="arb-optional">(optional)</span></label>
-                        <input type="date" class="form-control-custom" id="arb-pause_until" data-arb-key="pause_until"
-                            value="<?php echo $arb_e($arb_cfg['pause_until'] ?? ''); ?>">
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 
@@ -186,7 +170,6 @@ $arb_chips = static function (string $prefix, string $title, string $sub, array 
             <div class="sett-card-body">
                 <?php
                 $arb_toggle('rule_overdue_block_enabled', 'Decline if the borrower has an overdue item', 'A faculty member with equipment past its return time cannot borrow more.', $arb_bool('rule_overdue_block_enabled', false));
-                $arb_toggle('rule_duplicate_block_enabled', 'Decline duplicate requests', 'Blocks a new request for equipment the borrower already has an active request for.', $arb_bool('rule_duplicate_block_enabled', false));
                 $arb_toggle('rule_missing_doc_block_enabled', 'Require a request letter', 'Requests without a letter are held for an admin instead of being decided automatically.', $arb_bool('rule_missing_doc_block_enabled', false));
                 $arb_stepper('max_items_per_borrower', 'Items per borrower', 'Most items one borrower can have at a time.', $arb_num('max_items_per_borrower', 3), 1, 20, 1, 'items');
                 $arb_stepper('max_borrow_days', 'Longest loan', 'How long an item can be kept before it is due.', $arb_num('max_borrow_days', 1), 1, 14, 1, 'days');
@@ -233,7 +216,6 @@ $arb_chips = static function (string $prefix, string $title, string $sub, array 
                 $arb_stepper('room_cancel_cutoff_min', 'Cancellation cutoff', 'Faculty can cancel until this long before the start time.', $arb_num('room_cancel_cutoff_min', 60), 0, 240, 15, 'min');
                 $arb_toggle('room_same_day_auto', 'Confirm same-day reservations automatically', 'When the slot is free, nothing waits for an admin.', $arb_bool('room_same_day_auto', true));
                 $arb_toggle('room_letter_required', 'Require a request letter for later dates', 'Later-date reservations without a letter cannot be submitted.', $arb_bool('room_letter_required', false));
-                $arb_toggle('room_waitlist_enabled', 'Allow waitlists', 'Faculty can join a waitlist for a slot that is already taken.', $arb_bool('room_waitlist_enabled', true));
                 ?>
                 <div class="arb-row">
                     <div class="arb-row__text">
@@ -260,7 +242,6 @@ $arb_chips = static function (string $prefix, string $title, string $sub, array 
                 <?php
                 $arb_time('Reservation hours', 'Earliest start and latest end of a reservation.', 'room_day_start', '07:00', 'room_day_end', '20:00');
                 $arb_chips('room_day', 'Days rooms can be reserved', 'Unticked days are closed to new reservations.', ['mon' => 'Mon', 'tue' => 'Tue', 'wed' => 'Wed', 'thu' => 'Thu', 'fri' => 'Fri', 'sat' => 'Sat', 'sun' => 'Sun'], ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']);
-                $arb_stepper('room_buffer_min', 'Gap between reservations', 'Time kept free between back-to-back bookings in the same room.', $arb_num('room_buffer_min', 0), 0, 60, 5, 'min');
                 $arb_stepper('room_max_hours', 'Longest single reservation', 'Longest a room can be held in one reservation.', $arb_num('room_max_hours', 13), 1, 13, 1, 'hours');
                 ?>
             </div>
@@ -276,38 +257,57 @@ $arb_chips = static function (string $prefix, string $title, string $sub, array 
     <div class="arb-grid">
         <div class="sett-card arb-card">
             <div class="sett-card-head">
-                <span class="material-symbols-outlined">timer</span>
-                <h3>Tie-break</h3>
-            </div>
-            <div class="sett-card-body">
-                <?php
-                $arb_stepper('tie_break_window_seconds', 'Tie window', 'Requests sent within this time of each other count as simultaneous and are settled by the order below.', $arb_num('tie_break_window_seconds', 5), 0, 60, 1, 'sec');
-                ?>
-                <div class="arb-order">
-                    <div class="arb-order__label">Order used to settle a tie</div>
-                    <ol class="arb-order__list">
-                        <li><span class="arb-order__n">1</span> First come, first served</li>
-                        <li><span class="arb-order__n">2</span> Signed request letter</li>
-                        <li><span class="arb-order__n">3</span> Borrower role</li>
-                        <li><span class="arb-order__n">4</span> Clean return record</li>
-                        <li><span class="arb-order__n">5</span> Earliest request number</li>
-                    </ol>
-                    <div class="arb-order__hint">The order is fixed. Only the role weights below can be changed.</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="sett-card arb-card">
-            <div class="sett-card-head">
                 <span class="material-symbols-outlined">groups</span>
                 <h3>Role weights</h3>
             </div>
             <div class="sett-card-body">
                 <?php
-                $arb_stepper('role_priority_student', 'Student representative', 'Higher number wins a tie.', $arb_num('role_priority_student', 1), 1, 10, 1, 'pts');
-                $arb_stepper('role_priority_faculty', 'Regular faculty', 'Higher number wins a tie.', $arb_num('role_priority_faculty', 2), 1, 10, 1, 'pts');
-                $arb_stepper('role_priority_director', 'Director', 'Higher number wins a tie.', $arb_num('role_priority_director', 4), 1, 10, 1, 'pts');
+                $arb_stepper('role_priority_student', 'Student representative', 'Higher number wins when requests compete.', $arb_num('role_priority_student', 1), 1, 10, 1, 'pts');
+                $arb_stepper('role_priority_faculty', 'Regular faculty', 'Higher number wins when requests compete.', $arb_num('role_priority_faculty', 2), 1, 10, 1, 'pts');
+                $arb_stepper('role_priority_director', 'Priority', 'Applies to the faculty you mark as priority. Higher number wins.', $arb_num('role_priority_director', 4), 1, 10, 1, 'pts');
                 ?>
+            </div>
+        </div>
+
+        <div class="sett-card arb-card" id="arbPriorityCard" data-arb-max="10">
+            <div class="sett-card-head">
+                <span class="material-symbols-outlined">star</span>
+                <h3>Priority faculty</h3>
+            </div>
+            <div class="sett-card-body">
+                <div class="arb-prio">
+                    <div class="arb-prio__top">
+                        <p class="arb-prio__hint">Choose who counts as priority. You decide, up to 10 faculty.</p>
+                        <span class="arb-prio__count"><span id="arbPrioCount">0</span> / 10</span>
+                    </div>
+
+                    <div class="arb-pick">
+                        <input type="search" class="form-control-custom" id="arbPrioSearch" autocomplete="off"
+                            placeholder="Search faculty by name, ID or department" aria-label="Search faculty to mark as priority">
+                        <ul class="arb-pick__list" id="arbPrioOptions" hidden>
+                            <?php foreach ($arb_faculty as $arb_f): ?>
+                                <li>
+                                    <button type="button" class="arb-pick__opt"
+                                        data-id="<?php echo $arb_e($arb_f['id']); ?>"
+                                        data-name="<?php echo $arb_e($arb_f['name']); ?>"
+                                        data-dept="<?php echo $arb_e($arb_f['dept']); ?>"
+                                        data-search="<?php echo $arb_e($arb_f['name'] . ' ' . $arb_f['id'] . ' ' . $arb_f['dept']); ?>">
+                                        <span class="arb-pick__name"><?php echo $arb_e($arb_f['name']); ?></span>
+                                        <span class="arb-pick__meta"><?php echo $arb_e(trim($arb_f['id'] . ($arb_f['dept'] !== '' ? ' · ' . $arb_f['dept'] : ''))); ?></span>
+                                    </button>
+                                </li>
+                            <?php endforeach; ?>
+                            <li class="arb-pick__none" id="arbPrioNone" hidden>No matching faculty.</li>
+                        </ul>
+                    </div>
+
+                    <div class="arb-prio__limit" id="arbPrioLimit" hidden>
+                        <span class="material-symbols-outlined">block</span> Limit reached. Remove someone to add another.
+                    </div>
+
+                    <ul class="arb-prio__list" id="arbPrioChosen"></ul>
+                    <div class="arb-prio__empty" id="arbPrioEmpty">No priority faculty yet.</div>
+                </div>
             </div>
         </div>
     </div>

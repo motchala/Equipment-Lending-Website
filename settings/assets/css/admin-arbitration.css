@@ -200,15 +200,6 @@
     margin-bottom: 0.25rem;
 }
 
-#sett-arbitration .arb-grid--inner {
-    gap: 2rem;
-    margin: 0;
-}
-
-#sett-arbitration .arb-card--full {
-    margin-bottom: 0;
-}
-
 /* Cards in this tab are made of rows, so the body has no gap */
 #sett-arbitration .arb-card .sett-card-body {
     gap: 0;
@@ -356,41 +347,6 @@
     font-size: 0.8rem;
 }
 
-#sett-arbitration .arb-textarea {
-    resize: vertical;
-    min-height: 4.5rem;
-    line-height: 1.45;
-}
-
-#sett-arbitration .arb-textarea:disabled,
-#sett-arbitration #arb-pause_until:disabled {
-    opacity: 0.55;
-    cursor: not-allowed;
-}
-
-#sett-arbitration .arb-counter {
-    margin-top: 3px;
-    text-align: right;
-    font-size: 11px;
-    color: var(--text-light);
-}
-
-#sett-arbitration .arb-optional {
-    font-weight: 400;
-    color: var(--text-light);
-}
-
-#sett-arbitration .arb-pause-extra {
-    display: flex;
-    flex-direction: column;
-    gap: 0.9rem;
-    padding-top: 0.6rem;
-}
-
-#sett-arbitration .arb-pause-extra .form-group {
-    margin: 0;
-}
-
 /* ── Chips (days, durations) ─────────────────────────────────── */
 #sett-arbitration .arb-chips {
     display: flex;
@@ -436,55 +392,189 @@
     color: #fff;
 }
 
-/* ── Tie-break order (read-only) ─────────────────────────────── */
-#sett-arbitration .arb-order {
-    margin: 0.25rem 0 0.75rem;
-    padding: 0.85rem 1rem;
-    border-radius: 12px;
-    background: var(--secondary-cream);
-    border: 1px solid var(--khaki-border);
+/* ── Priority faculty ────────────────────────────────────────── */
+#sett-arbitration .arb-prio {
+    padding: 0.85rem 0 0.5rem;
 }
 
-#sett-arbitration .arb-order__label {
-    margin-bottom: 0.5rem;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-dark);
-}
-
-#sett-arbitration .arb-order__list {
+#sett-arbitration .arb-prio__top {
     display: flex;
-    flex-direction: column;
-    gap: 6px;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.7rem;
+}
+
+#sett-arbitration .arb-prio__hint {
     margin: 0;
-    padding: 0;
-    list-style: none;
-    font-size: 12.5px;
-    color: var(--text-dark);
+    font-size: 11.5px;
+    line-height: 1.4;
+    color: var(--text-light);
 }
 
-#sett-arbitration .arb-order__list li {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-#sett-arbitration .arb-order__n {
-    display: inline-grid;
-    place-items: center;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: var(--card-bg);
-    border: 1px solid var(--khaki-border);
-    font-size: 11px;
+#sett-arbitration .arb-prio__count {
+    flex-shrink: 0;
+    padding: 0.15rem 0.6rem;
+    border-radius: 999px;
+    background: var(--accent-light);
+    font-size: 11.5px;
     font-weight: 700;
     color: var(--accent-maroon);
 }
 
-#sett-arbitration .arb-order__hint {
+#sett-arbitration #arbPrioSearch:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+#sett-arbitration .arb-pick__list {
+    margin: 6px 0 0;
+    padding: 4px;
+    list-style: none;
+    max-height: 14rem;
+    overflow-y: auto;
+    border: 1px solid var(--khaki-border);
+    border-radius: 10px;
+    background: var(--input-bg);
+}
+
+#sett-arbitration .arb-pick__list[hidden],
+#sett-arbitration .arb-prio__limit[hidden],
+#sett-arbitration .arb-pick__none[hidden],
+#sett-arbitration .arb-prio__empty[hidden] {
+    display: none;
+}
+
+#sett-arbitration .arb-pick__opt {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+    padding: 0.45rem 0.6rem;
+    border: none;
+    border-radius: 8px;
+    background: none;
+    text-align: left;
+    font-family: 'Poppins', sans-serif;
+    cursor: pointer;
+}
+
+#sett-arbitration .arb-pick__opt:hover,
+#sett-arbitration .arb-pick__opt:focus-visible {
+    background: var(--accent-light);
+    outline: none;
+}
+
+#sett-arbitration .arb-pick__name {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
+#sett-arbitration .arb-pick__meta {
+    font-size: 11px;
+    color: var(--text-light);
+}
+
+#sett-arbitration .arb-pick__none {
+    padding: 0.6rem;
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+#sett-arbitration .arb-prio__limit {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     margin-top: 0.6rem;
     font-size: 11.5px;
+    color: var(--text-light);
+}
+
+#sett-arbitration .arb-prio__limit .material-symbols-outlined {
+    font-size: 16px;
+    color: var(--accent-maroon);
+}
+
+#sett-arbitration .arb-prio__list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0.75rem 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+#sett-arbitration .arb-prio__item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0.5rem 0.6rem;
+    border: 1px solid var(--khaki-border);
+    border-radius: 10px;
+    background: var(--secondary-cream);
+}
+
+#sett-arbitration .arb-prio__av {
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--accent-maroon);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+#sett-arbitration .arb-prio__who {
+    flex: 1;
+    min-width: 0;
+}
+
+#sett-arbitration .arb-prio__name {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-dark);
+    overflow-wrap: anywhere;
+}
+
+#sett-arbitration .arb-prio__meta {
+    font-size: 11px;
+    color: var(--text-light);
+    overflow-wrap: anywhere;
+}
+
+#sett-arbitration .arb-prio__remove {
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 8px;
+    background: none;
+    color: var(--text-light);
+    cursor: pointer;
+}
+
+#sett-arbitration .arb-prio__remove:hover {
+    background: var(--accent-light);
+    color: var(--accent-maroon);
+}
+
+#sett-arbitration .arb-prio__remove .material-symbols-outlined {
+    font-size: 18px;
+}
+
+#sett-arbitration .arb-prio__empty {
+    margin-top: 0.75rem;
+    padding: 0.9rem;
+    border: 1.5px dashed var(--khaki-border);
+    border-radius: 10px;
+    text-align: center;
+    font-size: 12px;
     color: var(--text-light);
 }
 

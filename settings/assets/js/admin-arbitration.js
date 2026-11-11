@@ -2,8 +2,8 @@
  * settings/assets/js/admin-arbitration.js
  *
  * Settings → Arbitration tab (Super Admin only). UI BEHAVIOUR ONLY:
- * steppers, quick presets, the unsaved-changes bar and a couple of
- * show/hide touches. Nothing is sent to the server. Saving is a stub.
+ * steppers, quick presets, the Priority faculty picker (max 10) and the
+ * unsaved-changes bar. Nothing is sent to the server. Saving is a stub.
  *
  * Every field in the panel carries data-arb-key="<setting key>".
  */
@@ -17,9 +17,7 @@
        DEFAULTS is every setting at its standard value; each preset
        only overrides what it changes. */
     var DEFAULTS = {
-        pause_equipment: false, pause_rooms: false, pause_message: '', pause_until: '',
-
-        rule_overdue_block_enabled: true, rule_duplicate_block_enabled: true, rule_missing_doc_block_enabled: false,
+        rule_overdue_block_enabled: true, rule_missing_doc_block_enabled: false,
         max_items_per_borrower: 3, max_borrow_days: 1, max_extensions: 2,
         auto_approve_timeout_minutes: 1, low_stock_threshold: 2,
 
@@ -28,27 +26,26 @@
         equip_dur_1: true, equip_dur_2: true, equip_dur_3: true, equip_dur_4: false, equip_dur_5: false, equip_dur_6: true,
 
         room_max_active: 2, room_max_advance_weeks: 3, room_cancel_cutoff_min: 60,
-        room_same_day_auto: true, room_letter_required: false, room_waitlist_enabled: true, room_expiry_mode: 'day',
+        room_same_day_auto: true, room_letter_required: false, room_expiry_mode: 'day',
 
         room_day_start: '07:00', room_day_end: '20:00',
         room_day_mon: true, room_day_tue: true, room_day_wed: true, room_day_thu: true, room_day_fri: true, room_day_sat: true, room_day_sun: false,
-        room_buffer_min: 0, room_max_hours: 13,
+        room_max_hours: 13,
 
-        tie_break_window_seconds: 5,
         role_priority_student: 1, role_priority_faculty: 2, role_priority_director: 4
     };
 
     var PRESETS = {
         standard: {},
         busy: {
-            rule_overdue_block_enabled: true, rule_duplicate_block_enabled: true, rule_missing_doc_block_enabled: true,
+            rule_overdue_block_enabled: true, rule_missing_doc_block_enabled: true,
             max_items_per_borrower: 2, max_borrow_days: 1, max_extensions: 1,
             auto_approve_timeout_minutes: 5, low_stock_threshold: 3,
             equip_max_advance_days: 7, equip_cancel_cutoff_min: 120,
             room_max_active: 1, room_max_advance_weeks: 2, room_cancel_cutoff_min: 120, room_letter_required: true
         },
         relaxed: {
-            rule_overdue_block_enabled: false, rule_duplicate_block_enabled: false, rule_missing_doc_block_enabled: false,
+            rule_overdue_block_enabled: false, rule_missing_doc_block_enabled: false,
             max_items_per_borrower: 5, max_borrow_days: 3, max_extensions: 3,
             auto_approve_timeout_minutes: 1, low_stock_threshold: 1,
             equip_max_advance_days: 21, equip_cancel_cutoff_min: 30,
@@ -93,7 +90,6 @@
             if (Object.prototype.hasOwnProperty.call(map, k)) writeField(el, map[k]);
         });
         applying = false;
-        syncDerived();
     }
 
     function setPresetActive(name) {
@@ -117,18 +113,132 @@
         if (saveText) saveText.innerHTML = saveTextHtml;
     }
 
-    /* Things that depend on other fields: pause message box and counter. */
-    function syncDerived() {
-        var eq = document.getElementById('arb-pause_equipment');
-        var rm = document.getElementById('arb-pause_rooms');
-        var paused = !!((eq && eq.checked) || (rm && rm.checked));
-        ['arb-pause_message', 'arb-pause_until'].forEach(function (id) {
-            var el = document.getElementById(id);
-            if (el) el.disabled = !paused;
+    /* ── Priority faculty (the Super Admin's own pick, max 10) ──── */
+    var prioCard = document.getElementById('arbPriorityCard');
+    var prio = { max: 10, chosen: [], initial: [], info: {} };
+    var renderPrio = function () {};   // replaced below once the card exists
+
+    if (prioCard) {
+        var prioSearch = document.getElementById('arbPrioSearch');
+        var prioOptions = document.getElementById('arbPrioOptions');
+        var prioNone = document.getElementById('arbPrioNone');
+        var prioList = document.getElementById('arbPrioChosen');
+        var prioEmpty = document.getElementById('arbPrioEmpty');
+        var prioLimit = document.getElementById('arbPrioLimit');
+        var prioCount = document.getElementById('arbPrioCount');
+        var optBtns = prioOptions ? prioOptions.querySelectorAll('.arb-pick__opt') : [];
+        prio.max = parseInt(prioCard.dataset.arbMax, 10) || 10;
+
+        optBtns.forEach(function (b) {
+            prio.info[b.dataset.id] = { name: b.dataset.name, dept: b.dataset.dept };
         });
-        var msg = document.getElementById('arb-pause_message');
-        var count = document.getElementById('arbPauseCount');
-        if (msg && count) count.textContent = String(msg.value.length);
+
+        var initials = function (name) {
+            var parts = String(name).trim().split(/\s+/).filter(Boolean);
+            if (!parts.length) return '?';
+            return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
+        };
+
+        renderPrio = function () {
+            // chosen list
+            prioList.textContent = '';
+            prio.chosen.forEach(function (id) {
+                var info = prio.info[id] || { name: id, dept: '' };
+                var li = document.createElement('li');
+                li.className = 'arb-prio__item';
+
+                var av = document.createElement('span');
+                av.className = 'arb-prio__av';
+                av.textContent = initials(info.name);
+
+                var who = document.createElement('div');
+                who.className = 'arb-prio__who';
+                var nm = document.createElement('div');
+                nm.className = 'arb-prio__name';
+                nm.textContent = info.name;
+                var meta = document.createElement('div');
+                meta.className = 'arb-prio__meta';
+                meta.textContent = id + (info.dept ? ' \u00b7 ' + info.dept : '');
+                who.appendChild(nm);
+                who.appendChild(meta);
+
+                var rm = document.createElement('button');
+                rm.type = 'button';
+                rm.className = 'arb-prio__remove';
+                rm.dataset.arbPrioRemove = id;
+                rm.setAttribute('aria-label', 'Remove ' + info.name + ' from priority');
+                var ico = document.createElement('span');
+                ico.className = 'material-symbols-outlined';
+                ico.textContent = 'close';
+                rm.appendChild(ico);
+
+                li.appendChild(av);
+                li.appendChild(who);
+                li.appendChild(rm);
+                prioList.appendChild(li);
+            });
+
+            var full = prio.chosen.length >= prio.max;
+            prioCount.textContent = String(prio.chosen.length);
+            prioEmpty.hidden = prio.chosen.length > 0;
+            prioLimit.hidden = !full;
+            prioSearch.disabled = full;
+            if (full) prioOptions.hidden = true;
+            filterPrio();
+        };
+
+        var filterPrio = function () {
+            var q = prioSearch.value.trim().toLowerCase();
+            var shown = 0;
+            optBtns.forEach(function (b) {
+                var hide = prio.chosen.indexOf(b.dataset.id) !== -1 || (q && b.dataset.search.toLowerCase().indexOf(q) === -1);
+                b.parentNode.hidden = hide;
+                if (!hide) shown++;
+            });
+            if (prioNone) prioNone.hidden = shown > 0;
+        };
+
+        var openPicker = function () {
+            if (prioSearch.disabled) return;
+            prioOptions.hidden = false;
+            filterPrio();
+        };
+
+        prioSearch.addEventListener('focus', openPicker);
+        prioSearch.addEventListener('input', openPicker);
+        document.addEventListener('click', function (e) {
+            if (!prioCard.contains(e.target)) prioOptions.hidden = true;
+        });
+
+        prioOptions.addEventListener('click', function (e) {
+            var b = e.target.closest('.arb-pick__opt');
+            if (!b || prio.chosen.length >= prio.max || prio.chosen.indexOf(b.dataset.id) !== -1) return;
+            prio.chosen.push(b.dataset.id);
+            prioSearch.value = '';
+            renderPrio();
+            prioOptions.hidden = true;
+            setPresetActive(null);
+            showBar();
+        });
+
+        prioList.addEventListener('click', function (e) {
+            var rm = e.target.closest('[data-arb-prio-remove]');
+            if (!rm) return;
+            prio.chosen = prio.chosen.filter(function (id) { return id !== rm.dataset.arbPrioRemove; });
+            renderPrio();
+            setPresetActive(null);
+            showBar();
+        });
+
+        renderPrio();
+    }
+
+    function setPriority(ids) {
+        if (!prioCard) return;
+        prio.chosen = ids.slice(0, prio.max);
+        prioSearch.value = '';
+        prioOptions.hidden = true;
+        renderPrio();
     }
 
     /* ── Events ──────────────────────────────────────────────── */
@@ -150,7 +260,6 @@
     function onEdit(e) {
         if (applying || !e.target.matches('[data-arb-key]')) return;
         setPresetActive(null);
-        syncDerived();
         showBar();
     }
     root.addEventListener('input', onEdit);
@@ -160,7 +269,7 @@
     });
 
     // Quick presets: only touch the rules the presets are about (limits and toggles),
-    // never the pause settings, opening hours, open days or role weights.
+    // never opening hours, open days, role weights or the priority list.
     var PRESET_KEYS = {};
     Object.keys(PRESETS).forEach(function (n) {
         Object.keys(PRESETS[n]).forEach(function (k) { PRESET_KEYS[k] = true; });
@@ -183,6 +292,7 @@
     if (restoreBtn) {
         restoreBtn.addEventListener('click', function () {
             fill(DEFAULTS);
+            setPriority([]);
             setPresetActive(null);
             showBar();
         });
@@ -193,6 +303,7 @@
     if (discardBtn) {
         discardBtn.addEventListener('click', function () {
             fill(initial);
+            setPriority(prio.initial);
             setPresetActive(null);
             hideBar();
         });
@@ -210,5 +321,4 @@
         });
     }
 
-    syncDerived();
 })();

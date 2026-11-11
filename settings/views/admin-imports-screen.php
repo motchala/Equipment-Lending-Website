@@ -1,10 +1,12 @@
 <!-- ============================================================
      TAB: IMPORTS  (Super Admin only)  -  its own sidebar screen (was Settings -> Imports)
-     Equipment Inventory (placeholder: that import is not built yet) + Rooms Assigned +
+     Equipment Inventory (linked Google Sheet: Sync now + categories) + Rooms Assigned +
      Faculty Registry imports behind ONE password unlock.
      The page only ever contains placeholders: real numbers, lists and
      files are fetched after unlock (settings/api/imports.php).
      Rooms Assigned is its own import (settings/api/rooms-import.php): it never touches the Faculty Registry.
+     Equipment Inventory is not a file upload: its card is settings/views/admin-imports-equipment-card.php and it is
+     served by settings/api/equipment-import.php (the Google Sheets sync the Settings -> Equipment tab also drives).
      Script: settings/assets/js/admin-imports.js
      Styles: settings/assets/css/admin-imports.css
      Layout: page header (title + session pill) / [ import cards | sticky import guide ]
@@ -13,16 +15,12 @@
 <?php
 $imp_cards = [
     'equipment' => [
-        'pending' => true,   // clickable, but nothing is read, uploaded or imported (see initPlaceholderCard)
+        // Not a file upload: drawn by admin-imports-equipment-card.php (Google Sheets link, Sync now, categories)
         'title'   => 'Equipment Inventory',
         'icon'    => 'inventory_2',
-        'sub'     => 'Equipment lists with item names and stock counts',
-        'types'   => 'XLSX or CSV',
-        'accept'  => '.xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'stats'   => ['Items', 'Categories', 'Rows in file'],
-        'cols'    => ['#', 'Item name', 'Category', 'Quantity', 'Condition'],
-        'what'    => 'Items added to equipment inventory for loan.',
-        'replace' => 'Remove the current items first',
+        'sub'     => 'Equipment list synced from a Google Sheet',
+        'stats'   => ['Items', 'Categories', 'Archived'],
+        'what'    => 'Items added to equipment inventory for loan. They are read from the linked Google Sheet, and each tab of the sheet becomes a category.',
     ],
     'faculty' => [
         'title'  => 'Faculty Registry',
@@ -74,7 +72,8 @@ $imp_cards = [
             <div class="imp-layout">
                 <!-- Left: one card per import -->
                 <div class="imp-main">
-                <?php foreach ($imp_cards as $kind => $c): $soon = !empty($c['pending']); ?>
+                <?php foreach ($imp_cards as $kind => $c): $soon = !empty($c['pending']);
+                    if ($kind === 'equipment') { require __DIR__ . '/admin-imports-equipment-card.php'; continue; } ?>
                     <section class="imp-card<?= $soon ? ' imp-card--soon' : '' ?>" data-kind="<?= $kind ?>">
                         <header class="imp-card-head">
                             <div class="imp-card-icon"><span class="material-symbols-outlined"><?= $c['icon'] ?></span></div>
@@ -169,7 +168,7 @@ $imp_cards = [
                 // ── Import guide: what each file has to look like, column by column ──
                 // Faculty Registry is the real, working import (rules below come from its parser).
                 // Rooms Assigned is the Faculty Rooms workbook (rules below come from room-reservation/core/class-schedule.php).
-                // Equipment Inventory is the planned layout for when that import is built.
+                // Equipment Inventory is the Google Sheet layout (rules below come from equipment-booking/api/sync-inventory.php).
                 $gh = function ($s) {
                     return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
                 };
@@ -177,23 +176,23 @@ $imp_cards = [
                 $imp_guide = [
                     'equipment' => [
                         'label'   => 'Equipment Inventory',
-                        'planned' => true,
-                        'formats' => [['XLSX', 'Best choice', 'ok'], ['CSV', 'Works too', 'alt'], ['PDF', 'Not for this list', 'no']],
-                        'why'     => 'Excel keeps every value in its own cell, so quantities stay numbers and a comma in a description never shifts the columns. If you use CSV, save it as "CSV UTF-8" so special characters survive.',
+                        'planned' => false,
+                        'formats' => [['Google Sheets', 'Required', 'ok'], ['XLSX / CSV file', 'Not used here', 'no'], ['Private sheet', 'Will not sync', 'no']],
+                        'why'     => 'Nothing is uploaded. PUPSync reads the sheet straight from Google, so it has to be shared as "Anyone with the link can view". Press Sync now to bring it in; PUPSync also checks the sheet for changes by itself while an admin page is open.',
                         'cols'    => [
-                            ['Item name',   true,  'The name students see when they borrow it. One row for each kind of item.', 'HDMI Cable'],
-                            ['Category',    true,  'Pick one: Audio/Visual, Cables & Connectors, Computing, Lab Equipment, Networking, Power, Tools or Others.', 'Cables & Connectors'],
-                            ['Quantity',    true,  'Total units you own. A whole number, 0 or more.', '5'],
-                            ['Condition',   false, 'Good, Fair or For Repair. Leave it blank for Good.', 'Good'],
-                            ['Description', false, 'A short note, up to 500 characters.', '1.5 m, braided'],
+                            ['Name (or Description)', true,  'The item name people see when they borrow it. It is read from the column headed Name, or Description when there is no Name column. A row with no name, or only a number, is skipped.', 'HDMI Cable'],
+                            ['Status',                true,  'The working state. OK or Working counts as Good. NG, Not working or For repair counts as For Repair. Anything else counts as Fair.', 'OK'],
+                            ['Quantity',              false, 'Use it when one row stands for several identical units. A whole number, 0 or more. Leave the Control No. column out of a sheet that uses Quantity.', '5'],
+                            ['Control No.',           false, 'Use it instead of Quantity when each row is one physical unit. Units with the same name are counted for you, and only OK or Working units are counted as available.', 'CITE-0042'],
                         ],
-                        'rows'    => [['HDMI Cable', 'Cables & Connectors', '5', 'Good', '1.5 m, braided'], ['Projector', 'Audio/Visual', '2', 'Fair', 'Acer, HDMI + VGA']],
+                        'rows'    => [['HDMI Cable', 'OK', '5', ''], ['Extension Cord', 'NG', '2', '']],
                         'tips'    => [
-                            'Put the column names in row 1 and start your data in row 2. Nothing above the headers, no blank rows, no merged cells, no totals row.',
-                            'One row per kind of item. Put the total in Quantity instead of repeating the row for every unit.',
-                            'Spell each item the same way every time, because Merge will match items by name.',
-                            'Photos cannot come from the file. Add them afterwards on the Equipment page (JPG or PNG, up to 2 MB each).',
-                            'Keep each file under 5,000 rows and 10 MB, the same limits as the faculty import.',
+                            'Each tab of the sheet is one category, named after the tab. Tabs named Offices Inventory, Software List, Sports & Development Equipment, Ventilation and Fire Extinguisher are skipped.',
+                            'The header row has to contain Name (or Description) and Status. Rows above it can hold titles. Columns are found by their header names, so their order does not matter.',
+                            'To say which campus a tab belongs to, type Campus: in one cell and Canlalay (PUP CITE) or Zapote (PUP MAIN) in the cell next to it, above the header. With nothing there the tab is read as PUP CITE.',
+                            'Items are matched by name within a campus: existing ones are updated and new ones are added. Units that are out on loan right now are taken off the quantity, so a sync never wipes an active borrow.',
+                            'An item that is no longer in the sheet is archived, not deleted. It leaves the borrowing list but stays on record.',
+                            'Photos cannot come from the sheet. Add them afterwards on the Equipment page (JPG or PNG, up to 2 MB each).',
                         ],
                     ],
                     'rooms' => [

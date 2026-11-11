@@ -26,3 +26,6 @@ importing.md
 !/uploads/rooms_assigned/.htaccess
 /uploads/student_registry/*
 !/uploads/student_registry/.htaccess
+
+# Claude context file (local only)
+/CLAUDE.md

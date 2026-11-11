@@ -577,10 +577,10 @@
                                     </summary>
                                     <div class="hc-faq-a">
                                         <strong>Imports</strong> (in the sidebar, under <strong>Data</strong>) is locked behind your password. Use it to bring in:<br>
-                                        <strong>Equipment Inventory</strong> (XLSX or CSV): for importing equipment lists. This card is a placeholder and is not available yet.<br>
+                                        <strong>Equipment Inventory</strong> (Google Sheet): paste the link of your equipment sheet (shared as &ldquo;Anyone with the link can view&rdquo;), press <strong>Sync now</strong>, and manage the equipment categories on the same card.<br>
                                         <strong>Rooms Assigned</strong> (XLSX or CSV): for importing which rooms are assigned to which faculty or class. This card is a placeholder and is not available yet.<br>
                                         <strong>Faculty Registry</strong> (PDF or XLSX): used to confirm a faculty member when you create their account.<br><br>
-                                        Choose <strong>Merge</strong> to add new entries and update existing ones, or <strong>Replace</strong> to remove everyone listed first. Files can be up to 10 MB, and the original file of the latest import is kept.
+                                        For the Faculty Registry and Rooms Assigned, choose <strong>Merge</strong> to add new entries and update existing ones, or <strong>Replace</strong> to remove everyone listed first. Files can be up to 10 MB, and the original file of the latest import is kept.
                                     </div>
                                 </details>
 

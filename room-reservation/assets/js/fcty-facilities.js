@@ -82,6 +82,19 @@
 
     function plural(n, one, many) { return n + ' ' + (n === 1 ? one : (many || one + 's')); }
 
+    /* Weekly classes (the imported Rooms Assigned list) come from get-room-schedule.php with kind: 'class'.
+       They repeat every week and block the room exactly like an approved reservation. */
+    function isClass(s) { return !!s && s.kind === 'class'; }
+    /* 'COMP 017 · DIT 3-1 (Lecture) — Jane Doe' -> 'COMP 017 · DIT 3-1 (Lecture)': what the class is, not who teaches it */
+    function classTitle(s) { return decodeHtml(String(s.label || '')).split(' \u2014 ')[0] || 'a class'; }
+    /* '2 classes · 1 reservation' */
+    function dayCountLabel(list) {
+        var nc = list.filter(isClass).length, nr = list.length - nc, parts = [];
+        if (nc) parts.push(plural(nc, 'class', 'classes'));
+        if (nr) parts.push(plural(nr, 'reservation'));
+        return parts.length ? parts.join(' \u00b7 ') : 'Free all day';
+    }
+
     function apiBase() {
         var p = window.location.pathname;
         return p.substring(0, p.lastIndexOf('/') + 1);
@@ -524,14 +537,16 @@
         var blocks = '', rows = '';
         list.forEach(function (s) {
             var st = reservationState(dateStr, s, now);
+            var cls = isClass(s);
+            if (cls && st.label === 'Ongoing') st = { cls: st.cls, label: 'In class' };
             var a = tlPct(timeToMin(s.start)), b = tlPct(timeToMin(s.end));
             var range = timeRange(s.start, s.end);
             if (b > a) {
-                blocks += '<div class="fcty-dtl-block ' + st.cls + '" data-l="' + a + '" data-w="' + (b - a) + '" title="' +
+                blocks += '<div class="fcty-dtl-block ' + st.cls + (cls ? ' is-class' : '') + '" data-l="' + a + '" data-w="' + (b - a) + '" title="' +
                     esc(range + ' \u00b7 ' + decodeHtml(s.label) + ' \u00b7 ' + st.label) + '"></div>';
             }
-            rows += '<li class="fcty-dtl-item ' + st.cls + '"><div class="fcty-dtl-info"><time>' + range + '</time>' +
-                '<span class="fcty-dtl-what">' + s.label + '</span></div>' +
+            rows += '<li class="fcty-dtl-item ' + st.cls + (cls ? ' is-class' : '') + '"><div class="fcty-dtl-info"><time>' + range + '</time>' +
+                '<span class="fcty-dtl-what">' + (cls ? '<span class="fcty-dtl-tag">Class</span> ' : '') + s.label + '</span></div>' +
                 '<span class="fcty-dtl-state">' + st.label + '</span></li>';
         });
         var nowLine = (dateStr === ymd(now) && nowMin >= TL_START_MIN && nowMin <= TL_END_MIN)
@@ -542,7 +557,7 @@
         return '<div class="fcty-dtl">' +
             '<div class="fcty-dtl-track" aria-hidden="true">' + blocks + nowLine + '</div>' +
             '<div class="fcty-dtl-ticks" aria-hidden="true">' + ticks + '</div>' +
-            (rows ? '<ul class="fcty-dtl-list">' + rows + '</ul>' : '<p class="fcty-dtl-empty">No reservations</p>') +
+            (rows ? '<ul class="fcty-dtl-list">' + rows + '</ul>' : '<p class="fcty-dtl-empty">No classes or reservations</p>') +
             '</div>';
     }
 
@@ -556,7 +571,7 @@
             '<button type="button" class="fcty-day-head" data-day-key="' + key + '" aria-expanded="' + (open ? 'true' : 'false') + '" aria-controls="' + id + '">' +
             '<span class="fcty-day-main"><span class="fcty-day-title">' + longDate(date) + '</span>' +
             (dateStr === today ? '<span class="fcty-day-tag">Today</span>' : '') + '</span>' +
-            '<span class="fcty-day-count' + (n ? ' has' : '') + '">' + (n ? plural(n, 'reservation') : 'No reservations') + '</span>' +
+            '<span class="fcty-day-count' + (n ? ' has' : '') + '">' + dayCountLabel(list) + '</span>' +
             icon('expand_more') +
             '</button>' +
             '<div class="fcty-day-body" id="' + id + '"' + (open ? '' : ' hidden') + '>' + dayTimelineHTML(dateStr, list, now) + '</div>' +
@@ -803,7 +818,7 @@
 
         var firstOpenStr = ymd(nextOpenDay(now));   /* earliest bookable date: Sundays are closed */
         var weekData = null;          /* schedule for the week of st.date */
-        var serverClash = false;
+        var serverClash = false, serverClass = '';
         var availTimer = null, availCtl = null;
 
         /* Quick date chips: the next two open days (Sundays are skipped) */
@@ -1058,7 +1073,7 @@
             bookings.forEach(function (b) {
                 var s = pct(timeToMin(b.start)), e = pct(timeToMin(b.end));
                 var block = document.createElement('div');
-                block.className = 'fcty-tl-block';
+                block.className = 'fcty-tl-block' + (isClass(b) ? ' is-class' : '');
                 block.style.left = s + '%';
                 block.style.width = Math.max(0, e - s) + '%';
                 block.title = timeRange(b.start, b.end) + ' \u00b7 ' + decodeHtml(b.label);
@@ -1077,7 +1092,9 @@
                 noteEl.innerHTML = icon('schedule') + 'Checking the schedule\u2026';
             } else if (clash.length) {
                 noteEl.className = 'fcty-tl-note is-clash';
-                noteEl.innerHTML = icon('warning') + 'Overlaps ' + timeRange(clash[0].start, clash[0].end) + '. Pick another time.';
+                noteEl.innerHTML = icon('warning') + (isClass(clash[0])
+                    ? 'This room has a class, ' + esc(classTitle(clash[0])) + ', ' + timeRange(clash[0].start, clash[0].end) + '. Pick another time.'
+                    : 'Overlaps ' + timeRange(clash[0].start, clash[0].end) + '. Pick another time.');
             } else {
                 noteEl.className = 'fcty-tl-note';
                 noteEl.innerHTML = icon('check_circle') + 'This time is free.';
@@ -1085,7 +1102,9 @@
 
             /* Server-side conflict notice (only if the local check didn't already flag it) */
             if (serverClash && !clash.length) {
-                setAlert(elAvail, 'warn', 'warning', 'Another reservation overlaps this time. Try a different slot.');
+                setAlert(elAvail, 'warn', 'warning', serverClass
+                    ? 'This room is assigned to a class at that time (' + esc(serverClass) + '). Try a different slot.'
+                    : 'Another reservation overlaps this time. Try a different slot.');
             } else {
                 elAvail.hidden = true;
             }
@@ -1119,12 +1138,12 @@
                 credentials: 'same-origin', signal: availCtl.signal
             })
                 .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
-                .then(function (d) { serverClash = !!d.conflict; renderSummary(); })
-                .catch(function (err) { if (!err || err.name !== 'AbortError') { serverClash = false; } });
+                .then(function (d) { serverClash = !!d.conflict; serverClass = d.reason === 'class' ? String(d.class_label || 'a class') : ''; renderSummary(); })
+                .catch(function (err) { if (!err || err.name !== 'AbortError') { serverClash = false; serverClass = ''; } });
         }
 
         function changed(dateChanged) {
-            serverClash = false;
+            serverClash = false; serverClass = '';
             elMsg.hidden = true;
             if (dateChanged) { refresh(); loadWeek(); } else refresh();
             clearTimeout(availTimer);

@@ -3169,3 +3169,67 @@ textarea.fcty-input {
         transition: none;
     }
 }
+
+/* ── Weekly classes (imported Rooms Assigned list) in the Today / This week schedule and the booking timeline ──
+   Same time-blocks as reservations, but a cooler colour and a "Class" tag so they read as the room's fixed schedule. */
+.fcty-dtl-block.is-class {
+    background: var(--fcty-class, #1f6f8b);
+}
+
+.fcty-dtl-block.is-class.is-ongoing {
+    background: repeating-linear-gradient(135deg, rgba(255, 255, 255, .32) 0 4px, transparent 4px 8px), var(--fcty-class, #1f6f8b);
+}
+
+.fcty-dtl-block.is-class.is-past {
+    background: var(--fcty-static);
+}
+
+.fcty-dtl-item.is-class {
+    border-left-color: var(--fcty-class, #1f6f8b);
+}
+
+.fcty-dtl-item.is-class.is-ongoing {
+    border-left-color: var(--fcty-booked);
+}
+
+.fcty-dtl-item.is-class.is-past {
+    border-left-color: var(--fcty-static);
+}
+
+.fcty-dtl-item.is-class .fcty-dtl-state {
+    background: color-mix(in srgb, var(--fcty-class, #1f6f8b) 14%, transparent);
+    color: var(--fcty-class, #1f6f8b);
+}
+
+.fcty-dtl-item.is-class.is-ongoing .fcty-dtl-state {
+    background: color-mix(in srgb, var(--fcty-booked) 14%, transparent);
+    color: var(--fcty-booked);
+}
+
+.fcty-dtl-item.is-class.is-past .fcty-dtl-state {
+    background: color-mix(in srgb, var(--fcty-static) 16%, transparent);
+    color: var(--fcty-static);
+}
+
+.fcty-dtl-tag {
+    display: inline-block;
+    margin-right: 4px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--fcty-class, #1f6f8b) 14%, transparent);
+    color: var(--fcty-class, #1f6f8b);
+    font-size: .6875rem;
+    font-weight: 700;
+    letter-spacing: .02em;
+    vertical-align: 1px;
+}
+
+.fcty-dtl-item.is-class.is-past .fcty-dtl-tag {
+    background: color-mix(in srgb, var(--fcty-static) 16%, transparent);
+    color: var(--fcty-static);
+}
+
+/* booking form: the room's classes on the small timeline (white hatch on the maroon side panel) */
+.fcty-tl-block.is-class {
+    background: repeating-linear-gradient(45deg, rgba(255, 255, 255, .62) 0 3px, rgba(255, 255, 255, .28) 3px 6px);
+}
