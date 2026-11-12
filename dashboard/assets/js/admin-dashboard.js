@@ -4726,19 +4726,19 @@
                             if (data.success && data.checklist) {
                                 // Show inline checklist inside the scanner modal
                                 scanning = false;
-                                const cameraView    = document.getElementById('qrCameraView');
+                                const cameraView = document.getElementById('qrCameraView');
                                 const checklistView = document.getElementById('qrChecklistView');
-                                const itemsEl       = document.getElementById('qrChecklistItems');
-                                const hintEl        = document.getElementById('qrChecklistHint');
-                                const confirmBtn    = document.getElementById('qrChecklistConfirm');
-                                const cancelBtn     = document.getElementById('qrChecklistCancel');
-                                const titleEl       = document.getElementById('qrScannerTitle');
-                                const subtitleEl    = document.getElementById('qrScannerSubtitle');
+                                const itemsEl = document.getElementById('qrChecklistItems');
+                                const hintEl = document.getElementById('qrChecklistHint');
+                                const confirmBtn = document.getElementById('qrChecklistConfirm');
+                                const cancelBtn = document.getElementById('qrChecklistCancel');
+                                const titleEl = document.getElementById('qrScannerTitle');
+                                const subtitleEl = document.getElementById('qrScannerSubtitle');
 
                                 // Switch view
-                                cameraView.style.display    = 'none';
+                                cameraView.style.display = 'none';
                                 checklistView.style.display = '';
-                                titleEl.textContent    = isClaimQr ? 'Claim Checklist' : 'Return Checklist';
+                                titleEl.textContent = isClaimQr ? 'Claim Checklist' : 'Return Checklist';
                                 subtitleEl.textContent = isClaimQr
                                     ? 'Hand over to ' + (data.collector || data.borrower)
                                     : 'Return from ' + data.borrower;
@@ -4746,7 +4746,7 @@
                                 // Build item rows
                                 itemsEl.innerHTML = '';
                                 const CONDITIONS = ['Good', 'Fair', 'Damaged', 'Missing'];
-                                data.items.forEach(function(item, idx) {
+                                data.items.forEach(function (item, idx) {
                                     const bg = idx % 2 === 0 ? '#fff' : '#fafafa';
                                     const row = document.createElement('div');
                                     row.style.cssText = 'display:flex;align-items:center;gap:.65rem;padding:.75rem 1rem;background:' + bg + ';border-bottom:1px solid #f0f0f0;';
@@ -4797,30 +4797,30 @@
 
                                 // Wire qty +/- buttons and condition dropdown visibility
                                 if (isClaimQr) {
-                                    itemsEl.addEventListener('click', function(e) {
+                                    itemsEl.addEventListener('click', function (e) {
                                         var dec = e.target.closest('[data-claim-dec]');
                                         var inc = e.target.closest('[data-claim-inc]');
                                         var btn = dec || inc;
                                         if (!btn) return;
-                                        var rid  = btn.dataset.reqId || btn.getAttribute('data-req-id');
-                                        var inp  = itemsEl.querySelector('input[data-claim-qty][data-req-id="' + rid + '"]');
+                                        var rid = btn.dataset.reqId || btn.getAttribute('data-req-id');
+                                        var inp = itemsEl.querySelector('input[data-claim-qty][data-req-id="' + rid + '"]');
                                         var cond = itemsEl.querySelector('select[data-claim-cond][data-req-id="' + rid + '"]');
                                         if (!inp) return;
                                         var max = parseInt(inp.dataset.maxQty || inp.max, 10);
-                                        var v   = parseInt(inp.value, 10);
+                                        var v = parseInt(inp.value, 10);
                                         if (dec) v = Math.max(0, v - 1);
                                         if (inc) v = Math.min(max, v + 1);
                                         inp.value = v;
                                         // Show condition dropdown only when some units are withheld
                                         if (cond) cond.style.display = (v < max) ? '' : 'none';
                                     });
-                                    itemsEl.addEventListener('change', function(e) {
+                                    itemsEl.addEventListener('change', function (e) {
                                         var inp = e.target.closest('input[data-claim-qty]');
                                         if (!inp) return;
-                                        var max  = parseInt(inp.dataset.maxQty || inp.max, 10);
-                                        var v    = Math.max(0, Math.min(max, parseInt(inp.value, 10) || 0));
+                                        var max = parseInt(inp.dataset.maxQty || inp.max, 10);
+                                        var v = Math.max(0, Math.min(max, parseInt(inp.value, 10) || 0));
                                         inp.value = v;
-                                        var rid  = inp.getAttribute('data-req-id');
+                                        var rid = inp.getAttribute('data-req-id');
                                         var cond = itemsEl.querySelector('select[data-claim-cond][data-req-id="' + rid + '"]');
                                         if (cond) cond.style.display = (v < max) ? '' : 'none';
                                     });
@@ -4831,7 +4831,7 @@
                                     : 'Tick only items being returned now. Unticked items stay On Loan. "Damaged" or "Missing" flags the record.';
 
                                 // Confirm handler
-                                confirmBtn.onclick = function() {
+                                confirmBtn.onclick = function () {
                                     confirmBtn.disabled = true;
                                     confirmBtn.textContent = 'Saving...';
 
@@ -4844,22 +4844,22 @@
 
                                     if (isClaimQr) {
                                         // Collect actual qty per item from the spinners
-                                                                                const claimRows = [];
-                                        itemsEl.querySelectorAll('input[data-claim-qty][data-req-id]').forEach(function(inp) {
-                                            const rid     = inp.getAttribute('data-req-id');
-                                            const maxQty  = parseInt(inp.dataset.maxQty || inp.max, 10);
+                                        const claimRows = [];
+                                        itemsEl.querySelectorAll('input[data-claim-qty][data-req-id]').forEach(function (inp) {
+                                            const rid = inp.getAttribute('data-req-id');
+                                            const maxQty = parseInt(inp.dataset.maxQty || inp.max, 10);
                                             const giveQty = Math.max(0, Math.min(maxQty, parseInt(inp.value, 10) || 0));
                                             const condSel = itemsEl.querySelector('select[data-claim-cond][data-req-id="' + rid + '"]');
-                                            const held    = maxQty - giveQty;
-                                            const cond    = (held > 0 && condSel) ? condSel.value : 'Good';
+                                            const held = maxQty - giveQty;
+                                            const cond = (held > 0 && condSel) ? condSel.value : 'Good';
                                             claimRows.push({ id: rid, give: giveQty, max: maxQty, withheld: held, condition: cond });
                                         });
 
                                         // Reason required only when a GOOD-condition item is withheld.
                                         // Damaged / Missing are self-explanatory — automatic reason applied.
-                                        const needReason = claimRows.filter(function(r) { return r.withheld > 0 && r.condition === 'Good'; });
+                                        const needReason = claimRows.filter(function (r) { return r.withheld > 0 && r.condition === 'Good'; });
                                         if (needReason.length > 0) {
-                                            const lines = needReason.map(function(r) {
+                                            const lines = needReason.map(function (r) {
                                                 const inp2 = itemsEl.querySelector('input[data-claim-qty][data-req-id="' + r.id + '"]');
                                                 const prev = inp2 ? inp2.closest('div') : null;
                                                 const nameEl = prev ? prev.previousElementSibling.querySelector('strong') : null;
@@ -4876,17 +4876,17 @@
                                                 confirmBtn.textContent = 'Confirm';
                                                 return;
                                             }
-                                            needReason.forEach(function(r) {
+                                            needReason.forEach(function (r) {
                                                 formData.append('reason[' + r.id + ']', reason.trim());
                                             });
                                         }
 
                                         // Damaged / Missing: automatic reason, no prompt needed
-                                        claimRows.filter(function(r) { return r.withheld > 0 && r.condition !== 'Good'; }).forEach(function(r) {
+                                        claimRows.filter(function (r) { return r.withheld > 0 && r.condition !== 'Good'; }).forEach(function (r) {
                                             formData.append('reason[' + r.id + ']', r.condition + ' at handover — item kept in cabinet.');
                                         });
 
-                                        claimRows.forEach(function(r) {
+                                        claimRows.forEach(function (r) {
                                             formData.append('give_qty[' + r.id + ']', r.give);
                                             if (r.withheld > 0) {
                                                 formData.append('withheld_qty[' + r.id + ']', r.withheld);
@@ -4896,22 +4896,22 @@
 
                                         fetch('equipment-booking/api/partial-claim.php', {
                                             method: 'POST', credentials: 'same-origin', body: formData
-                                        }).then(function(r) { return r.json(); })
-                                        .then(function(result) {
-                                            const msg = (result.claimed || 0) + ' item(s) handed over' +
-                                                (result.withheld > 0 ? ', ' + result.withheld + ' unit(s) withheld.' : '.');
-                                            showToast('✅ ' + msg);
-                                            resetToCamera();
-                                            if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
-                                        }).catch(function() {
-                                            showToast('Network error. Please try again.');
-                                            confirmBtn.disabled = false;
-                                            confirmBtn.textContent = 'Confirm';
-                                        });
+                                        }).then(function (r) { return r.json(); })
+                                            .then(function (result) {
+                                                const msg = (result.claimed || 0) + ' item(s) handed over' +
+                                                    (result.withheld > 0 ? ', ' + result.withheld + ' unit(s) withheld.' : '.');
+                                                showToast('✅ ' + msg);
+                                                resetToCamera();
+                                                if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
+                                            }).catch(function () {
+                                                showToast('Network error. Please try again.');
+                                                confirmBtn.disabled = false;
+                                                confirmBtn.textContent = 'Confirm';
+                                            });
 
                                     } else {
                                         // Only process items whose checkbox is ticked
-                                        itemsEl.querySelectorAll('input[type="checkbox"]:checked[data-req-id]').forEach(function(cb) {
+                                        itemsEl.querySelectorAll('input[type="checkbox"]:checked[data-req-id]').forEach(function (cb) {
                                             const rid = cb.dataset.reqId;
                                             const sel = itemsEl.querySelector('select[data-req-id="' + rid + '"]');
                                             if (sel) {
@@ -4923,17 +4923,17 @@
                                         });
                                         fetch('equipment-booking/api/partial-return.php', {
                                             method: 'POST', credentials: 'same-origin', body: formData
-                                        }).then(function(r) { return r.json(); })
-                                        .then(function(result) {
-                                            const n = result.returned || 0;
-                                            showToast('✅ ' + n + ' item' + (n === 1 ? '' : 's') + ' marked as returned.');
-                                            resetToCamera();
-                                            if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
-                                        }).catch(function() {
-                                            showToast('Network error. Please try again.');
-                                            confirmBtn.disabled = false;
-                                            confirmBtn.textContent = 'Confirm';
-                                        });
+                                        }).then(function (r) { return r.json(); })
+                                            .then(function (result) {
+                                                const n = result.returned || 0;
+                                                showToast('✅ ' + n + ' item' + (n === 1 ? '' : 's') + ' marked as returned.');
+                                                resetToCamera();
+                                                if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
+                                            }).catch(function () {
+                                                showToast('Network error. Please try again.');
+                                                confirmBtn.disabled = false;
+                                                confirmBtn.textContent = 'Confirm';
+                                            });
                                     }
                                 };
 
@@ -4944,8 +4944,8 @@
                                     confirmBtn.disabled = false;
                                     confirmBtn.textContent = 'Confirm';
                                     checklistView.style.display = 'none';
-                                    cameraView.style.display    = '';
-                                    titleEl.textContent    = 'Scan QR Code';
+                                    cameraView.style.display = '';
+                                    titleEl.textContent = 'Scan QR Code';
                                     subtitleEl.textContent = 'Point the camera at the faculty member\'s QR code.';
                                     status.textContent = 'Point camera at the next QR code.';
                                     status.style.color = '#888';
@@ -5981,8 +5981,8 @@ function psSelectFmt(btn) {
             if (nav) {
                 nav.click();
                 // Defer sub-panel navigation until the tab panel has activated (next tick).
-                var loanFilter  = go.getAttribute('data-dash-loan-filter');
-                var roomsTab    = go.getAttribute('data-dash-rooms-tab');
+                var loanFilter = go.getAttribute('data-dash-loan-filter');
+                var roomsTab = go.getAttribute('data-dash-rooms-tab');
                 var roomsFilter = go.getAttribute('data-dash-rooms-filter');
                 if (loanFilter || roomsTab) {
                     setTimeout(function () {
@@ -6458,7 +6458,7 @@ function psSelectFmt(btn) {
             }
         }
 
-        window.psRefreshEquipmentLoans = function () {
+        window.psRefreshEquipmentLoans = function (keepPage) {
             rows = Array.prototype.slice.call(table.querySelectorAll('tbody tr.eq-loan-row'));
             orderRowsTogether();
             var pendingByBatch = {};
@@ -6496,7 +6496,7 @@ function psSelectFmt(btn) {
                 actionCell.appendChild(button);
                 actionCell.classList.add('has-bundle-approve');
             });
-            page = 1;
+            if (!keepPage) page = 1;
             render();
         };
 
@@ -6565,6 +6565,173 @@ function psSelectFmt(btn) {
             });
         }
 
+        /* ── In-place action helpers (Manual Return / Send Notice / Cancel Booking) ──────────
+           The buttons show a spinner while the request runs, the row dims, and when the server
+           answers the row / counts are updated right here. No page reload. */
+        var SPIN_HTML = '<span class="material-symbols-outlined" style="animation:spin 0.8s linear infinite">progress_activity</span> ';
+
+        function btnBusy(btn, label) {
+            if (!btn) return;
+            if (btn.getAttribute('aria-busy') !== 'true') btn.dataset.idleHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.setAttribute('aria-busy', 'true');
+            btn.innerHTML = SPIN_HTML + label;
+        }
+        function btnIdle(btn) {
+            if (!btn) return;
+            if (btn.dataset.idleHtml) btn.innerHTML = btn.dataset.idleHtml;
+            btn.removeAttribute('aria-busy');
+            btn.disabled = false;
+        }
+        function rowBusy(tr, on) {
+            if (!tr) return;
+            tr.style.transition = 'opacity .15s';
+            tr.style.opacity = on ? '.5' : '';
+            tr.style.pointerEvents = on ? 'none' : '';
+        }
+        function loanRow(id) {
+            return table.querySelector('tr.eq-loan-row[data-id="' + id + '"]');
+        }
+        function toast(msg, type) {
+            if (typeof window.showToast === 'function') window.showToast(msg, type);
+        }
+        /* POST as an AJAX call. Always resolves to { ok, data } (data is {} if the reply was not JSON);
+           rejects on a network error or after 25 s so a button can never stay stuck on a spinner. */
+        function postAjax(url, fd) {
+            var ctl = (typeof AbortController === 'function') ? new AbortController() : null;
+            var timer = ctl ? setTimeout(function () { ctl.abort(); }, 25000) : null;
+            return fetch(url, {
+                method: 'POST',
+                body: fd,
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                signal: ctl ? ctl.signal : undefined
+            }).then(function (r) {
+                return r.json().catch(function () { return {}; }).then(function (data) {
+                    return { ok: r.ok, data: data || {} };
+                });
+            }).then(function (res) {
+                if (timer) clearTimeout(timer);
+                return res;
+            }, function (err) {
+                if (timer) clearTimeout(timer);
+                throw err;
+            });
+        }
+        /* +/- the little number on a status tab (Waiting / Pickup / Active / Overdue) */
+        function bumpTab(key, delta) {
+            var chip = tabBar ? tabBar.querySelector('[data-loan-filter="' + key + '"] .eq-loan-tab-count') : null;
+            if (!chip) return;
+            var n = Math.max(0, (parseInt(chip.textContent, 10) || 0) + delta);
+            chip.textContent = String(n);
+            if (key !== 'active') chip.classList.toggle('has', n > 0);
+        }
+        function afterLoanChange() {
+            if (typeof window.adminDoPoll === 'function') window.adminDoPoll();   /* dashboard numbers */
+        }
+
+        /* A loan that was just returned: turn the row into a "Returned" row (same cells the server draws). */
+        function markRowReturned(tr, d) {
+            var prev = tr.dataset.loanState;
+            tr.className = tr.className.replace(/\bis-\S+/g, '').trim() + ' is-returned';
+            tr.dataset.loanState = 'returned';
+            tr.dataset.status = 'Returned';
+            tr.dataset.returnedAtDisplay = d.returned_at_label || '';
+            tr.dataset.handledBy = d.handled_by || '';
+
+            var c4 = tr.querySelector('td[data-col="col4"]');
+            if (c4) {
+                c4.removeAttribute('style');
+                c4.textContent = d.returned_date || '';
+                var sub = document.createElement('div');
+                sub.className = 'eq-cell-sub';
+                sub.textContent = d.returned_time || '';
+                c4.appendChild(sub);
+            }
+            var c5 = tr.querySelector('td[data-col="col5"]');
+            if (c5) {
+                c5.textContent = '';
+                var wrap = document.createElement('span');
+                wrap.className = 'ps-decider';
+                var nm = document.createElement('span');
+                nm.className = 'ps-decider-name';
+                nm.textContent = d.handled_by || '';
+                var when = document.createElement('span');
+                when.className = 'ps-decider-sub';
+                when.textContent = d.handled_label || '';
+                wrap.appendChild(nm);
+                wrap.appendChild(when);
+                c5.appendChild(wrap);
+            }
+            var act = tr.querySelector('td[data-col="actions"] > div');
+            if (act) act.innerHTML = '<button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-action="eq-open-loan-detail">View</button>';
+
+            bumpTab(prev === 'overdue' ? 'overdue' : (prev === 'pickup' ? 'pickup' : 'active'), -1);
+        }
+
+        /* Notice button states. A faculty member can be noticed once per day, so after a notice every
+           overdue row of that faculty shows "Sent today" (disabled) until midnight. */
+        var NOTICE_LOCK_TIP = 'A notice was already sent to this faculty today. You can send another one tomorrow.';
+        function noticeIcon(name) {
+            return '<span class="material-symbols-outlined" style="font-size:14px;">' + name + '</span> ';
+        }
+        function lockNoticeBtn(btn, unlockTs) {
+            if (!btn) return;
+            btn.removeAttribute('aria-busy');
+            btn.disabled = true;
+            btn.dataset.unlockTs = String(unlockTs || 0);
+            btn.classList.remove('ps-btn--outline');
+            btn.classList.add('ps-btn--ghost');
+            btn.title = NOTICE_LOCK_TIP;
+            btn.innerHTML = noticeIcon('mark_email_read') + 'Sent today';
+        }
+        function unlockNoticeBtn(btn) {
+            var tr = btn.closest('tr.eq-loan-row');
+            var n = tr ? (parseInt(tr.dataset.noticeCount || '0', 10) || 0) : 0;
+            delete btn.dataset.unlockTs;
+            btn.removeAttribute('aria-busy');
+            btn.disabled = false;
+            btn.classList.toggle('ps-btn--ghost', n > 0);
+            btn.classList.toggle('ps-btn--outline', n === 0);
+            btn.title = n > 0 ? 'Notice already sent (' + n + 'x). Click to send another.' : 'Send overdue notice';
+            btn.innerHTML = noticeIcon(n > 0 ? 'mark_email_read' : 'mail') + (n > 0 ? 'Notice (' + n + ')' : 'Notice');
+        }
+        function lockFacultyNotices(facultyKey, unlockTs) {
+            table.querySelectorAll('tr.eq-loan-row[data-loan-state="overdue"]').forEach(function (tr) {
+                if (facultyKey && tr.dataset.facultyKey !== facultyKey) return;
+                lockNoticeBtn(tr.querySelector('[data-notice-btn]'), unlockTs);
+            });
+        }
+        function unlockExpiredNotices() {
+            var now = Date.now();
+            table.querySelectorAll('[data-notice-btn][data-unlock-ts]').forEach(function (btn) {
+                if (now >= (parseInt(btn.dataset.unlockTs, 10) || 0) * 1000) unlockNoticeBtn(btn);
+            });
+        }
+        setInterval(unlockExpiredNotices, 60000);
+        document.addEventListener('visibilitychange', function () { if (!document.hidden) unlockExpiredNotices(); });
+
+        function markNoticeSent(d) {
+            var tr = loanRow(d.request_id);
+            if (tr) {
+                tr.dataset.noticeCount = String(d.notice_count || 1);
+                tr.dataset.noticeLast = d.last_label || '';
+                var c4 = tr.querySelector('td[data-col="col4"]');
+                if (c4) {
+                    var line = c4.querySelector('.eq-cell-sub[title^="Notice sent"]');
+                    if (!line) {
+                        line = document.createElement('div');
+                        line.className = 'eq-cell-sub';
+                        line.style.cssText = 'color:#059669;font-weight:500;display:flex;align-items:center;gap:3px;margin-top:2px;';
+                        c4.appendChild(line);
+                    }
+                    line.title = 'Notice sent: ' + (d.last_label || '');
+                    line.innerHTML = '<span class="material-symbols-outlined" style="font-size:12px;">mark_email_read</span> Notice sent (just now)';
+                }
+            }
+            lockFacultyNotices(d.faculty_id, d.unlock_ts);
+        }
+
         /* ── Scheduled (later-date) bookings: cancel / revoke before they start ──
            They are approved by default, so an admin can still revoke one here. Uses the existing
            admin-override endpoint (Approved → Declined, reason required). A booking that has not
@@ -6624,8 +6791,9 @@ function psSelectFmt(btn) {
                     return;
                 }
                 var orig = cBtn.innerHTML;
-                cBtn.disabled = true;
-                cBtn.textContent = 'Cancelling\u2026';
+                var cRow = loanRow(id);
+                btnBusy(cBtn, 'Cancelling\u2026');
+                rowBusy(cRow, true);
                 cClearAlert();
 
                 var tok = document.querySelector('input[name="csrf_token"]');
@@ -6641,7 +6809,8 @@ function psSelectFmt(btn) {
                         if (data && data.status === 'success') {
                             if (typeof window.showToast === 'function') window.showToast('Booking cancelled.');
                             cModal.classList.remove('ps-modal-open');
-                            cBtn.innerHTML = orig;
+                            btnIdle(cBtn);
+                            cBtn.disabled = true;   /* the next booking starts with an empty reason */
 
                             /* take the row out of the table and update the Waiting count */
                             var tr = table.querySelector('tr.eq-loan-row[data-id="' + id + '"]');
@@ -6652,16 +6821,19 @@ function psSelectFmt(btn) {
                             var cnt = tabBar ? tabBar.querySelector('[data-loan-filter="waiting"] .eq-loan-tab-count') : null;
                             if (cnt) cnt.textContent = String(Math.max(0, (parseInt(cnt.textContent, 10) || 0) - 1));
                             render();
+                            afterLoanChange();
                         } else {
+                            rowBusy(cRow, false);
                             cShowAlert((data && data.message) || 'Action failed. Please try again.');
-                            cBtn.disabled = false;
-                            cBtn.innerHTML = orig;
+                            btnIdle(cBtn);
+                            cBtn.disabled = cReason ? cReason.value.trim().length < 5 : false;
                         }
                     })
                     .catch(function () {
+                        rowBusy(cRow, false);
                         cShowAlert('Network error. Please try again.');
-                        cBtn.disabled = false;
-                        cBtn.innerHTML = orig;
+                        btnIdle(cBtn);
+                        cBtn.disabled = cReason ? cReason.value.trim().length < 5 : false;
                     });
             });
         }
@@ -6697,20 +6869,47 @@ function psSelectFmt(btn) {
                 if (returnNotes) returnNotes.value = '';
             });
 
+            var returnBusy = false;
             returnForm.addEventListener('submit', function (e) {
+                e.preventDefault();
+                if (returnBusy) return;
                 var id = returnId ? returnId.value : '';
                 if (!id) {
-                    e.preventDefault();
-                    if (typeof window.showToast === 'function') window.showToast('Select a loan to return first.');
+                    toast('Select a loan to return first.');
                     return;
                 }
                 var selected = returnCondition && returnCondition.options[returnCondition.selectedIndex];
                 if (returnConditionValue) {
                     returnConditionValue.value = selected ? selected.text.split(/\s+/)[0] : 'Good';
                 }
-                returnBtn.disabled = true;
-                returnBtn.textContent = 'Recording\u2026';
-                try { sessionStorage.setItem('openManualReturnLoanTab', '1'); } catch (_) { }
+                var tr = loanRow(id);
+                returnBusy = true;
+                btnBusy(returnBtn, 'Recording\u2026');
+                rowBusy(tr, true);
+
+                postAjax('equipment-booking/api/manual-return.php', new FormData(returnForm))
+                    .then(function (res) {
+                        if (res.ok && res.data.status === 'success') {
+                            if (typeof psCloseModal === 'function') psCloseModal('ps-return-modal');
+                            toast('Manual return recorded.');
+                            var row = loanRow(id);
+                            if (row) markRowReturned(row, res.data);
+                            if (typeof window.psRefreshEquipmentLoans === 'function') window.psRefreshEquipmentLoans(true);
+                            afterLoanChange();
+                            /* the returned units are back in stock: refresh the Catalog numbers too */
+                            if (typeof window.psRefreshInventoryTbody === 'function') window.psRefreshInventoryTbody();
+                        } else {
+                            toast(res.data.message || 'Could not record the return. Please try again.');
+                        }
+                    })
+                    .catch(function () {
+                        toast('Network error. The return may not have been saved, so check the list before trying again.');
+                    })
+                    .then(function () {
+                        returnBusy = false;
+                        btnIdle(returnBtn);
+                        rowBusy(loanRow(id), false);
+                    });
             });
         }
 
@@ -6744,8 +6943,8 @@ function psSelectFmt(btn) {
 
                 // Show "notice already sent" warning banner inside the modal
                 var histAlert = document.getElementById('overdue-notice-history-alert');
-                var histText  = document.getElementById('overdue-notice-history-text');
-                var nCount    = parseInt(d.noticeCount || '0', 10);
+                var histText = document.getElementById('overdue-notice-history-text');
+                var nCount = parseInt(d.noticeCount || '0', 10);
                 if (histAlert && histText) {
                     if (nCount > 0) {
                         var nLast = d.noticeLast || '';
@@ -6770,35 +6969,64 @@ function psSelectFmt(btn) {
                 }
             });
 
+            var noticeBusy = false;
             noticeForm.addEventListener('submit', function (e) {
+                e.preventDefault();
+                if (noticeBusy) return;
                 if (!noticeId || !noticeId.value) {
-                    e.preventDefault();
-                    if (typeof window.showToast === 'function') window.showToast('Select an overdue loan first.');
+                    toast('Select an overdue loan first.');
                     return;
                 }
-                noticeBtn.disabled = true;
-                noticeBtn.textContent = 'Sending\u2026';
-                try { sessionStorage.setItem('openOverdueLoanTab', '1'); } catch (_) { }
+                var id = noticeId.value;
+                var tr = loanRow(id);
+                noticeBusy = true;
+                btnBusy(noticeBtn, 'Sending\u2026');
+                rowBusy(tr, true);
+
+                postAjax('equipment-booking/api/send-overdue-notice.php', new FormData(noticeForm))
+                    .then(function (res) {
+                        var d = res.data;
+                        if (res.ok && d.status === 'success') {
+                            if (typeof psCloseModal === 'function') psCloseModal('ps-notice-modal');
+                            toast(d.message || 'Overdue notice sent to the borrower.');
+                            markNoticeSent(d);
+                        } else if (d.code === 'already_sent_today') {
+                            /* once per faculty per day: another admin (or an earlier click) already noticed them */
+                            if (typeof psCloseModal === 'function') psCloseModal('ps-notice-modal');
+                            toast(d.message || NOTICE_LOCK_TIP, 'warning');
+                            lockFacultyNotices(d.faculty_id, d.unlock_ts);
+                        } else {
+                            toast(d.message || 'Could not send the overdue notice. Please try again.');
+                        }
+                    })
+                    .catch(function () {
+                        toast('Network error. Please try again.');
+                    })
+                    .then(function () {
+                        noticeBusy = false;
+                        btnIdle(noticeBtn);
+                        rowBusy(loanRow(id), false);
+                    });
             });
         }
 
         /* ── Manual Claim ──────────────────────────────────────────────────
            Lets an admin record an equipment handover without the borrower's
            QR code. Shown as a small "Manual" button on every pickup-tab row. */
-        var mcModal    = document.getElementById('ps-manual-claim-modal');
-        var mcReqId    = document.getElementById('manual-claim-request-id');
-        var mcAlert    = document.getElementById('ps-manual-claim-alert');
+        var mcModal = document.getElementById('ps-manual-claim-modal');
+        var mcReqId = document.getElementById('manual-claim-request-id');
+        var mcAlert = document.getElementById('ps-manual-claim-alert');
         var mcBorrower = document.getElementById('mc-borrower');
         var mcEquipment = document.getElementById('mc-equipment');
-        var mcDue      = document.getElementById('mc-due');
-        var mcQtyInp   = document.getElementById('mc-qty');
-        var mcQtyOf    = document.getElementById('mc-qty-of');
-        var mcWrap     = document.getElementById('mc-withheld-wrap');
-        var mcCondSel  = document.getElementById('mc-withheld-cond');
+        var mcDue = document.getElementById('mc-due');
+        var mcQtyInp = document.getElementById('mc-qty');
+        var mcQtyOf = document.getElementById('mc-qty-of');
+        var mcWrap = document.getElementById('mc-withheld-wrap');
+        var mcCondSel = document.getElementById('mc-withheld-cond');
         var mcReasonWrap = document.getElementById('mc-reason-wrap');
-        var mcReasonInp  = document.getElementById('mc-reason');
-        var mcConfirm  = document.getElementById('manual-claim-confirm-btn');
-        var mcMaxQty   = 1;
+        var mcReasonInp = document.getElementById('mc-reason');
+        var mcConfirm = document.getElementById('manual-claim-confirm-btn');
+        var mcMaxQty = 1;
 
         function mcUpdateUI() {
             if (!mcQtyInp) return;
@@ -6822,15 +7050,15 @@ function psSelectFmt(btn) {
                 var d = tr.dataset;
                 if (mcReqId) mcReqId.value = d.id || '';
                 mcMaxQty = Math.max(1, parseInt(d.qty, 10) || 1);
-                if (mcBorrower)  mcBorrower.textContent  = d.borrower  || '—';
+                if (mcBorrower) mcBorrower.textContent = d.borrower || '—';
                 if (mcEquipment) mcEquipment.textContent = d.equipment + (mcMaxQty > 1 ? ' \u00d7' + mcMaxQty : '');
-                if (mcDue)       mcDue.textContent       = d.dueLabel  || '—';
-                if (mcQtyInp)    { mcQtyInp.max = mcMaxQty; mcQtyInp.value = mcMaxQty; }
-                if (mcQtyOf)     mcQtyOf.textContent = 'of ' + mcMaxQty;
-                if (mcCondSel)   mcCondSel.selectedIndex = 0;
+                if (mcDue) mcDue.textContent = d.dueLabel || '—';
+                if (mcQtyInp) { mcQtyInp.max = mcMaxQty; mcQtyInp.value = mcMaxQty; }
+                if (mcQtyOf) mcQtyOf.textContent = 'of ' + mcMaxQty;
+                if (mcCondSel) mcCondSel.selectedIndex = 0;
                 if (mcReasonInp) mcReasonInp.value = '';
-                if (mcAlert)     { mcAlert.style.display = 'none'; mcAlert.textContent = ''; }
-                if (mcConfirm)   { mcConfirm.disabled = false; mcConfirm.innerHTML = '<span class="material-symbols-outlined">check</span> Record Handover'; }
+                if (mcAlert) { mcAlert.style.display = 'none'; mcAlert.textContent = ''; }
+                if (mcConfirm) { mcConfirm.disabled = false; mcConfirm.innerHTML = '<span class="material-symbols-outlined">check</span> Record Handover'; }
                 mcUpdateUI();
             });
 
@@ -7135,7 +7363,7 @@ function psSelectFmt(btn) {
 
     /* ── Admin inventory form: filter category options by selected campus ── */
     (function () {
-        var campusSel   = document.getElementById('inv-campus');
+        var campusSel = document.getElementById('inv-campus');
         var categorySel = document.getElementById('inv-category');
         if (!campusSel || !categorySel) return;
 
@@ -7178,18 +7406,18 @@ function psSelectFmt(btn) {
                 credentials: 'same-origin',
                 cache: 'no-store'
             })
-            .then(function (r) { return r.ok ? r.json() : null; })
-            .then(function (frag) {
-                if (!frag || frag.status !== 'success') return;
-                var tbody = document.getElementById('inventory-body');
-                if (tbody) {
-                    tbody.innerHTML = frag.active_html;
-                    if (typeof window._setupInventoryListFn === 'function') {
-                        window._setupInventoryListFn();
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (frag) {
+                    if (!frag || frag.status !== 'success') return;
+                    var tbody = document.getElementById('inventory-body');
+                    if (tbody) {
+                        tbody.innerHTML = frag.active_html;
+                        if (typeof window._setupInventoryListFn === 'function') {
+                            window._setupInventoryListFn();
+                        }
                     }
-                }
-            })
-            .catch(function () {});
+                })
+                .catch(function () { });
         }
 
         function poll() {
@@ -7198,42 +7426,42 @@ function psSelectFmt(btn) {
                 credentials: 'same-origin',
                 cache: 'no-store'
             })
-            .then(function (r) { return r.ok ? r.json() : null; })
-            .then(function (d) {
-                if (!d || !d.changed) return;
-                syncing = true;
-                var fd = new FormData();
-                fd.append('csrf_token', csrfTokenForSync);
-                fetch('equipment-booking/api/sync-inventory.php', {
-                    method: 'POST',
-                    credentials: 'same-origin',
-                    body: fd
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (d) {
+                    if (!d || !d.changed) return;
+                    syncing = true;
+                    var fd = new FormData();
+                    fd.append('csrf_token', csrfTokenForSync);
+                    fetch('equipment-booking/api/sync-inventory.php', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        body: fd
+                    })
+                        .then(function (r) { return r.json(); })
+                        .then(function (syncData) {
+                            syncing = false;
+                            if (!syncData || syncData.status !== 'success') return;
+                            var s = syncData.summary;
+                            // Always refresh the table when the sheet was detected as changed —
+                            // even if added/updated/archived are all 0 (Google export cache may
+                            // lag behind Ctrl+Z / Ctrl+Y for a cycle or two, but the DB is still
+                            // re-read fresh so the next render will reflect the true state).
+                            refreshInventoryTable();
+                            var parts = [];
+                            if (s.added > 0) parts.push(s.added + ' added');
+                            if (s.updated > 0) parts.push(s.updated + ' updated');
+                            if (s.archived > 0) parts.push(s.archived + ' archived');
+                            var now = Date.now();
+                            if (parts.length > 0 && now - lastSyncToastAt >= syncToastInterval
+                                && typeof window.showToast === 'function') {
+                                lastSyncToastAt = now;
+                                LS.set('inventorySyncToastAt', now);
+                                window.showToast('Inventory synced: ' + parts.join(', ') + '.', 'success');
+                            }
+                        })
+                        .catch(function () { syncing = false; });
                 })
-                .then(function (r) { return r.json(); })
-                .then(function (syncData) {
-                    syncing = false;
-                    if (!syncData || syncData.status !== 'success') return;
-                    var s = syncData.summary;
-                    // Always refresh the table when the sheet was detected as changed —
-                    // even if added/updated/archived are all 0 (Google export cache may
-                    // lag behind Ctrl+Z / Ctrl+Y for a cycle or two, but the DB is still
-                    // re-read fresh so the next render will reflect the true state).
-                    refreshInventoryTable();
-                    var parts = [];
-                    if (s.added    > 0) parts.push(s.added    + ' added');
-                    if (s.updated  > 0) parts.push(s.updated  + ' updated');
-                    if (s.archived > 0) parts.push(s.archived + ' archived');
-                    var now = Date.now();
-                    if (parts.length > 0 && now - lastSyncToastAt >= syncToastInterval
-                        && typeof window.showToast === 'function') {
-                        lastSyncToastAt = now;
-                        LS.set('inventorySyncToastAt', now);
-                        window.showToast('Inventory synced: ' + parts.join(', ') + '.', 'success');
-                    }
-                })
-                .catch(function () { syncing = false; });
-            })
-            .catch(function () {});
+                .catch(function () { });
         }
 
         setInterval(poll, 5000);
