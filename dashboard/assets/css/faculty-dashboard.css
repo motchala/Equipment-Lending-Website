@@ -5688,17 +5688,44 @@ body {
 .sov-profile-actions .sov-btn-primary {
     position: absolute;
     top: 0;
-    left: 0;
+    right: 0;
+    left: auto;
     min-height: 40px;
-    padding: 8px 14px;
+    padding: 8px 18px;
     border-radius: 999px;
-    background: #570000;
+    /* White pill with dark-wine text, same as the admin Profile Hero's Save Changes */
+    background: rgba(255, 255, 255, 0.9);
+    color: #3a0008;
     box-shadow: 0 2px 8px rgba(87, 0, 0, 0.24);
+}
+
+.sov-profile-actions .sov-btn-primary:hover:not(:disabled) {
+    background: #fff;
+    filter: none;
 }
 
 .sov-profile-actions .sov-btn-primary:disabled {
     opacity: 0.58;
     cursor: not-allowed;
+}
+
+/* Cancel sits on the LEFT of Save Changes (Save Changes stays on the right, where Edit Profile was),
+   translucent wine pill with a light outline, same as the admin Profile Hero's Cancel */
+.sov-profile-actions .sov-profile-cancel-btn {
+    right: auto;
+    left: 0;
+    border: 1.5px solid rgba(255, 255, 255, 0.3);
+    background: rgba(87, 0, 0, 0.62);
+    box-shadow: none;
+    color: #fff;
+}
+
+.sov-profile-actions .sov-profile-cancel-btn:hover:not(:disabled) {
+    border-color: rgba(255, 255, 255, 0.3);
+    background: rgba(87, 0, 0, 0.85);
+    filter: none;
+    box-shadow: none;
+    color: #fff;
 }
 
 .sov-profile-actions .material-symbols-outlined {
@@ -6257,6 +6284,51 @@ body {
 
 .sov-theme-option.theme-active .sov-theme-check {
     display: flex;
+}
+
+/* Theme picker pills  same look as the admin Settings > Appearance (sun Light / moon Dark).
+   JS still marks the chosen one with .theme-active, so no script change is needed. */
+.sov-theme-row.sov-theme-row--pills {
+    flex-wrap: nowrap;
+    gap: 8px;
+}
+
+.sov-theme-row .sov-theme-option.sov-theme-opt {
+    flex: 1 1 0;
+    min-width: 0;
+    flex-direction: row;
+    justify-content: center;
+    gap: 6px;
+    padding: 0.6rem 0.5rem;
+    border: 1.5px solid var(--color-outline-variant);
+    border-radius: 8px;
+    background: var(--color-surface-container);
+    color: var(--color-secondary);
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 600;
+    text-align: center;
+    transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.sov-theme-row .sov-theme-option.sov-theme-opt:hover {
+    border-color: var(--color-primary);
+    color: var(--color-on-surface);
+}
+
+.sov-theme-row .sov-theme-option.sov-theme-opt.theme-active {
+    border-color: var(--color-primary);
+    background: var(--color-surface-lowest);
+    color: var(--color-primary);
+}
+
+.sov-theme-opt .sov-theme-check {
+    display: none !important;
+}
+
+.sov-theme-opt-emoji {
+    font-size: 14px;
+    line-height: 1;
 }
 
 .sov-theme-name {
@@ -11143,6 +11215,7 @@ body .side-nav .side-nav-user .side-nav-user-name {
     font-size: 0.78rem;
     line-height: 1.4;
     color: var(--color-secondary);
+    line-clamp: 2;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
 }

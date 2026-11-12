@@ -15,7 +15,6 @@
         <button class="rq-sub-tab active" data-sett-panel="sett-account">My Account</button>
         <button class="rq-sub-tab" data-sett-panel="sett-prefs">Preferences</button>
         <?php if ($is_super_admin): ?>
-            <button class="rq-sub-tab" data-sett-panel="sett-equipment">Equipment</button>
             <button class="rq-sub-tab" data-sett-panel="sett-arbitration">Arbitration</button>
         <?php endif; ?>
         <button class="rq-sub-tab" data-sett-panel="sett-help">Help &amp; FAQ</button>
@@ -283,121 +282,6 @@
     </div><!-- /sett-prefs -->
 
     <?php if ($is_super_admin): ?>
-
-        <!-- ── EQUIPMENT SETTINGS (Super Admin only) ─────────────────── -->
-        <div class="rq-sub-panel" id="sett-equipment">
-            <div class="ps-card" style="max-width:720px;">
-                <div class="ps-card-header">
-                    <h3><span class="material-symbols-outlined">category</span> Equipment Categories</h3>
-                </div>
-                <div class="ps-card-body">
-                    <p style="margin-bottom:16px;font-size:.875rem;color:var(--text-light);">
-                        Categories are shown when adding or editing equipment. Each campus has its own list.
-                        Items already assigned to a category are not affected when you add or delete categories here.
-                    </p>
-
-                    <!-- Campus selector -->
-                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:20px;">
-                        <label for="catMgrCampus" style="font-size:.875rem;font-weight:600;white-space:nowrap;">Campus</label>
-                        <select id="catMgrCampus" class="form-control-custom" style="width:220px;">
-                            <?php
-                            $cat_campuses = $conn->query("SELECT campus_id, campus_name FROM tbl_campuses ORDER BY campus_id ASC");
-                            while ($cat_campuses && ($cc = $cat_campuses->fetch_assoc())):
-                            ?>
-                                <option value="<?php echo (int)$cc['campus_id']; ?>"><?php echo htmlspecialchars($cc['campus_name']); ?></option>
-                            <?php endwhile; ?>
-                        </select>
-                    </div>
-
-                    <!-- Category list -->
-                    <div id="catMgrList" style="margin-bottom:20px;min-height:40px;">
-                        <span style="color:var(--text-light);font-size:.875rem;">Loading…</span>
-                    </div>
-
-                    <!-- Add new category -->
-                    <div style="display:flex;gap:8px;align-items:flex-start;">
-                        <input type="text" id="catMgrInput" class="form-control-custom"
-                            placeholder="New category name" maxlength="100"
-                            style="flex:1;" autocomplete="off">
-                        <button type="button" class="ps-btn ps-btn--primary" id="catMgrAdd">
-                            <span class="material-symbols-outlined">add</span> Add
-                        </button>
-                    </div>
-                    <p id="catMgrMsg" style="margin-top:8px;font-size:.8rem;display:none;"></p>
-                </div>
-            </div>
-
-            <!-- Google Sheets Sync card -->
-            <div class="ps-card" style="max-width:720px;margin-top:20px;">
-                <div class="ps-card-header">
-                    <h3><span class="material-symbols-outlined">sync</span> Google Sheets Sync</h3>
-                </div>
-                <div class="ps-card-body">
-                    <p style="font-size:.875rem;color:var(--text-light);margin-bottom:16px;">
-                        Connect your Google Sheets inventory. PUPSync will read the spreadsheet and
-                        automatically update equipment items. The sheet must be set to
-                        <strong>"Anyone with the link can view"</strong>.
-                    </p>
-
-                    <div class="form-group" style="margin-bottom:16px;">
-                        <label for="gsheetUrl" style="font-size:.875rem;font-weight:600;">Google Sheets URL</label>
-                        <div style="display:flex;gap:8px;margin-top:6px;">
-                            <input type="url" id="gsheetUrl" class="form-control-custom" style="flex:1;"
-                                placeholder="https://docs.google.com/spreadsheets/d/..."
-                                value="<?php
-                                $cfg_url_q = $conn->query("SELECT value FROM tbl_sync_config WHERE config_key='gsheet_url' LIMIT 1");
-                                echo $cfg_url_q ? htmlspecialchars((string)($cfg_url_q->fetch_assoc()['value'] ?? '')) : '';
-                                ?>">
-                            <button type="button" class="ps-btn ps-btn--ghost" id="gsheetSaveUrl">Save URL</button>
-                        </div>
-                    </div>
-
-                    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-                        <button type="button" class="ps-btn ps-btn--primary" id="gsheetSyncNow">
-                            <span class="material-symbols-outlined">sync</span> Sync Now
-                        </button>
-                        <span id="gsheetLastSync" style="font-size:.8rem;color:var(--text-light);">
-                            <?php
-                            $ls_q = $conn->query("SELECT value FROM tbl_sync_config WHERE config_key='gsheet_last_sync' LIMIT 1");
-                            $ls = $ls_q ? (string)($ls_q->fetch_assoc()['value'] ?? '') : '';
-                            echo $ls ? 'Last synced: ' . htmlspecialchars(date('M j, Y g:i A', strtotime($ls))) : 'Never synced';
-                            ?>
-                        </span>
-                    </div>
-
-                    <div id="gsheetSyncResult" style="margin-top:12px;display:none;padding:12px;border-radius:8px;font-size:.85rem;"></div>
-
-                    <!-- Pending deletions -->
-                    <?php
-                    $pd_q = $conn->query("SELECT pd.id, pd.item_name, c.campus_name FROM tbl_sync_pending_deletions pd LEFT JOIN tbl_campuses c ON c.campus_id = pd.campus_id ORDER BY pd.detected_at DESC");
-                    $pd_rows = $pd_q ? $pd_q->fetch_all(MYSQLI_ASSOC) : [];
-                    if ($pd_rows):
-                    ?>
-                    <div style="margin-top:20px;padding:14px;background:#fff8e1;border-radius:10px;border:1px solid #ffe082;">
-                        <p style="font-weight:700;font-size:.875rem;margin-bottom:10px;">
-                            <span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle;color:#f57c00;">warning</span>
-                            <?php echo count($pd_rows); ?> item(s) were removed from the Google Sheet
-                        </p>
-                        <p style="font-size:.8rem;color:var(--text-light);margin-bottom:12px;">
-                            These items exist in PUPSync but are no longer in your spreadsheet. Decide what to do with each one.
-                        </p>
-                        <?php foreach ($pd_rows as $pd): ?>
-                            <div class="pd-row" data-pd-id="<?php echo (int)$pd['id']; ?>" style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #ffecb3;">
-                                <div>
-                                    <strong style="font-size:.875rem;"><?php echo htmlspecialchars($pd['item_name']); ?></strong>
-                                    <span style="font-size:.78rem;color:var(--text-light);margin-left:8px;"><?php echo htmlspecialchars($pd['campus_name'] ?? ''); ?></span>
-                                </div>
-                                <div style="display:flex;gap:8px;">
-                                    <button type="button" class="ps-btn ps-btn--danger ps-btn--sm" data-pd-action="archive" data-pd-id="<?php echo (int)$pd['id']; ?>">Archive it</button>
-                                    <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-pd-action="keep" data-pd-id="<?php echo (int)$pd['id']; ?>">Keep it</button>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                    <?php endif; ?>
-                </div>
-            </div>
-        </div><!-- /sett-equipment -->
 
         <?php require __DIR__ . '/admin-arbitration-panel.php'; /* Arbitration rules (Super Admin only, UI only) */ ?>
 

@@ -137,7 +137,16 @@ switch ($action) {
 
     // ── Sync Now: the existing sync, behind the gates above ─────────────────
     case 'sync':
-        ob_start();
+        // The buffer also rewrites one error: when the sheet is private Google answers with an HTML sign-in
+        // page, which sync-inventory.php reports as "Unknown archive format". Say what to fix instead.
+        ob_start(function (string $buf): string {
+            $e = json_decode($buf, true);
+            if (is_array($e) && ($e['status'] ?? '') === 'error' && strpos((string)($e['error'] ?? ''), 'Could not parse the spreadsheet') === 0) {
+                $e['error'] = 'Could not read the sheet. Make sure it is shared as "Anyone with the link can view" (a private sheet comes back as a sign-in page, not a spreadsheet) and that the link is to a Google Sheet.';
+                return json_encode($e);
+            }
+            return $buf;
+        });
         require __DIR__ . '/../../equipment-booking/api/sync-inventory.php';
         // sync-inventory.php exits by itself on every failure (the error JSON is already on its way to
         // the browser). Reaching this line means it finished and printed its success JSON into the buffer.

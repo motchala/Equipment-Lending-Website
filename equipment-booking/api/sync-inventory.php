@@ -86,7 +86,7 @@ foreach ($cfg_rows as $r) $cfg[$r['config_key']] = $r['value'];
 $gsheet_url = trim((string)($cfg['gsheet_url'] ?? ''));
 if ($gsheet_url === '') {
     http_response_code(400);
-    echo json_encode(['status' => 'error', 'error' => 'No Google Sheets URL configured. Go to Settings → Equipment to set it.']);
+    echo json_encode(['status' => 'error', 'error' => 'No Google Sheets URL configured. Save the link in Settings → Imports → Equipment Inventory first.']);
     exit;
 }
 
@@ -147,6 +147,7 @@ foreach ($sheet_names as $sheet_idx => $sheet_name) {
         continue;
     }
 
+    /** @var array $rows  SimpleXLSX::rows() has no return type, so editors would otherwise see each row as TYield */
     $rows = $xlsx->rows($sheet_idx);
     if (empty($rows)) {
         $summary['skipped_sheets'][] = $sheet_name_clean . ' (empty)';

@@ -9,8 +9,12 @@
        build their own FormData instead of submitting an actual <form>.
     ══════════════════════════════════════════════════════════════════ */
     function getCsrfToken() {
+        // The faculty pages carry the token in <meta name="csrf-token"> (faculty-shell-top.php); the hidden
+        // input only exists on admin screens, so without this fallback every call that uses it sent ''.
         const el = document.querySelector('input[name="csrf_token"]');
-        return el ? el.value : '';
+        if (el && el.value) return el.value;
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        return meta ? (meta.getAttribute('content') || '') : '';
     }
 
     /* ══════════════════════════════════════════════════════════════════
@@ -1695,10 +1699,10 @@
         fetch('settings/api/export-faculty-data.php', { method: 'POST', body: fd })
             .then(r => {
                 const type = r.headers.get('Content-Type') || '';
-                if (r.ok && type.indexOf('text/csv') !== -1) {
+                if (r.ok && type.indexOf('application/pdf') !== -1) {
                     const cd = r.headers.get('Content-Disposition') || '';
                     const m = /filename="?([^";]+)"?/.exec(cd);
-                    return r.blob().then(b => ({ blob: b, name: m ? m[1] : 'pupsync-my-data.csv' }));
+                    return r.blob().then(b => ({ blob: b, name: m ? m[1] : 'pupsync-activity-report.pdf' }));
                 }
                 return r.json().catch(() => ({})).then(j => {
                     throw new Error(j.msg || j.error || 'Could not export your data. Please try again.');
@@ -1713,7 +1717,7 @@
                 a.click();
                 a.remove();
                 setTimeout(() => URL.revokeObjectURL(url), 2000);
-                showToast('Your data was downloaded.', 'success');
+                showToast('Your activity report was downloaded.', 'success');
             })
             .catch(err => showToast(_sovEsc(err && err.message ? err.message : 'Could not export your data.'), 'error'))
             .finally(() => {
@@ -3986,7 +3990,7 @@
 
         // Fire toast exactly once when we detect the transition active → used
         if (isUsed && window._fccLastUsed === false) {
-            showToast('✅ Code used by ' + _fccEsc(data.used_by_name) + '. Their borrow request was submitted.', 'success');
+            showToast('✅ Code used by ' + _fccEsc(data.used_by_name) + '. A borrow request was auto-approved.', 'success');
         }
         window._fccLastUsed = isUsed;
 
