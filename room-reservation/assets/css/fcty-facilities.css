@@ -3567,3 +3567,127 @@ button.fcty-open-chip {
 .fcty-btn:disabled[title] {
     cursor: not-allowed;
 }
+
+/* ── Today: the one-day timetable ────────────────────────────────────────────────────────
+   Same look as the weekly timetable, but a single wide column (13 rows of 56px) so every
+   class / reservation can be written out in full. Open gaps that are still ahead are marked. */
+.fcty-tt-daybar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    font-size: .875rem;
+    color: var(--fcty-ink);
+}
+
+.fcty-tt-daycount {
+    margin-left: auto;
+    font-size: .75rem;
+    font-weight: 600;
+    color: var(--fcty-muted);
+}
+
+.fcty-tt-day .fcty-tt-scroll {
+    max-height: 440px;
+}
+
+.fcty-tt-day .fcty-tt-grid {
+    grid-template-columns: 52px 1fr;
+    min-width: 0;
+}
+
+.fcty-tt-day .fcty-tt-hours,
+.fcty-tt-day .fcty-tt-col {
+    height: 728px;
+}
+
+.fcty-tt-day .fcty-tt-col {
+    border-left: 1px solid var(--fcty-line);
+}
+
+.fcty-tt-day .fcty-tt-block {
+    left: 6px;
+    right: 6px;
+    gap: 2px;
+    padding: 5px 10px;
+    font-size: .8125rem;
+    cursor: default;
+}
+
+.fcty-tt-top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 8px;
+}
+
+.fcty-tt-day .fcty-tt-time {
+    font-size: .75rem;
+}
+
+.fcty-tt-live {
+    margin-left: auto;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: var(--fcty-booked);
+    color: #fff;
+    font-size: .6875rem;
+    font-weight: 700;
+}
+
+.fcty-tt-day .fcty-tt-name {
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+}
+
+/* 1-hour blocks: time, name and who on three tight lines; 30-minute blocks: the name only */
+.fcty-tt-day .fcty-tt-block.is-short {
+    padding-top: 3px;
+    padding-bottom: 3px;
+}
+
+.fcty-tt-day .fcty-tt-block.is-short .fcty-tt-tag,
+.fcty-tt-day .fcty-tt-block.is-short .fcty-tt-live {
+    display: none;
+}
+
+.fcty-tt-day .fcty-tt-block.is-short .fcty-tt-who {
+    display: block;
+}
+
+.fcty-tt-day .fcty-tt-block.is-xs {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+.fcty-tt-day .fcty-tt-block.is-xs .fcty-tt-tag,
+.fcty-tt-day .fcty-tt-block.is-xs .fcty-tt-live,
+.fcty-tt-day .fcty-tt-block.is-xs .fcty-tt-who {
+    display: none;
+}
+
+.fcty-tt-open {
+    position: absolute;
+    left: 6px;
+    right: 6px;
+    z-index: 0;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    overflow: hidden;
+    border: 1px dashed color-mix(in srgb, var(--fcty-available) 55%, transparent);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--fcty-available) 8%, transparent);
+    color: var(--fcty-available);
+    font-size: .75rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.fcty-tt-legend i.is-open {
+    background: color-mix(in srgb, var(--fcty-available) 12%, var(--fcty-card));
+    border: 1px dashed var(--fcty-available);
+}

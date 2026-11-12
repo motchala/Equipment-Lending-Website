@@ -39,7 +39,24 @@ require_once __DIR__ . '/booking-schedule.php';
 final class BorrowCancellation
 {
     /** Same cutoff as room reservations. */
-    public const CUTOFF_SECONDS = 3600;
+    public const CUTOFF_SECONDS = 3600;   // default; the live value is Settings → Arbitration → Cancellation cutoff
+
+    /** Seconds before the start time after which an approved booking can no longer be cancelled. */
+    public static function cutoffSeconds(): int
+    {
+        return BookingSchedule::cancelCutoffSeconds();
+    }
+
+    /** "1 hour" / "2 hours" / "30 minutes": the cutoff in words. */
+    public static function cutoffLabel(): string
+    {
+        $min = intdiv(self::cutoffSeconds(), 60);
+        if ($min >= 60 && $min % 60 === 0) {
+            $h = intdiv($min, 60);
+            return $h . ($h === 1 ? ' hour' : ' hours');
+        }
+        return $min . ($min === 1 ? ' minute' : ' minutes');
+    }
 
     private static function tz(): DateTimeZone
     {
@@ -66,8 +83,8 @@ final class BorrowCancellation
             return 'This borrowing has already started. Return it with the Return QR instead.';
         }
         // A pending request holds nothing for anyone else, so it can go any time before it starts.
-        if ($status === 'Approved' && $start->getTimestamp() - $now->getTimestamp() <= self::CUTOFF_SECONDS) {
-            return 'Cancellations are not allowed within 1 hour of the borrow start time.';
+        if ($status === 'Approved' && self::cutoffSeconds() > 0 && $start->getTimestamp() - $now->getTimestamp() <= self::cutoffSeconds()) {
+            return 'Cancellations are not allowed within ' . self::cutoffLabel() . ' of the borrow start time.';
         }
         return null;
     }
@@ -97,6 +114,7 @@ final class BorrowCancellation
      */
     public static function cancel(mysqli $conn, int $requestId, string $facultyId): array
     {
+        BookingSchedule::loadRules($conn);
         if (!BookingSchedule::ensureSchema($conn)) {
             return ['success' => false, 'error' => 'The request could not be cancelled right now. Please try again.'];
         }

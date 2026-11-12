@@ -17,6 +17,7 @@
         <?php if ($is_super_admin): ?>
             <button class="rq-sub-tab" data-sett-panel="sett-arbitration">Arbitration</button>
         <?php endif; ?>
+        <button class="rq-sub-tab" data-sett-panel="sett-ratings">Service Ratings</button>
         <button class="rq-sub-tab" data-sett-panel="sett-help">Help &amp; FAQ</button>
     </div>
 
@@ -288,6 +289,8 @@
     <?php endif; ?>
 
     <!-- ── HELP & FAQ (was the standalone Help Center overlay) ─── -->
+    <?php require __DIR__ . '/../../service-survey/views/admin-ratings-panel.php'; /* Service Ratings (Admin + Super Admin) */ ?>
+
     <div class="rq-sub-panel" id="sett-help">
 
         <div class="ps-two-col">

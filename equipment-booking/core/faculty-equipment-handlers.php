@@ -52,7 +52,8 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name'])) {
                 $bk['qty'],
                 substr($bk['borrow_time'], 0, 5),
                 (int)($_POST['duration'] ?? 1),
-                date('Y-m-d', strtotime($bk['borrow_date'] . ' +1 day'))
+                date('Y-m-d', strtotime($bk['borrow_date'] . ' +1 day')),
+                (string)($bk['unit'] ?? 'hours')
             )
             : null;
         bm_fail('"' . $equipment_name . '" is already booked for that schedule.'

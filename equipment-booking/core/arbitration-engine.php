@@ -51,6 +51,8 @@ class ArbitrationEngine
     public const RULE_ERROR            = 'arbitration_error';
     public const RULE_SCHEDULE_CONFLICT = 'rule_schedule_conflict';
     public const RULE_NO_SHOW           = 'rule_no_show';
+    public const RULE_ITEM_LIMIT        = 'rule_item_limit';
+    public const RULE_LETTER_REQUIRED   = 'rule_letter_required';
 
     // ── Public entry point ───────────────────────────────────────────────────
 
@@ -442,6 +444,10 @@ class ArbitrationEngine
      *   - overdue block      (only when rule_overdue_block_enabled = 1)
      *   - duplicate block    (only when rule_duplicate_block_enabled = 1)
      *   - archived item      always: an archived item cannot be borrowed
+     *   - items per borrower (Settings → Arbitration): units this faculty already holds or has requested
+     *                        for the same time, counting requests filed before this one
+     *   - request letter     (only when rule_missing_doc_block_enabled = 1): a faculty member's own
+     *                        later-date request must carry a letter
      *
      * @return array{rule:string, reason:string}|null  null = nothing blocks it
      */
@@ -464,6 +470,21 @@ class ArbitrationEngine
         }
         if (isset($request['is_archived']) && (int)$request['is_archived'] === 1) {
             return ['rule' => self::RULE_ARCHIVED, 'reason' => 'This item is no longer available for borrowing.'];
+        }
+
+        // ── Settings → Arbitration rules (live values through BookingSchedule) ──
+        BookingSchedule::loadRules($conn);
+        $start = (string)$request['borrow_date'] . ' ' . ((string)($request['borrow_time'] ?? '') ?: '00:00:00');
+        $end   = (string)$request['return_date'] . ' ' . ((string)($request['return_time'] ?? '') ?: '23:59:59');
+        $limit = BookingSchedule::itemsLimitError($conn, $faculty_id, max(1, (int)($request['borrow_qty'] ?? 1)), $start, $end, $request_id);
+        if ($limit !== null) {
+            return ['rule' => self::RULE_ITEM_LIMIT, 'reason' => $limit];
+        }
+        if (($config['rule_missing_doc_block_enabled'] ?? '0') === '1'
+            && (string)($request['booking_mode'] ?? '') === 'future'
+            && (string)($request['submitted_as'] ?? 'personal') === 'personal'
+            && trim((string)($request['document_path'] ?? '')) === '') {
+            return ['rule' => self::RULE_LETTER_REQUIRED, 'reason' => 'A request letter is required for later-date requests. Please attach one.'];
         }
         return null;
     }
@@ -622,11 +643,9 @@ class ArbitrationEngine
      */
     private static function checkMissingDocument(array $request, array $config): ?string
     {
-        // A request letter is OPTIONAL for every request (it is only recommended for
-        // reservations / borrowings on a later date). Attaching one can still raise a
-        // request's priority (see validateDocument()), but a missing letter never puts a
-        // request on hold. The old rule_missing_doc_block_enabled setting is therefore
-        // no longer applied.
+        // A missing letter never puts a request on hold. The "Require a request letter" setting
+        // (rule_missing_doc_block_enabled) is applied at submit time instead, in preflight(): a
+        // faculty member's own later-date request without a letter is declined there.
         return null;
     }
 
@@ -978,7 +997,7 @@ class ArbitrationEngine
             $occupied  = BookingSchedule::occupancy($conn, $item, $startTs, $endTs, $request_id);
             $free      = $total - $occupied;
             $immediate = ($mode === 'today')
-                && strtotime($startTs) <= time() + BookingSchedule::IMMEDIATE_GRACE_MIN * 60;
+                && strtotime($startTs) <= time() + BookingSchedule::graceMin() * 60;
 
             if ($mode === 'today' && $shelf < 1) {
                 self::writeDecision(

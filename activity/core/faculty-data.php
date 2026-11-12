@@ -33,7 +33,7 @@
  *                      1 hour before the start). Rules and side effects: core/borrow-cancellation.php.
  *                      A cancelled request moves to History as "Cancelled".
  *   Extend             offered on loans whose return moment has been reached (Overdue, or Approved and
- *                      due), up to BorrowExtension::MAX_EXTENSIONS times per loan. Rules and availability
+ *                      due), up to BorrowExtension::maxExtensions() times per loan (Settings → Arbitration). Rules and availability
  *                      check: core/borrow-extension.php. A granted extension moves the return moment, puts an
  *                      Overdue loan back to Approved and shows as "Extended once / N times, originally due ..."
  *                      on the row. Lateness is judged against the ORIGINAL return moment, so extending never
@@ -232,8 +232,8 @@ function fact_eq_load(mysqli $conn, string $faculty_id): array
                 // 'cancel_note' says why not, only for the "too late" case (same wording as room reservations).
                 $cancelWhy = in_array($status, ['Waiting', 'Approved'], true) ? BorrowCancellation::blocker($row, $now) : 'n/a';
                 $item['can_cancel']  = $cancelWhy === null;
-                $item['cancel_note'] = $cancelWhy !== null && str_contains($cancelWhy, 'within 1 hour')
-                    ? 'Can\'t be cancelled within 1 hour of the start' : '';
+                $item['cancel_note'] = $cancelWhy !== null && str_contains($cancelWhy, 'Cancellations are not allowed within')
+                    ? 'Can\'t be cancelled within ' . BorrowCancellation::cutoffLabel() . ' of the start' : '';
 
                 switch ($status) {
                     case 'Overdue':
@@ -488,7 +488,9 @@ function fact_eq_render_item(array $it, string $kind, string $rootUrl, DateTimeI
         $sub[] = fact_h(fact_s($it, 'cancel_note'));
     }
     if ($kind === 'live' && !empty($it['extend_limit'])) {
-        $sub[] = 'Extension limit reached (' . BorrowExtension::MAX_EXTENSIONS . ' of ' . BorrowExtension::MAX_EXTENSIONS . ')';
+        $sub[] = BorrowExtension::maxExtensions() === 0
+            ? 'Extensions are turned off'
+            : 'Extension limit reached (' . BorrowExtension::maxExtensions() . ' of ' . BorrowExtension::maxExtensions() . ')';
     }
 
     $isBundle = fact_i($it, 'bundle_count') > 1;
@@ -574,7 +576,7 @@ function fact_eq_action_slots(array $it, string $kind, string $status): array
         } elseif (fact_s($it, 'cancel_note') !== '') {
             $slots['end'] = fact_action_btn('Cancel', 'lock', [], [
                 'danger' => true, 'disabled' => true,
-                'title'  => 'Requests can\'t be cancelled within 1 hour of the start time',
+                'title'  => 'Requests can\'t be cancelled within ' . BorrowCancellation::cutoffLabel() . ' of the start time',
             ]);
         }
     }

@@ -174,3 +174,32 @@
         width: 19%;
     }
 }
+
+/* ============================================================================
+   Facility Schedule modal: weekly CLASSES (Rooms Assigned import)
+   Same grid as the reservations, with the room's classes drawn in blue so they read as the
+   room's fixed weekly schedule. Additive: nothing above is changed.
+   ========================================================================== */
+#roomScheduleModal .rsm-block--class {
+    background: #e6f1f5;
+    background: color-mix(in srgb, #1f6f8b 14%, var(--card-bg));
+    border-color: color-mix(in srgb, #1f6f8b 35%, var(--card-bg));
+    border-left-color: #1f6f8b;
+    color: #1f6f8b;
+}
+
+#roomScheduleModal .rsm-block--class:hover,
+#roomScheduleModal .rsm-block--class:focus {
+    background: color-mix(in srgb, #1f6f8b 22%, var(--card-bg));
+}
+
+/* in use right now (a class in session, or a reservation under way) */
+#roomScheduleModal .rsm-block.is-live {
+    box-shadow: 0 0 0 2px #d93025;
+}
+
+.rsm-legend-dot.class {
+    background: #e6f1f5;
+    background: color-mix(in srgb, #1f6f8b 14%, var(--card-bg));
+    border: 1.5px solid #1f6f8b;
+}

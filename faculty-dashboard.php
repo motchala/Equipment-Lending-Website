@@ -71,6 +71,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
 <?php require __DIR__ . '/equipment-booking/views/faculty-equipment-modals-2.php'; ?>
 <?php require __DIR__ . '/settings/views/faculty-modals.php'; ?>
 <?php require __DIR__ . '/shared/views/faculty-shell-overlays.php'; ?>
+<?php require __DIR__ . '/service-survey/views/faculty-modal.php'; /* anonymous service survey pop-up */ ?>
 <?php require __DIR__ . '/shared/views/faculty-shell-scripts.php'; ?>
 </body>
 

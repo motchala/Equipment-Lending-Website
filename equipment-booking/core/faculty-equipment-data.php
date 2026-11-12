@@ -1,5 +1,6 @@
 <?php
 // ── Borrow Request modal data ─────────────────────────────────────────────
+BookingSchedule::loadRules($conn);                      // Settings → Arbitration values for the rules below
 $bk_rooms  = BookingSchedule::roomsTree($conn, true);   // Available rooms only (no Maintenance / Not Bookable)
 $bk_totals = BookingSchedule::totalStockMap($conn);
 $bk_items  = [];
@@ -17,13 +18,5 @@ $bk_meta_json = json_encode([
     'mine'    => $bk_mine,
     'today'   => date('Y-m-d'),
     'nowMin'  => (int)date('G') * 60 + (int)date('i'),
-    'rules'   => [
-        'dayStart'   => BookingSchedule::DAY_START,
-        'lastStart'  => BookingSchedule::LAST_START,
-        'dayEnd'     => BookingSchedule::DAY_END,
-        'slot'       => BookingSchedule::SLOT_MINUTES,
-        'maxAhead'   => BookingSchedule::MAX_ADVANCE_DAYS,
-        'durationHours' => BookingSchedule::DURATION_HOURS,
-        'graceMin'   => BookingSchedule::IMMEDIATE_GRACE_MIN,
-    ],
+    'rules'   => BookingSchedule::metaRules(),
 ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE);

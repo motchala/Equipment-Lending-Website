@@ -24,7 +24,8 @@ declare(strict_types=1);
  *   booking_mode string   "today" or "future"
  *   borrow_date  string   "YYYY-MM-DD" (future mode)
  *   time_slot    string   "HH:MM" start time
- *   duration     int      hours (1, 2, 3, or 6)
+ *   duration     int      length: hours (the ones offered in Settings → Arbitration) or days
+ *   duration_unit string  "hours" (default) or "days" (up to the longest loan)
  *   collector_type "faculty" | "student", collector_name string (student only)
  *
  * Returns:
@@ -130,6 +131,7 @@ $pseudo_post = [
     'booking_mode' => (string)($body['booking_mode'] ?? ''),
     'start_time'   => (string)($body['time_slot'] ?? $body['start_time'] ?? ''),
     'duration'     => (int)($body['duration'] ?? 1),
+    'duration_unit' => ((string)($body['duration_unit'] ?? 'hours')) === 'days' ? 'days' : 'hours',
     'borrow_date'  => (string)($body['borrow_date'] ?? ''),
 ];
 $submitted = [];

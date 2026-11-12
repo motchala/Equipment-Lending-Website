@@ -73,7 +73,7 @@ try {
         $conn->rollback();
         manual_return_response(404, 'error', 'Loan record not found.');
     }
-    if (!in_array($loan['status'], ['Approved', 'Overdue'], true)) {
+    if (!in_array($loan['status'], ['Approved', 'On Loan', 'Overdue'], true)) {
         $conn->rollback();
         manual_return_response(409, 'error', 'This loan has already been closed or cannot be returned.');
     }
@@ -81,7 +81,7 @@ try {
     $returnedAt = date('Y-m-d H:i:s');
     $update = $conn->prepare(
         "UPDATE tbl_requests SET status = 'Returned', returned_at = ?, return_token = NULL
-          WHERE id = ? AND status IN ('Approved', 'Overdue')"
+          WHERE id = ? AND status IN ('Approved', 'On Loan', 'Overdue')"
     );
     if (!$update) throw new RuntimeException('Could not update the loan record.');
     $update->bind_param('si', $returnedAt, $requestId);

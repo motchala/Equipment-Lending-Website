@@ -39,6 +39,9 @@
             <div class="rsm-foot">
                 <div class="rsm-legend">
                     <div class="rsm-legend-item">
+                        <div class="rsm-legend-dot class"></div> Class
+                    </div>
+                    <div class="rsm-legend-item">
                         <div class="rsm-legend-dot reserved"></div> Reserved
                     </div>
                     <div class="rsm-legend-item">
