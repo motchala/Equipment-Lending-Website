@@ -23,6 +23,11 @@
 
     var elBanner = document.getElementById('svrBanner');
     var elOverall = document.getElementById('svrOverall');
+    var elCurrentHeading = document.getElementById('svrCurrentHeading');
+    var elCurrentPeriodRange = document.getElementById('svrCurrentPeriodRange');
+    var elSemesterRange = document.getElementById('svrSemesterRange');
+    var elSemester = document.getElementById('svrSemester');
+    var elQuestionsHeading = document.getElementById('svrQuestionsHeading');
     var elQuestions = document.getElementById('svrQuestions');
     var elComments = document.getElementById('svrComments');
     var elMoreWrap = document.getElementById('svrMoreWrap');
@@ -33,6 +38,8 @@
     var ed = document.getElementById('svrEditor');
     var edEnabled = document.getElementById('svrEnabled');
     var edCommentOn = document.getElementById('svrCommentOn');
+    var edSemesterStart = document.getElementById('svrSemesterStart');
+    var edSemesterEnd = document.getElementById('svrSemesterEnd');
     var edList = document.getElementById('svrEdList');
     var edCount = document.getElementById('svrEdCount');
     var btnAdd = document.getElementById('svrAdd');
@@ -131,18 +138,18 @@
         elBanner.hidden = false;
     }
 
-    function renderOverall(r) {
-        clear(elOverall);
-        if (r.ready && r.overall !== null) {
+    function renderAggregate(target, summary) {
+        clear(target);
+        if (summary.ready && summary.overall !== null) {
             var left = el('div', 'svr-overall__score');
-            left.appendChild(el('span', 'svr-overall__num', r.overall.toFixed(1)));
+            left.appendChild(el('span', 'svr-overall__num', summary.overall.toFixed(1)));
             left.appendChild(el('span', 'svr-overall__of', '/ 5'));
-            elOverall.appendChild(left);
+            target.appendChild(left);
 
             var right = el('div', 'svr-overall__meta');
-            right.appendChild(starsDisplay(r.overall));
-            right.appendChild(el('p', 'svr-muted', 'Combined average of every star rating, from ' + plural(r.responses, 'response', 'responses') + '.'));
-            elOverall.appendChild(right);
+            right.appendChild(starsDisplay(summary.overall));
+            right.appendChild(el('p', 'svr-muted', 'Combined average of every star rating, from ' + plural(summary.responses, 'response', 'responses') + '.'));
+            target.appendChild(right);
             return;
         }
         var box = el('div', 'svr-collecting');
@@ -150,10 +157,53 @@
         var t = el('div', '');
         t.appendChild(el('strong', '', 'Collecting responses'));
         t.appendChild(el('p', 'svr-muted',
-            r.responses + ' of ' + r.min_responses + ' responses so far. Averages appear after ' + r.min_responses +
+            summary.responses + ' of ' + state.results.min_responses + ' responses so far. Averages appear after ' + state.results.min_responses +
             ' so a single person’s answer can never be picked out.'));
         box.appendChild(t);
-        elOverall.appendChild(box);
+        target.appendChild(box);
+    }
+
+    function renderOverall(r) {
+        var period = r.current_period || {};
+        if (!period.configured) {
+            elCurrentHeading.textContent = 'Legacy overall rating';
+            elCurrentPeriodRange.textContent = 'Semester dates not configured';
+            elQuestionsHeading.textContent = 'Legacy all-time question ratings';
+        } else if (!period.active) {
+            elCurrentHeading.textContent = 'Current two-week rating';
+            elCurrentPeriodRange.textContent = 'Outside the configured semester';
+            elQuestionsHeading.textContent = 'Current period by question';
+        } else {
+            elCurrentHeading.textContent = 'Current two-week rating';
+            elCurrentPeriodRange.textContent = period.start + ' – ' + period.end;
+            elQuestionsHeading.textContent = 'Current period by question';
+        }
+
+        if (period.configured && !period.active) {
+            clear(elOverall);
+            elOverall.appendChild(el('p', 'svr-muted svr-pad', 'There is no active two-week period today. Check the semester dates in Survey settings.'));
+            return;
+        }
+        renderAggregate(elOverall, r);
+    }
+
+    function renderSemester(summary) {
+        clear(elSemester);
+        if (!summary || !summary.configured) {
+            elSemesterRange.textContent = '';
+            elSemester.appendChild(el('p', 'svr-muted svr-pad', 'Set semester start and end dates in Survey settings to begin period reporting.'));
+            return;
+        }
+        elSemesterRange.textContent = summary.start + ' – ' + summary.end;
+        renderAggregate(elSemester, summary);
+        if (summary.legacy_responses > 0) {
+            elSemester.appendChild(el(
+                'p',
+                'svr-muted svr-pad',
+                plural(summary.legacy_responses, 'unperiodized response is', 'unperiodized responses are') +
+                    ' retained outside this semester total.'
+            ));
+        }
     }
 
     function renderQuestions(r) {
@@ -204,7 +254,10 @@
     function renderComments(r) {
         clear(elComments);
         if (!state.comments.length) {
-            elComments.appendChild(el('p', 'svr-muted svr-pad', r.comment_enabled ? 'No comments yet.' : 'The comment box is turned off. Earlier comments appear here.'));
+            var message = r.comments_pending
+                ? 'Comments appear after ' + r.min_responses + ' survey responses to protect anonymity.'
+                : (r.comment_enabled ? 'No comments yet.' : 'The comment box is turned off. Earlier comments appear here.');
+            elComments.appendChild(el('p', 'svr-muted svr-pad', message));
         }
         state.comments.forEach(function (c) {
             var card = el('div', 'svr-comment');
@@ -220,6 +273,7 @@
         if (!r) return;
         showBanner(r.enabled ? '' : 'The survey is turned off, so faculty are not being asked right now. Results already collected are shown below.', 'warning');
         renderOverall(r);
+        renderSemester(r.semester);
         renderQuestions(r);
         renderComments(r);
         if (ed && state.isSuper) {
@@ -233,6 +287,8 @@
         return JSON.stringify({
             enabled: e.enabled,
             commentOn: e.commentOn,
+            semesterStart: e.semesterStart,
+            semesterEnd: e.semesterEnd,
             items: e.items.map(function (i) { return [i.id, i.text]; })
         });
     }
@@ -242,11 +298,15 @@
         state.editor = {
             enabled: !!r.enabled,
             commentOn: !!r.comment_enabled,
-            items: r.questions.map(function (q) { return { id: q.id, text: q.text, responses: q.responses || 0 }; })
+            semesterStart: r.semester && r.semester.start ? r.semester.start : '',
+            semesterEnd: r.semester && r.semester.end ? r.semester.end : '',
+            items: (r.editor_questions || r.questions).map(function (q) { return { id: q.id, text: q.text, responses: q.responses || 0 }; })
         };
         state.snapshot = snapshotOf(state.editor);
         edEnabled.checked = state.editor.enabled;
         edCommentOn.checked = state.editor.commentOn;
+        edSemesterStart.value = state.editor.semesterStart;
+        edSemesterEnd.value = state.editor.semesterEnd;
         edConfirm.hidden = true;
         setMsg('');
         renderEditorList();
@@ -327,6 +387,8 @@
             csrf_token: CSRF,
             enabled: e.enabled,
             comment_enabled: e.commentOn,
+            semester_start: e.semesterStart,
+            semester_end: e.semesterEnd,
             confirm_reset: !!confirmReset,
             questions: e.items.map(function (i) { return { id: i.id === undefined ? null : i.id, text: i.text }; })
         };
@@ -334,6 +396,12 @@
 
     function validate() {
         var L = limits();
+        if ((state.editor.semesterStart === '') !== (state.editor.semesterEnd === '')) {
+            return 'Enter both semester dates, or leave both blank to disable period reporting.';
+        }
+        if (state.editor.semesterStart && state.editor.semesterStart > state.editor.semesterEnd) {
+            return 'The semester end date must be on or after the start date.';
+        }
         for (var i = 0; i < state.editor.items.length; i++) {
             var t = state.editor.items[i].text.replace(/\s+/g, ' ').trim();
             if (t.length < L.question_min) return 'Question ' + (i + 1) + ' is too short (at least ' + L.question_min + ' characters).';
@@ -399,6 +467,8 @@
 
         edEnabled.addEventListener('change', function () { state.editor.enabled = edEnabled.checked; refreshEditorButtons(); });
         edCommentOn.addEventListener('change', function () { state.editor.commentOn = edCommentOn.checked; refreshEditorButtons(); });
+        edSemesterStart.addEventListener('change', function () { state.editor.semesterStart = edSemesterStart.value; refreshEditorButtons(); });
+        edSemesterEnd.addEventListener('change', function () { state.editor.semesterEnd = edSemesterEnd.value; refreshEditorButtons(); });
 
         edList.addEventListener('input', function (ev) {
             var t = ev.target;

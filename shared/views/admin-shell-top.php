@@ -88,6 +88,9 @@
                 } else if (wasEquipment) { hash = '#tab-inventory'; }
                 var qs = params.toString();
                 window._adminLeaving = true;
+                // Keep the Dashboard (and its sidebar highlight) from showing while the page reloads once more.
+                document.documentElement.classList.add('admin-tab-pending');
+                setTimeout(function() { document.documentElement.classList.remove('admin-tab-pending'); }, 5000);
                 loc.replace(loc.pathname + (qs ? '?' + qs : '') + hash);
                 return;
             }

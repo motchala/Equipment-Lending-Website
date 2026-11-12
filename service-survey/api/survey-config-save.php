@@ -33,7 +33,12 @@ if (!admin_is_super_admin($conn)) {
     ss_fail(403, 'Only the Super Admin can change survey settings.');
 }
 
-if (!isset($body['enabled'], $body['comment_enabled']) || !is_array($body['questions'])) {
+if (
+    !isset($body['enabled'], $body['comment_enabled'])
+    || !is_array($body['questions'])
+    || !array_key_exists('semester_start', $body)
+    || !array_key_exists('semester_end', $body)
+) {
     ss_fail(400, 'The survey settings are incomplete.');
 }
 $toBool = static function ($value): ?int {
@@ -49,6 +54,28 @@ $enabled = $toBool($body['enabled']);
 $commentEnabled = $toBool($body['comment_enabled']);
 if ($enabled === null || $commentEnabled === null) {
     ss_fail(422, 'Survey switches must be on or off.');
+}
+
+$semesterStartValue = $body['semester_start'];
+$semesterEndValue = $body['semester_end'];
+if (!is_string($semesterStartValue) || !is_string($semesterEndValue)) {
+    ss_fail(422, 'Semester dates must be valid dates.');
+}
+$semesterStartValue = trim($semesterStartValue);
+$semesterEndValue = trim($semesterEndValue);
+if (($semesterStartValue === '') !== ($semesterEndValue === '')) {
+    ss_fail(422, 'Enter both semester dates, or leave both blank to disable period reporting.');
+}
+$semesterStart = null;
+$semesterEnd = null;
+if ($semesterStartValue !== '') {
+    $startDate = ss_parse_date($semesterStartValue);
+    $endDate = ss_parse_date($semesterEndValue);
+    if (!$startDate || !$endDate || $startDate > $endDate) {
+        ss_fail(422, 'Semester start and end dates are invalid or out of order.');
+    }
+    $semesterStart = $startDate->format('Y-m-d');
+    $semesterEnd = $endDate->format('Y-m-d');
 }
 
 $submitted = $body['questions'];
@@ -97,6 +124,7 @@ foreach ($clean as $item) {
 
 $affected = [];
 $retainedIds = [];
+$resetQuestionIds = [];
 foreach ($clean as $item) {
     if ($item['id'] === null) {
         continue;
@@ -105,11 +133,13 @@ foreach ($clean as $item) {
     $old = $existing[$item['id']];
     if ($old['text'] !== $item['text'] && $old['responses'] > 0) {
         $affected[] = ['text' => $old['text'], 'responses' => $old['responses'], 'change' => 'wording'];
+        $resetQuestionIds[$item['id']] = (int)$item['id'];
     }
 }
 foreach ($existing as $id => $old) {
     if (!isset($retainedIds[$id]) && $old['responses'] > 0) {
         $affected[] = ['text' => $old['text'], 'responses' => $old['responses'], 'change' => 'removed'];
+        $resetQuestionIds[$id] = (int)$id;
     }
 }
 if ($affected && empty($body['confirm_reset'])) {
@@ -118,13 +148,18 @@ if ($affected && empty($body['confirm_reset'])) {
 
 $conn->begin_transaction();
 try {
+    foreach ($resetQuestionIds as $questionId) {
+        ss_reset_question_aggregates($conn, (int)$questionId);
+    }
     $configUpdate = $conn->prepare(
-        'UPDATE tbl_service_survey_config SET enabled = ?, comment_enabled = ? WHERE id = 1'
+        'UPDATE tbl_service_survey_config
+         SET enabled = ?, comment_enabled = ?, semester_start = ?, semester_end = ?
+         WHERE id = 1'
     );
     if (!$configUpdate) {
         throw new RuntimeException('Could not prepare survey settings update: ' . $conn->error);
     }
-    $configUpdate->bind_param('ii', $enabled, $commentEnabled);
+    $configUpdate->bind_param('iiss', $enabled, $commentEnabled, $semesterStart, $semesterEnd);
     if (!$configUpdate->execute()) {
         $configUpdate->close();
         throw new RuntimeException('Could not save survey settings: ' . $configUpdate->error);

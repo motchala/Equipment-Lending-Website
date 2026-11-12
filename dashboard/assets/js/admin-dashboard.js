@@ -231,6 +231,8 @@
     function _switchTabDOM(tabName, clickedEl) {
         const panel = document.getElementById('panel-' + tabName);
         if (!panel) return;
+        // A real tab switch ends the "restored screen" state (see admin-shell-bottom.php), so the new screen slides in as usual
+        if (clickedEl !== false) document.documentElement.classList.remove('ps-restored');
         // Remember the screen for a soft refresh (backup for the #tab- part of the URL; see admin-shell-top.php)
         try { sessionStorage.setItem('adminCurrentTab', tabName); } catch (_) { }
         // If the pre-paint script already activated this panel (no flash), skip
@@ -2286,11 +2288,111 @@
         });
     }
 
+    /* ── Click the screen you are already on → refresh it in place ──────
+       Same as most apps and sites: tapping the active tab reloads its data. The screen, filters,
+       sub-tab and scroll position stay put, and a thin bar at the top shows that it is working.
+       Dashboard, Equipment, Faculty and Activity refresh in place. Facilities and Admins have no
+       in-place refresh yet, so they fall back to a normal soft refresh (which returns to the same screen).
+       Settings and Imports hold forms, so they only scroll back to the top. */
+    let _psRefreshBusy = false;
+
+    function _psRefreshBar(on) {
+        let bar = document.getElementById('ps-refresh-bar');
+        if (on) {
+            if (!bar) {
+                bar = document.createElement('div');
+                bar.id = 'ps-refresh-bar';
+                bar.setAttribute('role', 'progressbar');
+                bar.setAttribute('aria-label', 'Refreshing');
+                document.body.appendChild(bar);
+            }
+            void bar.offsetWidth;
+            bar.classList.add('on');
+        } else if (bar) {
+            bar.classList.remove('on');
+        }
+    }
+
+    /* The current admin page, fetched in the background and parsed (scripts in it do not run). */
+    function _psFetchPageDoc() {
+        return fetch('admin-dashboard.php', {
+            credentials: 'same-origin',
+            cache: 'no-store',
+            headers: { 'X-Requested-With': 'fetch' }
+        }).then(function (r) {
+            if (r.redirected || !r.ok) throw new Error('HTTP ' + r.status);   // signed out, or a server error
+            return r.text();
+        }).then(function (html) {
+            return new DOMParser().parseFromString(html, 'text/html');
+        });
+    }
+
+    /* Equipment: Catalog numbers (fragment endpoint) + the Loans table and its tab counts. */
+    function _psRefreshEquipment() {
+        const catalog = new Promise(function (resolve) {
+            if (typeof window.psRefreshInventoryTbody !== 'function') { resolve(); return; }
+            window.psRefreshInventoryTbody(resolve);
+            setTimeout(resolve, 15000);   // never leave the loading bar hanging
+        });
+        const loans = _psFetchPageDoc().then(function (doc) {
+            const fresh = doc.querySelector('#eq-loan-table tbody');
+            const live = document.querySelector('#eq-loan-table tbody');
+            if (!fresh || !live) return;
+            live.innerHTML = fresh.innerHTML;
+            doc.querySelectorAll('#eqLoanFilter [data-loan-filter]').forEach(function (f) {
+                const key = f.getAttribute('data-loan-filter');
+                const cur = document.querySelector('#eqLoanFilter [data-loan-filter="' + key + '"] .eq-loan-tab-count');
+                const nw = f.querySelector('.eq-loan-tab-count');
+                if (cur && nw) { cur.textContent = nw.textContent; cur.className = nw.className; }
+            });
+            if (typeof window.psRefreshEquipmentLoans === 'function') window.psRefreshEquipmentLoans(true);   // keeps filter + page
+        });
+        return Promise.all([catalog, loans]);
+    }
+
+    window.psRefreshActiveTab = function (tab) {
+        // back to the top, like most apps do when you tap the tab you are on
+        try {
+            const m = document.getElementById('app-main');
+            if (m && m.scrollTop > 0) m.scrollTo({ top: 0, behavior: 'smooth' });
+            if (window.scrollY > 0) window.scrollTo({ top: 0, behavior: 'smooth' });
+        } catch (_) { }
+        if (tab === 'settings' || tab === 'imports') return;   // forms: nothing to reload
+        if (_psRefreshBusy) return;
+
+        let job = null;
+        if (tab === 'dashboard' && typeof window.psRefreshDashboard === 'function') job = window.psRefreshDashboard;
+        else if (tab === 'inventory') job = _psRefreshEquipment;
+        else if (tab === 'faculty' && typeof window.adminRefreshFacultyList === 'function') job = window.adminRefreshFacultyList;
+        else if (tab === 'activity' && typeof window.psActivityRefresh === 'function') job = window.psActivityRefresh;
+
+        if (!job) { window.location.reload(); return; }   // Facilities, Admins: a normal soft refresh
+
+        _psRefreshBusy = true;
+        const started = Date.now();
+        _psRefreshBar(true);
+        Promise.resolve().then(job).catch(function () {
+            if (typeof showToast === 'function') showToast('Could not refresh. Please check your connection.');
+        }).then(function () {
+            // keep the bar up for a moment so a very quick refresh still reads as "refreshed"
+            setTimeout(function () { _psRefreshBar(false); _psRefreshBusy = false; }, Math.max(0, 450 - (Date.now() - started)));
+        });
+    };
+
     /* ── Sidebar nav items ────────────────────────────────────── */
     document.querySelectorAll('.nav-item[data-tab]').forEach(btn => {
         btn.addEventListener('click', function (e) {
             e.preventDefault();
-            _switchTabDOM(this.dataset.tab, this);
+            const tab = this.dataset.tab;
+            const cur = document.querySelector('.tab-panel.active');
+            // A real click on the tab you are already on refreshes it. Clicks made by code
+            // (e.g. a Dashboard card jumping to a screen) are not real clicks and still just open the screen.
+            if (e.isTrusted && cur && cur.id === 'panel-' + tab) {
+                _closeMobileSidebar();
+                window.psRefreshActiveTab(tab);
+                return;
+            }
+            _switchTabDOM(tab, this);
         });
     });
 
@@ -2613,7 +2715,7 @@
             if (showLoading !== false) message('hourglass_top', 'Loading activity\u2026');
             const url = ADM_ACTIVITY_API + '?actor=' + encodeURIComponent(p.actor) +
                 '&filter=' + encodeURIComponent(p.filter) + '&range=' + encodeURIComponent(p.range) + '&page=' + page;
-            fetch(url, { credentials: 'same-origin' })
+            return fetch(url, { credentials: 'same-origin' })
                 .then(function (res) { return res.json().catch(function () { return {}; }).then(function (j) { return { ok: res.ok, data: j }; }); })
                 .then(function (r) {
                     if (myToken !== token) return; // the user moved on
@@ -2654,7 +2756,7 @@
         /* load(true) = filters changed → back to page 1 */
         function load(resetPage, showLoading) {
             if (resetPage) page = 1;
-            fetchPage(false, showLoading);
+            return fetchPage(false, showLoading);
         }
 
         return { load: load };
@@ -3320,6 +3422,8 @@
         if (nav) nav.addEventListener('click', ensureLoaded);
         if (panel.classList.contains('active')) ensureLoaded();
         window.psActivityReady = ensureLoaded; // lets ?view=activity open it with data
+        /* Re-fetch the page you are on (same filters), without the "Loading…" message. Used by the click-the-active-tab refresh. */
+        window.psActivityRefresh = function () { loaded = true; return feed.load(false, false); };
 
         /* Open Activity with a preset — used by the Admins panel and My Account.
            opts: { actor: 'all' | 'auto' | 'me' | <admin id>, filter: chip key, range: today | 7d | 30d | all } */
@@ -6031,9 +6135,9 @@ function psSelectFmt(btn) {
         return !!panel && panel.classList.contains('active') && !document.hidden;
     }
     function refresh() {
-        if (stopped || inflight || !dashboardVisible()) return;
+        if (stopped || inflight || !dashboardVisible()) return Promise.resolve();
         inflight = true;
-        fetch(window.location.pathname + '?fragment=dashboard', {
+        return fetch(window.location.pathname + '?fragment=dashboard', {
             credentials: 'same-origin',
             cache: 'no-store',
             headers: { 'X-Requested-With': 'fetch' }
@@ -6062,6 +6166,7 @@ function psSelectFmt(btn) {
     }
 
     setInterval(refresh, POLL_MS);
+    window.psRefreshDashboard = refresh;   // used by the click-the-active-tab refresh
     document.addEventListener('visibilitychange', function () { if (!document.hidden) refresh(); });
     // coming back to the Dashboard tab -> refresh right away (after admin-dashboard.js flips the panel)
     document.addEventListener('click', function (e) {

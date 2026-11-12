@@ -84,6 +84,19 @@ if (!$skipped && $config['comment_enabled']) {
     }
 }
 
+$periodId = null;
+if (!$skipped && ss_has_semester($config)) {
+    $period = ss_period_for_date($config, date('Y-m-d'));
+    if ($period !== null) {
+        ss_ensure_semester_periods($conn, $config);
+        $periodRecord = ss_period_record($conn, $period);
+        if ($periodRecord === null) {
+            throw new RuntimeException('The active survey period could not be created.');
+        }
+        $periodId = $periodRecord['id'];
+    }
+}
+
 $conn->begin_transaction();
 try {
     $insert = $conn->prepare(
@@ -179,12 +192,35 @@ try {
         }
         $update->close();
 
+        if ($periodId !== null) {
+            $periodTotalScore = 0;
+            foreach ($questions as $index => $question) {
+                $rating = (int)$ratings[(string)$question['id']];
+                $periodTotalScore += $rating;
+                ss_record_period_answer(
+                    $conn,
+                    $periodId,
+                    (int)$question['id'],
+                    (string)$question['text'],
+                    $index + 1,
+                    $rating
+                );
+            }
+            ss_record_period_response($conn, $periodId, count($questions), $periodTotalScore);
+        }
+
         if ($comment !== '') {
-            $commentInsert = $conn->prepare('INSERT INTO tbl_service_survey_comments (comment_text) VALUES (?)');
+            $commentInsert = $periodId === null
+                ? $conn->prepare('INSERT INTO tbl_service_survey_comments (comment_text) VALUES (?)')
+                : $conn->prepare('INSERT INTO tbl_service_survey_comments (period_id, comment_text) VALUES (?, ?)');
             if (!$commentInsert) {
                 throw new RuntimeException('Could not prepare anonymous comment write: ' . $conn->error);
             }
-            $commentInsert->bind_param('s', $comment);
+            if ($periodId === null) {
+                $commentInsert->bind_param('s', $comment);
+            } else {
+                $commentInsert->bind_param('is', $periodId, $comment);
+            }
             if (!$commentInsert->execute()) {
                 $commentInsert->close();
                 throw new RuntimeException('Could not save anonymous comment: ' . $commentInsert->error);

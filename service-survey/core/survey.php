@@ -55,6 +55,8 @@ function ss_ensure_schema(mysqli $conn): void
             id TINYINT UNSIGNED NOT NULL PRIMARY KEY,
             enabled TINYINT(1) NOT NULL DEFAULT 1,
             comment_enabled TINYINT(1) NOT NULL DEFAULT 1,
+            semester_start DATE DEFAULT NULL,
+            semester_end DATE DEFAULT NULL,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
         "CREATE TABLE IF NOT EXISTS tbl_service_survey_questions (
@@ -78,11 +80,42 @@ function ss_ensure_schema(mysqli $conn): void
             PRIMARY KEY (source_type, transaction_key),
             KEY idx_service_survey_answered (answered)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+        "CREATE TABLE IF NOT EXISTS tbl_service_survey_periods (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            semester_start DATE NOT NULL,
+            semester_end DATE NOT NULL,
+            period_start DATE NOT NULL,
+            period_end DATE NOT NULL,
+            response_count INT UNSIGNED NOT NULL DEFAULT 0,
+            rating_count INT UNSIGNED NOT NULL DEFAULT 0,
+            total_score BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_service_survey_period (semester_start, semester_end, period_start),
+            KEY idx_service_survey_semester (semester_start, semester_end)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+        "CREATE TABLE IF NOT EXISTS tbl_service_survey_period_questions (
+            period_id BIGINT UNSIGNED NOT NULL,
+            question_id INT UNSIGNED NOT NULL,
+            question_version CHAR(64) NOT NULL,
+            question_text VARCHAR(160) NOT NULL,
+            sort_order TINYINT UNSIGNED NOT NULL DEFAULT 0,
+            responses INT UNSIGNED NOT NULL DEFAULT 0,
+            total_score BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            rating_1 INT UNSIGNED NOT NULL DEFAULT 0,
+            rating_2 INT UNSIGNED NOT NULL DEFAULT 0,
+            rating_3 INT UNSIGNED NOT NULL DEFAULT 0,
+            rating_4 INT UNSIGNED NOT NULL DEFAULT 0,
+            rating_5 INT UNSIGNED NOT NULL DEFAULT 0,
+            PRIMARY KEY (period_id, question_id, question_version),
+            KEY idx_service_survey_period_question (question_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
         "CREATE TABLE IF NOT EXISTS tbl_service_survey_comments (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            period_id BIGINT UNSIGNED DEFAULT NULL,
             comment_text VARCHAR(500) NOT NULL,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            KEY idx_service_survey_comment_date (created_at)
+            KEY idx_service_survey_comment_date (created_at),
+            KEY idx_service_survey_comment_period (period_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
     ];
 
@@ -91,6 +124,11 @@ function ss_ensure_schema(mysqli $conn): void
             throw new RuntimeException('Could not create service survey tables: ' . $conn->error);
         }
     }
+
+    ss_ensure_column($conn, 'tbl_service_survey_config', 'semester_start', 'DATE DEFAULT NULL');
+    ss_ensure_column($conn, 'tbl_service_survey_config', 'semester_end', 'DATE DEFAULT NULL');
+    ss_ensure_column($conn, 'tbl_service_survey_comments', 'period_id', 'BIGINT UNSIGNED DEFAULT NULL');
+    ss_ensure_index($conn, 'tbl_service_survey_comments', 'idx_service_survey_comment_period', '(period_id)');
 
     if (!$conn->query('INSERT IGNORE INTO tbl_service_survey_config (id, enabled, comment_enabled) VALUES (1, 1, 1)')) {
         throw new RuntimeException('Could not initialize service survey settings: ' . $conn->error);
@@ -126,9 +164,56 @@ function ss_ensure_schema(mysqli $conn): void
     }
 }
 
+function ss_ensure_column(mysqli $conn, string $table, string $column, string $definition): void
+{
+    $result = $conn->query("SHOW COLUMNS FROM `$table` LIKE '$column'");
+    if (!$result) {
+        throw new RuntimeException('Could not inspect service survey schema: ' . $conn->error);
+    }
+    $exists = $result->num_rows > 0;
+    $result->free();
+    if ($exists || $conn->query("ALTER TABLE `$table` ADD COLUMN `$column` $definition")) {
+        return;
+    }
+
+    $checkAgain = $conn->query("SHOW COLUMNS FROM `$table` LIKE '$column'");
+    if (!$checkAgain || $checkAgain->num_rows === 0) {
+        if ($checkAgain) {
+            $checkAgain->free();
+        }
+        throw new RuntimeException('Could not add service survey schema field: ' . $conn->error);
+    }
+    $checkAgain->free();
+}
+
+function ss_ensure_index(mysqli $conn, string $table, string $index, string $columns): void
+{
+    $result = $conn->query("SHOW INDEX FROM `$table` WHERE Key_name = '$index'");
+    if (!$result) {
+        throw new RuntimeException('Could not inspect service survey indexes: ' . $conn->error);
+    }
+    $exists = $result->num_rows > 0;
+    $result->free();
+    if ($exists || $conn->query("ALTER TABLE `$table` ADD INDEX `$index` $columns")) {
+        return;
+    }
+
+    $checkAgain = $conn->query("SHOW INDEX FROM `$table` WHERE Key_name = '$index'");
+    if (!$checkAgain || $checkAgain->num_rows === 0) {
+        if ($checkAgain) {
+            $checkAgain->free();
+        }
+        throw new RuntimeException('Could not add service survey index: ' . $conn->error);
+    }
+    $checkAgain->free();
+}
+
 function ss_config(mysqli $conn): array
 {
-    $result = $conn->query('SELECT enabled, comment_enabled FROM tbl_service_survey_config WHERE id = 1 LIMIT 1');
+    $result = $conn->query(
+        'SELECT enabled, comment_enabled, semester_start, semester_end
+         FROM tbl_service_survey_config WHERE id = 1 LIMIT 1'
+    );
     if (!$result) {
         throw new RuntimeException('Could not read service survey settings: ' . $conn->error);
     }
@@ -137,6 +222,8 @@ function ss_config(mysqli $conn): array
     return [
         'enabled' => (bool)$row['enabled'],
         'comment_enabled' => (bool)$row['comment_enabled'],
+        'semester_start' => !empty($row['semester_start']) ? (string)$row['semester_start'] : null,
+        'semester_end' => !empty($row['semester_end']) ? (string)$row['semester_end'] : null,
     ];
 }
 
@@ -159,6 +246,7 @@ function ss_questions(mysqli $conn): array
         $questions[] = [
             'id' => (int)$row['id'],
             'text' => (string)$row['question_text'],
+            'sort_order' => (int)$row['sort_order'],
             'responses' => $responses,
             'average' => $responses > 0 ? round((int)$row['total_score'] / $responses, 2) : null,
             'counts' => $counts,
@@ -169,16 +257,419 @@ function ss_questions(mysqli $conn): array
     return $questions;
 }
 
+function ss_parse_date(string $value): ?DateTimeImmutable
+{
+    $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value, new DateTimeZone('Asia/Manila'));
+    $errors = DateTimeImmutable::getLastErrors();
+    if (!$date || ($errors !== false && ($errors['warning_count'] > 0 || $errors['error_count'] > 0)) || $date->format('Y-m-d') !== $value) {
+        return null;
+    }
+    return $date;
+}
+
+function ss_has_semester(array $config): bool
+{
+    $start = ss_parse_date((string)($config['semester_start'] ?? ''));
+    $end = ss_parse_date((string)($config['semester_end'] ?? ''));
+    return $start !== null && $end !== null && $start <= $end;
+}
+
+function ss_period_for_date(array $config, string $dateValue): ?array
+{
+    if (!ss_has_semester($config)) {
+        return null;
+    }
+    $semesterStart = ss_parse_date((string)$config['semester_start']);
+    $semesterEnd = ss_parse_date((string)$config['semester_end']);
+    $date = ss_parse_date($dateValue);
+    if (!$semesterStart || !$semesterEnd || !$date || $date < $semesterStart || $date > $semesterEnd) {
+        return null;
+    }
+
+    $elapsedDays = (int)$semesterStart->diff($date)->format('%a');
+    $periodStart = $semesterStart->modify('+' . (intdiv($elapsedDays, 14) * 14) . ' days');
+    $periodEnd = $periodStart->modify('+13 days');
+    if ($periodEnd > $semesterEnd) {
+        $periodEnd = $semesterEnd;
+    }
+    return [
+        'semester_start' => $semesterStart->format('Y-m-d'),
+        'semester_end' => $semesterEnd->format('Y-m-d'),
+        'period_start' => $periodStart->format('Y-m-d'),
+        'period_end' => $periodEnd->format('Y-m-d'),
+    ];
+}
+
+function ss_ensure_semester_periods(mysqli $conn, array $config): void
+{
+    if (!ss_has_semester($config)) {
+        return;
+    }
+    $start = ss_parse_date((string)$config['semester_start']);
+    $end = ss_parse_date((string)$config['semester_end']);
+    if (!$start || !$end) {
+        return;
+    }
+
+    $stmt = $conn->prepare(
+        'INSERT IGNORE INTO tbl_service_survey_periods
+         (semester_start, semester_end, period_start, period_end) VALUES (?, ?, ?, ?)'
+    );
+    if (!$stmt) {
+        throw new RuntimeException('Could not prepare survey period creation: ' . $conn->error);
+    }
+    for ($cursor = $start; $cursor <= $end; $cursor = $cursor->modify('+14 days')) {
+        $periodEnd = $cursor->modify('+13 days');
+        if ($periodEnd > $end) {
+            $periodEnd = $end;
+        }
+        $semesterStart = $start->format('Y-m-d');
+        $semesterEnd = $end->format('Y-m-d');
+        $periodStart = $cursor->format('Y-m-d');
+        $periodEndValue = $periodEnd->format('Y-m-d');
+        $stmt->bind_param('ssss', $semesterStart, $semesterEnd, $periodStart, $periodEndValue);
+        if (!$stmt->execute()) {
+            $error = $stmt->error;
+            $stmt->close();
+            throw new RuntimeException('Could not create survey period: ' . $error);
+        }
+    }
+    $stmt->close();
+}
+
+function ss_period_record(mysqli $conn, array $period): ?array
+{
+    $stmt = $conn->prepare(
+        'SELECT id, response_count, rating_count, total_score
+         FROM tbl_service_survey_periods
+         WHERE semester_start = ? AND semester_end = ? AND period_start = ? LIMIT 1'
+    );
+    if (!$stmt) {
+        throw new RuntimeException('Could not prepare survey period lookup: ' . $conn->error);
+    }
+    $stmt->bind_param('sss', $period['semester_start'], $period['semester_end'], $period['period_start']);
+    if (!$stmt->execute()) {
+        $error = $stmt->error;
+        $stmt->close();
+        throw new RuntimeException('Could not read survey period: ' . $error);
+    }
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$row) {
+        return null;
+    }
+    return [
+        'id' => (int)$row['id'],
+        'responses' => (int)$row['response_count'],
+        'rating_count' => (int)$row['rating_count'],
+        'total_score' => (int)$row['total_score'],
+    ];
+}
+
+function ss_semester_totals(mysqli $conn, string $semesterStart, string $semesterEnd): array
+{
+    $stmt = $conn->prepare(
+        'SELECT COALESCE(SUM(response_count), 0) AS responses,
+                COALESCE(SUM(rating_count), 0) AS rating_count,
+                COALESCE(SUM(total_score), 0) AS total_score
+         FROM tbl_service_survey_periods
+         WHERE semester_start = ? AND semester_end = ?'
+    );
+    if (!$stmt) {
+        throw new RuntimeException('Could not prepare semester survey summary: ' . $conn->error);
+    }
+    $stmt->bind_param('ss', $semesterStart, $semesterEnd);
+    if (!$stmt->execute()) {
+        $error = $stmt->error;
+        $stmt->close();
+        throw new RuntimeException('Could not read semester survey summary: ' . $error);
+    }
+    $row = $stmt->get_result()->fetch_assoc() ?: [];
+    $stmt->close();
+    return [
+        'responses' => (int)($row['responses'] ?? 0),
+        'rating_count' => (int)($row['rating_count'] ?? 0),
+        'total_score' => (int)($row['total_score'] ?? 0),
+    ];
+}
+
+function ss_period_questions(mysqli $conn, ?int $periodId, array $activeQuestions): array
+{
+    $questions = [];
+    $seen = [];
+    if ($periodId !== null) {
+        $stmt = $conn->prepare(
+            'SELECT question_id, question_version, question_text, sort_order, responses, total_score,
+                    rating_1, rating_2, rating_3, rating_4, rating_5
+             FROM tbl_service_survey_period_questions
+             WHERE period_id = ?
+             ORDER BY sort_order ASC, question_id ASC, question_text ASC'
+        );
+        if (!$stmt) {
+            throw new RuntimeException('Could not prepare period question summary: ' . $conn->error);
+        }
+        $stmt->bind_param('i', $periodId);
+        if (!$stmt->execute()) {
+            $error = $stmt->error;
+            $stmt->close();
+            throw new RuntimeException('Could not read period question summary: ' . $error);
+        }
+        $rows = $stmt->get_result();
+        while ($row = $rows->fetch_assoc()) {
+            $questionId = (int)$row['question_id'];
+            $version = (string)$row['question_version'];
+            $responseCount = (int)$row['responses'];
+            $counts = [];
+            for ($star = 1; $star <= 5; $star++) {
+                $counts[] = (int)$row['rating_' . $star];
+            }
+            $questions[] = [
+                'id' => $questionId,
+                'text' => (string)$row['question_text'],
+                'sort_order' => (int)$row['sort_order'],
+                'responses' => $responseCount,
+                'average' => $responseCount > 0 ? round((int)$row['total_score'] / $responseCount, 2) : null,
+                'counts' => $counts,
+                'total_score' => (int)$row['total_score'],
+            ];
+            $seen[$questionId . ':' . $version] = true;
+        }
+        $stmt->close();
+    }
+
+    foreach ($activeQuestions as $question) {
+        $version = hash('sha256', (string)$question['text']);
+        $key = (int)$question['id'] . ':' . $version;
+        if (isset($seen[$key])) {
+            continue;
+        }
+        $questions[] = [
+            'id' => (int)$question['id'],
+            'text' => (string)$question['text'],
+            'sort_order' => (int)$question['sort_order'],
+            'responses' => 0,
+            'average' => null,
+            'counts' => [0, 0, 0, 0, 0],
+            'total_score' => 0,
+        ];
+    }
+
+    usort($questions, static function (array $a, array $b): int {
+        return ($a['sort_order'] <=> $b['sort_order'])
+            ?: ($a['id'] <=> $b['id'])
+            ?: strcmp($a['text'], $b['text']);
+    });
+    return $questions;
+}
+
+function ss_reset_question_aggregates(mysqli $conn, int $questionId): void
+{
+    $read = $conn->prepare(
+        'SELECT period_id, SUM(responses) AS rating_count, SUM(total_score) AS total_score
+         FROM tbl_service_survey_period_questions
+         WHERE question_id = ?
+         GROUP BY period_id'
+    );
+    if (!$read) {
+        throw new RuntimeException('Could not prepare period question reset: ' . $conn->error);
+    }
+    $read->bind_param('i', $questionId);
+    if (!$read->execute()) {
+        $error = $read->error;
+        $read->close();
+        throw new RuntimeException('Could not read period question totals to reset: ' . $error);
+    }
+    $periods = [];
+    $rows = $read->get_result();
+    while ($row = $rows->fetch_assoc()) {
+        $periods[] = [
+            'period_id' => (int)$row['period_id'],
+            'rating_count' => (int)($row['rating_count'] ?? 0),
+            'total_score' => (int)($row['total_score'] ?? 0),
+        ];
+    }
+    $read->close();
+
+    if ($periods !== []) {
+        $update = $conn->prepare(
+            'UPDATE tbl_service_survey_periods
+             SET rating_count = GREATEST(rating_count - ?, 0),
+                 total_score = GREATEST(total_score - ?, 0)
+             WHERE id = ?'
+        );
+        if (!$update) {
+            throw new RuntimeException('Could not prepare period reset update: ' . $conn->error);
+        }
+        foreach ($periods as $entry) {
+            $update->bind_param('iii', $entry['rating_count'], $entry['total_score'], $entry['period_id']);
+            if (!$update->execute()) {
+                $error = $update->error;
+                $update->close();
+                throw new RuntimeException('Could not subtract cleared question totals: ' . $error);
+            }
+        }
+        $update->close();
+    }
+
+    $delete = $conn->prepare('DELETE FROM tbl_service_survey_period_questions WHERE question_id = ?');
+    if (!$delete) {
+        throw new RuntimeException('Could not prepare period question delete: ' . $conn->error);
+    }
+    $delete->bind_param('i', $questionId);
+    if (!$delete->execute()) {
+        $error = $delete->error;
+        $delete->close();
+        throw new RuntimeException('Could not remove cleared question periods: ' . $error);
+    }
+    $delete->close();
+}
+
+function ss_record_period_answer(
+    mysqli $conn,
+    int $periodId,
+    int $questionId,
+    string $questionText,
+    int $sortOrder,
+    int $rating
+): void {
+    $version = hash('sha256', $questionText);
+    $zero = 0;
+    $stars = [$zero, $zero, $zero, $zero, $zero];
+    $stars[$rating - 1] = 1;
+    $stmt = $conn->prepare(
+        'INSERT INTO tbl_service_survey_period_questions
+         (period_id, question_id, question_version, question_text, sort_order, responses, total_score,
+          rating_1, rating_2, rating_3, rating_4, rating_5)
+         VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+             sort_order = VALUES(sort_order),
+             responses = responses + 1,
+             total_score = total_score + VALUES(total_score),
+             rating_1 = rating_1 + VALUES(rating_1),
+             rating_2 = rating_2 + VALUES(rating_2),
+             rating_3 = rating_3 + VALUES(rating_3),
+             rating_4 = rating_4 + VALUES(rating_4),
+             rating_5 = rating_5 + VALUES(rating_5)'
+    );
+    if (!$stmt) {
+        throw new RuntimeException('Could not prepare period rating write: ' . $conn->error);
+    }
+    $stmt->bind_param(
+        'iissiiiiiii',
+        $periodId,
+        $questionId,
+        $version,
+        $questionText,
+        $sortOrder,
+        $rating,
+        $stars[0],
+        $stars[1],
+        $stars[2],
+        $stars[3],
+        $stars[4]
+    );
+    if (!$stmt->execute()) {
+        $error = $stmt->error;
+        $stmt->close();
+        throw new RuntimeException('Could not save period rating: ' . $error);
+    }
+    $stmt->close();
+}
+
+function ss_record_period_response(mysqli $conn, int $periodId, int $ratingCount, int $totalScore): void
+{
+    $stmt = $conn->prepare(
+        'UPDATE tbl_service_survey_periods
+         SET response_count = response_count + 1,
+             rating_count = rating_count + ?,
+             total_score = total_score + ?
+         WHERE id = ?'
+    );
+    if (!$stmt) {
+        throw new RuntimeException('Could not prepare period response update: ' . $conn->error);
+    }
+    $stmt->bind_param('iii', $ratingCount, $totalScore, $periodId);
+    if (!$stmt->execute() || $stmt->affected_rows !== 1) {
+        $error = $stmt->error;
+        $stmt->close();
+        throw new RuntimeException('Could not update period response count: ' . $error);
+    }
+    $stmt->close();
+}
+
 function ss_results(mysqli $conn, int $offset = 0): array
 {
     $config = ss_config($conn);
-    $questions = ss_questions($conn);
+    $editorQuestions = ss_questions($conn);
     $responseResult = $conn->query('SELECT COUNT(*) AS n FROM tbl_service_survey_completions WHERE answered = 1');
     if (!$responseResult) {
         throw new RuntimeException('Could not count service survey responses: ' . $conn->error);
     }
-    $responses = (int)($responseResult->fetch_assoc()['n'] ?? 0);
+    $allTimeResponses = (int)($responseResult->fetch_assoc()['n'] ?? 0);
     $responseResult->free();
+
+    $today = date('Y-m-d');
+    $hasSemester = ss_has_semester($config);
+    $period = null;
+    $periodRow = null;
+    $semester = [
+        'configured' => false,
+        'start' => null,
+        'end' => null,
+        'responses' => 0,
+        'ready' => false,
+        'overall' => null,
+        'legacy_responses' => $allTimeResponses,
+    ];
+    if ($hasSemester) {
+        ss_ensure_semester_periods($conn, $config);
+        $period = ss_period_for_date($config, $today);
+        $periodRow = $period ? ss_period_record($conn, $period) : null;
+        $questions = ss_period_questions($conn, $periodRow['id'] ?? null, $editorQuestions);
+        $periodTotals = ss_semester_totals(
+            $conn,
+            (string)$config['semester_start'],
+            (string)$config['semester_end']
+        );
+        $periodizedResult = $conn->query(
+            'SELECT COALESCE(SUM(response_count), 0) AS responses FROM tbl_service_survey_periods'
+        );
+        if (!$periodizedResult) {
+            throw new RuntimeException('Could not count periodized survey responses: ' . $conn->error);
+        }
+        $periodizedResponses = (int)($periodizedResult->fetch_assoc()['responses'] ?? 0);
+        $periodizedResult->free();
+        $semesterReady = $periodTotals['responses'] >= SS_MIN_RESPONSES && $periodTotals['rating_count'] > 0;
+        $semester = [
+            'configured' => true,
+            'start' => $config['semester_start'],
+            'end' => $config['semester_end'],
+            'responses' => $periodTotals['responses'],
+            'ready' => $semesterReady,
+            'overall' => $semesterReady
+                ? round($periodTotals['total_score'] / $periodTotals['rating_count'], 2)
+                : null,
+            'legacy_responses' => max(0, $allTimeResponses - $periodizedResponses),
+        ];
+        $responses = $periodRow['responses'] ?? 0;
+        $currentPeriod = [
+            'configured' => true,
+            'active' => $period !== null,
+            'start' => $period['period_start'] ?? null,
+            'end' => $period['period_end'] ?? null,
+            'responses' => $responses,
+        ];
+    } else {
+        $questions = $editorQuestions;
+        $responses = $allTimeResponses;
+        $currentPeriod = [
+            'configured' => false,
+            'active' => false,
+            'start' => null,
+            'end' => null,
+            'responses' => $responses,
+        ];
+    }
 
     $ratingCount = 0;
     $ratingTotal = 0;
@@ -189,35 +680,69 @@ function ss_results(mysqli $conn, int $offset = 0): array
             $question['average'] = null;
             $question['counts'] = null;
         }
-        unset($question['total_score']);
+        unset($question['total_score'], $question['sort_order']);
     }
     unset($question);
 
-    $commentCountResult = $conn->query('SELECT COUNT(*) AS n FROM tbl_service_survey_comments');
-    if (!$commentCountResult) {
-        throw new RuntimeException('Could not count service survey comments: ' . $conn->error);
+    if ($hasSemester) {
+        $commentCountStmt = $conn->prepare(
+            'SELECT COUNT(*) AS n
+             FROM tbl_service_survey_comments c
+             INNER JOIN tbl_service_survey_periods p ON p.id = c.period_id
+             WHERE p.semester_start = ? AND p.semester_end = ?'
+        );
+        if (!$commentCountStmt) {
+            throw new RuntimeException('Could not prepare semester comment count: ' . $conn->error);
+        }
+        $commentCountStmt->bind_param('ss', $config['semester_start'], $config['semester_end']);
+        if (!$commentCountStmt->execute()) {
+            $error = $commentCountStmt->error;
+            $commentCountStmt->close();
+            throw new RuntimeException('Could not count semester comments: ' . $error);
+        }
+        $commentCount = (int)($commentCountStmt->get_result()->fetch_assoc()['n'] ?? 0);
+        $commentCountStmt->close();
+    } else {
+        $commentCountResult = $conn->query('SELECT COUNT(*) AS n FROM tbl_service_survey_comments');
+        if (!$commentCountResult) {
+            throw new RuntimeException('Could not count service survey comments: ' . $conn->error);
+        }
+        $commentCount = (int)($commentCountResult->fetch_assoc()['n'] ?? 0);
+        $commentCountResult->free();
     }
-    $commentCount = (int)($commentCountResult->fetch_assoc()['n'] ?? 0);
-    $commentCountResult->free();
 
-    // Keep individual comments hidden until there are enough comments to protect contributors.
-    $commentsVisible = $commentCount >= SS_MIN_RESPONSES && $responses >= SS_MIN_RESPONSES;
+    // Reveal submitted comments once the same response threshold as rating summaries is met.
+    $privacyResponses = $hasSemester ? $semester['responses'] : $allTimeResponses;
+    $commentsVisible = $privacyResponses >= SS_MIN_RESPONSES;
     $comments = [];
     $visibleCommentCount = 0;
     if ($commentsVisible) {
         $visibleCommentCount = $commentCount;
-        $stmt = $conn->prepare(
-            "SELECT comment_text, DATE_FORMAT(created_at, '%Y-%m') AS month
-             FROM tbl_service_survey_comments
-             ORDER BY created_at DESC, id DESC LIMIT 10 OFFSET ?"
-        );
+        $stmt = $hasSemester
+            ? $conn->prepare(
+                "SELECT c.comment_text, DATE_FORMAT(c.created_at, '%Y-%m') AS month
+                 FROM tbl_service_survey_comments c
+                 INNER JOIN tbl_service_survey_periods p ON p.id = c.period_id
+                 WHERE p.semester_start = ? AND p.semester_end = ?
+                 ORDER BY c.created_at DESC, c.id DESC LIMIT 10 OFFSET ?"
+            )
+            : $conn->prepare(
+                "SELECT comment_text, DATE_FORMAT(created_at, '%Y-%m') AS month
+                 FROM tbl_service_survey_comments
+                 ORDER BY created_at DESC, id DESC LIMIT 10 OFFSET ?"
+            );
         if (!$stmt) {
             throw new RuntimeException('Could not prepare service survey comments: ' . $conn->error);
         }
-        $stmt->bind_param('i', $offset);
+        if ($hasSemester) {
+            $stmt->bind_param('ssi', $config['semester_start'], $config['semester_end'], $offset);
+        } else {
+            $stmt->bind_param('i', $offset);
+        }
         if (!$stmt->execute()) {
+            $error = $stmt->error;
             $stmt->close();
-            throw new RuntimeException('Could not load service survey comments: ' . $stmt->error);
+            throw new RuntimeException('Could not load service survey comments: ' . $error);
         }
         $rows = $stmt->get_result();
         while ($row = $rows->fetch_assoc()) {
@@ -236,8 +761,12 @@ function ss_results(mysqli $conn, int $offset = 0): array
             ? round($ratingTotal / $ratingCount, 2)
             : null,
         'questions' => $questions,
+        'editor_questions' => $editorQuestions,
+        'current_period' => $currentPeriod,
+        'semester' => $semester,
         'comments' => $comments,
         'comment_total' => $visibleCommentCount,
+        'comments_pending' => $commentCount > 0 && !$commentsVisible,
         'limits' => [
             'min_questions' => SS_MIN_QUESTIONS,
             'max_questions' => SS_MAX_QUESTIONS,

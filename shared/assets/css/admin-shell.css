@@ -7,3 +7,56 @@
         html.admin-tab-pending .app-body {
             visibility: hidden;
         }
+
+/* No transitions while a restored screen is being activated (the page is still hidden): the sidebar
+   highlight must not fade from the Dashboard to the real tab. Removed together with .admin-tab-pending
+   by admin-shell-bottom.php, after the new state has been committed, so nothing animates on reveal. */
+html.admin-tab-pending *,
+html.admin-tab-pending *::before,
+html.admin-tab-pending *::after {
+    transition: none !important;
+}
+
+/* A restored screen simply appears in place (no slide-in replay). Cleared on the first real tab switch. */
+html.ps-restored .tab-panel.active {
+    animation: none !important;
+}
+
+/* Thin loading bar shown while the screen you clicked (the one you are already on) refreshes in place. */
+#ps-refresh-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    z-index: 10050;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s ease;
+}
+
+#ps-refresh-bar.on {
+    opacity: 1;
+}
+
+#ps-refresh-bar::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -40%;
+    width: 40%;
+    border-radius: 3px;
+    background: var(--accent-maroon, #800000);
+    animation: ps-refresh-slide 1s ease-in-out infinite;
+}
+
+@keyframes ps-refresh-slide {
+    0% { left: -40%; }
+    100% { left: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #ps-refresh-bar::before { animation-duration: 2.4s; }
+}

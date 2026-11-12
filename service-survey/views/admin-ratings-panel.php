@@ -32,7 +32,7 @@ $svr_super = !empty($is_super_admin);
             <h2 class="svr-intro__title">Service Ratings</h2>
             <p class="svr-intro__sub">
                 How faculty rate the admin service after a finished borrow or room reservation.
-                Fully anonymous: only the combined results are kept, never who answered.
+                Fully anonymous: only combined results are kept. Reporting uses 14-day windows within the configured semester.
             </p>
         </div>
         <button type="button" class="btn-cancel-acc svr-refresh" id="svrRefresh">
@@ -45,9 +45,21 @@ $svr_super = !empty($is_super_admin);
     <!-- Overall -->
     <div class="info-card" id="svrOverallCard">
         <div class="info-card-head">
-            <h3><span class="material-symbols-outlined">star</span> Overall rating</h3>
+            <h3><span class="material-symbols-outlined">star</span> <span id="svrCurrentHeading">Current two-week rating</span></h3>
+            <span class="svr-period-range" id="svrCurrentPeriodRange"></span>
         </div>
         <div class="svr-overall" id="svrOverall">
+            <p class="svr-muted">Loading…</p>
+        </div>
+    </div>
+
+    <!-- Semester roll-up -->
+    <div class="info-card" id="svrSemesterCard">
+        <div class="info-card-head">
+            <h3><span class="material-symbols-outlined">calendar_month</span> Semester-to-date rating</h3>
+            <span class="svr-period-range" id="svrSemesterRange"></span>
+        </div>
+        <div class="svr-overall" id="svrSemester">
             <p class="svr-muted">Loading…</p>
         </div>
     </div>
@@ -55,7 +67,7 @@ $svr_super = !empty($is_super_admin);
     <!-- Per question -->
     <div class="info-card" id="svrQuestionsCard">
         <div class="info-card-head">
-            <h3><span class="material-symbols-outlined">format_list_numbered</span> By question</h3>
+            <h3><span class="material-symbols-outlined">format_list_numbered</span> <span id="svrQuestionsHeading">Current period by question</span></h3>
         </div>
         <div class="svr-questions" id="svrQuestions"></div>
     </div>
@@ -80,6 +92,24 @@ $svr_super = !empty($is_super_admin);
         </div>
 
         <div class="svr-ed-body">
+            <div class="svr-semester-settings">
+                <div>
+                    <div class="svr-switch-title">Semester reporting dates</div>
+                    <div class="svr-switch-sub">Set both dates to start 14-day reporting windows anchored to the semester start. Leave both blank to use unperiodized totals.</div>
+                </div>
+                <div class="svr-date-fields">
+                    <label class="svr-date-field" for="svrSemesterStart">
+                        Semester starts
+                        <input type="date" id="svrSemesterStart">
+                    </label>
+                    <label class="svr-date-field" for="svrSemesterEnd">
+                        Semester ends
+                        <input type="date" id="svrSemesterEnd">
+                    </label>
+                </div>
+                <p class="svr-switch-sub">Ratings already collected before period reporting began remain in the legacy totals and cannot be assigned to exact two-week windows.</p>
+            </div>
+
             <div class="svr-switch-row">
                 <label class="toggle-sw">
                     <input type="checkbox" id="svrEnabled">

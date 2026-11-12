@@ -278,7 +278,7 @@
                Called after in-place account creation so the new row appears without
                a full page reload. Exposed globally so admin-dashboard.js can call it. */
             window.adminRefreshFacultyList = function() {
-                fetch('admin-dashboard.php?fragment=faculty-tbody', {
+                return fetch('admin-dashboard.php?fragment=faculty-tbody', {
                         credentials: 'same-origin'
                     })
                     .then(function(r) {
