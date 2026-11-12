@@ -269,7 +269,6 @@ class FacultyReportPdf extends FPDF
         $line = array_filter([
             'Faculty ID: ' . $p['faculty_id'],
             $p['department'] !== '' ? $p['department'] : '',
-            $p['rank'] !== '' ? $p['rank'] : '',
         ], 'strlen');
         $this->SetXY($textX, $y + 13);
         $this->Cell(160, 5, $this->clip($this->t(implode('   |   ', $line)), 160));

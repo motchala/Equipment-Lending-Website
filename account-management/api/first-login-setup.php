@@ -12,7 +12,7 @@ ini_set('display_errors', '0');
  * Doing it all at once means there is never a half-finished state to resume from, and the
  * WHERE must_change_password = 1 makes a double click (or a replayed request) harmless.
  *
- * POST: csrf_token, new_password, confirm_password, department, phone, backup_email (optional)
+ * POST: csrf_token, new_password, confirm_password, department, backup_email (optional)
  * JSON: { success, msg, field?, redirect? }
  */
 
@@ -39,7 +39,7 @@ csrf_verify();
 date_default_timezone_set('Asia/Manila');
 
 require_once __DIR__ . '/../../config/db.php';
-require_once __DIR__ . '/../../settings/core/faculty-helpers.php';     // phone + department helpers
+require_once __DIR__ . '/../../settings/core/faculty-helpers.php';     // department helpers
 require_once __DIR__ . '/../core/faculty-first-login.php';
 $conn = getDB();
 

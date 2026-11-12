@@ -1294,141 +1294,6 @@
         showToast('All settings reset to defaults.');
     }
 
-    /* ── Profile Edit ──────────────────────────────────────────────────── */
-    // Locked fields: dob, gender, nationality cannot be changed once set.
-    // The PHP template only renders their <input>/<select> elements when the
-    // value is empty, so we simply skip any [data-input] that has no matching
-    // element in the DOM.
-    function toggleProfileEdit() {
-        const editBtn = document.getElementById('editProfileBtn');
-        const saveBtn = document.getElementById('saveProfileBtn');
-        const cancelBtn = document.getElementById('cancelProfileBtn');
-        if (editBtn) editBtn.style.display = 'none';
-        if (saveBtn) saveBtn.style.display = 'flex';
-        if (cancelBtn) cancelBtn.style.display = 'flex';
-
-        document.querySelectorAll('[data-field]').forEach(span => {
-            const key = span.dataset.field;
-            const input = document.querySelector('[data-input="' + key + '"]');
-            if (!input) return; // locked — no input rendered, skip
-            span.style.display = 'none';
-            input.style.display = '';
-            input.disabled = false;
-            if (span.classList.contains('empty')) input.value = '';
-        });
-    }
-
-    function cancelProfileEdit() {
-        const editBtn = document.getElementById('editProfileBtn');
-        const saveBtn = document.getElementById('saveProfileBtn');
-        const cancelBtn = document.getElementById('cancelProfileBtn');
-        if (editBtn) editBtn.style.display = 'flex';
-        if (saveBtn) saveBtn.style.display = 'none';
-        if (cancelBtn) cancelBtn.style.display = 'none';
-        document.querySelectorAll('[data-input]').forEach(input => {
-            const key = input.dataset.input;
-            const span = document.querySelector('[data-field="' + key + '"]');
-            if (!span) return;
-            span.style.display = '';
-            input.style.display = 'none';
-            input.disabled = true;
-        });
-    }
-
-    function saveProfileEdit() {
-        const saveBtn = document.getElementById('saveProfileBtn');
-        const cancelBtn = document.getElementById('cancelProfileBtn');
-
-        // Collect values from visible inputs
-        const fd = new FormData();
-        fd.append('action', 'save_profile');
-        fd.append('csrf_token', getCsrfToken());
-
-        document.querySelectorAll('[data-input]').forEach(input => {
-            const key = input.dataset.input;
-            const val = input.tagName === 'SELECT'
-                ? input.options[input.selectedIndex].value
-                : input.value.trim();
-            fd.append(key, val);
-        });
-
-        // Optimistic UI: disable buttons while saving
-        if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
-        if (cancelBtn) cancelBtn.disabled = true;
-
-        fetch('settings/api/update-profile.php', { method: 'POST', body: fd })
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    // Update each span from the server-confirmed values
-                    const serverVals = {
-                        fullname: data.fullname || '',
-                        dob: data.dob || '',
-                        gender: data.gender || '',
-                        nationality: data.nationality || ''
-                    };
-
-                    document.querySelectorAll('[data-input]').forEach(input => {
-                        const key = input.dataset.input;
-                        const span = document.querySelector('[data-field="' + key + '"]');
-                        if (!span) return;
-
-                        let displayVal = serverVals[key] || '';
-
-                        // Format date of birth for display
-                        if (key === 'dob' && displayVal) {
-                            const d = new Date(displayVal + 'T00:00:00');
-                            displayVal = d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-                        }
-
-                        if (displayVal) {
-                            span.textContent = displayVal;
-                            span.classList.remove('empty');
-                            // If this field is now permanently locked, remove the input from DOM
-                            const locks = window.USER_PROFILE_LOCKS || {};
-                            if ((key === 'dob' || key === 'gender' || key === 'nationality') && !locks[key]) {
-                                // Mark as locked for this session without full reload
-                                input.parentElement.removeChild(input);
-                            }
-                        } else {
-                            span.textContent = '— Not provided';
-                            span.classList.add('empty');
-                        }
-                    });
-
-                    // Update header name display
-                    if (data.fullname) {
-                        document.querySelectorAll('.side-nav-user-name, .u-name, .acc-hero-info h2').forEach(el => {
-                            el.textContent = data.fullname;
-                        });
-                        // Update initials
-                        const parts = data.fullname.trim().split(' ');
-                        let ini = parts[0].charAt(0).toUpperCase();
-                        if (parts.length > 1) ini += parts[parts.length - 1].charAt(0).toUpperCase();
-                        document.querySelectorAll('.avatar-btn, .side-nav-avatar, .acc-avatar-large').forEach(el => {
-                            // Replace only text nodes (preserve child elements like .cam-btn)
-                            const textNode = [...el.childNodes].find(n => n.nodeType === Node.TEXT_NODE);
-                            if (textNode) textNode.textContent = ini;
-                            else if (!el.querySelector('.cam-btn')) el.textContent = ini;
-                            else { el.insertBefore(document.createTextNode(ini), el.firstChild); }
-                        });
-                    }
-
-                    cancelProfileEdit();
-                    showToast(data.msg || 'Profile updated!');
-                } else {
-                    if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;"><polyline points="20 6 9 17 4 12"/></svg> Save'; }
-                    if (cancelBtn) cancelBtn.disabled = false;
-                    showToast('Error: ' + (data.msg || 'Could not save profile.'));
-                }
-            })
-            .catch(() => {
-                if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;"><polyline points="20 6 9 17 4 12"/></svg> Save'; }
-                if (cancelBtn) cancelBtn.disabled = false;
-                showToast('Network error. Please try again.');
-            });
-    }
-
     /* ══════════════════════════════════════════════════════════════════
        SETTINGS > PERSONAL INFORMATION  ("Edit Account" -> Save / Cancel)
        The card is read-only until Edit Account is clicked. Save only becomes
@@ -1487,11 +1352,6 @@
     function _sovIsEditingAccount() {
         const card = _sovCard();
         return Boolean(card && card.dataset.editing === 'true');
-    }
-
-    // Same rules as the server: 09XXXXXXXXX, +639XXXXXXXXX, 639XXXXXXXXX or 9XXXXXXXXX (spaces / dashes allowed)
-    function _sovPhoneOk(v) {
-        return /^(?:\+?63|0)?9\d{9}$/.test(String(v).replace(/[\s\-().]/g, ''));
     }
 
     function sovStartEdit() {
@@ -1556,15 +1416,6 @@
         const nameView = document.getElementById('sovFullNameView');
         if (nameView) nameView.textContent = d.fullname;
 
-        const phoneIn = c.querySelector('[data-edit-field="phone"]');
-        if (phoneIn) phoneIn.value = d.phone_display || '';
-        const phoneView = document.getElementById('sovPhoneView');
-        if (phoneView) {
-            phoneView.textContent = d.phone_display || '— Not provided';
-            phoneView.classList.toggle('acct-row-static-muted', !d.phone_display);
-            phoneView.classList.toggle('acct-row-not-provided', !d.phone_display);
-        }
-
         // department: once chosen it becomes a permanent, read-only value
         const deptSel = c.querySelector('[data-edit-field="department"]');
         const deptView = document.getElementById('sovDepartmentView');
@@ -1611,11 +1462,6 @@
         const vals = {};
         _sovFields().forEach(el => { vals[el.dataset.editField] = el.value.trim(); });
         if (!vals.fullname) { _sovShowError('fullname', 'Full name cannot be empty.'); return; }
-        const phoneEl = c.querySelector('[data-edit-field="phone"]');
-        if (vals.phone && phoneEl && vals.phone !== (phoneEl.dataset.original || '') && !_sovPhoneOk(vals.phone)) {
-            _sovShowError('phone', 'Enter a valid mobile number, like 09XX XXX XXXX.');
-            return;
-        }
 
         const fd = new FormData();
         fd.append('action', 'save_account');
@@ -2388,15 +2234,6 @@
                 // case 'reset-settings': — reset button removed from new settings design
                 //     resetAllSettings();
                 //     break;
-                case 'profile-edit':
-                    toggleProfileEdit();
-                    break;
-                case 'profile-save':
-                    saveProfileEdit();
-                    break;
-                case 'profile-cancel':
-                    cancelProfileEdit();
-                    break;
                 case 'open-pw-modal':
                     if (el.hasAttribute('data-sov-edit-gated') && !_sovIsEditingAccount()) break;
                     openPwModal();
@@ -3092,178 +2929,6 @@
     }
 
     /* ══════════════════════════════════════════════════════════════════
-       CONTACT DETAILS - EDIT/SAVE/CANCEL
-    ══════════════════════════════════════════════════════════════════ */
-    let contactOriginalValues = {};
-
-    function initContactSection() {
-        const editBtn = document.getElementById('editContactBtn');
-        const saveBtn = document.getElementById('saveContactBtn');
-        const cancelBtn = document.getElementById('cancelContactBtn');
-
-        if (!editBtn) return;
-
-        editBtn.addEventListener('click', function () {
-            // Store original values
-            contactOriginalValues = {
-                phone: document.querySelector('[data-input="phone"]')?.value || '',
-                present_address: document.querySelector('[data-input="present_address"]')?.value || '',
-                permanent_address: document.querySelector('[data-input="permanent_address"]')?.value || '',
-                landline: document.querySelector('[data-input="landline"]')?.value || ''
-            };
-
-            // Show inputs, hide displays
-            document.querySelectorAll('#acc-contact .info-input-f').forEach(inp => {
-                const field = inp.getAttribute('data-input');
-                const display = document.querySelector(`#acc-contact [data-field="${field}"]`);
-                if (display) {
-                    const currentText = display.textContent.trim();
-                    if (currentText !== '— Not provided') {
-                        inp.value = currentText;
-                    }
-                    display.style.display = 'none';
-                }
-                inp.style.display = 'block';
-                inp.disabled = false;
-            });
-
-            editBtn.style.display = 'none';
-            saveBtn.style.display = 'inline-flex';
-            cancelBtn.style.display = 'inline-flex';
-        });
-
-        cancelBtn.addEventListener('click', function () {
-            document.querySelectorAll('#acc-contact .info-input-f').forEach(inp => {
-                const field = inp.getAttribute('data-input');
-                inp.value = contactOriginalValues[field] || '';
-                inp.style.display = 'none';
-                inp.disabled = true;
-                const display = document.querySelector(`#acc-contact [data-field="${field}"]`);
-                if (display) display.style.display = 'block';
-            });
-
-            editBtn.style.display = 'inline-flex';
-            saveBtn.style.display = 'none';
-            cancelBtn.style.display = 'none';
-        });
-
-        saveBtn.addEventListener('click', function () {
-            const formData = new FormData();
-            formData.append('action', 'save_contact');
-            formData.append('csrf_token', getCsrfToken());
-            formData.append('phone', document.querySelector('[data-input="phone"]')?.value || '');
-            formData.append('present_address', document.querySelector('[data-input="present_address"]')?.value || '');
-            formData.append('permanent_address', document.querySelector('[data-input="permanent_address"]')?.value || '');
-            formData.append('landline', document.querySelector('[data-input="landline"]')?.value || '');
-
-            fetch('settings/api/update-profile.php', {
-                method: 'POST',
-                body: formData
-            })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.needsConfirmation) {
-                        showConfirmationModal(data.changes, 'contact', data.data);
-                    } else if (data.success) {
-                        showToast(data.msg, 'success');
-                        updateCompletionProgress();
-                    } else {
-                        showToast(data.msg, 'error');
-                    }
-                })
-                .catch(err => {
-                    console.error(err);
-                    showToast('Failed to save contact details', 'error');
-                });
-        });
-    }
-
-    /* ══════════════════════════════════════════════════════════════════
-       EMERGENCY CONTACT - EDIT/SAVE/CANCEL
-    ══════════════════════════════════════════════════════════════════ */
-    let emergencyOriginalValues = {};
-
-    function initEmergencySection() {
-        const editBtn = document.getElementById('editEmergencyBtn');
-        const saveBtn = document.getElementById('saveEmergencyBtn');
-        const cancelBtn = document.getElementById('cancelEmergencyBtn');
-
-        if (!editBtn) return;
-
-        editBtn.addEventListener('click', function () {
-            // Store original values
-            emergencyOriginalValues = {
-                emergency_name: document.querySelector('[data-input="emergency_name"]')?.value || '',
-                emergency_relationship: document.querySelector('[data-input="emergency_relationship"]')?.value || '',
-                emergency_phone: document.querySelector('[data-input="emergency_phone"]')?.value || ''
-            };
-
-            // Show inputs, hide displays
-            document.querySelectorAll('#acc-emergency .info-input-f').forEach(inp => {
-                const field = inp.getAttribute('data-input');
-                const display = document.querySelector(`#acc-emergency [data-field="${field}"]`);
-                if (display) {
-                    const currentText = display.textContent.trim();
-                    if (currentText !== '— Not provided') {
-                        inp.value = currentText;
-                    }
-                    display.style.display = 'none';
-                }
-                inp.style.display = 'block';
-                inp.disabled = false;
-            });
-
-            editBtn.style.display = 'none';
-            saveBtn.style.display = 'inline-flex';
-            cancelBtn.style.display = 'inline-flex';
-        });
-
-        cancelBtn.addEventListener('click', function () {
-            document.querySelectorAll('#acc-emergency .info-input-f').forEach(inp => {
-                const field = inp.getAttribute('data-input');
-                inp.value = emergencyOriginalValues[field] || '';
-                inp.style.display = 'none';
-                inp.disabled = true;
-                const display = document.querySelector(`#acc-emergency [data-field="${field}"]`);
-                if (display) display.style.display = 'block';
-            });
-
-            editBtn.style.display = 'inline-flex';
-            saveBtn.style.display = 'none';
-            cancelBtn.style.display = 'none';
-        });
-
-        saveBtn.addEventListener('click', function () {
-            const formData = new FormData();
-            formData.append('action', 'save_emergency');
-            formData.append('csrf_token', getCsrfToken());
-            formData.append('emergency_name', document.querySelector('[data-input="emergency_name"]')?.value || '');
-            formData.append('emergency_relationship', document.querySelector('[data-input="emergency_relationship"]')?.value || '');
-            formData.append('emergency_phone', document.querySelector('[data-input="emergency_phone"]')?.value || '');
-
-            fetch('settings/api/update-profile.php', {
-                method: 'POST',
-                body: formData
-            })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.needsConfirmation) {
-                        showConfirmationModal(data.changes, 'emergency', data.data);
-                    } else if (data.success) {
-                        showToast(data.msg, 'success');
-                        updateCompletionProgress();
-                    } else {
-                        showToast(data.msg, 'error');
-                    }
-                })
-                .catch(err => {
-                    console.error(err);
-                    showToast('Failed to save emergency contact', 'error');
-                });
-        });
-    }
-
-    /* ══════════════════════════════════════════════════════════════════
        CONFIRMATION MODAL
     ══════════════════════════════════════════════════════════════════ */
     let pendingConfirmation = null;
@@ -3355,9 +3020,7 @@
                     });
 
                     // Reset edit mode
-                    const sectionId = section === 'profile' ? 'acc-overview' :
-                        section === 'academic' ? 'acc-academic' :
-                            section === 'contact' ? 'acc-contact' : 'acc-emergency';
+                    const sectionId = 'acc-academic';   // the only section that still uses this confirmation step
 
                     document.querySelectorAll(`#${sectionId} .info-input-f`).forEach(inp => {
                         inp.style.display = 'none';
@@ -3385,62 +3048,11 @@
     }
 
     /* ══════════════════════════════════════════════════════════════════
-       MODIFIED PROFILE SAVE TO USE CONFIRMATION
-    ══════════════════════════════════════════════════════════════════ */
-    // This function should be added to or replace the existing profile save handler
-    function handleProfileSaveWithConfirmation() {
-        const saveBtn = document.getElementById('saveProfileBtn');
-        if (!saveBtn) return;
-
-        // Remove existing listeners (if any) and add new one
-        const newSaveBtn = saveBtn.cloneNode(true);
-        saveBtn.parentNode.replaceChild(newSaveBtn, saveBtn);
-
-        newSaveBtn.addEventListener('click', function () {
-            const fullname = (document.querySelector('[data-input="fullname"]')?.value || '').trim();
-            const dob = document.querySelector('[data-input="dob"]')?.value || '';
-            const gender = document.querySelector('[data-input="gender"]')?.value || '';
-            const nationality = document.querySelector('[data-input="nationality"]')?.value || '';
-
-            const formData = new FormData();
-            formData.append('action', 'save_profile');
-            formData.append('csrf_token', getCsrfToken());
-            formData.append('fullname', fullname);
-            formData.append('dob', dob);
-            formData.append('gender', gender);
-            formData.append('nationality', nationality);
-
-            fetch('settings/api/update-profile.php', {
-                method: 'POST',
-                body: formData
-            })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.needsConfirmation) {
-                        showConfirmationModal(data.changes, 'profile', { fullname, dob, gender, nationality });
-                    } else if (data.success) {
-                        showToast(data.msg, 'success');
-                        updateCompletionProgress();
-                    } else {
-                        showToast(data.msg, 'error');
-                    }
-                })
-                .catch(err => {
-                    console.error(err);
-                    showToast('Failed to save profile', 'error');
-                });
-        });
-    }
-
-    /* ══════════════════════════════════════════════════════════════════
        EVENT LISTENERS FOR MODALS AND BUTTONS
     ══════════════════════════════════════════════════════════════════ */
     document.addEventListener('DOMContentLoaded', function () {
         // Initialize sections
         initAcademicSection();
-        initContactSection();
-        initEmergencySection();
-        handleProfileSaveWithConfirmation();
 
         // Confirmation modal buttons
         const confirmBtn = document.getElementById('confirmChangesBtn');

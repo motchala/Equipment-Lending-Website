@@ -22,7 +22,7 @@ $fullname = $_SESSION['faculty_name'];
 $user_slug = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-', $fullname)));
 
 require_once PS_ROOT . '/config/db.php';
-require_once PS_ROOT . '/settings/core/faculty-helpers.php';   // department list, email mask, phone format, device label
+require_once PS_ROOT . '/settings/core/faculty-helpers.php';   // department list, email mask, device label
 $conn = getDB();
 
 $base_url = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\') . '/';

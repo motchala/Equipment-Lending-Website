@@ -163,45 +163,22 @@ function fr_load_profile(mysqli $conn, string $faculty_id, ?string $employment):
     }
     $g = static fn(string $k): string => fr_s($u[$k] ?? '');
 
-    $phone = $g('phone');
-    if ($phone !== '') {
-        if (!function_exists('faculty_phone_display')) {
-            require_once __DIR__ . '/faculty-helpers.php';
-        }
-        if (function_exists('faculty_phone_display')) {
-            $pretty = faculty_phone_display($phone);
-            $phone  = $pretty !== '' ? $pretty : $phone;
-        }
-    }
-
     // Whitelisted columns only, so the password hash can never reach the file.
     $fields = [
-        ['Full Name',                $g('fullname')],
-        ['Faculty ID',               faculty_id_display($faculty_id, 'Not set yet')],
-        ['Email Address',            $g('email')],
-        ['Backup Email',             $g('backup_email')],
-        ['Department',               $g('department')],
-        ['Position / Rank',          $g('faculty_rank')],
-        ['Employment Status',        (string)$employment],
-        ['Account Role',             $g('role')],
-        ['Mobile Number',            $phone],
-        ['Landline',                 $g('landline')],
-        ['Date of Birth',            fr_date($g('dob'))],
-        ['Gender',                   $g('gender')],
-        ['Nationality',              $g('nationality')],
-        ['Present Address',          $g('present_address')],
-        ['Permanent Address',        $g('permanent_address')],
-        ['Emergency Contact',        $g('emergency_name')],
-        ['Emergency Relationship',   $g('emergency_relationship')],
-        ['Emergency Phone',          $g('emergency_phone')],
-        ['Password Last Changed',    fr_stamp($g('last_password_change'))],
+        ['Full Name',             $g('fullname')],
+        ['Faculty ID',            faculty_id_display($faculty_id, 'Not set yet')],
+        ['Email Address',         $g('email')],
+        ['Backup Email',          $g('backup_email')],
+        ['Department',            $g('department')],
+        ['Employment Status',     (string)$employment],
+        ['Account Role',          $g('role')],
+        ['Password Last Changed', fr_stamp($g('last_password_change'))],
     ];
 
     return [
         'name'       => $g('fullname'),
         'faculty_id' => faculty_id_display($faculty_id, 'Not set yet'),
         'department' => $g('department'),
-        'rank'       => $g('faculty_rank'),
         'photo'      => fr_profile_photo($g('profile_picture')),
         'fields'     => $fields,
     ];

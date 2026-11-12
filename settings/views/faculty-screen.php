@@ -19,9 +19,6 @@
             <button class="acc-nav-btn" data-acc-tab="acc-academic">
                 <span class="material-symbols-outlined">school</span> Department Info
             </button>
-            <button class="acc-nav-btn" data-acc-tab="acc-contact">
-                <span class="material-symbols-outlined">contacts</span> Contact Details
-            </button>
         </div>
         <div class="account-content">
 
@@ -179,86 +176,11 @@
                         <?php endif; ?>
                     </div>
                     <div class="info-row">
-                        <span class="info-lbl">Position / Rank</span>
-                        <span class="info-val <?php echo $db_faculty_rank ? '' : 'empty'; ?>" data-field="faculty_rank">
-                            <?php echo $db_faculty_rank ? htmlspecialchars($db_faculty_rank) : '— Not provided'; ?>
-                        </span>
-                        <select class="info-input-f" data-input="faculty_rank" disabled style="display:none;">
-                            <option value="">Select Position...</option>
-                            <?php foreach (['Instructor I', 'Instructor II', 'Instructor III', 'Assistant Professor I', 'Assistant Professor II', 'Assistant Professor III', 'Associate Professor I', 'Associate Professor II', 'Professor I', 'Professor II', 'Part-time Faculty'] as $rank): ?>
-                                <option value="<?php echo $rank; ?>">
-                                    <?php echo $rank; ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="info-row">
                         <span class="info-lbl">Status</span>
                         <span class="info-val"><span class="stock-badge stock-avail">Active / Regular</span></span>
                     </div>
                 </div>
             </div><!-- /acc-academic -->
-
-            <!-- Contact -->
-            <div id="acc-contact" class="overlay-sub-panel">
-                <div class="overlay-section-header">
-                    <span class="section-eyebrow">My Account ║ Contact</span>
-                    <h2>Contact Details</h2>
-                    <p>How we can reach you.</p>
-                </div>
-                <div class="info-card">
-                    <div class="info-card-head">
-                        <h3>Address</h3>
-                        <button class="btn-edit-acc" id="editContactBtn" data-action="contact-edit"
-                            style="display:inline-flex;">Edit</button>
-                        <button class="btn-save-acc" id="saveContactBtn" style="display:none;"
-                            data-action="contact-save">Save Changes</button>
-                        <button class="btn-cancel-acc" id="cancelContactBtn" style="display:none;"
-                            data-action="contact-cancel">Cancel</button>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-lbl">Present Address</span>
-                        <span class="info-val <?php echo $db_present_address ? '' : 'empty'; ?>"
-                            data-field="present_address">
-                            <?php echo $db_present_address ? htmlspecialchars($db_present_address) : '— Not provided'; ?>
-                        </span>
-                        <textarea class="info-input-f" data-input="present_address"
-                            placeholder="Enter your current address" disabled
-                            style="display:none;min-height:60px;"></textarea>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-lbl">Permanent Address</span>
-                        <span class="info-val <?php echo $db_permanent_address ? '' : 'empty'; ?>"
-                            data-field="permanent_address">
-                            <?php echo $db_permanent_address ? htmlspecialchars($db_permanent_address) : '— Not provided'; ?>
-                        </span>
-                        <textarea class="info-input-f" data-input="permanent_address"
-                            placeholder="Enter your permanent address" disabled
-                            style="display:none;min-height:60px;"></textarea>
-                    </div>
-                </div>
-                <div class="info-card">
-                    <div class="info-card-head">
-                        <h3>Phone</h3>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-lbl">Mobile Number</span>
-                        <span class="info-val <?php echo $db_phone ? '' : 'empty'; ?>" data-field="phone">
-                            <?php echo $db_phone ? htmlspecialchars($db_phone) : '— Not provided'; ?>
-                        </span>
-                        <input class="info-input-f" data-input="phone" placeholder="e.g. +63 912 345 6789" disabled
-                            style="display:none;">
-                    </div>
-                    <div class="info-row">
-                        <span class="info-lbl">Landline</span>
-                        <span class="info-val <?php echo $db_landline ? '' : 'empty'; ?>" data-field="landline">
-                            <?php echo $db_landline ? htmlspecialchars($db_landline) : '— Not provided'; ?>
-                        </span>
-                        <input class="info-input-f" data-input="landline" placeholder="e.g. (02) 1234-5678" disabled
-                            style="display:none;">
-                    </div>
-                </div>
-            </div><!-- /acc-contact -->
 
         </div>
     </div>
@@ -350,7 +272,6 @@
                             <!-- Personal Information: read-only until the profile-bar Edit Profile action is clicked -->
                             <?php
                             $sov_email_masked = faculty_mask_email($db_email);
-                            $sov_phone_view   = faculty_phone_display($db_phone);
                             ?>
                             <div class="acct-card sov-edit-card" id="sovPersonalCard" data-editing="false">
                                 <div class="acct-card-head">
@@ -411,16 +332,6 @@
                                         <?php if ($department_locked): ?>
                                             <span class="material-symbols-outlined fid-lock" title="Your department is permanent once set">lock</span>
                                         <?php endif; ?>
-                                    </div>
-                                    <div class="acct-row">
-                                        <label class="acct-row-label" for="sovPhone">Mobile Number</label>
-                                        <div class="acct-row-value">
-                                            <span class="acct-row-static <?php echo $sov_phone_view === '' ? 'acct-row-static-muted acct-row-not-provided' : ''; ?>" id="sovPhoneView" data-view="phone"><?php echo $sov_phone_view === '' ? '— Not provided' : htmlspecialchars($sov_phone_view); ?></span>
-                                            <input class="acct-row-input" id="sovPhone" name="phone" type="tel" inputmode="tel" autocomplete="tel"
-                                                maxlength="20" placeholder="09XX XXX XXXX" value="<?php echo htmlspecialchars($sov_phone_view); ?>"
-                                                data-edit-field="phone" disabled>
-                                            <p class="acct-field-error" data-error-for="phone" role="alert" hidden></p>
-                                        </div>
                                     </div>
                                 </div>
                             </div>
