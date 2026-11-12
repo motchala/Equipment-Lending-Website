@@ -13355,6 +13355,30 @@ body .side-nav .side-nav-user .side-nav-user-name {
     position: relative;
 }
 
+/* Item code layer: it FLOATS over the card instead of sitting in the card's flow.
+   It used to push the card taller, and since the grid stretches every card in a row to the tallest
+   one, the whole row grew with it. Now nothing moves: the panel is drawn on top of the card (and
+   the cards around it), and only the card whose chevron was pressed is raised (.eq-ic-open, set
+   by the item-code script). The phone layout (html.rx-mobile) keeps its own in-list panel. */
+html:not(.rx-mobile) #panel-lending .eq-item-card.eq-ic-open {
+    z-index: 40;
+    overflow: visible;
+}
+
+html:not(.rx-mobile) #panel-lending .eq-ic-panel {
+    position: absolute;
+    top: 44px;
+    right: 8px;
+    left: 8px;
+    z-index: 5;
+    margin: 0;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: var(--color-surface-lowest, #fff);
+    border: 1px solid var(--color-outline-variant, #e0e0e0);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22), 0 2px 8px rgba(0, 0, 0, 0.10);
+}
+
 /* Cancel confirmation chips */
 .act-cancel-chips {
     margin-top: 8px;

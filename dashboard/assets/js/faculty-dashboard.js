@@ -5712,6 +5712,30 @@
         errEl.style.display = '';
     }
 
+    /* The code panel floats over its card (see faculty-dashboard.css). Only one is open at a time, and it
+       closes when you click anywhere else or press Esc. */
+    function closeCodePanel(card) {
+        var p = card.querySelector('.eq-ic-panel');
+        if (p) p.style.display = 'none';
+        var b = card.querySelector('[data-action="toggle-item-code"]');
+        if (b) {
+            b.setAttribute('aria-expanded', 'false');
+            var ch = b.querySelector('.eq-ic-chevron');
+            if (ch) ch.style.transform = '';
+        }
+        card.classList.remove('eq-ic-open');
+    }
+
+    function closeAllCodePanels(exceptCard) {
+        document.querySelectorAll('.eq-item-card.eq-ic-open').forEach(function (c) {
+            if (c !== exceptCard) closeCodePanel(c);
+        });
+    }
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeAllCodePanels(null);
+    });
+
     function loadCode(itemId, panel) {
         showLoading(panel);
         var body = new URLSearchParams({ csrf_token: CSRF(), item_id: itemId });
@@ -5735,6 +5759,8 @@
     }
 
     document.addEventListener('click', function (e) {
+        // Click anywhere outside the code layer closes it
+        if (!e.target.closest('.eq-ic-panel, [data-action="toggle-item-code"]')) closeAllCodePanels(null);
         // ── Toggle chevron ──────────────────────────────────────────
         var toggleBtn = e.target.closest('[data-action="toggle-item-code"]');
         if (toggleBtn && !toggleBtn.disabled) {
@@ -5742,12 +5768,16 @@
             var panel = getPanel(itemId);
             if (!panel) return;
 
+            var card = toggleBtn.closest('.eq-item-card');
             var isOpen = panel.style.display !== 'none';
             if (isOpen) {
                 panel.style.display = 'none';
                 toggleBtn.setAttribute('aria-expanded', 'false');
                 toggleBtn.querySelector('.eq-ic-chevron').style.transform = '';
+                if (card) card.classList.remove('eq-ic-open');
             } else {
+                closeAllCodePanels(card);
+                if (card) card.classList.add('eq-ic-open');
                 panel.style.display = '';
                 toggleBtn.setAttribute('aria-expanded', 'true');
                 toggleBtn.querySelector('.eq-ic-chevron').style.transform = 'rotate(180deg)';
