@@ -5659,7 +5659,12 @@
 (function () {
     'use strict';
 
+    // The faculty pages carry the token in <meta name="csrf-token"> (faculty-shell-top.php). The hidden
+    // csrf_token <input> that this used to read only exists on admin screens, so the code request was sent
+    // with an empty token and rejected (403 "Invalid or expired session").
     var CSRF = function () {
+        var meta = document.querySelector('meta[name="csrf-token"]');
+        if (meta && meta.content) return meta.content;
         var el = document.querySelector('input[name="csrf_token"]');
         return el ? el.value : '';
     };
