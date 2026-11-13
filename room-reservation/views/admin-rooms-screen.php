@@ -317,11 +317,17 @@
                                 : $rooms_expired_count . ' reservations were automatically declined this session because they were not reviewed in time.'; ?>
                             They appear in the <strong>Declined</strong> tab.
                         </span>
-                        <button type="button" aria-label="Dismiss" onclick="this.parentElement.style.display='none';"
+                        <button type="button" id="rrExpiryDismiss" aria-label="Dismiss"
                             style="margin-left:auto;background:none;border:none;cursor:pointer;color:#92400e;padding:0;line-height:1;">
                             <span class="material-symbols-outlined" style="font-size:18px;">close</span>
                         </button>
                     </div>
+                    <script nonce="<?php echo $csp_nonce; ?>">
+                        (function () {
+                            var b = document.getElementById('rrExpiryDismiss');
+                            if (b) b.addEventListener('click', function () { b.parentElement.style.display = 'none'; });
+                        })();
+                    </script>
                     <?php endif; ?>
                     <div class="pr-card">
                         <div class="pr-card-header">

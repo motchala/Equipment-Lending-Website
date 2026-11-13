@@ -6,12 +6,13 @@
  * Included from settings/views/admin-screen.php as a direct child of #panel-settings,
  * so the existing Settings sub-tab switcher can show and hide it.
  *
- * UI ONLY: nothing here is saved yet. Fields are pre-filled from tbl_arbitration_config
- * where a key already exists, otherwise from the rule the system uses today.
- * Priority faculty starts empty (no storage yet). Saving is intentionally not wired (see settings/assets/js/admin-arbitration.js).
+ * LIVE cards (marked data-arb-live): "Borrowing rules" and "Booking window". They load their
+ * values through ArbitrationConfig and save through settings/api/save-arbitration.php.
+ * The other cards (room rules, room schedule, role weights, priority faculty) are still UI only
+ * and carry a "Not connected yet" badge.
  *
  * Styles : settings/assets/css/admin-arbitration.css  (all classes are arb-*)
- * Script : settings/assets/js/admin-arbitration.js    (UI behaviour only)
+ * Script : settings/assets/js/admin-arbitration.js
  */
 
 if (empty($is_super_admin)) {
@@ -19,6 +20,8 @@ if (empty($is_super_admin)) {
 }
 
 /* ── Current values (read-only) ───────────────────────────────────────────── */
+require_once __DIR__ . '/../../shared/core/arbitration-config.php';
+$arb_live = ArbitrationConfig::all($conn, true);   // typed values for the cards that are connected
 $arb_cfg = [];
 if (isset($conn) && $conn instanceof mysqli) {
     $arb_res = @$conn->query('SELECT config_key, config_value FROM tbl_arbitration_config');
@@ -85,9 +88,9 @@ $arb_time = static function (string $title, string $sub, string $key_from, strin
     echo '<div class="arb-row__text"><div class="arb-row__title">' . $arb_e($title) . '</div>';
     echo '<div class="arb-row__sub">' . $arb_e($sub) . '</div></div>';
     echo '<div class="arb-row__ctl"><div class="arb-timepair">';
-    echo '<input type="time" class="form-control-custom arb-time" id="arb-' . $arb_e($key_from) . '" data-arb-key="' . $arb_e($key_from) . '" value="' . $arb_e($from) . '" aria-label="' . $arb_e($title) . ' from">';
+    echo '<input type="time" class="form-control-custom arb-time" step="3600" id="arb-' . $arb_e($key_from) . '" data-arb-key="' . $arb_e($key_from) . '" value="' . $arb_e($from) . '" aria-label="' . $arb_e($title) . ' from">';
     echo '<span class="arb-timepair__sep">to</span>';
-    echo '<input type="time" class="form-control-custom arb-time" id="arb-' . $arb_e($key_to) . '" data-arb-key="' . $arb_e($key_to) . '" value="' . $arb_e($to) . '" aria-label="' . $arb_e($title) . ' until">';
+    echo '<input type="time" class="form-control-custom arb-time" step="3600" id="arb-' . $arb_e($key_to) . '" data-arb-key="' . $arb_e($key_to) . '" value="' . $arb_e($to) . '" aria-label="' . $arb_e($title) . ' until">';
     echo '</div></div>';
     echo '</div>';
 };
@@ -162,36 +165,35 @@ $arb_chips = static function (string $prefix, string $title, string $sub, array 
     </div>
 
     <div class="arb-grid">
-        <div class="sett-card arb-card">
+        <div class="sett-card arb-card" data-arb-live>
             <div class="sett-card-head">
                 <span class="material-symbols-outlined">rule</span>
                 <h3>Borrowing rules</h3>
             </div>
             <div class="sett-card-body">
                 <?php
-                $arb_toggle('rule_overdue_block_enabled', 'Decline if the borrower has an overdue item', 'A faculty member with equipment past its return time cannot borrow more.', $arb_bool('rule_overdue_block_enabled', false));
-                $arb_toggle('rule_missing_doc_block_enabled', 'Require a request letter', 'Requests without a letter are held for an admin instead of being decided automatically.', $arb_bool('rule_missing_doc_block_enabled', false));
-                $arb_stepper('max_items_per_borrower', 'Items per borrower', 'Most items one borrower can have at a time.', $arb_num('max_items_per_borrower', 3), 1, 20, 1, 'items');
-                $arb_stepper('max_borrow_days', 'Longest loan', 'How long an item can be kept before it is due.', $arb_num('max_borrow_days', 1), 1, 14, 1, 'days');
-                $arb_stepper('max_extensions', 'Extensions per loan', 'How many times a borrower can extend. 0 turns extensions off.', $arb_num('max_extensions', 2), 0, 5, 1, 'times');
-                $arb_stepper('auto_approve_timeout_minutes', 'Auto-decision wait', 'How long a request waits before the system decides it. 0 decides right away.', $arb_num('auto_approve_timeout_minutes', 1), 0, 60, 1, 'min');
-                $arb_stepper('low_stock_threshold', 'Low-stock warning', 'Shows in Stock watch when an item has this many units or fewer.', $arb_num('low_stock_threshold', 2), 0, 20, 1, 'units');
+                $arb_toggle('rule_overdue_block_enabled', 'Decline if the borrower has an overdue item', 'A faculty member with equipment past its return time cannot borrow more or generate student codes.', (bool)$arb_live['rule_overdue_block_enabled']);
+                $arb_toggle('rule_missing_doc_block_enabled', 'Require a request letter', 'Faculty must attach a request letter when booking for a later date. Same-day requests never need one.', (bool)$arb_live['rule_missing_doc_block_enabled']);
+                $arb_stepper('max_items_per_borrower', 'Items per borrower', 'Most items a borrower can hold or have requested at the same time.', (int)$arb_live['max_items_per_borrower'], 1, 20, 1, 'items');
+                $arb_stepper('max_borrow_days', 'Longest loan', 'The most days a faculty member can pick in the Borrow form.', (int)$arb_live['max_borrow_days'], 1, 14, 1, 'days');
+                $arb_stepper('max_extensions', 'Extensions per loan', 'How many times a borrower can extend. 0 turns extensions off.', (int)$arb_live['max_extensions'], 0, 5, 1, 'times');
+                $arb_stepper('low_stock_threshold', 'Low-stock warning', 'Shows in Stock watch when an item has this many units or fewer.', (int)$arb_live['low_stock_threshold'], 0, 20, 1, 'units');
                 ?>
             </div>
         </div>
 
-        <div class="sett-card arb-card">
+        <div class="sett-card arb-card" data-arb-live>
             <div class="sett-card-head">
                 <span class="material-symbols-outlined">schedule</span>
                 <h3>Booking window</h3>
             </div>
             <div class="sett-card-body">
                 <?php
-                $arb_time('Booking hours', 'Earliest pickup and latest return on a booking day.', 'equip_day_start', '07:00', 'equip_day_end', '21:00');
-                $arb_stepper('equip_max_advance_days', 'Book ahead up to', 'How far in advance a later-date request can start.', $arb_num('equip_max_advance_days', 14), 1, 60, 1, 'days');
-                $arb_stepper('equip_immediate_grace_min', 'Same-day grace', 'A same-day booking starting within this time takes stock right away.', $arb_num('equip_immediate_grace_min', 15), 0, 60, 5, 'min');
-                $arb_stepper('equip_cancel_cutoff_min', 'Cancellation cutoff', 'Borrowers can cancel until this long before the start time.', $arb_num('equip_cancel_cutoff_min', 60), 0, 240, 15, 'min');
-                $arb_chips('equip_dur', 'Booking lengths offered', 'Hours a borrower can pick for a same-day booking.', [1 => '1 hr', 2 => '2 hrs', 3 => '3 hrs', 4 => '4 hrs', 5 => '5 hrs', 6 => '6 hrs'], [1, 2, 3, 6]);
+                $arb_time('Booking hours', 'Earliest pickup and latest return on a booking day. Start times are on the hour.', 'equip_day_start', (string)$arb_live['equip_day_start'], 'equip_day_end', (string)$arb_live['equip_day_end']);
+                $arb_stepper('equip_max_advance_days', 'Book ahead up to', 'How far in advance a later-date request can start.', (int)$arb_live['equip_max_advance_days'], 1, 60, 1, 'days');
+                $arb_stepper('equip_immediate_grace_min', 'Same-day grace', 'A same-day booking starting within this time takes stock right away.', (int)$arb_live['equip_immediate_grace_min'], 0, 60, 5, 'min');
+                $arb_stepper('equip_cancel_cutoff_min', 'Cancellation cutoff', 'Borrowers can cancel an approved booking until this long before it starts. 0 allows it until the start.', (int)$arb_live['equip_cancel_cutoff_min'], 0, 240, 15, 'min');
+                $arb_chips('equip_dur', 'Booking lengths offered', 'Hours a borrower can pick, for today and for later dates. At least one is needed.', [1 => '1 hr', 2 => '2 hrs', 3 => '3 hrs', 4 => '4 hrs', 5 => '5 hrs', 6 => '6 hrs'], array_map('intval', (array)$arb_live['equip_durations']));
                 ?>
             </div>
         </div>
@@ -208,6 +210,7 @@ $arb_chips = static function (string $prefix, string $title, string $sub, array 
             <div class="sett-card-head">
                 <span class="material-symbols-outlined">rule</span>
                 <h3>Reservation rules</h3>
+                <span class="arb-badge">Not connected yet</span>
             </div>
             <div class="sett-card-body">
                 <?php
@@ -237,6 +240,7 @@ $arb_chips = static function (string $prefix, string $title, string $sub, array 
             <div class="sett-card-head">
                 <span class="material-symbols-outlined">calendar_month</span>
                 <h3>Room schedule</h3>
+                <span class="arb-badge">Not connected yet</span>
             </div>
             <div class="sett-card-body">
                 <?php
@@ -259,6 +263,7 @@ $arb_chips = static function (string $prefix, string $title, string $sub, array 
             <div class="sett-card-head">
                 <span class="material-symbols-outlined">groups</span>
                 <h3>Role weights</h3>
+                <span class="arb-badge">Not connected yet</span>
             </div>
             <div class="sett-card-body">
                 <?php
@@ -273,6 +278,7 @@ $arb_chips = static function (string $prefix, string $title, string $sub, array 
             <div class="sett-card-head">
                 <span class="material-symbols-outlined">star</span>
                 <h3>Priority faculty</h3>
+                <span class="arb-badge">Not connected yet</span>
             </div>
             <div class="sett-card-body">
                 <div class="arb-prio">

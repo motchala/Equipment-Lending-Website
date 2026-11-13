@@ -27,6 +27,9 @@
     var STEP_MIN = 60;
     var BORROW_HOURS = [1, 2, 3, 6];
     var BORROW_ADVANCE_DAYS = 14;
+    var BORROW_CLOSE_MIN = 21 * 60;   /* borrowing closes (equipment only; rooms use CLOSE_MIN) */
+    /* The six values above are only defaults: loadBorrowRules() replaces them with the booking
+       window from Settings → Arbitration, so the pickers match what the server accepts. */
     var EQ_PAGE_SIZE = 20;
     var PURPOSES = ['Lecture', 'Lab session', 'Meeting', 'Exam', 'Seminar'];
     var QR_SRC = 'https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js';
@@ -36,6 +39,7 @@
         verifyItem: 'equipment-booking/api/verify-item-code.php',
         verifyRoom: 'room-reservation/api/verify-room-code.php',
         studentRooms: 'equipment-booking/api/student-room-options.php',
+        borrowRules: 'equipment-booking/api/borrow-rules.php',
         borrow: 'equipment-booking/api/submit-student-borrow.php',
         itemBorrow: 'equipment-booking/api/submit-item-borrow.php',
         reserve: 'room-reservation/api/submit-student-reserve.php'
@@ -69,6 +73,28 @@
     function icon(name) { return '<span class="material-symbols-outlined" aria-hidden="true">' + name + '</span>'; }
     function toInt(v, d) { var n = parseInt(v, 10); return isNaN(n) ? (d || 0) : n; }
     function isSunday(dateStr) { return parseYmd(dateStr).getDay() === 0; }
+    function borrowClockLabel(min) {
+        var h = Math.floor(min / 60) % 24, m = min % 60;
+        return ((h % 12) || 12) + ':' + pad(m) + ' ' + (h < 12 ? 'AM' : 'PM');
+    }
+    function borrowClosedMsg() {
+        return 'Same-day borrowing is unavailable after ' + borrowClockLabel(BORROW_LAST_START_MIN) + '. Choose a later date.';
+    }
+    function borrowAheadMsg() {
+        return 'Choose today or a non-Sunday date within the next ' + BORROW_ADVANCE_DAYS + ' days.';
+    }
+    function loadBorrowRules() {
+        if (!window.fetch) return;
+        fetch(URLS.borrowRules, { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (j) {
+            if (!j || !j.ok || !j.rules) return;
+            var r = j.rules;
+            BORROW_OPEN_MIN = hhmmToMin(r.dayStart);
+            BORROW_LAST_START_MIN = hhmmToMin(r.lastStart);
+            BORROW_CLOSE_MIN = hhmmToMin(r.dayEnd);
+            if (r.durationHours && r.durationHours.length) BORROW_HOURS = r.durationHours.map(Number);
+            if (r.maxAhead) BORROW_ADVANCE_DAYS = +r.maxAhead;
+        }).catch(function () { /* keep the defaults */ });
+    }
     function borrowDates() {
         var dates = [];
         for (var offset = 0; offset <= BORROW_ADVANCE_DAYS; offset++) {
@@ -87,7 +113,7 @@
         var isToday = dateStr === todayStr();
         var start = isToday ? Math.max(BORROW_OPEN_MIN, Math.ceil(nowMin() / STEP_MIN) * STEP_MIN) : BORROW_OPEN_MIN;
         var times = [];
-        for (var minute = start; minute <= BORROW_LAST_START_MIN && minute + duration * 60 <= CLOSE_MIN; minute += STEP_MIN) {
+        for (var minute = start; minute <= BORROW_LAST_START_MIN && minute + duration * 60 <= BORROW_CLOSE_MIN; minute += STEP_MIN) {
             times.push(minToHHMM(minute));
         }
         return times;
@@ -113,7 +139,7 @@
         var start = time ? hhmmToMin(time) : OPEN_MIN;
         return '<option value="" disabled' + (!selected ? ' selected' : '') + '>Choose duration</option>' +
             BORROW_HOURS.map(function (hours) {
-                var disabled = !dateStr || start + hours * 60 > CLOSE_MIN;
+                var disabled = !dateStr || start + hours * 60 > BORROW_CLOSE_MIN;
                 return '<option value="' + hours + '"' + (selected === hours ? ' selected' : '') +
                     (disabled ? ' disabled' : '') + '>' + hours + ' ' + (hours === 1 ? 'hour' : 'hours') + '</option>';
             }).join('');
@@ -148,7 +174,7 @@
         if (info) {
             var message = reason === 'sunday'
                 ? 'Same-day borrowing is unavailable on Sundays. Choose a later date.'
-                : 'Same-day borrowing is unavailable after 8:00 PM. Choose a later date.';
+                : borrowClosedMsg();
             info.hidden = !reason;
             info.title = reason ? message : '';
             info.setAttribute('aria-label', reason ? message : '');
@@ -654,13 +680,13 @@
         if (!borrow) return showAlert('flowError', 'Please select a borrow date.');
         if (!startTime || !duration) return showAlert('flowError', 'Please choose a start time and a duration.');
         if (borrow < todayStr() || !borrowDates().some(function (date) { return date.value === borrow; })) {
-            return showAlert('flowError', 'Choose today or a non-Sunday date within the next two weeks.');
+            return showAlert('flowError', borrowAheadMsg());
         }
         var selectedDate = borrowDates().find(function (date) { return date.value === borrow; });
         if (selectedDate && !selectedDate.available) {
             return showAlert('flowError', isSunday(borrow)
                 ? 'Same-day borrowing is unavailable on Sundays. Choose a later date.'
-                : 'Same-day borrowing is unavailable after 8:00 PM. Choose a later date.');
+                : borrowClosedMsg());
         }
         if (isSunday(borrow)) return showAlert('flowError', 'Equipment borrowing is unavailable on Sundays.');
         if (!studentStartTimes(borrow, duration).includes(startTime)) {
@@ -788,13 +814,13 @@
         if (qty > avail) return showAlert('flowError', 'Quantity exceeds available stock (' + avail + ').');
         if (!borrow || !startTime || !duration) return showAlert('flowError', 'Please choose a borrowing date, start time, and duration.');
         if (!borrowDates().some(function (date) { return date.value === borrow; })) {
-            return showAlert('flowError', 'Choose today or a non-Sunday date within the next two weeks.');
+            return showAlert('flowError', borrowAheadMsg());
         }
         var selectedDate = borrowDates().find(function (date) { return date.value === borrow; });
         if (selectedDate && !selectedDate.available) {
             return showAlert('flowError', isSunday(borrow)
                 ? 'Same-day borrowing is unavailable on Sundays. Choose a later date.'
-                : 'Same-day borrowing is unavailable after 8:00 PM. Choose a later date.');
+                : borrowClosedMsg());
         }
         if (!studentStartTimes(borrow, duration).includes(startTime)) {
             return showAlert('flowError', 'Choose a start time that allows the selected borrowing duration.');
@@ -1478,6 +1504,7 @@
        INIT
     ══════════════════════════════════════════════════════════ */
     function init() {
+        loadBorrowRules();
         var course = $('studentCourse');
         COURSES.forEach(function (c) {
             var o = document.createElement('option');

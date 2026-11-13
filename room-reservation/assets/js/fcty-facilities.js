@@ -419,7 +419,7 @@
     }
 
     function pollOnce() {
-        fetch(apiBase() + 'room-reservation/api/poll-room-status.php', { credentials: 'same-origin' })
+        return fetch(apiBase() + 'room-reservation/api/poll-room-status.php', { credentials: 'same-origin' })
             .then(function (r) { return r.ok ? r.json() : null; })
             .then(function (statuses) {
                 if (!statuses) return;
@@ -1451,6 +1451,9 @@
         /* Public hook used by faculty-dashboard.js on first visit to the tab */
         window.PUPSyncFacilities = {
             start: start,
+
+            /* Pull the live room statuses right now (used when the Facilities tab is clicked again). */
+            refresh: pollOnce,
 
             /**
              * Deep-link entry point: navigate to a specific room and optionally

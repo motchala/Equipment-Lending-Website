@@ -115,7 +115,11 @@
             window._preJumpTab = tab;
             document.documentElement.classList.add('admin-tab-pending');
             // Safety net: never leave the page hidden if the reveal script below fails to run.
-            setTimeout(function() { document.documentElement.classList.remove('admin-tab-pending'); }, 5000);
+            // It waits for the page to finish loading (a slow connection can take longer than any fixed
+            // timeout, and lifting early would flash the Dashboard), then lifts after a short grace.
+            var lift = function() { document.documentElement.classList.remove('admin-tab-pending'); };
+            window.addEventListener('load', function() { setTimeout(lift, 1500); });
+            setTimeout(lift, 20000);
         })();
     </script>
     <link rel="stylesheet" href="shared/assets/css/admin-shell.css?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/css/admin-shell.css'); ?>">

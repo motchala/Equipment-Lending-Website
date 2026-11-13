@@ -7518,7 +7518,8 @@ function psSelectFmt(btn) {
     (function startLiveSync() {
         var syncing = false;
         var syncToastInterval = 3 * 60 * 1000;
-        var lastSyncToastAt = Number(LS.get('inventorySyncToastAt')) || 0;
+        var lastSyncToastAt = 0;
+        try { lastSyncToastAt = Number(localStorage.getItem('adm_inventorySyncToastAt')) || 0; } catch (e) { }
 
         var csrfTokenForSync = (function () {
             var m = document.querySelector('meta[name="csrf-token"]');
@@ -7581,7 +7582,7 @@ function psSelectFmt(btn) {
                             if (parts.length > 0 && now - lastSyncToastAt >= syncToastInterval
                                 && typeof window.showToast === 'function') {
                                 lastSyncToastAt = now;
-                                LS.set('inventorySyncToastAt', now);
+                                try { localStorage.setItem('adm_inventorySyncToastAt', String(now)); } catch (e) { }
                                 window.showToast('Inventory synced: ' + parts.join(', ') + '.', 'success');
                             }
                         })

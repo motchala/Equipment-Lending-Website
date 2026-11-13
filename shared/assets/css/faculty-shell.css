@@ -2076,3 +2076,70 @@
             border-color: var(--color-outline-variant) !important;
             color: var(--color-on-surface-variant) !important;
         }
+
+        /* ================================================================
+           REFRESH BEHAVIOUR  (soft refresh keeps the screen, no flicker)
+        ================================================================ */
+
+        /* While a restored screen is being set up the page stays hidden (set by the script in the page
+           head, lifted by faculty-dashboard.js), so the Dashboard never shows on the way. */
+        html.fac-tab-pending .side-nav,
+        html.fac-tab-pending .main-wrapper,
+        html.fac-tab-pending .mobile-menu-btn,
+        html.fac-tab-pending .nav-backdrop,
+        html.fac-tab-pending .act-ai-fab,
+        html.fac-tab-pending .act-ai-chat {
+            visibility: hidden !important;
+        }
+
+        /* No transitions meanwhile: the sidebar highlight must not fade from the Dashboard to the real tab.
+           The new state is committed first, then the page is revealed, so nothing animates on reveal. */
+        html.fac-tab-pending *,
+        html.fac-tab-pending *::before,
+        html.fac-tab-pending *::after {
+            transition: none !important;
+        }
+
+        /* A restored screen simply appears in place (no slide-in replay). Cleared on the first real tab switch. */
+        html.fac-restored .tab-panel.active {
+            animation: none !important;
+        }
+
+        /* Thin loading bar shown while the screen you clicked (the one you are already on) refreshes in place. */
+        #ps-refresh-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            z-index: 10050;
+            overflow: hidden;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .2s ease;
+        }
+
+        #ps-refresh-bar.on {
+            opacity: 1;
+        }
+
+        #ps-refresh-bar::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: -40%;
+            width: 40%;
+            border-radius: 3px;
+            background: var(--color-primary, #800000);
+            animation: ps-refresh-slide 1s ease-in-out infinite;
+        }
+
+        @keyframes ps-refresh-slide {
+            0% { left: -40%; }
+            100% { left: 100%; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            #ps-refresh-bar::before { animation-duration: 2.4s; }
+        }

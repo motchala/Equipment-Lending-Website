@@ -197,9 +197,14 @@
     /* ── Browser Back/Forward Navigation ───────────────────────────────── */
     // We use a lightweight pushState approach: each tab switch or overlay open
     // pushes a state object onto the history stack. popstate restores the UI.
-    // Reload always lands on Home because initPage() calls replaceState with
-    // the home state and never reads the hash back on load.
+    // A soft refresh keeps the screen you were on (the early script in the page head reads the #tab-
+    // hash / the remembered tab and initPage() restores it); a hard refresh lands on Home.
     let _navSuppressed = false;
+
+    /* Remember the current screen so a soft refresh can come back to it. */
+    function _rememberTab(tab) {
+        try { sessionStorage.setItem('facultyCurrentTab', tab); } catch (e) { }
+    }
 
     function _pushNav(state) {
         if (_navSuppressed) return;
@@ -212,6 +217,8 @@
         document.querySelectorAll('.overlay-page.active').forEach(o => o.classList.remove('active'));
         if (!state || state.type === 'tab') {
             const tab = (state && state.value) ? state.value : 'home';
+            document.documentElement.classList.remove('fac-restored');
+            _rememberTab(tab);
             _switchTabDOM(tab);
             if (state && state.sub) {
                 switchLendingSub(state.sub);
@@ -395,6 +402,9 @@
     }
 
     function switchTab(tabName, sub) {
+        // A real tab switch ends the "restored screen" state (see initPage), so the new screen slides in as usual
+        document.documentElement.classList.remove('fac-restored');
+        _rememberTab(tabName);
         _pushNav({
             type: 'tab',
             value: tabName,
@@ -2476,11 +2486,106 @@
         if (LS.get('sidebarCollapsed') === '1') setSidebarCollapsed(true);
     }
 
+    /* ── Click the screen you are already on → refresh it in place ──────
+       Same as most apps and sites: tapping the active tab reloads its data. The screen, scroll
+       choices and open cards stay put, and a thin bar at the top shows that it is working.
+       Home re-reads its cards, My Activity re-reads its lists, Equipment re-reads stock and
+       Facilities re-reads room status. */
+    let _psRefreshBusy = false;
+
+    function _psRefreshBar(on) {
+        let bar = document.getElementById('ps-refresh-bar');
+        if (on) {
+            if (!bar) {
+                bar = document.createElement('div');
+                bar.id = 'ps-refresh-bar';
+                bar.setAttribute('role', 'progressbar');
+                bar.setAttribute('aria-label', 'Refreshing');
+                document.body.appendChild(bar);
+            }
+            void bar.offsetWidth;
+            bar.classList.add('on');
+        } else if (bar) {
+            bar.classList.remove('on');
+        }
+    }
+
+    /* Home: the cards are drawn by the server, so re-read the page in the background (scripts in it do
+       not run) and swap the cards in. The Months / Week choice on the chart is kept. */
+    function _psHomeRefresh() {
+        const range = document.querySelector('#panel-home .fdb-range-input:checked');
+        const rangeId = range ? range.id : '';
+        const page = fetch(window.location.pathname + window.location.search, {
+            credentials: 'same-origin',
+            cache: 'no-store',
+            headers: { 'X-Requested-With': 'fetch' }
+        }).then(function (r) {
+            if (r.redirected || !r.ok) throw new Error('HTTP ' + r.status);   // signed out, or a server error
+            return r.text();
+        }).then(function (html) {
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            if (!doc.querySelector('#panel-home')) throw new Error('unexpected page');
+            ['#dashStats', '.fdb-area-chart', '.fdb-area-attn', '.fdb-area-third'].forEach(function (sel) {
+                const live = document.querySelectorAll('#panel-home ' + sel);
+                const fresh = doc.querySelectorAll('#panel-home ' + sel);
+                if (live.length !== fresh.length) return;   // layout differs: leave it, a full refresh fixes it
+                live.forEach(function (el, i) { el.replaceWith(fresh[i]); });
+            });
+            const again = rangeId ? document.getElementById(rangeId) : null;
+            if (again) again.checked = true;
+        });
+        const quiet = function (p) { return Promise.resolve(p).catch(function () { }); };
+        return Promise.all([
+            page,
+            quiet(window.psFacultyRequestsPoll && window.psFacultyRequestsPoll()),   // key figures, overdue banner
+            quiet(refreshNotifs()),                                                   // bell
+            quiet(window.psFacultyCodePoll && window.psFacultyCodePoll())             // student access code
+        ]);
+    }
+
+    window.psRefreshActiveTab = function (tab) {
+        // back to the top, like most apps do when you tap the tab you are on
+        try {
+            if (window.scrollY > 0) window.scrollTo({ top: 0, behavior: 'smooth' });
+            const mw = document.querySelector('.main-wrapper');
+            if (mw && mw.scrollTop > 0) mw.scrollTo({ top: 0, behavior: 'smooth' });
+            const am = document.getElementById('appMain');   // phone layout
+            if (am && am.scrollTop > 0) am.scrollTo({ top: 0, behavior: 'smooth' });
+        } catch (_) { }
+        if (_psRefreshBusy) return;
+
+        let job = null;
+        if (tab === 'home') job = _psHomeRefresh;
+        else if (tab === 'activity' && typeof window.psFacultyActivityRefresh === 'function') job = window.psFacultyActivityRefresh;
+        else if (tab === 'lending' && typeof window.psFacultyInventoryPoll === 'function') job = window.psFacultyInventoryPoll;
+        else if (tab === 'rooms' && window.PUPSyncFacilities && typeof window.PUPSyncFacilities.refresh === 'function') job = window.PUPSyncFacilities.refresh;
+
+        if (!job) { window.location.reload(); return; }   // nothing to refresh in place: a normal soft refresh
+
+        _psRefreshBusy = true;
+        const started = Date.now();
+        _psRefreshBar(true);
+        Promise.resolve().then(job).catch(function () {
+            showToast('Could not refresh. Please check your connection.', 'error');
+        }).then(function () {
+            // keep the bar up for a moment so a very quick refresh still reads as "refreshed"
+            setTimeout(function () { _psRefreshBar(false); _psRefreshBusy = false; }, Math.max(0, 450 - (Date.now() - started)));
+        });
+    };
+
     /* ── Side nav clicks ──────────────────────────────────────────────── */
     document.querySelectorAll('.side-nav-item[data-tab]').forEach(btn => {
         btn.addEventListener('click', function (e) {
             e.preventDefault();
             closeMobileNav();
+            // A real click on the tab you are already on refreshes it. Clicks made by code (e.g. a card
+            // jumping to a screen) are not real clicks and still just open the screen. With Settings open,
+            // the click still closes Settings and shows the tab, as before.
+            const _cur = document.querySelector('.tab-panel.active');
+            if (e.isTrusted && _cur && _cur.id === 'panel-' + this.dataset.tab && !document.querySelector('.overlay-page.active')) {
+                window.psRefreshActiveTab(this.dataset.tab);
+                return;
+            }
             // Close any open overlays
             document.querySelectorAll('.overlay-page.active').forEach(o => o.classList.remove('active'));
             // Remove active from all sidebar items (including settings and help)
@@ -2707,32 +2812,35 @@
         // USER_SLUG is injected by PHP into window.USER_SLUG via the inline <script>
         // tag in user-dashboard.php — never embed PHP directly in a .js file.
         const userSlug = window.USER_SLUG || '';
+        // After a soft refresh the page head decided which screen to come back to (window._preJumpTab).
+        const _restoreTab = window._preJumpTab || null;
+        const _homeState = { type: 'tab', value: _restoreTab || 'home', sub: null };
+        const _hashPart = _restoreTab ? '#tab-' + _restoreTab : '';
         if (!window.location.search.includes(userSlug)) {
             const newUrl = window.location.protocol + '//' + window.location.host +
                 window.location.pathname + '?u=' + userSlug;
-            window.history.replaceState({
-                type: 'tab',
-                value: 'home',
-                sub: null
-            }, '', newUrl);
+            window.history.replaceState(_homeState, '', newUrl + _hashPart);
         } else {
-            // Stamp the initial home state so popstate has something to land on
-            window.history.replaceState({
-                type: 'tab',
-                value: 'home',
-                sub: null
-            }, '', window.location.href.split('#')[0]);
+            // Stamp the initial state so popstate has something to land on
+            window.history.replaceState(_homeState, '', window.location.href.split('#')[0] + _hashPart);
         }
+        // Come back to the screen you were on, then reveal the page. The new state is committed while the page
+        // is still hidden AND transitions are off (html.fac-tab-pending), so the sidebar highlight never fades
+        // over from Home and the screen does not slide in again.
+        if (_restoreTab) {
+            try {
+                _switchTabDOM(_restoreTab);
+                document.documentElement.classList.add('fac-restored');
+                void document.body.offsetWidth;
+            } catch (e) { }
+        }
+        document.documentElement.classList.remove('fac-tab-pending');
         // Auto-hide success alert + clean URL param
         const sa = document.getElementById('success-alert');
         if (sa) {
             const url = new URL(window.location);
             url.searchParams.delete('success');
-            window.history.replaceState({
-                type: 'tab',
-                value: 'home',
-                sub: null
-            }, document.title, url.pathname + (url.search || ''));
+            window.history.replaceState(_homeState, document.title, url.pathname + (url.search || '') + _hashPart);
             setTimeout(() => {
                 if (sa) sa.style.display = 'none';
             }, 5000);
@@ -3369,7 +3477,7 @@
         const INTERVAL = 8000;
 
         function doPoll() {
-            fetch('equipment-booking/api/poll-inventory.php', { method: 'GET' })
+            return fetch('equipment-booking/api/poll-inventory.php', { method: 'GET' })
                 .then(r => r.json())
                 .then(items => {
                     if (!Array.isArray(items)) return;
@@ -3402,6 +3510,7 @@
 
         doPoll();                        // run immediately on page load
         setInterval(doPoll, INTERVAL);   // then every 8 seconds
+        window.psFacultyInventoryPoll = doPoll;   // used by the click-the-active-tab refresh
     }
 
     /* ── Real-time Requests Polling ────────────────────────────────────── */
@@ -3414,8 +3523,8 @@
             lastStatuses[r.id] = r.status;
         });
 
-        setInterval(function () {
-            fetch('equipment-booking/api/poll-requests.php', { method: 'GET' })
+        function pollNow() {
+            return fetch('equipment-booking/api/poll-requests.php', { method: 'GET' })
                 .then(r => r.json())
                 .then(fresh => {
                     if (!Array.isArray(fresh)) return;
@@ -3462,7 +3571,10 @@
                     }
                 })
                 .catch(() => { }); // silently ignore network errors
-        }, INTERVAL);
+        }
+
+        setInterval(pollNow, INTERVAL);
+        window.psFacultyRequestsPoll = pollNow;   // used by the click-the-active-tab refresh
     }
 
     /* -- Room Reservation Notices ---------------------------------------- */
@@ -3719,7 +3831,7 @@
 
     function startCodePolling() {
         function doPoll() {
-            fetch('equipment-booking/api/poll-faculty-codes.php', { credentials: 'same-origin' })
+            return fetch('equipment-booking/api/poll-faculty-codes.php', { credentials: 'same-origin' })
                 .then(function (r) { if (!r.ok) return null; return r.json(); })
                 .then(function (data) { if (data) renderCodePanel(data); })
                 .catch(function () { });
@@ -3727,6 +3839,7 @@
 
         doPoll();                        // fire immediately
         setInterval(doPoll, 5000);       // then every 5 seconds
+        window.psFacultyCodePoll = doPoll;   // used by the click-the-active-tab refresh
     }
 })();
 
@@ -4965,9 +5078,9 @@
         }
 
         function load(url, key, done) {
-            if (inFlight[key]) return;
+            if (inFlight[key]) return Promise.resolve();
             inFlight[key] = true;
-            fetch(url, { credentials: 'same-origin', cache: 'no-store' })
+            return fetch(url, { credentials: 'same-origin', cache: 'no-store' })
                 .then(function (r) { return r.ok ? r.json() : null; })
                 .then(function (data) {
                     if (!data || data.error || Array.isArray(data)) return;
@@ -4978,7 +5091,7 @@
         }
 
         function refreshRooms() {
-            load(API_ROOMS, 'rooms', function (data) {
+            return load(API_ROOMS, 'rooms', function (data) {
                 swapCard(cards.rooms, data);
                 if (typeof data.rows === 'string') swapHistory('room', data.rows);
                 renderTodo('rooms', data.todo);
@@ -4986,14 +5099,15 @@
         }
 
         function refreshEquipment() {
-            load(API_EQUIP, 'equipment', function (data) {
+            return load(API_EQUIP, 'equipment', function (data) {
                 swapCard(cards.equipment, data);
                 if (typeof data.rows === 'string') swapHistory('equipment', data.rows);
                 renderTodo('equipment', data.todo);
             });
         }
 
-        function refreshAll() { refreshEquipment(); refreshRooms(); }
+        function refreshAll() { return Promise.all([refreshEquipment(), refreshRooms()]); }
+        window.psFacultyActivityRefresh = refreshAll;   // used by the click-the-active-tab refresh
 
         function panelIsOpen() {
             return panel.classList.contains('active') && !document.hidden;
