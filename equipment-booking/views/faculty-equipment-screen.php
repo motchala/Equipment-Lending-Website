@@ -69,7 +69,7 @@
                             }
                             return '<div class="' . $cls . '"' . $attrs . '><button type="button" class="' . $btn . ' bf-add' . ($ahead ? ' btn-borrow-ahead' : '') . '" data-bf="add">'
                                  . '<span class="material-symbols-outlined" aria-hidden="true">' . ($ahead ? 'event' : 'add') . '</span>'
-                                 . '<span class="btn-borrow-label">' . ($ahead ? 'Book ahead' : 'Add') . '</span></button></div>';
+                                 . '<span class="btn-borrow-label">' . ($ahead ? 'Book ahead' : ($variant === 'hero' ? 'Add to request' : 'Add')) . '</span></button></div>';
                         }
                     }
 

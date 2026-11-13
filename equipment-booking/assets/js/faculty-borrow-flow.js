@@ -108,7 +108,7 @@
         }
         if (!item) {
             return '<button type="button" class="' + btn + ' bf-add' + (ahead ? ' btn-borrow-ahead' : '') + '" data-bf="add">' +
-                icon(ahead ? 'event' : 'add') + '<span class="btn-borrow-label">' + (ahead ? 'Book ahead' : 'Add') + '</span></button>';
+                icon(ahead ? 'event' : 'add') + '<span class="btn-borrow-label">' + (ahead ? 'Book ahead' : (hero ? 'Add to request' : 'Add')) + '</span></button>';
         }
         return stepperHTML(name, item.qty, cardCap(name));
     }

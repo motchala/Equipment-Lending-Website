@@ -3692,3 +3692,111 @@ button.fcty-open-chip {
 .fcty-btn:disabled[title] {
     cursor: not-allowed;
 }
+
+/* ── Reservation form (simplified) ────────────────────────────────────────────────────────
+   The form is the first thing a room opens; the room's weekly schedule is a secondary view
+   behind "View weekly schedule". Additive: nothing above is changed. */
+
+/* the room-limit badge was inheriting a muted text colour on the maroon panel: always readable,
+   and gold when the limit is reached */
+.fcty-res-side .fcty-pill {
+    color: #fff;
+}
+
+.fcty-res-side .fcty-pill.is-full {
+    background: #f2c14e;
+    border-color: #f2c14e;
+    color: #3a0c0c;
+}
+
+/* one line instead of the two-box Date / Time ticket */
+.fcty-sum {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, .12);
+    border: 1px solid rgba(255, 255, 255, .22);
+    font-size: .9375rem;
+    line-height: 1.3;
+}
+
+.fcty-sum .material-symbols-outlined {
+    flex: none;
+    opacity: .85;
+}
+
+.fcty-sum strong {
+    font-weight: 700;
+}
+
+/* secondary action: the room's weekly schedule */
+.fcty-linkbtn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    margin-top: auto;
+    padding: 12px 14px;
+    border: 1px solid rgba(255, 255, 255, .4);
+    border-radius: 12px;
+    background: transparent;
+    color: #fff;
+    font: inherit;
+    font-size: .875rem;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+}
+
+.fcty-linkbtn .material-symbols-outlined:last-child {
+    margin-left: auto;
+}
+
+.fcty-linkbtn:hover,
+.fcty-linkbtn:focus-visible {
+    background: rgba(255, 255, 255, .16);
+    border-color: #fff;
+}
+
+/* "Other" purpose reveals its text box */
+.fcty-input[hidden] {
+    display: none;
+}
+
+/* request letter: one tidy row that opens when needed */
+.fcty-doc > summary {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 12px;
+    cursor: pointer;
+    list-style: none;
+}
+
+.fcty-doc > summary::-webkit-details-marker {
+    display: none;
+}
+
+.fcty-doc > summary::after {
+    content: 'expand_more';
+    margin-left: auto;
+    font-family: 'Material Symbols Outlined';
+    font-size: 20px;
+    line-height: 1;
+}
+
+.fcty-doc[open] > summary::after {
+    content: 'expand_less';
+}
+
+.fcty-doc-state {
+    color: var(--fcty-available);
+    font-weight: 700;
+}
+
+.fcty-doc[open] > summary {
+    margin-bottom: 8px;
+}
