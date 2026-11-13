@@ -15,8 +15,9 @@
         <button class="rq-sub-tab active" data-sett-panel="sett-account">My Account</button>
         <button class="rq-sub-tab" data-sett-panel="sett-prefs">Preferences</button>
         <?php if ($is_super_admin): ?>
-            <button class="rq-sub-tab" data-sett-panel="sett-equipment">Equipment</button>
+            <button class="rq-sub-tab" data-sett-panel="sett-arbitration">Arbitration</button>
         <?php endif; ?>
+        <button class="rq-sub-tab" data-sett-panel="sett-ratings">Service Ratings</button>
         <button class="rq-sub-tab" data-sett-panel="sett-help">Help &amp; FAQ</button>
     </div>
 
@@ -234,37 +235,37 @@
                     <span class="material-symbols-outlined">notifications</span>
                     <h3>Notification Preferences</h3>
                 </div>
-                <div class="sett-card-body sett-card-body--notifs">
-                    <div class="sett-notif-row">
+                <?php
+                // Notification Preferences are saved per admin account on the server
+                // (notifications/api/notif-prefs.php) and applied there, so a muted
+                // category is never listed, counted, popped up or emailed.
+                require_once PS_ROOT . '/notifications/core/preferences.php';
+                $np_defs  = notif_pref_definitions('admin');
+                $np_state = notif_prefs_get($conn, 'admin', notif_prefs_current_key($conn, 'admin'));
+                ?>
+                <div class="sett-card-body sett-card-body--notifs<?php echo empty($np_state['all']) ? ' notif-prefs-off' : ''; ?>" id="notifPrefsPanel" data-notif-audience="admin">
+                    <div class="sett-notif-row sett-notif-row--master">
                         <label class="toggle-sw">
-                            <input type="checkbox" id="notifPrefRequestsToggle" checked>
+                            <input type="checkbox" data-notif-pref="all" data-notif-label="All notifications" aria-label="All notifications"<?php echo !empty($np_state['all']) ? ' checked' : ''; ?>>
                             <span class="toggle-track"></span>
                         </label>
                         <div>
-                            <div class="sett-notif-title">New Requests</div>
-                            <div class="sett-notif-sub">Alert when faculty submits a request</div>
+                            <div class="sett-notif-title">All notifications</div>
+                            <div class="sett-notif-sub">Turn this off to stop every alert, pop-up and email listed below</div>
                         </div>
                     </div>
-                    <div class="sett-notif-row">
+                    <?php foreach ($np_defs as $np_key => $np_def): ?>
+                    <div class="sett-notif-row sett-notif-row--child">
                         <label class="toggle-sw">
-                            <input type="checkbox" id="notifPrefOverdueToggle" checked>
+                            <input type="checkbox" data-notif-pref="<?php echo htmlspecialchars($np_key); ?>" data-notif-label="<?php echo htmlspecialchars($np_def['label']); ?>" aria-label="<?php echo htmlspecialchars($np_def['label']); ?>"<?php echo !empty($np_state[$np_key]) ? ' checked' : ''; ?><?php echo empty($np_state['all']) ? ' disabled' : ''; ?>>
                             <span class="toggle-track"></span>
                         </label>
                         <div>
-                            <div class="sett-notif-title">Overdue Alerts</div>
-                            <div class="sett-notif-sub">Alert when an item becomes overdue</div>
+                            <div class="sett-notif-title"><?php echo htmlspecialchars($np_def['label']); ?></div>
+                            <div class="sett-notif-sub"><?php echo htmlspecialchars($np_def['desc']); ?></div>
                         </div>
                     </div>
-                    <div class="sett-notif-row">
-                        <label class="toggle-sw">
-                            <input type="checkbox" id="notifPrefRoomToggle">
-                            <span class="toggle-track"></span>
-                        </label>
-                        <div>
-                            <div class="sett-notif-title">Facility Issues</div>
-                            <div class="sett-notif-sub">Alert when a facility issue is reported</div>
-                        </div>
-                    </div>
+                    <?php endforeach; ?>
                 </div>
             </div>
 
@@ -283,124 +284,13 @@
 
     <?php if ($is_super_admin): ?>
 
-        <!-- ── EQUIPMENT SETTINGS (Super Admin only) ─────────────────── -->
-        <div class="rq-sub-panel" id="sett-equipment">
-            <div class="ps-card" style="max-width:720px;">
-                <div class="ps-card-header">
-                    <h3><span class="material-symbols-outlined">category</span> Equipment Categories</h3>
-                </div>
-                <div class="ps-card-body">
-                    <p style="margin-bottom:16px;font-size:.875rem;color:var(--text-light);">
-                        Categories are shown when adding or editing equipment. Each campus has its own list.
-                        Items already assigned to a category are not affected when you add or delete categories here.
-                    </p>
-
-                    <!-- Campus selector -->
-                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:20px;">
-                        <label for="catMgrCampus" style="font-size:.875rem;font-weight:600;white-space:nowrap;">Campus</label>
-                        <select id="catMgrCampus" class="form-control-custom" style="width:220px;">
-                            <?php
-                            $cat_campuses = $conn->query("SELECT campus_id, campus_name FROM tbl_campuses ORDER BY campus_id ASC");
-                            while ($cat_campuses && ($cc = $cat_campuses->fetch_assoc())):
-                            ?>
-                                <option value="<?php echo (int)$cc['campus_id']; ?>"><?php echo htmlspecialchars($cc['campus_name']); ?></option>
-                            <?php endwhile; ?>
-                        </select>
-                    </div>
-
-                    <!-- Category list -->
-                    <div id="catMgrList" style="margin-bottom:20px;min-height:40px;">
-                        <span style="color:var(--text-light);font-size:.875rem;">Loading…</span>
-                    </div>
-
-                    <!-- Add new category -->
-                    <div style="display:flex;gap:8px;align-items:flex-start;">
-                        <input type="text" id="catMgrInput" class="form-control-custom"
-                            placeholder="New category name" maxlength="100"
-                            style="flex:1;" autocomplete="off">
-                        <button type="button" class="ps-btn ps-btn--primary" id="catMgrAdd">
-                            <span class="material-symbols-outlined">add</span> Add
-                        </button>
-                    </div>
-                    <p id="catMgrMsg" style="margin-top:8px;font-size:.8rem;display:none;"></p>
-                </div>
-            </div>
-
-            <!-- Google Sheets Sync card -->
-            <div class="ps-card" style="max-width:720px;margin-top:20px;">
-                <div class="ps-card-header">
-                    <h3><span class="material-symbols-outlined">sync</span> Google Sheets Sync</h3>
-                </div>
-                <div class="ps-card-body">
-                    <p style="font-size:.875rem;color:var(--text-light);margin-bottom:16px;">
-                        Connect your Google Sheets inventory. PUPSync will read the spreadsheet and
-                        automatically update equipment items. The sheet must be set to
-                        <strong>"Anyone with the link can view"</strong>.
-                    </p>
-
-                    <div class="form-group" style="margin-bottom:16px;">
-                        <label for="gsheetUrl" style="font-size:.875rem;font-weight:600;">Google Sheets URL</label>
-                        <div style="display:flex;gap:8px;margin-top:6px;">
-                            <input type="url" id="gsheetUrl" class="form-control-custom" style="flex:1;"
-                                placeholder="https://docs.google.com/spreadsheets/d/..."
-                                value="<?php
-                                $cfg_url_q = $conn->query("SELECT value FROM tbl_sync_config WHERE config_key='gsheet_url' LIMIT 1");
-                                echo $cfg_url_q ? htmlspecialchars((string)($cfg_url_q->fetch_assoc()['value'] ?? '')) : '';
-                                ?>">
-                            <button type="button" class="ps-btn ps-btn--ghost" id="gsheetSaveUrl">Save URL</button>
-                        </div>
-                    </div>
-
-                    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-                        <button type="button" class="ps-btn ps-btn--primary" id="gsheetSyncNow">
-                            <span class="material-symbols-outlined">sync</span> Sync Now
-                        </button>
-                        <span id="gsheetLastSync" style="font-size:.8rem;color:var(--text-light);">
-                            <?php
-                            $ls_q = $conn->query("SELECT value FROM tbl_sync_config WHERE config_key='gsheet_last_sync' LIMIT 1");
-                            $ls = $ls_q ? (string)($ls_q->fetch_assoc()['value'] ?? '') : '';
-                            echo $ls ? 'Last synced: ' . htmlspecialchars(date('M j, Y g:i A', strtotime($ls))) : 'Never synced';
-                            ?>
-                        </span>
-                    </div>
-
-                    <div id="gsheetSyncResult" style="margin-top:12px;display:none;padding:12px;border-radius:8px;font-size:.85rem;"></div>
-
-                    <!-- Pending deletions -->
-                    <?php
-                    $pd_q = $conn->query("SELECT pd.id, pd.item_name, c.campus_name FROM tbl_sync_pending_deletions pd LEFT JOIN tbl_campuses c ON c.campus_id = pd.campus_id ORDER BY pd.detected_at DESC");
-                    $pd_rows = $pd_q ? $pd_q->fetch_all(MYSQLI_ASSOC) : [];
-                    if ($pd_rows):
-                    ?>
-                    <div style="margin-top:20px;padding:14px;background:#fff8e1;border-radius:10px;border:1px solid #ffe082;">
-                        <p style="font-weight:700;font-size:.875rem;margin-bottom:10px;">
-                            <span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle;color:#f57c00;">warning</span>
-                            <?php echo count($pd_rows); ?> item(s) were removed from the Google Sheet
-                        </p>
-                        <p style="font-size:.8rem;color:var(--text-light);margin-bottom:12px;">
-                            These items exist in PUPSync but are no longer in your spreadsheet. Decide what to do with each one.
-                        </p>
-                        <?php foreach ($pd_rows as $pd): ?>
-                            <div class="pd-row" data-pd-id="<?php echo (int)$pd['id']; ?>" style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #ffecb3;">
-                                <div>
-                                    <strong style="font-size:.875rem;"><?php echo htmlspecialchars($pd['item_name']); ?></strong>
-                                    <span style="font-size:.78rem;color:var(--text-light);margin-left:8px;"><?php echo htmlspecialchars($pd['campus_name'] ?? ''); ?></span>
-                                </div>
-                                <div style="display:flex;gap:8px;">
-                                    <button type="button" class="ps-btn ps-btn--danger ps-btn--sm" data-pd-action="archive" data-pd-id="<?php echo (int)$pd['id']; ?>">Archive it</button>
-                                    <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-pd-action="keep" data-pd-id="<?php echo (int)$pd['id']; ?>">Keep it</button>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                    <?php endif; ?>
-                </div>
-            </div>
-        </div><!-- /sett-equipment -->
+        <?php require __DIR__ . '/admin-arbitration-panel.php'; /* Arbitration rules (Super Admin only, UI only) */ ?>
 
     <?php endif; ?>
 
     <!-- ── HELP & FAQ (was the standalone Help Center overlay) ─── -->
+    <?php require __DIR__ . '/../../service-survey/views/admin-ratings-panel.php'; /* Service Ratings (Admin + Super Admin) */ ?>
+
     <div class="rq-sub-panel" id="sett-help">
 
         <div class="ps-two-col">
@@ -530,7 +420,7 @@
                                     <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
                                 </summary>
                                 <div class="hc-faq-a">
-                                    The <strong>Dashboard</strong> shows what needs attention right now. The <strong>Activity</strong> tab is the full timeline of decisions and changes, and who made them. You can filter it by type (Requests, Facilities, Equipment, System, Sign-ins), by person, and by date, and export it. The bell on the Dashboard opens your Notifications. Choose which alerts you get (new requests, overdue items, facility issues) in <strong>Settings → Preferences</strong>.
+                                    The <strong>Dashboard</strong> shows what needs attention right now. The <strong>Activity</strong> tab is the full timeline of decisions and changes, and who made them. You can filter it by type (Requests, Facilities, Equipment, System, Sign-ins), by person, and by date, and export it. The bell on the Dashboard opens your Notifications. Choose which alerts you get (new requests, overdue items, stock alerts, facility issues and security emails), or switch them all off, in <strong>Settings → Preferences</strong>.
                                 </div>
                             </details>
 
@@ -574,10 +464,10 @@
                                     </summary>
                                     <div class="hc-faq-a">
                                         <strong>Imports</strong> (in the sidebar, under <strong>Data</strong>) is locked behind your password. Use it to bring in:<br>
-                                        <strong>Equipment Inventory</strong> (XLSX or CSV): for importing equipment lists. This card is a placeholder and is not available yet.<br>
+                                        <strong>Equipment Inventory</strong> (Google Sheet): paste the link of your equipment sheet (shared as &ldquo;Anyone with the link can view&rdquo;), press <strong>Sync now</strong>, and manage the equipment categories on the same card.<br>
                                         <strong>Rooms Assigned</strong> (XLSX or CSV): for importing which rooms are assigned to which faculty or class. This card is a placeholder and is not available yet.<br>
                                         <strong>Faculty Registry</strong> (PDF or XLSX): used to confirm a faculty member when you create their account.<br><br>
-                                        Choose <strong>Merge</strong> to add new entries and update existing ones, or <strong>Replace</strong> to remove everyone listed first. Files can be up to 10 MB, and the original file of the latest import is kept.
+                                        For the Faculty Registry and Rooms Assigned, choose <strong>Merge</strong> to add new entries and update existing ones, or <strong>Replace</strong> to remove everyone listed first. Files can be up to 10 MB, and the original file of the latest import is kept.
                                     </div>
                                 </details>
 

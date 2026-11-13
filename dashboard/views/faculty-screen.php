@@ -31,7 +31,7 @@
                 $fdb_sched     = [];
                 foreach ($requests_js as $fdb_v_r) {
                     $fdb_v_st = trim((string)($fdb_v_r['status'] ?? ''));
-                    if ($fdb_v_st !== 'Approved' || substr((string)$fdb_v_r['return_date'], 0, 10) !== $fdb_today) continue;
+                    if (!in_array($fdb_v_st, ['Approved', 'On Loan'], true) || substr((string)$fdb_v_r['return_date'], 0, 10) !== $fdb_today) continue;
                     $fdb_due_today++;
                     $fdb_v_qty = max(1, (int)($fdb_v_r['borrow_qty'] ?? 1));
                     $fdb_sched[] = [
@@ -165,7 +165,8 @@
                 $fdb_recent = [];
                 $fdb_req_map = [
                     'Waiting' => ['Pending', 'warn'],
-                    'Approved' => ['Active', 'ok'],
+                    'Approved' => ['Approved', 'ok'],
+                    'On Loan' => ['On loan', 'ok'],
                     'Overdue' => ['Overdue', 'danger'],
                     'Returned' => ['Returned', 'muted'],
                     'Cancelled' => ['Cancelled', 'muted'],

@@ -65,6 +65,7 @@ define('RL_IP_LOCKOUT_MINUTES', 10);
 // ── Dependency ────────────────────────────────────────────────────────────────
 
 require_once __DIR__ . '/../../shared/core/mailer.php';
+require_once __DIR__ . '/../../notifications/core/preferences.php';
 
 
 // ── Public functions ──────────────────────────────────────────────────────────
@@ -197,7 +198,9 @@ function recordFailedAttempt(
         $unlock_ts    = strtotime((string)$locked_until);
         $seconds_left = ($unlock_ts !== false) ? max(0, $unlock_ts - time()) : ($duration_min * 60);
 
-        if ($email_exists) {
+        // The unusual-sign-in email follows the account owner's Notification Preferences
+        // (Security alerts for an admin, Account & security for a faculty; fails open).
+        if ($email_exists && notif_security_email_allowed_for_login($conn, $email)) {
             _rl_send_lockout_alert($email, $display_name, $ip, $duration_min, $new_level);
         }
 

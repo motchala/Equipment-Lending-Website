@@ -20,6 +20,9 @@ $faculty_id   = $_SESSION['faculty_id'];
 $faculty_name = $_SESSION['faculty_name'];
 
 // ── Block generation if faculty has any overdue item ─────────────────────
+// (only while Settings → Arbitration → "Decline if the borrower has an overdue item" is on)
+require_once __DIR__ . '/../core/booking-schedule.php';
+BookingSchedule::loadRules($conn);
 $overdue_chk = $conn->prepare(
     "SELECT id FROM tbl_requests
       WHERE faculty_id = ? AND status = 'Overdue'
@@ -28,7 +31,7 @@ $overdue_chk = $conn->prepare(
 $overdue_chk->bind_param('s', $faculty_id);
 $overdue_chk->execute();
 $overdue_chk->store_result();
-$has_overdue = $overdue_chk->num_rows > 0;
+$has_overdue = BookingSchedule::overdueBlock() && $overdue_chk->num_rows > 0;
 $overdue_chk->close();
 
 if ($has_overdue) {

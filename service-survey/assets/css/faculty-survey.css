@@ -1,0 +1,263 @@
+/**
+ * service-survey/assets/css/faculty-survey.css
+ * Faculty portal: the anonymous service survey pop-up. All classes are svy-*.
+ * Builds on the portal's own .modal-backdrop / .modal-box / .modal-header / .modal-footer / .btn-* styles,
+ * so it follows the Light / Dark / High Contrast themes automatically.
+ */
+
+/* The portal's .modal-backdrop is display:flex, which would override the [hidden] attribute. */
+.svy-backdrop[hidden] {
+    display: none;
+}
+
+.svy-backdrop {
+    z-index: 1100;
+}
+
+.svy-box {
+    max-width: 480px;
+    max-height: calc(100vh - 40px);
+    display: flex;
+    flex-direction: column;
+    outline: none;
+}
+
+.svy-head h3 {
+    gap: 8px;
+}
+
+.svy-head-ic {
+    font-size: 22px;
+    color: #e0a100;
+    font-variation-settings: 'FILL' 1;
+}
+
+.svy-body {
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.svy-sub {
+    margin: 0;
+    font-size: 0.88rem;
+    line-height: 1.45;
+    color: var(--color-on-surface);
+}
+
+.svy-sub strong {
+    font-weight: 700;
+}
+
+.svy-scale {
+    margin: -6px 0 0;
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 0.72rem;
+    color: var(--color-secondary);
+}
+
+/* ── One question ───────────────────────────────────────────── */
+.svy-q {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+}
+
+.svy-q + .svy-q {
+    margin-top: 14px;
+}
+
+.svy-q legend {
+    padding: 0;
+    margin-bottom: 8px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--color-on-surface);
+}
+
+.svy-stars-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* DOM order is 5→1; row-reverse shows them 1→5 and lets "~" light up every lower star. */
+.svy-stars {
+    display: inline-flex;
+    flex-direction: row-reverse;
+    gap: 2px;
+}
+
+.svy-radio {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+    pointer-events: none;
+}
+
+.svy-star {
+    cursor: pointer;
+    line-height: 1;
+    padding: 2px;
+    border-radius: 8px;
+    color: var(--color-outline-variant);
+    transition: color 0.12s, transform 0.12s;
+}
+
+.svy-star .material-symbols-outlined {
+    font-size: 34px;
+    font-variation-settings: 'FILL' 0;
+    transition: font-variation-settings 0.12s;
+}
+
+.svy-radio:checked ~ .svy-star,
+.svy-star:hover,
+.svy-star:hover ~ .svy-star {
+    color: #e0a100;
+}
+
+.svy-radio:checked ~ .svy-star .material-symbols-outlined,
+.svy-star:hover .material-symbols-outlined,
+.svy-star:hover ~ .svy-star .material-symbols-outlined {
+    font-variation-settings: 'FILL' 1;
+}
+
+.svy-star:active {
+    transform: scale(0.92);
+}
+
+.svy-radio:focus-visible + .svy-star {
+    outline: 2px solid var(--color-primary-container);
+    outline-offset: 1px;
+}
+
+/* Text for screen readers only (the star icon carries the visual meaning). */
+.svy-sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+.svy-hint {
+    min-width: 76px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--color-secondary);
+}
+
+/* ── Optional comment ───────────────────────────────────────── */
+.svy-comment-lbl {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--color-on-surface);
+}
+
+.svy-comment-lbl span {
+    font-weight: 500;
+    color: var(--color-secondary);
+}
+
+.svy-comment textarea {
+    width: 100%;
+    box-sizing: border-box;
+    resize: vertical;
+    min-height: 72px;
+    max-height: 180px;
+    padding: 10px 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-outline-variant);
+    background: var(--color-surface);
+    color: var(--color-on-surface);
+    font-family: var(--font-sans);
+    font-size: 0.86rem;
+    line-height: 1.45;
+}
+
+.svy-comment textarea:focus {
+    outline: 2px solid var(--color-primary-container);
+    outline-offset: 0;
+}
+
+.svy-comment-foot {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 4px;
+    font-size: 0.72rem;
+    color: var(--color-secondary);
+}
+
+/* ── Notes / errors / footer ────────────────────────────────── */
+.svy-anon {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.76rem;
+    color: var(--color-secondary);
+}
+
+.svy-anon .material-symbols-outlined {
+    font-size: 16px;
+}
+
+.svy-error {
+    margin: 0;
+    padding: 8px 10px;
+    border-radius: var(--radius-md);
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #b3261e;
+    background: rgba(179, 38, 30, 0.1);
+}
+
+.svy-error[hidden] {
+    display: none;
+}
+
+.svy-foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.svy-foot .btn-save-acc .material-symbols-outlined {
+    font-size: 18px;
+}
+
+@media (max-width: 520px) {
+    .svy-backdrop {
+        padding: 10px;
+        align-items: flex-end;
+    }
+
+    .svy-star .material-symbols-outlined {
+        font-size: 30px;
+    }
+
+    .svy-stars-row {
+        gap: 8px;
+    }
+
+    .svy-hint {
+        min-width: 64px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .svy-star,
+    .svy-star .material-symbols-outlined {
+        transition: none;
+    }
+}

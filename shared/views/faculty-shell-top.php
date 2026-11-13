@@ -50,6 +50,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
 
     <link rel="stylesheet" href="dashboard/assets/css/faculty-dashboard.css?v=<?php echo @filemtime(PS_ROOT . '/dashboard/assets/css/faculty-dashboard.css'); ?>">
+    <link rel="stylesheet" href="equipment-booking/assets/css/faculty-borrow-flow.css?v=<?php echo @filemtime(PS_ROOT . '/equipment-booking/assets/css/faculty-borrow-flow.css'); ?>">
 
     <!-- NOTE: faculty-code-card.css intentionally not loaded — it was a stale
          snapshot of this same stylesheet (predating several redesigns) that

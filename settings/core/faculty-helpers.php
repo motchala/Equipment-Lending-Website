@@ -5,8 +5,6 @@
  *
  * Small, dependency-free helpers for the faculty Settings screen:
  *   - faculty_mask_email()           mask an email's local part while keeping its domain visible
- *   - faculty_phone_normalize()      validate + format a Philippine mobile number
- *   - faculty_phone_display()        pretty-print a stored mobile number
  *   - faculty_device_info()          turn a User-Agent into "Chrome on Windows PC"
  *   - faculty_ensure_department_column()  widen tbl_users.department if it is still varchar(50)
  */
@@ -44,38 +42,6 @@ function faculty_mask_email(?string $email, int $visible = 5): string
         return $maskedL;
     }
     return $maskedL . '@' . $domain;
-}
-
-/**
- * Accepts the ways people actually type a Philippine mobile number:
- *   09171234567 · 0917 123 4567 · 0917-123-4567 · +63 917 123 4567 · 639171234567 · 9171234567
- * Returns the canonical "09XX XXX XXXX", or null when it is not a valid PH mobile number.
- */
-function faculty_phone_normalize(string $raw): ?string
-{
-    $digits = preg_replace('/[\s\-().]/', '', trim($raw));
-    if ($digits === null || $digits === '') {
-        return null;
-    }
-    if (preg_match('/^(?:\+?63)(9\d{9})$/', $digits, $m)) {
-        $digits = '0' . $m[1];
-    } elseif (preg_match('/^9\d{9}$/', $digits)) {
-        $digits = '0' . $digits;
-    }
-    if (!preg_match('/^09\d{9}$/', $digits)) {
-        return null;
-    }
-    return substr($digits, 0, 4) . ' ' . substr($digits, 4, 3) . ' ' . substr($digits, 7, 4);
-}
-
-/** Stored value -> what to show. Legacy free-text values are shown as they are. */
-function faculty_phone_display(?string $stored): string
-{
-    $stored = trim((string)$stored);
-    if ($stored === '') {
-        return '';
-    }
-    return faculty_phone_normalize($stored) ?? $stored;
 }
 
 /**

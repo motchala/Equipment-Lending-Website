@@ -14141,3 +14141,23 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
         animation: none;
     }
 }
+
+/* ── Notification preferences: master switch + category rows ───────── */
+.sett-notif-row--master {
+    padding-bottom: 0.75rem;
+    margin-bottom: 0.15rem;
+    border-bottom: 1px solid var(--khaki-border);
+}
+
+.sett-notif-row--child {
+    transition: opacity 0.2s;
+}
+
+.notif-prefs-off .sett-notif-row--child {
+    opacity: 0.5;
+}
+
+.toggle-sw input:disabled+.toggle-track {
+    opacity: 0.55;
+    cursor: not-allowed;
+}

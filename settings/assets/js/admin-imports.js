@@ -8,9 +8,10 @@
      UI is never the only protection.
    - While locked the page holds placeholders only. Counts, lists and files are
      fetched after unlock and dropped again when the tab locks.
-   - Equipment Inventory and Rooms Assigned: placeholder cards. They are clickable (open the file
-     chooser, show the picked file's name and size) but never read, upload or import anything
-     (see initPlaceholderCard).
+   - Equipment Inventory: not a file upload. The list is read from a linked Google Sheet by
+     settings/api/equipment-import.php (Google Sheets link, Sync now, categories; see initEquipmentCard).
+     Rooms Assigned: a Faculty Rooms workbook (XLSX), read and saved by settings/api/rooms-import.php
+     (see initRoomsCard). It is separate from the Faculty Registry.
      Faculty Registry: Faculty Identification Records, PDF (PDF.js) or XLSX
      (read by parse-faculty-registry-xlsx.php).
    - Every import first stores the ORIGINAL file, then the rows read from it. Only the
@@ -30,16 +31,16 @@
 
     var KINDS = {
         equipment: {
-            pending: true,   // placeholder: interactive, but no endpoints and no file reading
-            label: 'Equipment Inventory', icon: 'inventory_2', exts: ['xlsx', 'csv'], noun: ['item', 'items'],
-            cols: ['#', 'Item name', 'Category', 'Quantity', 'Condition'],
-            search: 'Search by item name or category\u2026'
+            label: 'Equipment Inventory', icon: 'inventory_2', noun: ['item', 'items'],
+            ep: 'settings/api/equipment-import.php',     // link, sync, categories and the imported list
+            cols: ['#', 'Item name', 'Category', 'Campus', 'Quantity', 'Condition'],
+            search: 'Search by item name, category or campus\u2026'
         },
         rooms: {
-            pending: true,   // placeholder: interactive, but no endpoints and no file reading
-            label: 'Rooms Assigned', icon: 'meeting_room', exts: ['xlsx', 'csv'], noun: ['assignment', 'assignments'],
-            cols: ['#', 'Room', 'Building', 'Floor', 'Assigned to'],
-            search: 'Search by room or faculty\u2026'
+            label: 'Rooms Assigned', icon: 'meeting_room', exts: ['xlsx'], noun: ['class meeting', 'class meetings'],
+            ep: 'settings/api/rooms-import.php',
+            cols: ['#', 'Room', 'Building', 'Assigned to', 'Class', 'Day & time'],
+            search: 'Search by room, faculty or class\u2026'
         },
         faculty: {
             label: 'Faculty Registry', icon: 'badge', exts: ['pdf', 'xlsx'], noun: ['entry', 'entries'],
@@ -122,15 +123,15 @@
     function closeModal(id) { var m = $(id); if (m) m.classList.remove('ps-modal-open'); }
 
     /* ── Server calls ───────────────────────────────────────────── */
-    function post(action, data) {
+    function post(action, data, url) {
         var body = new URLSearchParams();
         body.set('action', action);
         body.set('csrf_token', csrf());
         Object.keys(data || {}).forEach(function (k) { body.set(k, data[k]); });
-        return fetch(API, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body });
+        return fetch(url || API, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body });
     }
-    function postJson(action, data) {
-        return post(action, data).then(function (r) { return r.json().catch(function () { return null; }); });
+    function postJson(action, data, url) {
+        return post(action, data, url).then(function (r) { return r.json().catch(function () { return null; }); });
     }
 
     /* ── PDF.js (self-hosted; reused if another script already loaded it) ── */
@@ -285,6 +286,7 @@
                     setExpiry(d.remaining);
                     setLocked(false);
                     loadOverview();
+                    if (controllers.equipment) controllers.equipment.load();
                     return;
                 }
                 showPwError((d && d.error) || 'Could not unlock. Please try again.');
@@ -307,7 +309,8 @@
             role(card, 'stat-rows').textContent = num(o.rows);
             var chip = role(card, 'chip');
             if (o.count > 0) {
-                chip.textContent = num(o.count) + ' ' + cfg.noun[o.count === 1 ? 0 : 1];
+                var chipN = typeof o.chip_count === 'number' ? o.chip_count : o.count;   // Rooms Assigned counts class meetings, not rooms
+                chip.textContent = num(chipN) + ' ' + cfg.noun[chipN === 1 ? 0 : 1];
                 chip.className = 'imp-chip imp-chip--ok';
             } else {
                 chip.textContent = 'Not imported yet';
@@ -329,6 +332,7 @@
                 if (!d || d.status !== 'success') return;
                 sync(d);
                 paintOverview('faculty', d.faculty);
+                if (d.rooms) paintOverview('rooms', d.rooms);
             });
         }
 
@@ -336,8 +340,8 @@
         var controllers = {};
         cards.forEach(function (card) {
             var k = card.dataset.kind;
-            /* placeholder cards (Equipment Inventory) are interactive but do no real work */
-            controllers[k] = (KINDS[k] && KINDS[k].pending) ? initPlaceholderCard(card) : initCard(card);
+            controllers[k] = k === 'equipment' ? initEquipmentCard(card)
+                : (k === 'rooms' ? initRoomsCard(card) : initCard(card));
         });
         initGuide();
         function resetAll() {
@@ -590,6 +594,210 @@
             return { reset: reset };
         }
 
+        /* Rooms Assigned: a Faculty Rooms workbook (or a Room Timetables workbook) -> weekly class meetings.
+           The server reads the uploaded file both times (preview, then import), so nothing the browser
+           shows is trusted. The Faculty Registry is never touched. */
+        function initRoomsCard(card) {
+            var kind = card.dataset.kind, cfg = KINDS[kind];
+            var drop = role(card, 'drop'), input = role(card, 'input');
+            var picked = role(card, 'picked'), alertEl = role(card, 'alert');
+            var preview = role(card, 'preview'), previewBody = role(card, 'preview-body'), previewCount = role(card, 'preview-count');
+            var importBtn = role(card, 'import');
+            var importHtml = importBtn.innerHTML;
+            var file = null, summary = null, busy = false, run = 0;   // run: a preview that finishes after a reset is ignored
+
+            function alertShow(msg, kind2, details) {
+                alertEl.className = 'imp-alert imp-alert--' + kind2;
+                alertEl.textContent = '';
+                alertEl.appendChild(el('span', 'material-symbols-outlined', kind2 === 'ok' ? 'check_circle' : (kind2 === 'err' ? 'error' : 'info')));
+                var box = el('div', 'imp-alert-text');
+                box.appendChild(el('span', null, msg));
+                if (details && details.length) {
+                    var ul = el('ul', 'imp-alert-list');
+                    details.forEach(function (d) { ul.appendChild(el('li', null, d)); });
+                    box.appendChild(ul);
+                }
+                alertEl.appendChild(box);
+            }
+            function alertHide() { alertEl.className = 'imp-alert hidden'; alertEl.textContent = ''; }
+
+            function reset(full) {
+                run++; file = null; summary = null; input.value = '';
+                picked.classList.add('hidden');
+                preview.classList.add('hidden'); previewBody.textContent = '';
+                drop.classList.remove('hidden', 'is-over');
+                importBtn.disabled = true; importBtn.innerHTML = importHtml; busy = false;
+                alertHide();
+                if (full) {
+                    ['stat-count', 'stat-extra', 'stat-rows'].forEach(function (r) { role(card, r).textContent = r === 'stat-count' ? '\u2022\u2022\u2022' : '\u2022\u2022'; });
+                    role(card, 'last-text').textContent = 'Last import \u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022';
+                    var chip = role(card, 'chip'); chip.textContent = '\u2022\u2022\u2022'; chip.className = 'imp-chip imp-chip--muted';
+                    role(card, 'view-list').disabled = false; role(card, 'view-files').disabled = false;
+                    var merge = card.querySelector('input[value="merge"]'); if (merge) merge.checked = true;
+                }
+            }
+
+            function summaryLine(s) {
+                if (s.kind === 'room_timetable') {
+                    return 'Room timetable: ' + num(s.meetings) + ' classes with no instructor yet \u00b7 ' + num(s.rooms) + ' rooms' + (s.term ? ' \u00b7 ' + s.term : '');
+                }
+                return num(s.meetings) + ' weekly class meetings \u00b7 ' + num(s.faculty) + ' faculty \u00b7 ' + num(s.rooms) + ' rooms \u00b7 ' + num(s.hours) + ' class hours a week';
+            }
+            function previewNotes(s) {
+                var n = [];
+                if (s.kind === 'room_timetable') {
+                    n.push('These classes have no instructor yet, but they still block their rooms for reservations. Classes that do have an instructor are not imported from this file (use the Faculty Rooms workbook for those). Replace is not used for this file.');
+                } else {
+                    n.push('Every class repeats each week until the next import replaces it, and blocks its room for reservations.');
+                    if (s.no_id) n.push(num(s.no_id) + ' faculty have no ID yet. Their classes are kept and attach as soon as their account is created.');
+                }
+                var made = s.new_rooms || [];
+                if (made.length) n.push(num(made.length) + ' rooms are not under Facilities yet and will be added: ' + made.slice(0, 4).join(', ') + (made.length > 4 ? ', \u2026' : '') + '.');
+                if ((s.unplaced || []).length) n.push('These room codes do not match a building, so their classes cannot block a room: ' + s.unplaced.join(', ') + '.');
+                (s.overlaps || []).slice(0, 3).forEach(function (w) { n.push(w); });
+                (s.warnings || []).slice(0, 5).forEach(function (w) { n.push(w); });
+                return n;
+            }
+            function renderPreview(rows, s) {
+                previewBody.textContent = '';
+                rows.forEach(function (r, i) {
+                    if (i >= PREVIEW_LIMIT) return;
+                    var tr = document.createElement('tr');
+                    tr.appendChild(el('td', 'imp-td-n', String(i + 1)));
+                    tr.appendChild(el('td', 'imp-td-nw', r.room));
+                    tr.appendChild(el('td', 'imp-td-nw', r.building));
+                    tr.appendChild(el('td', null, r.assigned_to));
+                    tr.appendChild(el('td', null, r.class_label));
+                    tr.appendChild(el('td', 'imp-td-nw', r.when));
+                    previewBody.appendChild(tr);
+                });
+                previewCount.textContent = summaryLine(s) + (rows.length > PREVIEW_LIMIT ? ' \u00b7 showing the first ' + PREVIEW_LIMIT : '');
+                preview.classList.remove('hidden');
+                importBtn.disabled = rows.length === 0;
+            }
+
+            function showPicked(f) {
+                role(card, 'picked-name').textContent = f.name;
+                role(card, 'picked-size').textContent = fmtSize(f.size);
+                role(card, 'picked-icon').textContent = 'table_chart';
+                picked.classList.remove('hidden');
+                drop.classList.add('hidden');
+            }
+
+            /* One request: the file goes up, the server reads it. action = preview (changes nothing) | import */
+            function send(action, f, mode) {
+                var form = new FormData();
+                form.append('csrf_token', csrf());
+                form.append('action', action);
+                form.append('file', f);
+                if (mode) form.append('mode', mode);
+                return fetch(cfg.ep, { method: 'POST', credentials: 'same-origin', body: form }).then(function (r) {
+                    return r.json().catch(function () { throw new Error('Unexpected response from the server. Please try again.'); }).then(function (d) {
+                        if (guard(d)) throw { handled: true };
+                        if (!r.ok || !d || d.status !== 'success') throw new Error((d && d.error) || 'Something went wrong. Please try again.');
+                        return d;
+                    });
+                });
+            }
+
+            function handleFile(f) {
+                if (!f || busy) return;
+                reset(false);
+                var ext = (f.name.split('.').pop() || '').toLowerCase();
+                if (cfg.exts.indexOf(ext) === -1) {
+                    alertShow('Unsupported file type. Please choose an XLSX file. For a CSV, open it in Excel and save it as .xlsx first.', 'err');
+                    return;
+                }
+                if (f.size > MAX_FILE_BYTES) { alertShow('File is too large. Maximum size is 10 MB.', 'err'); return; }
+
+                file = f;
+                showPicked(f);
+                alertShow('Reading the spreadsheet\u2026', 'info');
+                var mine = ++run;
+                send('preview', f).then(function (d) {
+                    if (mine !== run) return;
+                    summary = d.summary;
+                    renderPreview(d.rows || [], summary);
+                    if (!(d.rows || []).length) { alertShow('This workbook has no classes that can be imported.', 'info'); return; }
+                    alertShow('Check the preview before importing.', 'info', previewNotes(summary));
+                }).catch(function (err) {
+                    if (mine !== run || (err && err.handled)) return;
+                    reset(false);
+                    alertShow((err && err.message) || 'Network error. Please try again.', 'err');
+                });
+            }
+
+            function outcome(s, mode, details) {
+                var msg;
+                if (s.kind === 'room_timetable') {
+                    msg = 'Room timetable saved: ' + num(s.unassigned_classes) + ' classes with no instructor yet now block their rooms.';
+                } else {
+                    msg = 'Import complete: ' + num(s.meetings) + ' weekly class meetings saved for ' + num(s.faculty) + ' faculty in ' + num(s.rooms) + ' rooms'
+                        + (mode === 'replace' ? ' (every earlier class was replaced)' : '') + '. '
+                        + num(s.accounts_linked) + ' faculty accounts already have their classes.';
+                }
+                var made = s.rooms_created || [];
+                if (made.length) details.push(num(made.length) + ' rooms were not under Facilities yet and were added: ' + made.slice(0, 6).join(', ') + (made.length > 6 ? ', \u2026' : '') + '.');
+                if ((s.rooms_unresolved || []).length) details.push('These rooms could not be placed in a building, so their classes cannot block a room: ' + s.rooms_unresolved.join(', ') + '.');
+                var ov = s.reservations_overlapping || [];
+                if (ov.length) {
+                    var ex = ov.slice(0, 3).map(function (o) { return o.room_name + ' on ' + o.reservation_date + ' ' + String(o.start_time).slice(0, 5) + '\u2013' + String(o.end_time).slice(0, 5); }).join('; ');
+                    details.push(num(ov.length) + ' approved reservation(s) now overlap a class (' + ex + (ov.length > 3 ? '; \u2026' : '') + '). They were left as they are. Please review them.');
+                }
+                (s.file_overlaps || []).slice(0, 3).forEach(function (w) { details.push(w); });
+                (s.warnings || []).slice(0, 5).forEach(function (w) { details.push(w); });
+                return msg;
+            }
+
+            /* pick / drop */
+            input.addEventListener('click', function (e) { e.stopPropagation(); });
+            drop.addEventListener('click', function () { if (!busy) input.click(); });
+            drop.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (!busy) input.click(); } });
+            input.addEventListener('change', function () { handleFile(this.files && this.files[0]); });
+            ['dragenter', 'dragover'].forEach(function (t) {
+                drop.addEventListener(t, function (e) { e.preventDefault(); drop.classList.add('is-over'); });
+            });
+            ['dragleave', 'drop'].forEach(function (t) {
+                drop.addEventListener(t, function (e) { e.preventDefault(); drop.classList.remove('is-over'); });
+            });
+            drop.addEventListener('drop', function (e) {
+                var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+                if (f) handleFile(f);
+            });
+            role(card, 'clear').addEventListener('click', function () { if (!busy) reset(false); });
+
+            /* import: the server keeps the ORIGINAL file, then saves the class meetings */
+            importBtn.addEventListener('click', function () {
+                if (!file || !summary || busy) return;
+                var picked2 = card.querySelector('input[name="imp-mode-' + kind + '"]:checked');
+                var replaceAll = !!(picked2 && picked2.value === 'replace') && summary.kind !== 'room_timetable';
+                if (replaceAll && !window.confirm('Replace every class on the Rooms Assigned list? All saved class meetings will be removed first, then the ones in this file are saved. Classes with no instructor yet are kept.')) return;
+                if (!csrf()) { alertShow('Session expired. Please refresh the page.', 'err'); return; }
+
+                busy = true;
+                importBtn.disabled = true;
+                importBtn.innerHTML = '<span class="material-symbols-outlined imp-spin">progress_activity</span> Importing\u2026';
+                alertShow('Saving the original file and importing\u2026', 'info');
+                send('import', file, replaceAll ? 'replace' : 'merge').then(function (d) {
+                    var details = [];
+                    var msg = outcome(d.schedule || {}, d.mode, details);
+                    reset(false);
+                    alertShow(msg, 'ok', details);
+                    loadOverview();
+                }).catch(function (err) {
+                    busy = false;
+                    if (err && err.handled) return;
+                    importBtn.disabled = false; importBtn.innerHTML = importHtml;
+                    alertShow((err && err.message) || 'Network error. Please try again.', 'err');
+                });
+            });
+
+            role(card, 'view-list').addEventListener('click', function () { openList(kind); });
+            role(card, 'view-files').addEventListener('click', function () { openFiles(kind); });
+
+            return { reset: reset };
+        }
+
         /* Import guide: the tabs, and the "How to prepare this file" link on each card. */
         function initGuide() {
             var guide = $('imp-guide');
@@ -624,68 +832,290 @@
             });
         }
 
-        /* Equipment Inventory / Rooms Assigned: a clickable placeholder.
-           It opens the file chooser and shows the picked file's NAME and SIZE only. The file is never
-           read (no FileReader, no parsing), never uploaded, and nothing is imported or saved: every
-           button just explains that this import is not available yet. */
-        function initPlaceholderCard(card) {
-            var drop = role(card, 'drop'), input = role(card, 'input');
-            var picked = role(card, 'picked'), alertEl = role(card, 'alert');
-            var importBtn = role(card, 'import');
-            var what = (KINDS[card.dataset.kind] && KINDS[card.dataset.kind].label) || 'This';
+        /* Equipment Inventory: the list is read from a linked Google Sheet, not from an uploaded file.
+           Google Sheets link + Save link, Sync now, the category manager (campus, list, add, delete) and the
+           footer (Imported list / Open Google Sheet). Everything is fetched after unlock from
+           settings/api/equipment-import.php and dropped again when Imports locks (reset). The sync itself is
+           the same sync-inventory.php that the live background poller runs. */
+        function initEquipmentCard(card) {
+            var EP = KINDS.equipment.ep;
+            var urlInput = role(card, 'url'), saveBtn = role(card, 'save-url'), syncBtn = role(card, 'sync');
+            var alertEl = role(card, 'alert');
+            var campusSel = role(card, 'campus'), catsEl = role(card, 'cats');
+            var catInput = role(card, 'cat-input'), catAdd = role(card, 'cat-add'), catMsg = role(card, 'cat-msg');
+            var listBtn = role(card, 'view-list'), sheetBtn = role(card, 'open-sheet');
+            var syncHtml = syncBtn.innerHTML, saveHtml = saveBtn.innerHTML;
+            var savedUrl = '', ready = false, busy = false, run = 0, msgTimer = null;
 
-            function note(msg) {
-                alertEl.className = 'imp-alert imp-alert--info';
+            function alertShow(msg, kind2, details) {
+                alertEl.className = 'imp-alert imp-alert--' + kind2;
                 alertEl.textContent = '';
-                alertEl.appendChild(el('span', 'material-symbols-outlined', 'info'));
+                alertEl.appendChild(el('span', 'material-symbols-outlined', kind2 === 'ok' ? 'check_circle' : (kind2 === 'err' ? 'error' : 'info')));
                 var box = el('div', 'imp-alert-text');
                 box.appendChild(el('span', null, msg));
+                if (details && details.length) {
+                    var ul = el('ul', 'imp-alert-list');
+                    details.forEach(function (d) { ul.appendChild(el('li', null, d)); });
+                    box.appendChild(ul);
+                }
                 alertEl.appendChild(box);
             }
+            function alertHide() { alertEl.className = 'imp-alert hidden'; alertEl.textContent = ''; }
+
+            function catNote(msg, isErr) {
+                clearTimeout(msgTimer);
+                catMsg.textContent = msg;
+                catMsg.className = 'imp-eq-note ' + (isErr ? 'imp-eq-note--err' : 'imp-eq-note--ok');
+                msgTimer = setTimeout(function () { catMsg.className = 'imp-eq-note hidden'; }, 4000);
+            }
+
+            /* buttons follow what is typed and whether a request is running */
+            function typedUrl() { return urlInput.value.trim(); }
+            function refreshButtons() {
+                saveBtn.disabled = !ready || busy || typedUrl() === savedUrl;
+                syncBtn.disabled = !ready || busy || typedUrl() === '';
+                catAdd.disabled = !ready || busy || catInput.value.trim() === '' || !campusSel.value;
+                sheetBtn.disabled = !ready || savedUrl === '';
+            }
+
+            function paint(o) {
+                role(card, 'stat-count').textContent = num(o.items);
+                role(card, 'stat-extra').textContent = num(o.categories);
+                role(card, 'stat-rows').textContent = num(o.archived);
+                var chip = role(card, 'chip');
+                if (o.url === '') {
+                    chip.textContent = 'No sheet linked'; chip.className = 'imp-chip imp-chip--empty';
+                } else if (o.items > 0) {
+                    chip.textContent = num(o.items) + ' ' + KINDS.equipment.noun[o.items === 1 ? 0 : 1];
+                    chip.className = 'imp-chip imp-chip--ok';
+                } else {
+                    chip.textContent = 'Not synced yet'; chip.className = 'imp-chip imp-chip--empty';
+                }
+                role(card, 'last-text').textContent = o.last_sync
+                    ? 'Last sync ' + fmtDate(o.last_sync)
+                    : (o.url === '' ? 'No Google Sheet linked yet' : 'Not synced yet');
+                listBtn.disabled = o.items === 0;
+            }
+            var counts = { url: '', last_sync: '', items: 0, categories: 0, archived: 0 };
+            function setCounts(o) { Object.keys(o).forEach(function (k) { counts[k] = o[k]; }); paint(counts); }
+
+            /* ── Categories ── */
+            function drawCats(list) {
+                catsEl.textContent = '';
+                if (!list.length) { catsEl.appendChild(el('p', 'imp-eq-empty', 'No categories for this campus yet. Add one below.')); return; }
+                list.forEach(function (c) {
+                    var chipEl = el('span', 'imp-eq-cat');
+                    chipEl.appendChild(el('span', 'imp-eq-cat-name', c.name));
+                    if (c.items > 0) chipEl.appendChild(el('span', 'imp-eq-cat-n', String(c.items)));
+                    var x = el('button', 'imp-eq-cat-x');
+                    x.type = 'button';
+                    x.setAttribute('aria-label', 'Delete the category ' + c.name);
+                    x.title = c.items > 0 ? c.items + ' active item' + (c.items === 1 ? '' : 's') + ' use this category' : 'Delete this category';
+                    x.disabled = c.items > 0;
+                    x.appendChild(el('span', 'material-symbols-outlined', 'close'));
+                    x.addEventListener('click', function () { removeCat(c); });
+                    chipEl.appendChild(x);
+                    catsEl.appendChild(chipEl);
+                });
+            }
+            function loadCats() {
+                var my = run, cid = campusSel.value;
+                if (!cid) { catsEl.textContent = ''; return Promise.resolve(); }
+                catsEl.textContent = '';
+                catsEl.appendChild(el('p', 'imp-eq-empty', 'Loading\u2026'));
+                return postJson('categories', { campus_id: cid }, EP).then(function (d) {
+                    if (my !== run || cid !== campusSel.value) return;
+                    if (guard(d)) return;
+                    if (!d || d.status !== 'success') {
+                        catsEl.textContent = '';
+                        catsEl.appendChild(el('p', 'imp-eq-empty', (d && d.error) || 'Could not load the categories.'));
+                        return;
+                    }
+                    sync(d);
+                    drawCats(d.categories || []);
+                }).catch(function () {
+                    if (my !== run) return;
+                    catsEl.textContent = '';
+                    catsEl.appendChild(el('p', 'imp-eq-empty', 'Network error. Please try again.'));
+                });
+            }
+            function addCat() {
+                var name = catInput.value.trim();
+                if (!name || !campusSel.value || busy) return;
+                busy = true; refreshButtons();
+                postJson('category_add', { campus_id: campusSel.value, name: name }, EP).then(function (d) {
+                    busy = false;
+                    if (guard(d)) return;
+                    if (d && d.status === 'success') {
+                        sync(d);
+                        catInput.value = '';
+                        counts.categories += 1; paint(counts);
+                        catNote('Category added.', false);
+                        loadCats();
+                    } else {
+                        catNote((d && d.error) || 'Could not add the category.', true);
+                    }
+                    refreshButtons();
+                }).catch(function () { busy = false; catNote('Network error. Please try again.', true); refreshButtons(); });
+            }
+            function removeCat(c) {
+                if (busy || !window.confirm('Delete the category "' + c.name + '"? Items already assigned to it are not affected.')) return;
+                busy = true; refreshButtons();
+                postJson('category_delete', { category_id: c.category_id }, EP).then(function (d) {
+                    busy = false;
+                    if (guard(d)) return;
+                    if (d && d.status === 'success') {
+                        sync(d);
+                        counts.categories = Math.max(0, counts.categories - 1); paint(counts);
+                        catNote('Category deleted.', false);
+                        loadCats();
+                    } else {
+                        catNote((d && d.error) || 'Could not delete the category.', true);
+                    }
+                    refreshButtons();
+                }).catch(function () { busy = false; catNote('Network error. Please try again.', true); refreshButtons(); });
+            }
+
+            /* ── Link ── */
+            function saveUrl() {
+                // resolves true when the link on the card is saved (so Sync now can go on)
+                var url = typedUrl();
+                saveBtn.innerHTML = '<span class="material-symbols-outlined imp-spin">progress_activity</span> Saving\u2026';
+                return postJson('save_url', { url: url }, EP).then(function (d) {
+                    saveBtn.innerHTML = saveHtml;
+                    if (guard(d)) return false;
+                    if (d && d.status === 'success') {
+                        sync(d);
+                        savedUrl = d.url;
+                        urlInput.value = d.url;
+                        counts.url = d.url; paint(counts);
+                        return true;
+                    }
+                    alertShow((d && d.error) || 'Could not save the link. Please try again.', 'err');
+                    return false;
+                }).catch(function () {
+                    saveBtn.innerHTML = saveHtml;
+                    alertShow('Network error. Please try again.', 'err');
+                    return false;
+                });
+            }
+            saveBtn.addEventListener('click', function () {
+                if (busy) return;
+                busy = true; refreshButtons(); alertHide();
+                saveUrl().then(function (ok) {
+                    busy = false;
+                    if (ok) alertShow(savedUrl === '' ? 'The Google Sheets link was removed.' : 'The Google Sheets link was saved. Press Sync now to bring the items in.', 'ok');
+                    refreshButtons();
+                });
+            });
+
+            /* ── Sync now ── */
+            function refreshInventoryTable() {
+                // the Equipment page keeps its own copy of the list: refresh it in place (no page reload)
+                fetch('admin-dashboard.php?fragment=inventory-tbody', { credentials: 'same-origin', cache: 'no-store' })
+                    .then(function (r) { return r.ok ? r.json() : null; })
+                    .then(function (frag) {
+                        var tbody = document.getElementById('inventory-body');
+                        if (!frag || frag.status !== 'success' || !tbody) return;
+                        tbody.innerHTML = frag.active_html;
+                        if (typeof window._setupInventoryListFn === 'function') window._setupInventoryListFn();
+                    })
+                    .catch(function () { });
+            }
+            function runSync() {
+                var my = run;
+                syncBtn.innerHTML = '<span class="material-symbols-outlined imp-spin">sync</span> Syncing\u2026';
+                postJson('sync', {}, EP).then(function (d) {
+                    syncBtn.innerHTML = syncHtml; busy = false;
+                    if (my !== run) { refreshButtons(); return; }
+                    if (guard(d)) return;
+                    if (d && d.status === 'success') {
+                        sync(d);
+                        var s = d.summary || {};
+                        var msg = 'Sync complete: ' + num(s.added) + ' added, ' + num(s.updated) + ' updated'
+                            + (s.archived > 0 ? ', ' + num(s.archived) + ' removed from the sheet (archived).' : '.');
+                        var notes = [];
+                        if (s.skipped_sheets && s.skipped_sheets.length) notes.push('Skipped tabs: ' + s.skipped_sheets.join(', '));
+                        alertShow(msg, 'ok', notes);
+                        setCounts({ last_sync: d.last_sync || '', items: d.items, categories: d.categories, archived: d.archived });
+                        loadCats();
+                        refreshInventoryTable();
+                    } else {
+                        alertShow((d && d.error) || 'The sync failed. Please try again.', 'err');
+                    }
+                    refreshButtons();
+                }).catch(function () {
+                    syncBtn.innerHTML = syncHtml; busy = false;
+                    alertShow('Network error. Please try again.', 'err');
+                    refreshButtons();
+                });
+            }
+            syncBtn.addEventListener('click', function () {
+                if (busy || typedUrl() === '') return;
+                busy = true; refreshButtons(); alertHide();
+                if (typedUrl() === savedUrl) { runSync(); return; }
+                // a link typed but not saved yet is saved first, so the sync never reads an older sheet
+                syncBtn.innerHTML = '<span class="material-symbols-outlined imp-spin">sync</span> Saving link\u2026';
+                saveUrl().then(function (ok) {
+                    if (ok) runSync();
+                    else { syncBtn.innerHTML = syncHtml; busy = false; refreshButtons(); }
+                });
+            });
+
+            urlInput.addEventListener('input', refreshButtons);
+            urlInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); if (!saveBtn.disabled) saveBtn.click(); } });
+            catInput.addEventListener('input', refreshButtons);
+            catInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); if (!catAdd.disabled) addCat(); } });
+            catAdd.addEventListener('click', addCat);
+            campusSel.addEventListener('change', function () { refreshButtons(); loadCats(); });
+            listBtn.addEventListener('click', function () { openList('equipment'); });
+            sheetBtn.addEventListener('click', function () { if (savedUrl) window.open(savedUrl, '_blank', 'noopener'); });
+
+            /* ── Unlock / lock ── */
+            function load() {
+                var my = ++run;
+                return postJson('overview', {}, EP).then(function (d) {
+                    if (my !== run) return;
+                    if (guard(d)) return;
+                    if (!d || d.status !== 'success' || !d.equipment) {
+                        alertShow((d && d.error) || 'Could not load the equipment details. Please try again.', 'err');
+                        return;
+                    }
+                    sync(d);
+                    var o = d.equipment;
+                    savedUrl = o.url; urlInput.value = o.url;
+                    campusSel.textContent = '';
+                    (o.campuses || []).forEach(function (c) {
+                        var opt = document.createElement('option');
+                        opt.value = String(c.campus_id); opt.textContent = c.campus_name;
+                        campusSel.appendChild(opt);
+                    });
+                    ready = true;
+                    setCounts({ url: o.url, last_sync: o.last_sync, items: o.items, categories: o.categories, archived: o.archived });
+                    refreshButtons();
+                    loadCats();
+                }).catch(function () { alertShow('Network error. Please try again.', 'err'); });
+            }
             function reset() {
-                input.value = '';
-                picked.classList.add('hidden');
-                drop.classList.remove('hidden', 'is-over');
-                importBtn.disabled = true;
-                alertEl.className = 'imp-alert hidden';
-                alertEl.textContent = '';
-            }
-            function pick(f) {
-                if (!f) return;
-                role(card, 'picked-name').textContent = f.name;
-                role(card, 'picked-size').textContent = fmtSize(f.size);
-                role(card, 'picked-icon').textContent = /\.(xlsx|csv)$/i.test(f.name) ? 'table_chart' : 'description';
-                picked.classList.remove('hidden');
-                drop.classList.add('hidden');
-                importBtn.disabled = false;
-                note(what + ' import is not available yet. The file was not read or uploaded.');
+                // Imports locked: nothing from the server stays in the page
+                run++; ready = false; busy = false; savedUrl = '';
+                clearTimeout(msgTimer);
+                urlInput.value = ''; catInput.value = '';
+                campusSel.textContent = ''; catsEl.textContent = '';
+                catMsg.className = 'imp-eq-note hidden'; catMsg.textContent = '';
+                syncBtn.innerHTML = syncHtml; saveBtn.innerHTML = saveHtml;
+                alertHide();
+                counts = { url: '', last_sync: '', items: 0, categories: 0, archived: 0 };
+                role(card, 'stat-count').textContent = '\u2022\u2022\u2022';
+                role(card, 'stat-extra').textContent = '\u2022\u2022';
+                role(card, 'stat-rows').textContent = '\u2022\u2022';
+                var chip = role(card, 'chip'); chip.textContent = '\u2022\u2022\u2022'; chip.className = 'imp-chip imp-chip--muted';
+                role(card, 'last-text').textContent = 'Last sync \u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022';
+                listBtn.disabled = true;
+                refreshButtons();
             }
 
-            input.addEventListener('click', function (e) { e.stopPropagation(); });
-            drop.addEventListener('click', function () { input.click(); });
-            drop.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } });
-            input.addEventListener('change', function () { pick(this.files && this.files[0]); });
-            ['dragenter', 'dragover'].forEach(function (t) {
-                drop.addEventListener(t, function (e) { e.preventDefault(); drop.classList.add('is-over'); });
-            });
-            ['dragleave', 'drop'].forEach(function (t) {
-                drop.addEventListener(t, function (e) { e.preventDefault(); drop.classList.remove('is-over'); });
-            });
-            drop.addEventListener('drop', function (e) {
-                pick(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
-            });
-            role(card, 'clear').addEventListener('click', reset);
-            importBtn.addEventListener('click', function () {
-                note(what + ' import is not available yet. Nothing was uploaded or changed.');
-            });
-            role(card, 'view-list').addEventListener('click', function () {
-                note('Nothing to show yet. ' + what + ' import is not available yet.');
-            });
-            role(card, 'view-files').addEventListener('click', function () {
-                note('Nothing to show yet. ' + what + ' import is not available yet.');
-            });
-
-            return { reset: reset };
+            return { reset: reset, load: load };
         }
 
         /* ── Imported list modal ──────────────────────────────────── */
@@ -694,6 +1124,8 @@
         var listSearch = $('imp-list-search');
 
         function listCells(kind, r, i) {
+            if (kind === 'rooms') return [String(i + 1), r.room, r.building, r.assigned_to, r.class_label, r.when];
+            if (kind === 'equipment') return [String(i + 1), r.item_name, r.category, r.campus, String(r.quantity), r.condition];
             return [String(i + 1), r.is_newly_hired ? 'Newly hired' : r.faculty_id, r.full_name, r.department];
         }
         function drawList() {
@@ -709,7 +1141,10 @@
                 if (shown >= LIST_LIMIT) return;
                 var tr = document.createElement('tr');
                 listCells(listKind, r, matched - 1).forEach(function (t, ci) {
-                    var td = el('td', ci === 0 ? 'imp-td-n' : (ci === 1 ? 'imp-td-mono' : null));
+                    var td = el('td', ci === 0 ? 'imp-td-n'
+                        : (listKind === 'faculty' ? (ci === 1 ? 'imp-td-mono' : null)
+                            : (listKind === 'rooms' && (ci === 1 || ci === 2 || ci === 5) ? 'imp-td-nw'
+                                : (listKind === 'equipment' && ci >= 3 ? 'imp-td-nw' : null))));
                     if (listKind === 'faculty' && ci === 1 && r.is_newly_hired) td.appendChild(el('span', 'imp-pill imp-pill--gold', t));
                     else td.textContent = t;
                     tr.appendChild(td);
@@ -737,7 +1172,7 @@
             listEmpty.textContent = 'Loading\u2026'; listEmpty.classList.remove('hidden');
             listMeta.textContent = '';
             openModal('imp-list-modal');
-            postJson('list', { kind: kind }).then(function (d) {
+            postJson('list', { kind: kind }, kind === 'equipment' ? cfg.ep : undefined).then(function (d) {
                 if (guard(d)) return;
                 if (!d || d.status !== 'success') { listEmpty.textContent = (d && d.error) || 'Could not load the list.'; return; }
                 sync(d);
@@ -816,7 +1251,9 @@
                 var meta = [fmtSize(f.size), f.uploaded_by, fmtDate(f.uploaded_at)].filter(Boolean).join(' \u00b7 ');
                 info.appendChild(el('div', 'imp-file-meta', meta));
                 if (f.status === 'imported' && f.rows !== null) {
-                    var res = num(f.rows) + ' rows \u00b7 ' + num(f.inserted) + ' added \u00b7 ' + num(f.updated) + ' updated' + (f.skipped ? ' \u00b7 ' + num(f.skipped) + ' skipped' : '') + ' \u00b7 ' + (f.import_mode === 'replace' ? 'replaced the list' : 'merged');
+                    var res = filesKind === 'rooms'
+                        ? num(f.rows) + ' rows \u00b7 ' + num(f.inserted) + ' class meetings saved' + (f.skipped ? ' \u00b7 ' + num(f.skipped) + ' skipped' : '') + ' \u00b7 ' + (f.import_mode === 'replace' ? 'replaced every class' : 'merged')
+                        : num(f.rows) + ' rows \u00b7 ' + num(f.inserted) + ' added \u00b7 ' + num(f.updated) + ' updated' + (f.skipped ? ' \u00b7 ' + num(f.skipped) + ' skipped' : '') + ' \u00b7 ' + (f.import_mode === 'replace' ? 'replaced the list' : 'merged');
                     info.appendChild(el('div', 'imp-file-meta imp-file-meta--res', res));
                 }
                 if (!f.available) info.appendChild(el('div', 'imp-file-meta imp-file-meta--bad', 'The stored copy is missing from the server.'));

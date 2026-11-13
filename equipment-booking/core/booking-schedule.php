@@ -5,7 +5,7 @@ declare(strict_types=1);
 /**
  * booking-schedule.php
  *
- * Scheduling rules for equipment borrowing (Borrow Request modal).
+ * Scheduling rules for equipment borrowing (the Borrow modal on the faculty Equipment tab).
  *
  *  - Today bookings:  hourly start time (7:00 AM through 8:00 PM) + duration in hours
  *                     (1 / 2 / 3 / 6). No request letter.
@@ -28,11 +28,16 @@ declare(strict_types=1);
  *  joins tbl_inventory.quantity and the two names would collide.)
  */
 
+require_once __DIR__ . '/../../shared/core/arbitration-config.php';
+
 date_default_timezone_set('Asia/Manila');
 
 final class BookingSchedule
 {
-    // ── Tunable rules ────────────────────────────────────────────────────────
+    // ── Default rules ────────────────────────────────────────────────────────
+    // These are only the DEFAULTS. The live values come from Settings → Arbitration
+    // (tbl_arbitration_config, via ArbitrationConfig) and are read through the getters
+    // below: dayStart(), dayEnd(), lastStart(), maxAhead(), graceMin(), durations() ...
     public const DAY_START            = '07:00';   // earliest start time
     public const LAST_START            = '20:00';   // latest start time
     public const DAY_END              = '21:00';   // bookings must end by this time
@@ -44,12 +49,103 @@ final class BookingSchedule
     private static ?bool $ready = null;
 
     // ═════════════════════════════════════════════════════════════════════════
+    // Live rules (Settings → Arbitration)
+    // ═════════════════════════════════════════════════════════════════════════
+
+    /** @var array<string,mixed>|null */
+    private static ?array $rules = null;
+
+    /** Reads the Arbitration settings once per request. Safe to call again. */
+    public static function loadRules(mysqli $conn): void
+    {
+        if (self::$rules !== null) {
+            return;
+        }
+        self::$rules = self::buildRules(ArbitrationConfig::all($conn));
+    }
+
+    /** @param array<string,mixed> $c typed ArbitrationConfig values */
+    private static function buildRules(array $c): array
+    {
+        $startH = (int)substr((string)$c['equip_day_start'], 0, 2);
+        $endH   = (int)substr((string)$c['equip_day_end'], 0, 2);
+        return [
+            'dayStart'        => (string)$c['equip_day_start'],
+            'dayEnd'          => (string)$c['equip_day_end'],
+            // the last start is one slot before closing, so a booking is at least one hour
+            'lastStart'       => sprintf('%02d:00', max($startH, $endH - 1)),
+            'maxAhead'        => (int)$c['equip_max_advance_days'],
+            'graceMin'        => (int)$c['equip_immediate_grace_min'],
+            'durations'       => array_values(array_map('intval', (array)$c['equip_durations'])),
+            'maxBorrowDays'   => (int)$c['max_borrow_days'],
+            'maxItems'        => (int)$c['max_items_per_borrower'],
+            'maxExtensions'   => (int)$c['max_extensions'],
+            'cancelCutoffMin' => (int)$c['equip_cancel_cutoff_min'],
+            'overdueBlock'    => (bool)$c['rule_overdue_block_enabled'],
+            'letterRequired'  => (bool)$c['rule_missing_doc_block_enabled'],
+        ];
+    }
+
+    /** @return array<string,mixed> */
+    private static function liveRules(): array
+    {
+        return self::$rules ?? self::buildRules(ArbitrationConfig::defaults());
+    }
+
+    public static function dayStart(): string       { return (string)self::liveRules()['dayStart']; }
+    public static function dayEnd(): string         { return (string)self::liveRules()['dayEnd']; }
+    public static function lastStart(): string      { return (string)self::liveRules()['lastStart']; }
+    public static function maxAhead(): int          { return (int)self::liveRules()['maxAhead']; }
+    public static function graceMin(): int          { return (int)self::liveRules()['graceMin']; }
+    /** @return list<int> */
+    public static function durations(): array       { return self::liveRules()['durations']; }
+    public static function maxBorrowDays(): int     { return (int)self::liveRules()['maxBorrowDays']; }
+    public static function maxItems(): int          { return (int)self::liveRules()['maxItems']; }
+    public static function maxExtensions(): int     { return (int)self::liveRules()['maxExtensions']; }
+    public static function cancelCutoffSeconds(): int { return (int)self::liveRules()['cancelCutoffMin'] * 60; }
+    public static function overdueBlock(): bool     { return (bool)self::liveRules()['overdueBlock']; }
+    public static function letterRequired(): bool   { return (bool)self::liveRules()['letterRequired']; }
+
+    /** The rules the Borrow Request screens (JS) need. */
+    public static function metaRules(): array
+    {
+        $r = self::liveRules();
+        return [
+            'dayStart'       => $r['dayStart'],
+            'lastStart'      => $r['lastStart'],
+            'dayEnd'         => $r['dayEnd'],
+            'slot'           => self::SLOT_MINUTES,
+            'maxAhead'       => $r['maxAhead'],
+            'durationHours'  => $r['durations'],
+            'graceMin'       => $r['graceMin'],
+            'maxBorrowDays'  => $r['maxBorrowDays'],
+            'letterRequired' => $r['letterRequired'],
+        ];
+    }
+
+    /** "1, 2, 3 or 6 hours" */
+    public static function durationsLabel(): string
+    {
+        $d = array_map('strval', self::durations());
+        $last = array_pop($d);
+        return ($d ? implode(', ', $d) . ' or ' : '') . $last . ' hours';
+    }
+
+    /** "8:00 PM" for an HH:MM string */
+    private static function clock(string $hhmm): string
+    {
+        $ts = strtotime('2000-01-01 ' . $hhmm . ':00');
+        return $ts ? date('g:i A', $ts) : $hhmm;
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
     // Schema
     // ═════════════════════════════════════════════════════════════════════════
 
     /** Adds the scheduling columns if they are missing. Returns true when they all exist. */
     public static function ensureSchema(mysqli $conn): bool
     {
+        self::loadRules($conn);
         if (self::$ready !== null) {
             return self::$ready;
         }
@@ -126,38 +222,117 @@ final class BookingSchedule
     // Housekeeping (runs on dashboard loads / polls)
     // ═════════════════════════════════════════════════════════════════════════
 
-    /** Time-aware overdue marking + start-of-booking stock activation. */
+    /**
+     * Housekeeping on every dashboard load / poll:
+     *   - a loan that is OUT (On Loan) and past its return moment becomes Overdue;
+     *   - an Approved booking nobody collected, whose borrow period is over, ends as a no-show;
+     *   - Approved bookings that start now take their units off the shelf.
+     */
     public static function tick(mysqli $conn): void
     {
         $ready = self::ensureSchema($conn);
-        $today = date('Y-m-d');
-        $now   = date('H:i:s');
 
         try {
+            self::markOverdue($conn, $ready);
+            self::expireNoShows($conn, $ready);
             if ($ready) {
-                $stmt = $conn->prepare(
-                    "UPDATE tbl_requests SET status = 'Overdue'
-                      WHERE status = 'Approved'
-                        AND (return_date < ?
-                             OR (return_date = ? AND return_time IS NOT NULL AND return_time < ?))"
-                );
-                if ($stmt) {
-                    $stmt->bind_param('sss', $today, $today, $now);
-                    $stmt->execute();
-                    $stmt->close();
-                }
                 self::activateDue($conn);
-            } else {
-                $stmt = $conn->prepare("UPDATE tbl_requests SET status = 'Overdue' WHERE status = 'Approved' AND return_date < ?");
-                if ($stmt) {
-                    $stmt->bind_param('s', $today);
-                    $stmt->execute();
-                    $stmt->close();
-                }
             }
         } catch (\Throwable $e) {
-            error_log('BookingSchedule::tick — ' . $e->getMessage());
+            error_log('BookingSchedule::tick - ' . $e->getMessage());
         }
+    }
+
+    /**
+     * SQL condition (no leading AND) that is true when the return moment has passed.
+     * Time-aware when the booking columns exist: the return time on the return date, or the end of
+     * that day when no time was set. Always three string parameters: today, today, now.
+     */
+    private static function pastReturnSql(bool $ready): string
+    {
+        return $ready
+            ? '(return_date < ? OR (return_date = ? AND return_time IS NOT NULL AND return_time < ?))'
+            : '(return_date < ? AND ? = ? )';
+    }
+
+    /**
+     * Only a loan that is physically OUT (status On Loan: the admin scanned the Claim QR) can be
+     * overdue. Before the On Loan status existed this flagged Approved rows instead, which meant an
+     * item nobody collected showed as overdue while a real unreturned loan never did.
+     */
+    public static function markOverdue(mysqli $conn, ?bool $ready = null): void
+    {
+        $ready = $ready ?? self::ensureSchema($conn);
+        $today = date('Y-m-d');
+        $now   = date('H:i:s');
+        $stmt  = $conn->prepare("UPDATE tbl_requests SET status = 'Overdue' WHERE status = 'On Loan' AND " . self::pastReturnSql($ready));
+        if ($stmt) {
+            // Without the booking columns only the date can be compared; the 2nd/3rd values are equal so the clause reduces to "return_date < today"
+            $a = $today; $b = $ready ? $today : 'x'; $c = $ready ? $now : 'x';
+            $stmt->bind_param('sss', $a, $b, $c);
+            $stmt->execute();
+            $stmt->close();
+        }
+    }
+
+    /**
+     * An Approved booking that was never collected and whose borrow period is now over is a
+     * no-show: it is Cancelled with that reason (not "Overdue": nothing is out), and any units it
+     * had taken off the shelf go back.
+     *
+     * @return int how many bookings were closed by this call
+     */
+    public static function expireNoShows(mysqli $conn, ?bool $ready = null): int
+    {
+        $ready  = $ready ?? self::ensureSchema($conn);
+        $today  = date('Y-m-d');
+        $now    = date('H:i:s');
+        $reason = 'Not collected – the borrow period ended before it was picked up.';
+        $rule   = 'rule_no_show';
+        $closed = 0;
+
+        $sel = $conn->prepare(
+            "SELECT id, equipment_name, borrow_qty, stock_applied FROM tbl_requests
+              WHERE status = 'Approved' AND " . self::pastReturnSql($ready)
+        );
+        if (!$sel) {
+            return 0;
+        }
+        $a = $today; $b = $ready ? $today : 'x'; $c = $ready ? $now : 'x';
+        $sel->bind_param('sss', $a, $b, $c);
+        $sel->execute();
+        $rows = $sel->get_result()->fetch_all(MYSQLI_ASSOC);
+        $sel->close();
+
+        foreach ($rows as $row) {
+            $id  = (int)$row['id'];
+            $upd = $conn->prepare(
+                "UPDATE tbl_requests SET status = 'Cancelled', arbitration_rule = ?, reason = ?, stock_applied = 0
+                  WHERE id = ? AND status = 'Approved'"
+            );
+            if (!$upd) {
+                continue;
+            }
+            $upd->bind_param('ssi', $rule, $reason, $id);
+            $upd->execute();
+            $won = $upd->affected_rows === 1;
+            $upd->close();
+            if (!$won) {
+                continue;   // collected or cancelled a moment ago
+            }
+            $closed++;
+            if ((int)($row['stock_applied'] ?? 0) === 1) {
+                $back = $conn->prepare('UPDATE tbl_inventory SET quantity = quantity + ? WHERE item_name = ?');
+                if ($back) {
+                    $q    = max(1, (int)$row['borrow_qty']);
+                    $name = (string)$row['equipment_name'];
+                    $back->bind_param('is', $q, $name);
+                    $back->execute();
+                    $back->close();
+                }
+            }
+        }
+        return $closed;
     }
 
     /**
@@ -241,7 +416,8 @@ final class BookingSchedule
         $statusSql = $availableOnly ? "AND r.status = 'Available'" : '';
         $res = $conn->query(
             "SELECT r.room_id, r.room_name, r.floor_number, r.floor_label, r.status,
-                    b.building_id, b.name AS building_name, b.wing, c.campus_name
+                    b.building_id, b.building_key, b.image_path AS building_image,
+                    b.name AS building_name, b.wing, c.campus_name
                FROM tbl_rooms r
                JOIN tbl_buildings b ON b.building_id = r.building_id
                JOIN tbl_campuses  c ON c.campus_id   = b.campus_id
@@ -256,6 +432,8 @@ final class BookingSchedule
                 $out[$bid] = [
                     'building_id' => $bid,
                     'name'        => $row['building_name'],
+                    'key'         => (string)($row['building_key'] ?? ''),
+                    'image'       => (string)($row['building_image'] ?? ''),
                     'wing'        => (string)($row['wing'] ?? ''),
                     'campus'      => (string)$row['campus_name'],
                     'floors'      => [],
@@ -430,7 +608,7 @@ final class BookingSchedule
                JOIN tbl_buildings b ON b.building_id = r.building_id
               WHERE rr.faculty_id = ? AND rr.status = 'Approved'
                 AND TIMESTAMP(rr.reservation_date, rr.end_time) > NOW()
-                AND rr.reservation_date <= DATE_ADD(CURDATE(), INTERVAL " . (int)self::MAX_ADVANCE_DAYS . " DAY)
+                AND rr.reservation_date <= DATE_ADD(CURDATE(), INTERVAL " . (int)self::maxAhead() . " DAY)
               ORDER BY rr.reservation_date ASC, rr.start_time ASC
               LIMIT " . (int)$limit
         );
@@ -463,7 +641,7 @@ final class BookingSchedule
                       FROM tbl_inventory i
                       LEFT JOIN (SELECT equipment_name, SUM(borrow_qty) AS out_qty
                                    FROM tbl_requests
-                                  WHERE status IN ('Approved','Overdue') AND stock_applied = 1
+                                  WHERE status IN ('Approved','On Loan','Overdue') AND stock_applied = 1
                                   GROUP BY equipment_name) x ON x.equipment_name = i.item_name
                      WHERE i.is_archived = 0";
         } else {
@@ -471,7 +649,7 @@ final class BookingSchedule
                       FROM tbl_inventory i
                       LEFT JOIN (SELECT equipment_name, COUNT(*) AS out_qty
                                    FROM tbl_requests
-                                  WHERE status IN ('Approved','Overdue')
+                                  WHERE status IN ('Approved','On Loan','Overdue')
                                   GROUP BY equipment_name) x ON x.equipment_name = i.item_name
                      WHERE i.is_archived = 0";
         }
@@ -497,7 +675,7 @@ final class BookingSchedule
                FROM tbl_requests
               WHERE equipment_name = ? AND id <> ?
                 AND (
-                      (status = 'Approved'
+                      (status IN ('Approved','On Loan')
                         AND TIMESTAMP(borrow_date, COALESCE(borrow_time, '00:00:00')) < ?
                         AND TIMESTAMP(return_date, COALESCE(return_time, '23:59:59')) > ?)
                    OR (status = 'Overdue' AND ? < ?)
@@ -540,29 +718,60 @@ final class BookingSchedule
     /** Allowed booking durations, in hours, for both today and future dates. */
     public static function allowedLengths(string $mode): array
     {
-        return self::DURATION_HOURS;
+        return self::durations();
     }
 
     /**
-     * Turns the form values into a booking window (no database access).
+     * The moment a day loan ends: closing time (dayEnd) on the Nth OPEN day, counting the start
+     * day as day 1 and skipping Sundays (nobody can take the item back on a Sunday).
+     */
+    public static function dayLoanEnd(string $startDate, int $days): int
+    {
+        $d    = $startDate;
+        $left = max(1, $days) - 1;
+        while ($left > 0) {
+            $d = date('Y-m-d', strtotime($d . ' +1 day'));
+            if ((int)date('w', strtotime($d)) !== 0) {
+                $left--;
+            }
+        }
+        return strtotime($d . ' ' . self::dayEnd() . ':00');
+    }
+
+    /**
+     * Turns the form values into a booking window (no database access; call loadRules() first).
+     *
+     * $unit = 'hours' : $length hours from the start time, finishing the same day.
+     * $unit = 'days'  : $length open days (1 .. Settings "Longest loan"), returned by closing time
+     *                   on the last day.
+     *
      * @return array{ok:bool,error?:string,data?:array<string,mixed>}
      */
-    public static function window(string $mode, string $date, string $time, int $length): array
+    public static function window(string $mode, string $date, string $time, int $length, string $unit = 'hours'): array
     {
+        $unit = $unit === 'days' ? 'days' : 'hours';
+
         if (!in_array($mode, ['today', 'future'], true)) {
             return ['ok' => false, 'error' => 'Please choose when you need the equipment.'];
         }
         if (!preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $time)) {
             return ['ok' => false, 'error' => 'Please choose a start time.'];
         }
-        if ($time < self::DAY_START || $time > self::LAST_START) {
-            return ['ok' => false, 'error' => 'Start time must be between ' . self::DAY_START . ' and ' . self::LAST_START . '.'];
+        if ($time < self::dayStart() || $time > self::lastStart()) {
+            return ['ok' => false, 'error' => 'Start time must be between ' . self::dayStart() . ' and ' . self::lastStart() . '.'];
         }
         if (substr($time, 3, 2) !== '00') {
             return ['ok' => false, 'error' => 'Start times are available on the hour only.'];
         }
-        if (!in_array($length, self::allowedLengths($mode), true)) {
-            return ['ok' => false, 'error' => 'Please choose a duration of 1, 2, 3, or 6 hours.'];
+        if ($unit === 'hours') {
+            if (!in_array($length, self::allowedLengths($mode), true)) {
+                return ['ok' => false, 'error' => 'Please choose a duration of ' . self::durationsLabel() . '.'];
+            }
+        } else {
+            $maxDays = self::maxBorrowDays();
+            if ($length < 1 || $length > $maxDays) {
+                return ['ok' => false, 'error' => 'Equipment can be borrowed for up to ' . $maxDays . ' day' . ($maxDays === 1 ? '' : 's') . '.'];
+            }
         }
 
         $today = date('Y-m-d');
@@ -570,17 +779,13 @@ final class BookingSchedule
             if ((int)date('w') === 0) {
                 return ['ok' => false, 'error' => 'Borrowing equipment today is unavailable on Sundays. Please choose a later date.'];
             }
-            if (date('H:i') > self::LAST_START) {
-                return ['ok' => false, 'error' => 'Same-day borrowing is unavailable after 8:00 PM. Please choose a later date.'];
+            if (date('H:i') > self::lastStart()) {
+                return ['ok' => false, 'error' => 'Same-day borrowing is unavailable after ' . self::clock(self::lastStart()) . '. Please choose a later date.'];
             }
             $startDate = $today;
             $startTs   = strtotime($startDate . ' ' . $time . ':00');
             if ($startTs < time() - 10 * 60) {
                 return ['ok' => false, 'error' => 'That start time has already passed.'];
-            }
-            $endTs = $startTs + $length * 3600;
-            if ($endTs > strtotime($today . ' ' . self::DAY_END . ':00')) {
-                return ['ok' => false, 'error' => 'Today bookings must end by ' . self::DAY_END . '.'];
             }
         } else {
             if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $date, $dateParts) ||
@@ -589,32 +794,39 @@ final class BookingSchedule
             }
             $startDate = $date;
             $tomorrow  = date('Y-m-d', strtotime('+1 day'));
-            $latest    = date('Y-m-d', strtotime('+' . self::MAX_ADVANCE_DAYS . ' days'));
+            $latest    = date('Y-m-d', strtotime('+' . self::maxAhead() . ' days'));
             if ($startDate < $tomorrow) {
                 return ['ok' => false, 'error' => 'Later bookings start tomorrow or after. Use "Today" for same-day use.'];
             }
             if ($startDate > $latest) {
-                return ['ok' => false, 'error' => 'You can only book up to two weeks ahead (latest start: ' . date('M j, Y', strtotime($latest)) . ').'];
+                return ['ok' => false, 'error' => 'You can only book up to ' . self::maxAhead() . ' days ahead (latest start: ' . date('M j, Y', strtotime($latest)) . ').'];
             }
             if ((int)date('w', strtotime($startDate)) === 0) {
                 return ['ok' => false, 'error' => 'Equipment borrowing is unavailable on Sundays. Please choose another date.'];
             }
             $startTs = strtotime($startDate . ' ' . $time . ':00');
-            $endTs   = $startTs + $length * 3600;
         }
-        if ($endTs > strtotime($startDate . ' ' . self::DAY_END . ':00')) {
-            return ['ok' => false, 'error' => 'Bookings must end by ' . self::DAY_END . '.'];
+
+        if ($unit === 'days') {
+            $endTs = self::dayLoanEnd($startDate, $length);
+        } else {
+            $endTs = $startTs + $length * 3600;
+            if ($endTs > strtotime($startDate . ' ' . self::dayEnd() . ':00')) {
+                return ['ok' => false, 'error' => ($mode === 'today' ? 'Today bookings' : 'Bookings') . ' must end by ' . self::dayEnd() . '.'];
+            }
         }
 
         return ['ok' => true, 'data' => [
             'mode'        => $mode,
+            'unit'        => $unit,
+            'length'      => $length,
             'borrow_date' => date('Y-m-d', $startTs),
             'borrow_time' => date('H:i:s', $startTs),
             'return_date' => date('Y-m-d', $endTs),
             'return_time' => date('H:i:s', $endTs),
             'start_ts'    => date('Y-m-d H:i:s', $startTs),
             'end_ts'      => date('Y-m-d H:i:s', $endTs),
-            'immediate'   => $mode === 'today' && $startTs <= time() + self::IMMEDIATE_GRACE_MIN * 60,
+            'immediate'   => $mode === 'today' && $startTs <= time() + self::graceMin() * 60,
         ]];
     }
 
@@ -624,9 +836,11 @@ final class BookingSchedule
      */
     public static function parse(mysqli $conn, array $post, string $item, int $qty): array
     {
+        self::loadRules($conn);
         $mode   = (string)($post['booking_mode'] ?? '');
         $length = (int)($post['duration'] ?? 0);
-        $w = self::window($mode, trim((string)($post['borrow_date'] ?? '')), trim((string)($post['start_time'] ?? '')), $length);
+        $unit   = (string)($post['duration_unit'] ?? 'hours');
+        $w = self::window($mode, trim((string)($post['borrow_date'] ?? '')), trim((string)($post['start_time'] ?? '')), $length, $unit);
         if (!$w['ok']) {
             return $w;
         }
@@ -655,16 +869,61 @@ final class BookingSchedule
         return $w;
     }
 
-    /** First start date (on/after $fromDate, within the booking window) where $qty units are free. */
-    public static function earliestFreeDate(mysqli $conn, string $item, int $qty, string $time, int $lengthHours, string $fromDate): ?string
+    /**
+     * "Items per borrower" (Settings → Arbitration → Borrowing rules): the units this faculty already
+     * holds or has requested that overlap the new window, plus the new quantity, must not pass the
+     * limit. An Overdue loan still counts. $beforeId limits the count to requests filed BEFORE that
+     * request id, so the items of one cart are counted in the order they were filed.
+     * Returns the message to show, or null when it is within the limit.
+     */
+    public static function itemsLimitError(mysqli $conn, string $facultyId, int $qty, string $startTs, string $endTs, ?int $beforeId = null): ?string
     {
-        $latest = date('Y-m-d', strtotime('+' . self::MAX_ADVANCE_DAYS . ' days'));
+        self::loadRules($conn);
+        $max = self::maxItems();
+        $sql = "SELECT COALESCE(SUM(borrow_qty), 0) AS held
+                  FROM tbl_requests
+                 WHERE faculty_id = ?
+                   AND (
+                         (status IN ('Waiting','Approved','On Loan')
+                           AND TIMESTAMP(borrow_date, COALESCE(borrow_time, '00:00:00')) < ?
+                           AND TIMESTAMP(return_date, COALESCE(return_time, '23:59:59')) > ?)
+                      OR status = 'Overdue'
+                       )";
+        if ($beforeId !== null) {
+            $sql .= ' AND id < ?';
+        }
+        $st = $conn->prepare($sql);
+        if (!$st) {
+            return null;
+        }
+        if ($beforeId !== null) {
+            $st->bind_param('sssi', $facultyId, $endTs, $startTs, $beforeId);
+        } else {
+            $st->bind_param('sss', $facultyId, $endTs, $startTs);
+        }
+        $st->execute();
+        $held = (int)($st->get_result()->fetch_assoc()['held'] ?? 0);
+        $st->close();
+
+        if ($held + $qty > $max) {
+            $unitWord = $max === 1 ? 'item' : 'items';
+            return $held > 0
+                ? 'You can have at most ' . $max . ' ' . $unitWord . ' at a time, and you already have ' . $held . ' booked or requested for that time.'
+                : 'You can borrow at most ' . $max . ' ' . $unitWord . ' at a time.';
+        }
+        return null;
+    }
+
+    /** First start date (on/after $fromDate, within the booking window) where $qty units are free. */
+    public static function earliestFreeDate(mysqli $conn, string $item, int $qty, string $time, int $length, string $fromDate, string $unit = 'hours'): ?string
+    {
+        $latest = date('Y-m-d', strtotime('+' . self::maxAhead() . ' days'));
         for ($d = $fromDate; $d <= $latest; $d = date('Y-m-d', strtotime($d . ' +1 day'))) {
             if ((int)date('w', strtotime($d)) === 0) {
                 continue;
             }
             $start = strtotime($d . ' ' . $time . ':00');
-            $end   = $start + $lengthHours * 3600;
+            $end   = $unit === 'days' ? self::dayLoanEnd($d, $length) : $start + $length * 3600;
             if (self::freeUnits($conn, $item, date('Y-m-d H:i:s', $start), date('Y-m-d H:i:s', $end)) >= $qty) {
                 return $d;
             }
@@ -683,129 +942,5 @@ final class BookingSchedule
         }
         $ts = strtotime('2000-01-01 ' . $t);
         return $ts ? date('g:i A', $ts) : '';
-    }
-
-    // ═════════════════════════════════════════════════════════════════════════
-    // HTML helpers used by the Borrow Request modal
-    // ═════════════════════════════════════════════════════════════════════════
-
-    private static function h(string $s): string
-    {
-        return htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
-    }
-
-    /**
-     * Room picker field: a button that shows the chosen room and opens the "Choose a room"
-     * modal (#roomPickModal in faculty-dashboard.php, one shared by every form). The modal is
-     * built in the browser from window.BOOKING_META.rooms, which holds only rooms the admin has
-     * left Available, and marks the ones another faculty has reserved for the chosen window.
-     * The chosen value goes in the hidden room_id field: a room id, or "outside".
-     */
-    public static function renderRoomPicker(string $id): string
-    {
-        $id = self::h($id);
-        return '
-        <div class="form-group bm-room" data-bm-room>
-            <span class="form-label" id="' . $id . 'Label">Room</span>
-            <input type="hidden" name="room_id" value="" data-bm-room-input>
-            <button type="button" class="bm-room-trigger" id="' . $id . '" data-bm-room-trigger
-                aria-haspopup="dialog" aria-labelledby="' . $id . 'Label ' . $id . 'Value">
-                <span class="bm-room-ico" aria-hidden="true"><span class="material-symbols-outlined">meeting_room</span></span>
-                <span class="bm-room-value" id="' . $id . 'Value" data-bm-room-value><span class="bm-room-ph">Choose a room</span></span>
-                <span class="material-symbols-outlined bm-room-chev" aria-hidden="true">chevron_right</span>
-            </button>
-            <p class="bm-hint" data-bm-room-hint hidden></p>
-        </div>';
-    }
-
-    /**
-     * The shared "when / how long / how many" block. JS (faculty-dashboard.js, BorrowSchedule)
-     * fills the time list and the length chips from window.BOOKING_META.
-     * A "Later date" booking also shows an optional request letter field (never shown for "Today").
-     */
-    public static function renderSchedule(string $p): string
-    {
-        $p = self::h($p);
-        $qty = '
-                <div class="form-group bm-qty" data-bm-future-only hidden>
-                    <span class="form-label">Quantity</span>
-                    <div class="bm-stepper" data-bm-qty-wrap>
-                        <button type="button" data-bm-qty-dec aria-label="Decrease quantity"><span class="material-symbols-outlined">remove</span></button>
-                        <input type="number" name="qty" value="1" min="1" max="1" inputmode="numeric" data-bm-qty aria-label="Quantity">
-                        <button type="button" data-bm-qty-inc aria-label="Increase quantity"><span class="material-symbols-outlined">add</span></button>
-                    </div>
-                    <p class="bm-hint" data-bm-qty-hint></p>
-                </div>';
-        return '
-        <div class="bm-sched" data-bm-sched id="' . $p . 'Sched">
-            <input type="hidden" name="booking_mode" value="today" data-bm-mode-input>
-            <input type="hidden" name="duration" value="" data-bm-duration-input>
-
-            <div class="form-group">
-                <span class="form-label">When do you need it?</span>
-                <div class="bm-seg" role="tablist" aria-label="When do you need it?">
-                    <span class="bm-seg-option" data-bm-today-wrapper role="presentation">
-                        <button type="button" class="bm-seg-btn active" role="tab" aria-selected="true" data-bm-mode="today">
-                            <span class="material-symbols-outlined">bolt</span> Today
-                            <span class="material-symbols-outlined bm-mode-info" data-bm-today-info aria-hidden="true" hidden>error</span>
-                        </button>
-                    </span>
-                    <button type="button" class="bm-seg-btn" role="tab" aria-selected="false" data-bm-mode="future">
-                        <span class="material-symbols-outlined">event</span> Later date
-                    </button>
-                </div>
-            </div>
-
-            <label class="bm-switch-row" data-bm-outnow hidden>
-                <span class="bm-switch-text">
-                    <strong>Out right now</strong>
-                    <small>Book it ahead for a later date. It is checked against the schedule, not today\'s stock.</small>
-                </span>
-                <span class="bm-switch">
-                    <input type="checkbox" data-bm-outnow-toggle checked>
-                    <span class="bm-switch-track" aria-hidden="true"></span>
-                </span>
-            </label>
-
-            <div class="bm-sched-fields" data-bm-fields>
-                <div class="bm-when">
-                    <div class="form-group bm-when-date" data-bm-future-only hidden>
-                        <label class="form-label" for="' . $p . 'Date">Borrow date</label>
-                        <select id="' . $p . 'Date" name="borrow_date" class="form-input bm-select" data-bm-date></select>
-                    </div>
-                    <div class="form-group bm-when-time">
-                        <label class="form-label" for="' . $p . 'Time">Start time</label>
-                        <select id="' . $p . 'Time" name="start_time" class="form-input bm-select" data-bm-time></select>
-                    </div>
-                </div>
-                <p class="bm-hint bm-date-hint" data-bm-date-hint data-bm-future-only hidden></p>
-
-                <div class="form-group">
-                    <span class="form-label" data-bm-length-label>For how long?</span>
-                    <div class="bm-chips" data-bm-chips role="radiogroup" aria-label="For how long?"></div>
-                </div>
-' . $qty . '
-
-                <div class="bm-summary" data-bm-summary aria-live="polite"></div>
-                <p class="bm-avail" data-bm-avail aria-live="polite"></p>
-            </div>
-
-            <div class="form-group bm-letter" data-bm-future-only hidden>
-                <span class="form-label">Request letter <span class="bm-opt">Recommended</span></span>
-                <label class="bm-drop" for="request_document">
-                    <span class="material-symbols-outlined bm-drop-icon" aria-hidden="true">upload_file</span>
-                    <span class="bm-drop-text">
-                        <strong data-bm-drop-title>Choose a file or drag it here</strong>
-                        <small>PDF, JPG, PNG or WEBP &middot; max 5 MB</small>
-                    </span>
-                    <input type="file" id="request_document" name="request_document"
-                        accept=".pdf,.jpg,.jpeg,.png,.webp">
-                </label>
-                <button type="button" class="pslc-trigger" data-letter-camera="request_document">
-                    <span class="material-symbols-outlined" aria-hidden="true">photo_camera</span> Take a photo of the letter
-                </button>
-                <p class="bm-hint">Recommended for bookings on a later date. You can still submit without one.</p>
-            </div>
-        </div>';
     }
 }

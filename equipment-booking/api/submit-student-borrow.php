@@ -113,7 +113,7 @@ if ($booking_mode === 'future' && $is_multipart && isset($_FILES['document'])) {
     }
 }
 
-// ── Insert as Waiting — the auto-approve tick will approve after buffer expires ──
+// ── Insert as Waiting — it is decided right below (core/request-decision.php) ──
 // Tokens and inventory decrement happen at approval time (auto-approve-tick.php
 // or admin-override.php), not at insert time.
 $ins = $conn->prepare(
@@ -163,6 +163,16 @@ if ($letter_path !== null) {
     }
 }
 
+// Decide it now, same rules as every other way of submitting (core/request-decision.php):
+//   same day   -> Approved (with its QR codes) or Declined, on the spot
+//   later date -> Waiting for an admin; declined automatically at 12:01 AM on the borrow date if nobody decides
+require_once __DIR__ . '/../core/request-decision.php';
+$decision   = equipment_decide_on_submit($conn, [(int)$request_id])[(int)$request_id] ?? ['status' => 'Waiting', 'reason' => ''];
+$req_status = $decision['status'];
+$tokens     = $req_status === 'Approved'
+    ? equipment_request_tokens($conn, (int)$request_id)
+    : ['claim_token' => null, 'return_token' => null];
+
 // ── Mark code as used — only on the last item of a multi-item submission ──────
 // JS sends is_last_item=true on the final request. For intermediate items the
 // code stays available so the next item in the sequence can still be verified.
@@ -180,26 +190,46 @@ if ($is_last_item) {
 
 
 // ── Email 2: Notify faculty that borrowing was successfully completed ──────
+// What the email says depends on the real outcome
+if ($req_status === 'Approved') {
+    $email_subject_word = 'Borrowing Confirmed';
+    $email_sentence     = 'The equipment borrowing request you authorized has been successfully submitted and approved.';
+    $email_status_label = 'Approved';
+    $email_status_color = '#2e7d32';
+} elseif ($req_status === 'Declined') {
+    $email_subject_word = 'Request Declined';
+    $email_sentence     = 'The equipment borrowing request you authorized was declined: ' . $decision['reason'];
+    $email_status_label = 'Declined';
+    $email_status_color = '#c62828';
+} else {
+    $email_subject_word = 'Request Submitted';
+    $email_sentence     = 'The equipment borrowing request you authorized was submitted. It is for a later date, so an admin will review it. If nobody decides, it is declined automatically at 12:01 AM on the borrow date.';
+    $email_status_label = 'Waiting for admin review';
+    $email_status_color = '#b26a00';
+}
+
 $fac_mail_stmt2 = $conn->prepare("SELECT email, fullname FROM tbl_users WHERE faculty_id = ? LIMIT 1");
 $fac_mail_stmt2->bind_param('s', $faculty_id);
 $fac_mail_stmt2->execute();
 $fac_mail_row2 = $fac_mail_stmt2->get_result()->fetch_assoc();
 $fac_mail_stmt2->close();
 
-if ($fac_mail_row2 && !empty($fac_mail_row2['email'])) {
+require_once __DIR__ . '/../../notifications/core/preferences.php';
+// Respect the faculty's Notification Preferences (Equipment requests / master switch).
+if ($fac_mail_row2 && !empty($fac_mail_row2['email']) && notif_family_enabled($conn, 'faculty', (string)$faculty_id, 'equipment')) {
     require_once __DIR__ . '/../../shared/core/mailer.php';
-    $email_subject2 = 'PUPSync: Borrowing Confirmed — ' . $equipment;
+    $email_subject2 = 'PUPSync: ' . $email_subject_word . ' — ' . $equipment;
     $email_body2 = '
     <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;border:1px solid #e0e0e0;border-radius:12px;overflow:hidden;">
         <div style="background:#800000;padding:24px 28px;">
-            <h2 style="color:#fff;margin:0;font-size:1.2rem;">PUPSync · Borrowing Confirmed</h2>
+            <h2 style="color:#fff;margin:0;font-size:1.2rem;">PUPSync · ' . htmlspecialchars($email_subject_word) . '</h2>
         </div>
         <div style="padding:28px;">
             <p style="margin:0 0 16px;color:#333;font-size:.95rem;">
                 Hello <strong>' . htmlspecialchars($fac_mail_row2['fullname']) . '</strong>,
             </p>
             <p style="margin:0 0 20px;color:#333;font-size:.95rem;">
-                The equipment borrowing request you authorized has been successfully submitted and approved.
+                ' . htmlspecialchars($email_sentence) . '
             </p>
             <table style="width:100%;border-collapse:collapse;font-size:.9rem;">
                 <tr style="background:#f9f5f5;">
@@ -228,7 +258,7 @@ if ($fac_mail_row2 && !empty($fac_mail_row2['email'])) {
                 </tr>
                 <tr style="background:#f9f5f5;">
                     <td style="padding:10px 14px;color:#666;">Status</td>
-                    <td style="padding:10px 14px;color:#2e7d32;font-weight:700;">✓ Approved</td>
+                    <td style="padding:10px 14px;color:' . $email_status_color . ';font-weight:700;">' . htmlspecialchars($email_status_label) . '</td>
                 </tr>
             </table>
             <p style="margin:20px 0 0;font-size:.8rem;color:#999;">
@@ -248,6 +278,8 @@ $conn->close();
 echo json_encode([
     'success'      => true,
     'request_id'   => $request_id,
-    'return_token' => null,
-    'claim_token'  => null,
+    'status'       => $req_status,
+    'reason'       => $decision['reason'],
+    'return_token' => $tokens['return_token'],
+    'claim_token'  => $tokens['claim_token'],
 ]);

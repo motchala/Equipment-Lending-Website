@@ -3,24 +3,34 @@ declare(strict_types=1);
 /**
  * submit-cart-borrow.php
  *
- * Multi-item personal borrow for the faculty equipment cart.
- * Accepts JSON, checks each item against BookingSchedule (time window, availability, room
- * conflicts) and files it as 'Waiting'. The ArbitrationEngine is NOT run here: a Borrow All
- * request is always left for an admin to approve or decline (unlike the single-item same-day
- * request in faculty-equipment-handlers.php, which the engine decides on the spot).
- * Returns JSON — no page redirect, enabling live UI updates.
+ * The one endpoint behind the faculty Equipment tab's borrow flow (pick one or many items,
+ * then fill in the Borrow modal). Checks each item against BookingSchedule (time window,
+ * availability, room conflicts), files each one as 'Waiting', then decides them right away with the
+ * same rules as every other way of borrowing (core/request-decision.php):
+ *   - same day   : decided on the spot. Items approved together share ONE Claim QR.
+ *   - later date : waits for an admin; declined automatically at 12:01 AM on the borrow date if
+ *                  nobody decides.
+ * Returns JSON - no page redirect, enabling live UI updates.
  *
- * POST JSON fields:
- *   csrf_token  string
- *   room_id     string   (from RoomPicker, may be empty for "Outside")
- *   items       array of { name: string, qty: int }
- *   booking_mode string  "today" or "future"
- *   borrow_date  string  "YYYY-MM-DD" (future mode)
- *   time_slot    string  "HH:MM" start time
- *   duration     int     hours (1, 2, 3, or 6)
+ * Accepts either:
+ *   - application/json                      (no request letter), or
+ *   - multipart/form-data with a `payload` field holding the same JSON, plus an optional
+ *     `request_document` file (the request letter; only kept for a later-date booking).
+ *
+ * Payload fields:
+ *   csrf_token   string
+ *   room_id      string   room id from the room picker, or "outside"
+ *   items        array of { name: string, qty: int }
+ *   booking_mode string   "today" or "future"
+ *   borrow_date  string   "YYYY-MM-DD" (future mode)
+ *   time_slot    string   "HH:MM" start time
+ *   duration     int      length: hours (the ones offered in Settings → Arbitration) or days
+ *   duration_unit string  "hours" (default) or "days" (up to the longest loan)
+ *   collector_type "faculty" | "student", collector_name string (student only)
  *
  * Returns:
- *   { ok: true,  submitted: [{name, request_id, status}], failed: [{name, error}] }
+ *   { ok: true,  submitted: [{name, request_id, status, reason}], failed: [{name, error}] }
+ *                status is the real outcome: Approved | Waiting | Declined
  *   { ok: false, error: string }
  *
  * Depth 2 → config prefix: __DIR__ . '/../../config/…'
@@ -50,7 +60,9 @@ require_once __DIR__ . '/../../config/csrf.php';
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../core/booking-schedule.php';
 
-$body = json_decode((string)file_get_contents('php://input'), true);
+$is_multipart = stripos((string)($_SERVER['CONTENT_TYPE'] ?? ''), 'multipart/form-data') !== false;
+$raw_body     = $is_multipart ? (string)($_POST['payload'] ?? '') : (string)file_get_contents('php://input');
+$body         = json_decode($raw_body, true);
 if (!is_array($body)) {
     http_response_code(400);
     echo json_encode(['ok' => false, 'error' => 'Invalid request body.']);
@@ -84,14 +96,14 @@ if (!$user) {
 $faculty_name = (string)$user['fullname'];
 $faculty_id   = (string)$user['faculty_id'];
 
-// Preserve the selected room label for display; "Outside" has no room ID.
-$room_label = trim((string)($body['room'] ?? ''));
-if ($room_label === '') {
-    echo json_encode(['ok' => false, 'error' => 'Please enter a room or location.']);
+// Where: a live room record (same tables as Facilities), or "outside" (no room).
+$rr = BookingSchedule::resolveRoom($conn, (string)($body['room_id'] ?? ''));
+if (!$rr['ok']) {
+    echo json_encode(['ok' => false, 'error' => $rr['error']]);
     exit;
 }
-$room    = $room_label;
-$room_id = null;
+$room    = $rr['label'];
+$room_id = $rr['id'];   // null = "Outside"
 
 // Collector info — who will physically pick up the equipment
 $collector_type = (string)($body['collector_type'] ?? 'faculty');
@@ -117,14 +129,11 @@ if (!is_array($raw_items) || empty($raw_items)) {
 // Build a pseudo-$_POST array that BookingSchedule::parse() expects.
 $pseudo_post = [
     'booking_mode' => (string)($body['booking_mode'] ?? ''),
-    'start_time'   => (string)($body['time_slot'] ?? date('H:i')),
+    'start_time'   => (string)($body['time_slot'] ?? $body['start_time'] ?? ''),
     'duration'     => (int)($body['duration'] ?? 1),
+    'duration_unit' => ((string)($body['duration_unit'] ?? 'hours')) === 'days' ? 'days' : 'hours',
     'borrow_date'  => (string)($body['borrow_date'] ?? ''),
 ];
-// room_id from the room picker (nullable — "outside" maps to null)
-$raw_room_id = trim((string)($body['room_id'] ?? ''));
-$room_id     = ($raw_room_id !== '' && $raw_room_id !== 'outside') ? (int)$raw_room_id : null;
-
 $submitted = [];
 $failed    = [];
 $cart_names = [];
@@ -136,6 +145,18 @@ foreach ($raw_items as $raw) {
         }
     }
 }
+// ── Optional request letter: recommended for a LATER date, ignored for a same-day request ──
+require_once __DIR__ . '/../../shared/core/document-helpers.php';
+$letter_path = null;
+if ($pseudo_post['booking_mode'] === 'future' && $is_multipart && isset($_FILES['request_document'])) {
+    $letter_err  = null;
+    $letter_path = ps_store_request_letter($_FILES['request_document'], 'uploads/request_letters', $faculty_id, $letter_err);
+    if ($letter_path === null && $letter_err !== null) {
+        echo json_encode(['ok' => false, 'error' => $letter_err]);
+        exit;
+    }
+}
+
 $batch_id = null;
 if (count($cart_names) > 1) {
     $uuid = bin2hex(random_bytes(16));
@@ -181,7 +202,7 @@ foreach ($raw_items as $raw) {
         continue;
     }
     $stmt_ins->bind_param(
-        'sssssssssiiisss',
+        'sssssssssiissss',   // borrow_qty + room_id are ints; booking_mode is TEXT ('today'/'future')
         $faculty_name,
         $faculty_id,
         $name,
@@ -206,8 +227,48 @@ foreach ($raw_items as $raw) {
     $request_id = (int)$conn->insert_id;
     $stmt_ins->close();
 
-    // Request stays Waiting — admin/super admin reviews and approves.
-    $submitted[] = ['name' => $name, 'request_id' => $request_id, 'status' => 'Waiting'];
+    if ($letter_path !== null) {
+        $stmt_doc = $conn->prepare('UPDATE tbl_requests SET document_path = ? WHERE id = ?');
+        if ($stmt_doc) {
+            $stmt_doc->bind_param('si', $letter_path, $request_id);
+            $stmt_doc->execute();
+            $stmt_doc->close();
+        }
+    }
+
+    $submitted[] = ['name' => $name, 'request_id' => $request_id, 'status' => 'Waiting', 'reason' => ''];
+}
+
+// ── Decide every item of the cart now (same rules as every other way of submitting) ──────
+//   same day   -> Approved (items of one cart share ONE Claim QR) or Declined, on the spot
+//   later date -> Waiting for an admin; declined automatically at 12:01 AM on the borrow date
+//                if nobody decides
+require_once __DIR__ . '/../core/request-decision.php';
+$decisions = equipment_decide_on_submit($conn, array_column($submitted, 'request_id'));
+foreach ($submitted as &$s) {
+    $d = $decisions[(int)$s['request_id']] ?? null;
+    if ($d) {
+        $s['status'] = $d['status'];
+        $s['reason'] = $d['reason'];
+    }
+}
+unset($s);
+
+// An item declined at the moment of submitting is not saved (existing rule): report it as "could not be
+// filed" with the reason, so the Borrow modal keeps it selected and shows why, exactly like a failed check.
+$filed = [];
+foreach ($submitted as $s) {
+    if ($s['status'] === 'Declined') {
+        $failed[] = ['name' => $s['name'], 'error' => $s['reason'] !== '' ? $s['reason'] : 'This request could not be accepted.'];
+    } else {
+        $filed[] = $s;
+    }
+}
+$submitted = $filed;
+
+// Nothing was filed: do not leave an orphaned letter file behind.
+if ($letter_path !== null && !$submitted) {
+    @unlink(dirname(__DIR__, 2) . '/' . $letter_path);
 }
 
 echo json_encode([

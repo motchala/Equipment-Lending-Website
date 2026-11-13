@@ -102,6 +102,13 @@ $rooms_archived = ps_load_archived_rooms($conn);
 require_once __DIR__ . '/room-expiry.php';
 $rooms_expired_count = ps_room_expire_unreviewed($conn);   // undecided Waiting reservations past 12:01 AM of their day become Declined
 
+// Cancelled tab needs "when" and "by whom". cancelled_at is missing on very old databases, so ask first.
+$rr_cancelled_col = 'NULL';
+$_rr_ca_chk = $conn->query("SHOW COLUMNS FROM tbl_room_reservations LIKE 'cancelled_at'");
+if ($_rr_ca_chk && $_rr_ca_chk->num_rows > 0) {
+    $rr_cancelled_col = 'rr.cancelled_at';
+}
+
 $admin_room_reservations_result = $conn->query(
     "SELECT rr.id, rr.room_id, rr.reservation_date,
             rr.start_time, rr.end_time,
@@ -115,7 +122,11 @@ $admin_room_reservations_result = $conn->query(
             COALESCE(r.floor_label, CONCAT(r.floor_number, 'F')) AS floor_label,
             c.campus_name,
             ral.rule_applied AS arb_rule,
-            ral.reason       AS arb_reason
+            ral.reason       AS arb_reason,
+            " . $rr_cancelled_col . " AS cancelled_at,
+            EXISTS (SELECT 1 FROM tbl_room_arbitration_log fc
+                     WHERE fc.reservation_id = rr.id
+                       AND fc.rule_applied = 'faculty_cancelled') AS cancelled_by_requester
        FROM tbl_room_reservations rr
        JOIN tbl_rooms     r ON r.room_id     = rr.room_id
        JOIN tbl_buildings b ON b.building_id = r.building_id

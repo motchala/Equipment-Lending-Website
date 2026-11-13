@@ -27,10 +27,6 @@ require __DIR__ . '/equipment-booking/core/faculty-equipment-data.php';
 
 $masked_email       = maskEmail($db_email);
 $masked_backup      = maskEmail($db_backup_email);
-$dob_display        = $db_dob ? date('F j, Y', strtotime($db_dob)) : '';
-$dob_locked         = !empty($db_dob);
-$gender_locked      = !empty($db_gender);
-$nationality_locked = !empty($db_nationality);
 $backup_locked      = !empty($db_backup_email);
 $department_locked  = !empty($db_department);
 $profile_pic_file = basename(str_replace('\\', '/', trim($db_profile_pic)));
@@ -74,8 +70,8 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
 <?php require __DIR__ . '/room-reservation/views/faculty-rooms-modals.php'; ?>
 <?php require __DIR__ . '/equipment-booking/views/faculty-equipment-modals-2.php'; ?>
 <?php require __DIR__ . '/settings/views/faculty-modals.php'; ?>
-<?php require __DIR__ . '/settings/views/faculty-scripts.php'; ?>
 <?php require __DIR__ . '/shared/views/faculty-shell-overlays.php'; ?>
+<?php require __DIR__ . '/service-survey/views/faculty-modal.php'; /* anonymous service survey pop-up */ ?>
 <?php require __DIR__ . '/shared/views/faculty-shell-scripts.php'; ?>
 </body>
 

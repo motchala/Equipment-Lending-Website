@@ -3,8 +3,8 @@ require_once __DIR__ . '/../../config/security-headers.php';
 
 /**
  * update-profile.php
- * AJAX endpoint — handles profile updates, password changes, backup email, profile pictures,
- * academic info, contact details, and emergency contact.
+ * AJAX endpoint — handles account updates (name, department), password changes, backup email,
+ * faculty ID and profile pictures.
  * Place this file inside: includes/update-profile.php
  */
 require_once __DIR__ . '/../../config/session.php';
@@ -30,7 +30,6 @@ $action = trim($_POST['action'] ?? '');
    Saves, in ONE request and with no extra confirmation step:
      - fullname    always editable
      - department  can be chosen ONCE; locked after that (same rule as the Faculty ID)
-     - phone       a Philippine mobile number, stored as "09XX XXX XXXX"; may be cleared
    The email address is the sign-in ID and is managed by the administrator, so it is
    deliberately NOT editable here.
 ══════════════════════════════════════════════════════════════════ */
@@ -44,7 +43,7 @@ if ($action === 'save_account') {
 
     $faculty_id = (string)$_SESSION['faculty_id'];
 
-    $sel = $conn->prepare('SELECT fullname, department, phone FROM tbl_users WHERE faculty_id = ? LIMIT 1');
+    $sel = $conn->prepare('SELECT fullname, department FROM tbl_users WHERE faculty_id = ? LIMIT 1');
     if (!$sel) {
         $fail('Could not load your account. Please try again.');
     }
@@ -57,7 +56,6 @@ if ($action === 'save_account') {
     }
     $cur_name  = (string)($cur['fullname'] ?? '');
     $cur_dept  = (string)($cur['department'] ?? '');
-    $cur_phone = (string)($cur['phone'] ?? '');
 
     $set    = [];   // column => new value (null clears the column)
     $errors = [];
@@ -95,22 +93,6 @@ if ($action === 'save_account') {
         }
     }
 
-    /* ── Mobile number ── */
-    $in_phone = trim((string)($_POST['phone'] ?? $cur_phone));
-    if ($in_phone !== $cur_phone) {
-        if ($in_phone === '') {
-            $set['phone'] = null;
-        } else {
-            $norm = faculty_phone_normalize($in_phone);
-            if ($norm === null) {
-                $fail('Enter a valid mobile number, like 09XX XXX XXXX.', 'phone');
-            }
-            if ($norm !== $cur_phone) {
-                $set['phone'] = $norm;
-            }
-        }
-    }
-
     if (!$set) {
         echo json_encode(['success' => true, 'changed' => false, 'msg' => 'No changes to save.']);
         exit;
@@ -144,7 +126,6 @@ if ($action === 'save_account') {
 
     $new_name  = $set['fullname']   ?? $cur_name;
     $new_dept  = $set['department'] ?? $cur_dept;
-    $new_phone = array_key_exists('phone', $set) ? (string)($set['phone'] ?? '') : $cur_phone;
 
     $parts    = preg_split('/\s+/u', trim($new_name)) ?: [];
     $initials = mb_strtoupper(mb_substr($parts[0] ?? '', 0, 1));
@@ -162,179 +143,8 @@ if ($action === 'save_account') {
             'initials'          => $initials,
             'department'        => $new_dept,
             'department_locked' => $new_dept !== '',
-            'phone'             => $new_phone,
-            'phone_display'     => faculty_phone_display($new_phone),
         ],
     ]);
-    exit;
-}
-
-/* ══════════════════════════════════════════════════════════════════
-   ACTION: save_profile
-   Updates fullname (always), and dob / gender / nationality only
-   if they have NOT been set before (one-time-lock rule).
-══════════════════════════════════════════════════════════════════ */
-if ($action === 'save_profile') {
-    $fullname = trim($_POST['fullname'] ?? '');
-
-    if (empty($fullname)) {
-        echo json_encode(['success' => false, 'msg' => 'Full name cannot be empty.']);
-        exit;
-    }
-    if (strlen($fullname) > 120) {
-        echo json_encode(['success' => false, 'msg' => 'Name is too long (max 120 chars).']);
-        exit;
-    }
-    // Strip anything that isn't letters, spaces, dots, hyphens, or apostrophes
-    if (!preg_match("/^[a-zA-ZÀ-ÖØ-öø-ÿ\s.\-']+$/u", $fullname)) {
-        echo json_encode(['success' => false, 'msg' => 'Name contains invalid characters.']);
-        exit;
-    }
-
-    $fn_esc = mysqli_real_escape_string($conn, $fullname);
-
-    // Fetch current locked-field values
-    $cur_row = mysqli_fetch_assoc(mysqli_query(
-        $conn,
-        "SELECT fullname, dob, gender, nationality FROM tbl_users WHERE faculty_id='$uid' LIMIT 1"
-    ));
-
-    $updates = [];
-    $changes = [];
-
-    // Fullname - always update
-    if ($cur_row['fullname'] !== $fullname) {
-        $updates[] = "fullname='$fn_esc'";
-        $changes[] = [
-            'field' => 'Full Name',
-            'from' => $cur_row['fullname'],
-            'to' => $fullname,
-            'locked' => false
-        ];
-    }
-
-    // DOB — only save if currently null/empty
-    if (empty($cur_row['dob']) && !empty($_POST['dob'])) {
-        $dob = mysqli_real_escape_string($conn, $_POST['dob']);
-        // Validate format
-        $d = DateTime::createFromFormat('Y-m-d', $dob);
-        if ($d && $d->format('Y-m-d') === $dob) {
-            $updates[] = "dob='$dob'";
-            $changes[] = [
-                'field' => 'Date of Birth',
-                'from' => '—',
-                'to' => date('F j, Y', strtotime($dob)),
-                'locked' => true
-            ];
-        }
-    }
-
-    // Gender — only save if currently null/empty
-    $allowed_genders = ['Male', 'Female', 'Prefer not to say'];
-    if (empty($cur_row['gender']) && !empty($_POST['gender'])) {
-        $gender = $_POST['gender'];
-        if (in_array($gender, $allowed_genders)) {
-            $gender_esc = mysqli_real_escape_string($conn, $gender);
-            $updates[] = "gender='$gender_esc'";
-            $changes[] = [
-                'field' => 'Gender',
-                'from' => '—',
-                'to' => $gender,
-                'locked' => true
-            ];
-        }
-    }
-
-    // Nationality — only save if currently null/empty
-    if (empty($cur_row['nationality']) && !empty($_POST['nationality'])) {
-        $nationality = trim($_POST['nationality']);
-        if (strlen($nationality) <= 80) {
-            $nat_esc = mysqli_real_escape_string($conn, $nationality);
-            $updates[] = "nationality='$nat_esc'";
-            $changes[] = [
-                'field' => 'Nationality',
-                'from' => '—',
-                'to' => $nationality,
-                'locked' => true
-            ];
-        }
-    }
-
-    if (empty($updates)) {
-        echo json_encode([
-            'success' => false,
-            'msg' => 'No changes to save.',
-            'changes' => []
-        ]);
-        exit;
-    }
-
-    $sql = "UPDATE tbl_users SET " . implode(', ', $updates) . " WHERE faculty_id='$uid'";
-
-    // Return changes for confirmation modal (don't execute yet)
-    echo json_encode([
-        'success' => true,
-        'msg' => 'Changes prepared for confirmation',
-        'changes' => $changes,
-        'sql' => $sql,
-        'needsConfirmation' => true
-    ]);
-    exit;
-}
-
-/* ══════════════════════════════════════════════════════════════════
-   ACTION: confirm_save_profile
-   Actually executes the profile update after user confirms
-══════════════════════════════════════════════════════════════════ */
-if ($action === 'confirm_save_profile') {
-    $fullname = trim($_POST['fullname'] ?? '');
-    $dob = trim($_POST['dob'] ?? '');
-    $gender = trim($_POST['gender'] ?? '');
-    $nationality = trim($_POST['nationality'] ?? '');
-
-    $fn_esc = mysqli_real_escape_string($conn, $fullname);
-
-    $cur_row = mysqli_fetch_assoc(mysqli_query(
-        $conn,
-        "SELECT dob, gender, nationality FROM tbl_users WHERE faculty_id='$uid' LIMIT 1"
-    ));
-
-    $updates = ["fullname='$fn_esc'"];
-
-    if (empty($cur_row['dob']) && !empty($dob)) {
-        $dob_esc = mysqli_real_escape_string($conn, $dob);
-        $updates[] = "dob='$dob_esc'";
-    }
-
-    if (empty($cur_row['gender']) && !empty($gender)) {
-        $gender_esc = mysqli_real_escape_string($conn, $gender);
-        $updates[] = "gender='$gender_esc'";
-    }
-
-    if (empty($cur_row['nationality']) && !empty($nationality)) {
-        $nat_esc = mysqli_real_escape_string($conn, $nationality);
-        $updates[] = "nationality='$nat_esc'";
-    }
-
-    $sql = "UPDATE tbl_users SET " . implode(', ', $updates) . " WHERE faculty_id='$uid'";
-
-    if (mysqli_query($conn, $sql)) {
-        $_SESSION['faculty_name'] = $fullname;
-        $updated = mysqli_fetch_assoc(mysqli_query(
-            $conn,
-            "SELECT fullname, dob, gender, nationality FROM tbl_users WHERE faculty_id='$uid' LIMIT 1"
-        ));
-        echo json_encode([
-            'success' => true,
-            'msg' => 'Profile updated successfully!',
-            'fullname' => $updated['fullname'],
-            'dob' => $updated['dob'],
-            'gender' => $updated['gender'],
-            'nationality' => $updated['nationality'],
-        ]);
-    } else {
-        echo json_encode(['success' => false, 'msg' => 'Database error: ' . mysqli_error($conn)]);
-    }
     exit;
 }
 
@@ -453,250 +263,6 @@ if ($action === 'confirm_save_academic') {
         }
     } else {
         echo json_encode(['success' => false, 'msg' => 'No changes to save.']);
-    }
-    exit;
-}
-
-/* ══════════════════════════════════════════════════════════════════
-   ACTION: save_contact
-   Updates contact details (all fields are editable)
-══════════════════════════════════════════════════════════════════ */
-if ($action === 'save_contact') {
-    $phone = trim($_POST['phone'] ?? '');
-    $present_address = trim($_POST['present_address'] ?? '');
-    $permanent_address = trim($_POST['permanent_address'] ?? '');
-    $landline = trim($_POST['landline'] ?? '');
-
-    // Validate phone format (basic)
-    if (!empty($phone) && !preg_match('/^[0-9+\-\s()]+$/', $phone)) {
-        echo json_encode(['success' => false, 'msg' => 'Invalid phone number format.']);
-        exit;
-    }
-    if (!empty($landline) && !preg_match('/^[0-9+\-\s()]+$/', $landline)) {
-        echo json_encode(['success' => false, 'msg' => 'Invalid landline format.']);
-        exit;
-    }
-
-    $cur_row = mysqli_fetch_assoc(mysqli_query(
-        $conn,
-        "SELECT phone, present_address, permanent_address, landline FROM tbl_users WHERE faculty_id='$uid' LIMIT 1"
-    ));
-
-    $updates = [];
-    $changes = [];
-
-    if ($cur_row['phone'] !== $phone) {
-        $phone_esc = mysqli_real_escape_string($conn, $phone);
-        $updates[] = "phone='$phone_esc'";
-        $changes[] = [
-            'field' => 'Mobile Number',
-            'from' => $cur_row['phone'] ?: '—',
-            'to' => $phone ?: '—',
-            'locked' => false
-        ];
-    }
-
-    if ($cur_row['present_address'] !== $present_address) {
-        $present_esc = mysqli_real_escape_string($conn, $present_address);
-        $updates[] = "present_address='$present_esc'";
-        $changes[] = [
-            'field' => 'Present Address',
-            'from' => $cur_row['present_address'] ?: '—',
-            'to' => $present_address ?: '—',
-            'locked' => false
-        ];
-    }
-
-    if ($cur_row['permanent_address'] !== $permanent_address) {
-        $perm_esc = mysqli_real_escape_string($conn, $permanent_address);
-        $updates[] = "permanent_address='$perm_esc'";
-        $changes[] = [
-            'field' => 'Permanent Address',
-            'from' => $cur_row['permanent_address'] ?: '—',
-            'to' => $permanent_address ?: '—',
-            'locked' => false
-        ];
-    }
-
-    if ($cur_row['landline'] !== $landline) {
-        $landline_esc = mysqli_real_escape_string($conn, $landline);
-        $updates[] = "landline='$landline_esc'";
-        $changes[] = [
-            'field' => 'Landline',
-            'from' => $cur_row['landline'] ?: '—',
-            'to' => $landline ?: '—',
-            'locked' => false
-        ];
-    }
-
-    if (empty($updates)) {
-        echo json_encode([
-            'success' => false,
-            'msg' => 'No changes to save.',
-            'changes' => []
-        ]);
-        exit;
-    }
-
-    echo json_encode([
-        'success' => true,
-        'msg' => 'Changes prepared for confirmation',
-        'changes' => $changes,
-        'needsConfirmation' => true,
-        'data' => [
-            'phone' => $phone,
-            'present_address' => $present_address,
-            'permanent_address' => $permanent_address,
-            'landline' => $landline
-        ]
-    ]);
-    exit;
-}
-
-/* ══════════════════════════════════════════════════════════════════
-   ACTION: confirm_save_contact
-══════════════════════════════════════════════════════════════════ */
-if ($action === 'confirm_save_contact') {
-    $phone = trim($_POST['phone'] ?? '');
-    $present_address = trim($_POST['present_address'] ?? '');
-    $permanent_address = trim($_POST['permanent_address'] ?? '');
-    $landline = trim($_POST['landline'] ?? '');
-
-    $phone_esc = mysqli_real_escape_string($conn, $phone);
-    $present_esc = mysqli_real_escape_string($conn, $present_address);
-    $perm_esc = mysqli_real_escape_string($conn, $permanent_address);
-    $landline_esc = mysqli_real_escape_string($conn, $landline);
-
-    $sql = "UPDATE tbl_users SET phone='$phone_esc', present_address='$present_esc', 
-            permanent_address='$perm_esc', landline='$landline_esc' WHERE faculty_id='$uid'";
-
-    if (mysqli_query($conn, $sql)) {
-        $updated = mysqli_fetch_assoc(mysqli_query(
-            $conn,
-            "SELECT phone, present_address, permanent_address, landline FROM tbl_users WHERE faculty_id='$uid' LIMIT 1"
-        ));
-        echo json_encode([
-            'success' => true,
-            'msg' => 'Contact details updated successfully!',
-            'phone' => $updated['phone'],
-            'present_address' => $updated['present_address'],
-            'permanent_address' => $updated['permanent_address'],
-            'landline' => $updated['landline']
-        ]);
-    } else {
-        error_log('[PUPSync] update-profile DB error: ' . mysqli_error($conn));
-        echo json_encode(['success' => false, 'msg' => 'A database error occurred. Please try again later.']);
-    }
-    exit;
-}
-
-/* ══════════════════════════════════════════════════════════════════
-   ACTION: save_emergency
-   Updates emergency contact (all fields are editable)
-══════════════════════════════════════════════════════════════════ */
-if ($action === 'save_emergency') {
-    $name = trim($_POST['emergency_name'] ?? '');
-    $relationship = trim($_POST['emergency_relationship'] ?? '');
-    $phone = trim($_POST['emergency_phone'] ?? '');
-
-    if (!empty($phone) && !preg_match('/^[0-9+\-\s()]+$/', $phone)) {
-        echo json_encode(['success' => false, 'msg' => 'Invalid phone number format.']);
-        exit;
-    }
-
-    $cur_row = mysqli_fetch_assoc(mysqli_query(
-        $conn,
-        "SELECT emergency_name, emergency_relationship, emergency_phone FROM tbl_users WHERE faculty_id='$uid' LIMIT 1"
-    ));
-
-    $updates = [];
-    $changes = [];
-
-    if ($cur_row['emergency_name'] !== $name) {
-        $name_esc = mysqli_real_escape_string($conn, $name);
-        $updates[] = "emergency_name='$name_esc'";
-        $changes[] = [
-            'field' => 'Emergency Contact Name',
-            'from' => $cur_row['emergency_name'] ?: '—',
-            'to' => $name ?: '—',
-            'locked' => false
-        ];
-    }
-
-    if ($cur_row['emergency_relationship'] !== $relationship) {
-        $rel_esc = mysqli_real_escape_string($conn, $relationship);
-        $updates[] = "emergency_relationship='$rel_esc'";
-        $changes[] = [
-            'field' => 'Relationship',
-            'from' => $cur_row['emergency_relationship'] ?: '—',
-            'to' => $relationship ?: '—',
-            'locked' => false
-        ];
-    }
-
-    if ($cur_row['emergency_phone'] !== $phone) {
-        $phone_esc = mysqli_real_escape_string($conn, $phone);
-        $updates[] = "emergency_phone='$phone_esc'";
-        $changes[] = [
-            'field' => 'Emergency Contact Phone',
-            'from' => $cur_row['emergency_phone'] ?: '—',
-            'to' => $phone ?: '—',
-            'locked' => false
-        ];
-    }
-
-    if (empty($updates)) {
-        echo json_encode([
-            'success' => false,
-            'msg' => 'No changes to save.',
-            'changes' => []
-        ]);
-        exit;
-    }
-
-    echo json_encode([
-        'success' => true,
-        'msg' => 'Changes prepared for confirmation',
-        'changes' => $changes,
-        'needsConfirmation' => true,
-        'data' => [
-            'emergency_name' => $name,
-            'emergency_relationship' => $relationship,
-            'emergency_phone' => $phone
-        ]
-    ]);
-    exit;
-}
-
-/* ══════════════════════════════════════════════════════════════════
-   ACTION: confirm_save_emergency
-══════════════════════════════════════════════════════════════════ */
-if ($action === 'confirm_save_emergency') {
-    $name = trim($_POST['emergency_name'] ?? '');
-    $relationship = trim($_POST['emergency_relationship'] ?? '');
-    $phone = trim($_POST['emergency_phone'] ?? '');
-
-    $name_esc = mysqli_real_escape_string($conn, $name);
-    $rel_esc = mysqli_real_escape_string($conn, $relationship);
-    $phone_esc = mysqli_real_escape_string($conn, $phone);
-
-    $sql = "UPDATE tbl_users SET emergency_name='$name_esc', emergency_relationship='$rel_esc', 
-            emergency_phone='$phone_esc' WHERE faculty_id='$uid'";
-
-    if (mysqli_query($conn, $sql)) {
-        $updated = mysqli_fetch_assoc(mysqli_query(
-            $conn,
-            "SELECT emergency_name, emergency_relationship, emergency_phone FROM tbl_users WHERE faculty_id='$uid' LIMIT 1"
-        ));
-        echo json_encode([
-            'success' => true,
-            'msg' => 'Emergency contact updated successfully!',
-            'emergency_name' => $updated['emergency_name'],
-            'emergency_relationship' => $updated['emergency_relationship'],
-            'emergency_phone' => $updated['emergency_phone']
-        ]);
-    } else {
-        echo json_encode(['success' => false, 'msg' => 'Database error: ' . mysqli_error($conn)]);
     }
     exit;
 }
@@ -914,6 +480,7 @@ if ($action === 'check_faculty_id' || $action === 'set_faculty_id') {
         ['tbl_room_arbitration_log', 'borrower_id'],
         ['tbl_room_issues',          'reported_by_id'],
         ['tbl_faculty_notif_state',  'faculty_id'],
+        ['tbl_notif_prefs',          'user_key'],
         ['tbl_room_waitlist',        'faculty_id'],
     ];
 
@@ -1084,31 +651,13 @@ if ($action === 'remove_profile_picture') {
 if ($action === 'get_completion_status') {
     $user = mysqli_fetch_assoc(mysqli_query(
         $conn,
-        "SELECT fullname, dob, gender, nationality, email, backup_email, program, year_level, 
-         phone, present_address, permanent_address, emergency_name, emergency_relationship, emergency_phone 
+        "SELECT fullname, email, backup_email, department, profile_picture
          FROM tbl_users WHERE faculty_id='$uid' LIMIT 1"
-    ));
+    )) ?: [];
 
-    $total_fields = 13;
+    $fields = ['fullname', 'email', 'backup_email', 'department', 'profile_picture'];
+    $total_fields = count($fields);
     $completed_fields = 0;
-
-    $fields = [
-        'fullname',
-        'dob',
-        'gender',
-        'nationality',
-        'email',
-        'backup_email',
-        'program',
-        'year_level',
-        'phone',
-        'present_address',
-        'permanent_address',
-        'emergency_name',
-        'emergency_relationship',
-        'emergency_phone'
-    ];
-
     foreach ($fields as $field) {
         if (!empty($user[$field])) {
             $completed_fields++;

@@ -20,5 +20,12 @@ importing.md
 # Faculty Registry originals (private; only the folder's .htaccess is tracked)
 /uploads/faculty_registry/*
 !/uploads/faculty_registry/.htaccess
+
+# Rooms Assigned originals (private; only the folder's .htaccess is tracked)
+/uploads/rooms_assigned/*
+!/uploads/rooms_assigned/.htaccess
 /uploads/student_registry/*
 !/uploads/student_registry/.htaccess
+
+# Claude context file (local only)
+/CLAUDE.md

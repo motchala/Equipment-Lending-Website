@@ -1,14 +1,15 @@
             <!-- ============================================================
          TAB: EQUIPMENT (LENDING)
     ============================================================ -->
+            <?php require_once dirname(__DIR__, 2) . '/shared/core/equipment-image.php'; // no photo -> uploads/default.png ?>
             <div class="tab-panel" id="panel-lending">
 
 
                 <!-- ── Sub: Browse ─────────────────────────────────────── -->
                 <div class="lending-sub active" id="lending-browse">
                     <div class="page-header-block">
-                        <h2 class="page-title-sm">Browse Equipment</h2>
-                        <p class="page-subtitle">Browse the catalog, check availability and request equipment for your class.</p>
+                        <h2 class="page-title-sm">Borrow Equipment</h2>
+                        <p class="page-subtitle">Add what you need, then choose where and when to use it.</p>
                     </div>
 
                     <!-- ── Featured Section ────────────────────────────────── -->
@@ -37,6 +38,39 @@
                     {
                         global $equip_borrow_count;
                         return $equip_borrow_count[strtolower(trim($itemName))] ?? 0;
+                    }
+
+                    // One "add to my request" control per item. The card is the same everywhere
+                    // (Most Borrowed cards and the catalog): JS (faculty-borrow-flow.js) swaps the
+                    // Add button for a quantity stepper once the item is picked, and keeps every
+                    // copy of the same item in sync. The first paint below is what shows before JS runs.
+                    if (!function_exists('fbAddSlot')) {
+                        function fbAddSlot(array $item, bool $blocked, array $bk_items, string $variant = ''): string
+                        {
+                            $name  = (string)$item['item_name'];
+                            $shelf = (int)$item['quantity'];
+                            $total = (int)($bk_items[$name]['total'] ?? $shelf);
+                            $ahead = ($shelf <= 0 && $total > 0);   // out now, but it exists: can be booked for later
+                            $h     = fn(string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+                            $cls   = 'bf-slot' . ($variant !== '' ? ' bf-slot--' . $variant : '');
+                            $btn   = $variant === 'hero' ? 'btn-borrow-primary' : 'btn-borrow';   // the big featured button keeps its own look
+                            $attrs = ' data-bf-slot data-item-id="' . (int)$item['item_id'] . '" data-item-name="' . $h($name) . '"'
+                                   . ($blocked ? ' data-blocked="1"' : '');
+                            if ($blocked) {
+                                return '<div class="' . $cls . '"' . $attrs . '><button type="button" class="' . $btn . ' btn-borrow-blocked bf-add" disabled'
+                                     . ' title="You have an overdue item. Return it before borrowing again.">'
+                                     . '<span class="material-symbols-outlined" aria-hidden="true">block</span>'
+                                     . '<span class="btn-borrow-label">Overdue Block</span></button></div>';
+                            }
+                            if ($shelf <= 0 && !$ahead) {
+                                return '<div class="' . $cls . '"' . $attrs . '><button type="button" class="' . $btn . ' bf-add" disabled>'
+                                     . '<span class="material-symbols-outlined" aria-hidden="true">block</span>'
+                                     . '<span class="btn-borrow-label">Unavailable</span></button></div>';
+                            }
+                            return '<div class="' . $cls . '"' . $attrs . '><button type="button" class="' . $btn . ' bf-add' . ($ahead ? ' btn-borrow-ahead' : '') . '" data-bf="add">'
+                                 . '<span class="material-symbols-outlined" aria-hidden="true">' . ($ahead ? 'event' : 'add') . '</span>'
+                                 . '<span class="btn-borrow-label">' . ($ahead ? 'Book ahead' : ($variant === 'hero' ? 'Add to request' : 'Add')) . '</span></button></div>';
+                        }
                     }
 
                     $featured_avail = array_filter($all_items, fn($r) => $r['quantity'] > 0);
@@ -76,29 +110,13 @@
                                                 <div class="feat-hero-desc" style="margin-top:6px;"><?php echo !empty($featured_hero['description']) ? htmlspecialchars(mb_substr($featured_hero['description'], 0, 110)) . (mb_strlen($featured_hero['description']) > 110 ? '…' : '') : 'Available for borrowing. Submit a request to reserve this item for your class or event.'; ?></div>
                                             </div>
                                             <div class="feat-hero-actions" style="margin-top:20px;">
-                                                <?php if ($has_overdue_block): ?>
-                                                    <button class="btn-borrow-primary" disabled>
-                                                        <span class="material-symbols-outlined">block</span> Overdue Block
-                                                    </button>
-                                                <?php else: ?>
-                                                    <button class="btn-borrow-primary"
-                                                        data-action="open-borrow-form"
-                                                        data-item="<?php echo htmlspecialchars($featured_hero['item_name'], ENT_QUOTES); ?>">
-                                                        <span class="material-symbols-outlined">add_circle</span> Borrow Now
-                                                    </button>
-                                                <?php endif; ?>
+                                                <?= fbAddSlot($featured_hero, (bool)$has_overdue_block, $bk_items, 'hero') ?>
                                             </div>
                                         </div>
-                                        <?php if (!empty($featured_hero['image_path'])): ?>
-                                            <div class="feat-hero-img">
-                                                <img src="<?php echo $root_url . htmlspecialchars($featured_hero['image_path']); ?>"
-                                                    alt="<?php echo htmlspecialchars($featured_hero['item_name']); ?>">
-                                            </div>
-                                        <?php else: ?>
-                                            <div class="feat-hero-img-placeholder">
-                                                <span class="material-symbols-outlined">inventory_2</span>
-                                            </div>
-                                        <?php endif; ?>
+                                        <div class="feat-hero-img">
+                                            <img src="<?php echo $root_url . htmlspecialchars(equipment_image_path($featured_hero['image_path'] ?? '')); ?>"
+                                                alt="<?php echo htmlspecialchars($featured_hero['item_name']); ?>">
+                                        </div>
                                     </div>
                                 <?php endif; ?>
 
@@ -106,12 +124,8 @@
                                 <?php if ($featured_sec): ?>
                                     <div class="feat-secondary" data-campus="<?php echo (int)($featured_sec['campus_id'] ?? 1); ?>">
                                         <div class="feat-secondary-img" style="position:relative;">
-                                            <?php if (!empty($featured_sec['image_path'])): ?>
-                                                <img src="<?php echo $root_url . htmlspecialchars($featured_sec['image_path']); ?>"
-                                                    alt="<?php echo htmlspecialchars($featured_sec['item_name']); ?>">
-                                            <?php else: ?>
-                                                <span class="material-symbols-outlined">inventory_2</span>
-                                            <?php endif; ?>
+                                            <img src="<?php echo $root_url . htmlspecialchars(equipment_image_path($featured_sec['image_path'] ?? '')); ?>"
+                                                alt="<?php echo htmlspecialchars($featured_sec['item_name']); ?>">
                                             <span class="stock-badge stock-avail"
                                                 style="position:absolute;top:10px;left:10px;margin-bottom:0;z-index:2;background:rgba(209,250,229,.95);backdrop-filter:blur(4px);">
                                                 <span class="material-symbols-outlined" style="font-size:12px;">check_circle</span>
@@ -133,17 +147,7 @@
                                                 <?php echo htmlspecialchars($featured_sec['category']); ?>
                                             </div>
                                             <div style="margin-top:auto;">
-                                                <?php if ($has_overdue_block): ?>
-                                                    <button class="btn-borrow-primary" style="width:100%;" disabled>
-                                                        <span class="material-symbols-outlined" aria-hidden="true">block</span> Overdue Block
-                                                    </button>
-                                                <?php else: ?>
-                                                    <button class="btn-borrow-primary" style="width:100%;justify-content:center;"
-                                                        data-action="open-borrow-form"
-                                                        data-item="<?php echo htmlspecialchars($featured_sec['item_name'], ENT_QUOTES); ?>">
-                                                        <span class="material-symbols-outlined" aria-hidden="true">add_shopping_cart</span> Borrow
-                                                    </button>
-                                                <?php endif; ?>
+                                                <?= fbAddSlot($featured_sec, (bool)$has_overdue_block, $bk_items, 'block') ?>
                                             </div>
                                         </div>
                                     </div>
@@ -224,28 +228,12 @@
                                         data-campus="<?php echo (int)$item['campus_id']; ?>"
                                         data-item-id="<?php echo (int)$item['item_id']; ?>">
                                         <div class="eq-item-img-wrap">
-                                            <?php if (!empty($item['image_path'])): ?>
-                                                <img class="eq-item-img"
-                                                    src="<?php echo $root_url . htmlspecialchars($item['image_path']); ?>"
-                                                    alt="<?php echo htmlspecialchars($item['item_name']); ?>">
-                                            <?php else: ?>
-                                                <div class="eq-item-img-placeholder">
-                                                    <span class="material-symbols-outlined">inventory_2</span>
-                                                </div>
-                                            <?php endif; ?>
-                                            <!-- Cart checkbox — bottom-right of image, in-stock items only -->
-                                            <?php if ((int)$item['quantity'] > 0 && !$has_overdue_block): ?>
-                                            <button type="button"
-                                                class="eq-cart-chk"
-                                                data-action="toggle-cart-item"
-                                                data-item-name="<?php echo htmlspecialchars($item['item_name'], ENT_QUOTES); ?>"
-                                                data-item-id="<?php echo (int)$item['item_id']; ?>"
-                                                data-shelf="<?php echo (int)$item['quantity']; ?>"
-                                                aria-label="Add <?php echo htmlspecialchars($item['item_name'], ENT_QUOTES); ?> to cart"
-                                                aria-pressed="false">
-                                                <span class="material-symbols-outlined eq-cart-chk-icon">check_box_outline_blank</span>
-                                            </button>
-                                            <?php endif; ?>
+                                            <img class="eq-item-img"
+                                                src="<?php echo $root_url . htmlspecialchars(equipment_image_path($item['image_path'] ?? '')); ?>"
+                                                alt="<?php echo htmlspecialchars($item['item_name']); ?>"
+                                                loading="lazy" decoding="async">
+                                            <!-- Shown when the item is part of the current request -->
+                                            <span class="bf-tick" aria-hidden="true"><span class="material-symbols-outlined">check</span></span>
 
                                             <!-- Stock badge overlay on image -->
                                             <div class="eq-stock-overlay">
@@ -316,42 +304,24 @@
                                                 <?php echo htmlspecialchars($item['category']); ?>
                                             </div>
 
-                                            <?php if ($has_overdue_block): ?>
-                                                <button class="btn-borrow btn-borrow-blocked" disabled
-                                                    title="You have an overdue item. Return it before borrowing again.">
-                                                    <span class="material-symbols-outlined" aria-hidden="true">block</span>
-                                                    <span class="btn-borrow-label">Overdue Block</span>
-                                                </button>
-                                            <?php else: ?>
-                                                <?php
-                                                $eq_shelf = (int)$item['quantity'];
-                                                $eq_total = (int)(($bk_items[$item['item_name']]['total'] ?? $eq_shelf));
-                                                $eq_ahead = ($eq_shelf <= 0 && $eq_total > 0);   // out now, but it exists: can be booked for later
-                                                ?>
-                                                <button class="btn-borrow<?php echo $eq_ahead ? ' btn-borrow-ahead' : ''; ?>"
-                                                    <?php if ($eq_shelf <= 0 && !$eq_ahead) echo 'disabled'; ?>
-                                                    data-action="open-borrow-form"
-                                                    data-item="<?php echo htmlspecialchars($item['item_name'], ENT_QUOTES); ?>">
-                                                    <span class="material-symbols-outlined" aria-hidden="true"><?php echo ($eq_shelf > 0) ? 'add_shopping_cart' : ($eq_ahead ? 'event' : 'block'); ?></span>
-                                                    <span class="btn-borrow-label"><?php echo ($eq_shelf > 0) ? 'Borrow' : ($eq_ahead ? 'Book ahead' : 'Unavailable'); ?></span>
-                                                </button>
-                                            <?php endif; ?>
+                                            <?= fbAddSlot($item, (bool)$has_overdue_block, $bk_items, 'card') ?>
                                         </div>
                                     </div>
                                 <?php endforeach; ?>
                             <?php endif; ?>
                         </div>
 
-                        <!-- ── Cart sticky bar ─────────────────────────────────── -->
+                        <!-- ── Selection bar: appears once at least one item is added ── -->
                         <div id="eqCartBar" class="eq-cart-bar" style="display:none" aria-live="polite" role="status">
                             <div class="eq-cart-bar-summary">
-                                <span class="material-symbols-outlined">shopping_cart</span>
-                                <span id="eqCartBarLabel">0 items selected</span>
+                                <span class="material-symbols-outlined">inventory_2</span>
+                                <span><span id="eqCartBarLabel">0 items selected</span>
+                                    <small id="eqCartBarSub" class="bf-bar-sub"></small></span>
                             </div>
                             <div class="eq-cart-bar-actions">
-                                <button type="button" class="eq-cart-bar-clear" data-action="cart-clear">Clear</button>
-                                <button type="button" class="eq-cart-bar-submit" data-action="cart-checkout">
-                                    <span class="material-symbols-outlined">send</span> Borrow All
+                                <button type="button" class="eq-cart-bar-clear" data-bf="clear">Clear</button>
+                                <button type="button" class="eq-cart-bar-submit" data-bf="continue">
+                                    Continue <span class="material-symbols-outlined">arrow_forward</span>
                                 </button>
                             </div>
                         </div>

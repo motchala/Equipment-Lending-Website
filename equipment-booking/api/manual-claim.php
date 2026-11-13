@@ -188,7 +188,7 @@ try {
     );
     if ($log) {
         $log->bind_param(
-            'isssssiss',
+            'issssssiss',
             $requestId, $loan['faculty_id'], $loan['faculty_name'],
             $loan['equipment_name'], $decision,
             $logReason, $adminName, $adminId, $logReason, $claimedAt

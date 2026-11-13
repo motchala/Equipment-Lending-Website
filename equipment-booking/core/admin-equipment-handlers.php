@@ -1,27 +1,13 @@
 <?php
-// ================= AUTO DECLINE EXPIRED REQUESTS =================
-
-$today = date('Y-m-d');
-$reason_expired = "Request expired – borrow date has already passed";
-
-$stmt_expired = $conn->prepare("
-    UPDATE tbl_requests
-    SET status = 'Declined', reason = ?
-    WHERE status = 'Waiting'
-    AND borrow_date < ?
-");
-$stmt_expired->bind_param("ss", $reason_expired, $today);
-$stmt_expired->execute();
-
-
-// ================= AUTO MARK OVERDUE =================
-
-mysqli_query($conn, "
-    UPDATE tbl_requests
-    SET status = 'Overdue'
-    WHERE status = 'Approved'
-    AND return_date < '$today'
-");
+// ================= STATUS HOUSEKEEPING =================
+// One shared routine (see core/request-decision.php and core/booking-schedule.php):
+//   - undecided requests past their deadline (12:01 AM on the borrow date) are declined
+//   - loans that are out and past their return time become Overdue
+//   - approved bookings nobody collected are closed as no-shows
+$today = date('Y-m-d');   // kept: other code that includes this file may read it
+require_once __DIR__ . '/auto-approve-tick.php';
+equipment_auto_approve_tick($conn);
+BookingSchedule::tick($conn);
 
 
 // ================= EQUIPMENT IMAGE FILE HELPERS =================

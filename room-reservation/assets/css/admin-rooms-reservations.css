@@ -1,0 +1,205 @@
+/* ============================================================================
+   Facilities > Reservations   (room-reservation/assets/css/admin-rooms-reservations.css)
+
+   Additive styles for the lifecycle-aligned Reservations tab
+   (Pending -> Upcoming -> In use now -> Completed, or Cancelled / Declined).
+   Loaded by room-reservation/views/admin-rooms-screen.php. Nothing here changes
+   an existing rule: it only styles the new tab separator, hint line, Status-cell
+   context lines, student tag and the stage accents on each row.
+   ========================================================================== */
+
+/* [hidden] must win over the display set by button / badge rules */
+#rooms-reservations-panel [hidden],
+#panel-rooms .pr-tab-badge[hidden] {
+    display: none !important;
+}
+
+/* ── Tab bar: workflow tabs | record tabs ─────────────────────── */
+#panel-rooms .rr-tabs {
+    align-items: center;
+}
+
+#panel-rooms .rr-tab-sep {
+    width: 1px;
+    height: 22px;
+    margin: 0 6px;
+    background: var(--khaki-border);
+    flex: 0 0 auto;
+}
+
+/* In use now: the count turns green while something is in use */
+#panel-rooms .rr-tab-count.has-live {
+    background: #1e8449;
+    color: #fff;
+}
+
+/* One-line explanation of the open tab */
+#rooms-reservations-panel .rr-hint {
+    margin: 0;
+    padding: 9px 1.25rem;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--text-light);
+    background: var(--card-bg);
+    border-bottom: 1px solid var(--khaki-border);
+}
+
+#rooms-reservations-panel .rr-hint:empty {
+    display: none;
+}
+
+/* ── Status badges: Cancelled gets its own tone (Completed stays grey) ── */
+.ps-badge--cancelled {
+    background: #f6eeed;
+    color: #8a4b45;
+}
+
+/* ── Status cell: badge + what matters about this stage ───────── */
+#rrTable .rr-ctx {
+    margin-top: 4px;
+    font-size: 11px;
+    line-height: 1.35;
+    color: var(--text-light);
+}
+
+#rrTable .rr-ctx--warn {
+    color: #b7770d;
+    font-weight: 600;
+}
+
+#rrTable .rr-ctx--danger {
+    color: var(--danger);
+}
+
+#rrTable .rr-ctx--ok {
+    color: #1e8449;
+    font-weight: 600;
+}
+
+#rrTable .rr-ctx--muted {
+    color: var(--text-light);
+    opacity: .85;
+}
+
+#rrTable .rr-ctx--clamp {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    max-width: 280px;
+}
+
+/* the request letter chip sits under the deadline, one click from the viewer */
+#rrTable td[data-col="status"] .ps-doc-chip {
+    margin-top: 6px;
+    max-width: 230px;
+}
+
+/* ── Requested by ─────────────────────────────────────────────── */
+#rrTable .rr-ellip {
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#rrTable .rr-tag {
+    display: inline-block;
+    margin-left: 4px;
+    padding: 1px 7px;
+    border-radius: 99px;
+    background: #e6f0fb;
+    color: #1f5fa8;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .02em;
+    vertical-align: middle;
+}
+
+/* ── Row accents: the two stages that need the admin's eyes ───── */
+#rrTable tr.ps-rr-row.is-pending td:first-child {
+    box-shadow: inset 3px 0 0 #e0a526;
+}
+
+#rrTable tr.ps-rr-row.is-live td:first-child {
+    box-shadow: inset 3px 0 0 #2e9e63;
+}
+
+/* Records (completed / cancelled / declined) read quieter than live work */
+#rrTable tr.ps-rr-row.is-completed .eq-cell-name,
+#rrTable tr.ps-rr-row.is-cancelled .eq-cell-name,
+#rrTable tr.ps-rr-row.is-declined .eq-cell-name {
+    font-weight: 500;
+}
+
+/* ── Primary action on a Pending row: Review ──────────────────── */
+#panel-rooms .pr-tbl-btn.review.is-primary {
+    background: var(--accent-maroon);
+    border-color: var(--accent-maroon);
+    color: #fff;
+}
+
+#panel-rooms .pr-tbl-btn.review.is-primary:hover {
+    background: var(--accent-maroon);
+    filter: brightness(1.12);
+    color: #fff;
+}
+
+/* ── Column widths (desktop / tablet) ─────────────────────────────
+   The table uses a fixed layout, so the Status column (badge + deadline + letter
+   chip) needs more room than the old 15%. Same selectors as the base rule in
+   admin-dashboard.css; this file loads after it, so these win. */
+@media (min-width: 769px) {
+    #panel-rooms #rrTable {
+        min-width: 820px;
+    }
+
+    #panel-rooms #rrTable thead th:nth-child(1) {
+        width: 19%;
+    }
+
+    #panel-rooms #rrTable thead th:nth-child(2) {
+        width: 15%;
+    }
+
+    #panel-rooms #rrTable thead th:nth-child(3) {
+        width: 22%;
+    }
+
+    #panel-rooms #rrTable thead th:nth-child(4) {
+        width: 25%;
+    }
+
+    #panel-rooms #rrTable thead th:nth-child(5) {
+        width: 19%;
+    }
+}
+
+/* ============================================================================
+   Facility Schedule modal: weekly CLASSES (Rooms Assigned import)
+   Same grid as the reservations, with the room's classes drawn in blue so they read as the
+   room's fixed weekly schedule. Additive: nothing above is changed.
+   ========================================================================== */
+#roomScheduleModal .rsm-block--class {
+    background: #e6f1f5;
+    background: color-mix(in srgb, #1f6f8b 14%, var(--card-bg));
+    border-color: color-mix(in srgb, #1f6f8b 35%, var(--card-bg));
+    border-left-color: #1f6f8b;
+    color: #1f6f8b;
+}
+
+#roomScheduleModal .rsm-block--class:hover,
+#roomScheduleModal .rsm-block--class:focus {
+    background: color-mix(in srgb, #1f6f8b 22%, var(--card-bg));
+}
+
+/* in use right now (a class in session, or a reservation under way) */
+#roomScheduleModal .rsm-block.is-live {
+    box-shadow: 0 0 0 2px #d93025;
+}
+
+.rsm-legend-dot.class {
+    background: #e6f1f5;
+    background: color-mix(in srgb, #1f6f8b 14%, var(--card-bg));
+    border: 1.5px solid #1f6f8b;
+}

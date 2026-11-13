@@ -1,5 +1,7 @@
 <?php
+
 /** Record an administrator-verified equipment return without a QR token. */
+
 declare(strict_types=1);
 
 ob_start();
@@ -71,7 +73,7 @@ try {
         $conn->rollback();
         manual_return_response(404, 'error', 'Loan record not found.');
     }
-    if (!in_array($loan['status'], ['Approved', 'Overdue'], true)) {
+    if (!in_array($loan['status'], ['Approved', 'On Loan', 'Overdue'], true)) {
         $conn->rollback();
         manual_return_response(409, 'error', 'This loan has already been closed or cannot be returned.');
     }
@@ -79,7 +81,7 @@ try {
     $returnedAt = date('Y-m-d H:i:s');
     $update = $conn->prepare(
         "UPDATE tbl_requests SET status = 'Returned', returned_at = ?, return_token = NULL
-          WHERE id = ? AND status IN ('Approved', 'Overdue')"
+          WHERE id = ? AND status IN ('Approved', 'On Loan', 'Overdue')"
     );
     if (!$update) throw new RuntimeException('Could not update the loan record.');
     $update->bind_param('si', $returnedAt, $requestId);
@@ -143,16 +145,33 @@ try {
         null,
         ['action' => 'request_returned', 'ref_type' => 'request', 'ref_id' => $requestId]
     );
-    // A regular form post is deliberately used by the On Loan screen: it is
-    // more reliable than leaving a disabled button waiting on an async fetch.
-    // Keep JSON for any future AJAX caller.
+    // The On Loan screen calls this with fetch() (X-Requested-With: XMLHttpRequest) and updates
+    // the row in place, so no page reload is needed. A plain form post (no JavaScript) still
+    // gets the old redirect.
     if (strtolower((string)($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '')) !== 'xmlhttprequest') {
         header('Location: ../../admin-dashboard.php?view=inventory&manual_return=1#tab-inventory', true, 303);
         exit;
     }
-    manual_return_response(200, 'success', 'Manual return recorded.');
+    while (ob_get_level() > 0) ob_end_clean();
+    http_response_code(200);
+    $retTs = strtotime($returnedAt) ?: time();
+    echo json_encode([
+        'status'            => 'success',
+        'message'           => 'Manual return recorded.',
+        'request_id'        => $requestId,
+        'was_overdue'       => $loan['status'] === 'Overdue',
+        'returned_at_label' => date('M d, Y g:i A', $retTs),
+        'returned_date'     => date('M d', $retTs),
+        'returned_time'     => date('g:i A', $retTs),
+        'handled_by'        => $adminName,
+        'handled_label'     => date('M j, g:i A', $retTs),
+    ]);
+    exit;
 } catch (Throwable $e) {
-    try { $conn->rollback(); } catch (Throwable $ignored) { }
+    try {
+        $conn->rollback();
+    } catch (Throwable $ignored) {
+    }
     error_log('[manual-return] ' . $e->getMessage());
     manual_return_response(500, 'error', 'Could not record the return. Please try again.');
 }

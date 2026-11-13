@@ -52,7 +52,8 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name'])) {
                 $bk['qty'],
                 substr($bk['borrow_time'], 0, 5),
                 (int)($_POST['duration'] ?? 1),
-                date('Y-m-d', strtotime($bk['borrow_date'] . ' +1 day'))
+                date('Y-m-d', strtotime($bk['borrow_date'] . ' +1 day')),
+                (string)($bk['unit'] ?? 'hours')
             )
             : null;
         bm_fail('"' . $equipment_name . '" is already booked for that schedule.'
@@ -142,11 +143,21 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name'])) {
         }
     }
 
-    // ── All requests (same-day and future) now stay Waiting ───────────────
-    // The arbitration engine is no longer called at submit time.
-    // The auto-approve tick (equipment-booking/core/auto-approve-tick.php)
-    // will flip them to Approved after the configured buffer time expires,
-    // or an admin can approve/decline manually at any time.
-    header("Location: faculty-dashboard.php?success=1");
+    // ── Decide it now (same rules for every way of submitting: see request-decision.php) ──
+    //   same day   -> Approved (with its QR codes) or Declined, on the spot
+    //   later date -> Waiting for an admin; declined automatically at 12:01 AM on the borrow date
+    //                 if nobody decides
+    require_once __DIR__ . '/request-decision.php';
+    $decision = equipment_decide_on_submit($conn, [(int)$new_request_id])[(int)$new_request_id]
+        ?? ['status' => 'Waiting', 'reason' => ''];
+
+    if ($decision['status'] === 'Approved') {
+        header("Location: faculty-dashboard.php?success=approved");
+    } elseif ($decision['status'] === 'Declined') {
+        $why = $decision['reason'] !== '' ? $decision['reason'] : 'It could not be approved.';
+        header("Location: faculty-dashboard.php?borrow_error=" . rawurlencode('Your request was declined: ' . $why));
+    } else {
+        header("Location: faculty-dashboard.php?success=1");
+    }
     exit();
 }

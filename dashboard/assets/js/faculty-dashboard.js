@@ -9,8 +9,21 @@
        build their own FormData instead of submitting an actual <form>.
     ══════════════════════════════════════════════════════════════════ */
     function getCsrfToken() {
+        // The faculty pages carry the token in <meta name="csrf-token"> (faculty-shell-top.php); the hidden
+        // input only exists on admin screens, so without this fallback every call that uses it sent ''.
         const el = document.querySelector('input[name="csrf_token"]');
-        return el ? el.value : '';
+        if (el && el.value) return el.value;
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        return meta ? (meta.getAttribute('content') || '') : '';
+    }
+
+    /* Notification Preferences (Settings): true unless this faculty turned that category -- or
+       everything -- off. The server already leaves muted items out of the bell feed and the emails;
+       this keeps the pop-up toasts and coach marks raised here in line with it. */
+    function notifFamilyOn(family) {
+        if (window.PSNotifPrefs) return window.PSNotifPrefs.isOn(family);
+        const p = window.NOTIF_PREFS;
+        return !p || (p.all !== false && p[family] !== false);
     }
 
     /* ══════════════════════════════════════════════════════════════════
@@ -560,705 +573,11 @@
         renderEquipmentPage();
     }
 
-    /* ── Borrow Form ───────────────────────────────────────────────────── */
-    /* ================================================================
-       ROOM PICKER  (Borrow Request modal -> "Choose a room" modal)
-       ----------------------------------------------------------------
-       The Room field in the Borrow Request modal is a button. It opens a
-       separate modal (#roomPickModal) that lists ONLY rooms the admin left
-       Available (window.BOOKING_META.rooms is already filtered; Maintenance
-       and Not Bookable rooms never appear), grouped building > floor.
+    /* ── Borrow flow ───────────────────────────────────────────────────────
+       Adding items, the Borrow modal and the building > floor > room picker live in
+       equipment-booking/assets/js/faculty-borrow-flow.js (loaded right after this file). */
 
-       A room that another faculty has reserved for the chosen date and time
-       is still listed, but it is marked Reserved and cannot be picked: it is
-       focusable and hoverable (hover / focus shows when it is taken) but a
-       click does nothing. Reserved rooms are re-checked every time the modal
-       opens and every few seconds while it stays open. The server checks
-       again on submit.
-    ================================================================ */
-    const RoomPicker = (function () {
-        const meta = () => window.BOOKING_META || {};
-        const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
-        const icon = n => { const s = el('span', 'material-symbols-outlined', n); s.setAttribute('aria-hidden', 'true'); return s; };
-        const pad2 = n => String(n).padStart(2, '0');
-        const parseTs = s => { const m = String(s || '').match(/(\d+)-(\d+)-(\d+)[ T](\d+):(\d+)/); return m ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) : null; };
-        const meridiem = d => (d.getHours() < 12 ? 'AM' : 'PM');
-        const hm = d => ((d.getHours() % 12) || 12) + (d.getMinutes() ? ':' + pad2(d.getMinutes()) : '');
-        function rangeLabel(a, b) { return meridiem(a) === meridiem(b) ? hm(a) + '–' + hm(b) + ' ' + meridiem(b) : hm(a) + ' ' + meridiem(a) + ' – ' + hm(b) + ' ' + meridiem(b); }
-        function dayLabel(d) {
-            const t = parseTs((meta().today || '') + ' 00:00'); if (!t) return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            const diff = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - t) / 86400000);
-            return diff === 0 ? 'Today' : diff === 1 ? 'Tomorrow' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        }
-        const whenLabel = (s, e) => { const a = parseTs(s), b = parseTs(e); return (a && b) ? dayLabel(a) + ' · ' + rangeLabel(a, b) : ''; };
-        const pageLoadedAt = Date.now();
-        /* "now" on the server's clock: the page's own date + minutes since midnight, kept ticking */
-        function nowDate() {
-            const t = parseTs((meta().today || '') + ' 00:00');
-            if (!t) return new Date();
-            return new Date(t.getTime() + ((meta().nowMin || 0) + (Date.now() - pageLoadedAt) / 60000) * 60000);
-        }
-        const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-
-        /* ---- room index (only rooms that can take equipment) -------- */
-        let index = null;   // room_id -> { id, name, building, floor }
-        function buildIndex() {
-            index = {};
-            (meta().rooms || []).forEach(b => (b.floors || []).forEach(f => (f.rooms || []).forEach(r => {
-                if (r.status && r.status !== 'Available') return;
-                index[r.room_id] = { id: r.room_id, name: r.name, building: b.name, floor: f.label };
-            })));
-        }
-
-        /* ---- shared modal --------------------------------------------- */
-        const M = {};          // element refs, filled by modalRefs()
-        let active = null;     // the picker (Room field) currently using the modal
-        let lastFocus = null, pollTimer = null, tab = 0;
-
-        function modalRefs() {
-            if (M.root) return M.root;
-            M.root = document.getElementById('roomPickModal'); if (!M.root) return null;
-            M.sub = document.getElementById('roomPickSub'); M.search = document.getElementById('roomPickSearch');
-            M.tabs = document.getElementById('roomPickTabs'); M.body = document.getElementById('roomPickBody');
-            M.count = document.getElementById('roomPickCount');
-            M.root.addEventListener('click', e => {
-                if (e.target === M.root || e.target.closest('[data-rp-close]')) { close(true); return; }
-                const t = e.target.closest('[data-rp-tab]'); if (t) { tab = +t.dataset.rpTab; filter(); return; }
-                if (e.target.closest('[data-rp-retry]')) { load(active, true); return; }
-                const r = e.target.closest('[data-room]'); if (!r || !active) return;
-                if (r.getAttribute('aria-disabled') === 'true') return;       // reserved: hoverable, never clickable
-                pick(active, r.dataset.room, false);
-            });
-            M.search.addEventListener('input', filter);
-            M.root.addEventListener('keydown', onKey);
-            return M.root;
-        }
-
-        function focusables() { return Array.from(M.root.querySelectorAll('button, input')).filter(x => !x.disabled && !x.closest('[hidden]') && x.offsetParent !== null); }
-        function onKey(e) {
-            if (e.key === 'Tab') {
-                const f = focusables(); if (!f.length) return;
-                const first = f[0], last = f[f.length - 1];
-                if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-                else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-                return;
-            }
-            const t = e.target.closest && e.target.closest('.rp-room, .rp-quick');
-            if (!t || ['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'].indexOf(e.key) < 0) return;
-            const tiles = Array.from(M.body.querySelectorAll('.rp-room, .rp-quick')).filter(x => !x.closest('[hidden]') && x.offsetParent !== null);
-            const i = tiles.indexOf(t); if (i < 0) return;
-            const cols = Math.max(1, getComputedStyle(t.parentElement).gridTemplateColumns.split(' ').length);
-            const n = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1 : e.key === 'ArrowDown' ? i + cols : i - cols;
-            if (n >= 0 && n < tiles.length) { e.preventDefault(); tiles[n].focus(); }
-        }
-        // Escape closes only this modal, never the Borrow Request modal underneath
-        document.addEventListener('keydown', e => {
-            if (e.key !== 'Escape' || !M.root || M.root.style.display !== 'flex') return;
-            e.stopImmediatePropagation(); e.preventDefault(); close(true);
-        }, true);
-
-        /* ---- per-field state ------------------------------------------ */
-        function setup(root) {
-            const st = {
-                root: root, form: root.closest('form'), input: root.querySelector('[data-bm-room-input]'),
-                trigger: root.querySelector('[data-bm-room-trigger]'), valueEl: root.querySelector('[data-bm-room-value]'),
-                hint: root.querySelector('[data-bm-room-hint]'),
-                query: null, label: '', reserved: new Set(), suggested: new Set(), info: {}, tok: 0, loaded: false
-            };
-            root._rp = st;
-            st.trigger.addEventListener('click', () => open(st));
-        }
-
-        function show(st, value) {
-            st.valueEl.innerHTML = '';
-            if (!value) { st.valueEl.appendChild(el('span', 'bm-room-ph', 'Choose a room')); return; }
-            if (value === 'outside') { st.valueEl.appendChild(el('strong', '', 'Outside')); st.valueEl.appendChild(el('span', '', 'Off-campus / outdoors')); return; }
-            const r = index[value]; if (!r) return;
-            st.valueEl.appendChild(el('strong', '', r.name)); st.valueEl.appendChild(el('span', '', r.building + ' · ' + r.floor));
-        }
-        function setHint(st, msg, cls) { st.hint.hidden = !msg; st.hint.textContent = msg || ''; st.hint.className = 'bm-hint' + (cls ? ' ' + cls : ''); }
-        function pick(st, value, auto) {
-            st.input.value = value; show(st, value);
-            setHint(st, auto ? 'Suggested from your reservation.' : '', auto ? 'ok' : '');
-            st.input.dispatchEvent(new Event('change', { bubbles: true }));
-            if (!auto) close(true);
-        }
-        function clear(st) { st.input.value = ''; show(st, ''); }
-
-        /* ---- availability for the chosen window ----------------------- */
-        function fetchRooms(st) {
-            return fetch('equipment-booking/api/check-booking-availability.php?' + st.query + '&rooms=1&items=%5B%5D', { credentials: 'same-origin' })
-                .then(r => r.json()).then(j => (j && j.ok === true && j.rooms) ? j.rooms : null);
-        }
-        function apply(st, rooms) {
-            st.reserved = new Set((rooms.reserved || []).map(Number));
-            st.suggested = new Set((rooms.mine || []).map(Number));
-            st.info = rooms.info || {};
-            st.loaded = true;
-        }
-        function load(st, showSpinner) {
-            if (!st || !st.query) return;
-            const token = ++st.tok;
-            if (showSpinner && active === st) paintMessage('Checking which rooms are free…', 'progress_activity', true);
-            fetchRooms(st).then(rooms => {
-                if (token !== st.tok) return;
-                if (!rooms) throw new Error('bad');
-                apply(st, rooms);
-                if (active === st) { if (M.body.querySelector('[data-rp-msg]')) build(); applyStates(); }
-            }).catch(() => {
-                if (token !== st.tok || active !== st) return;
-                if (!st.loaded) paintMessage('Could not check room availability.', 'wifi_off', false, true);
-            });
-        }
-
-        /* Called by BorrowSchedule whenever date / time / length change. */
-        function setWindow(form, query, label) {
-            const root = form && form.querySelector('[data-bm-room]'); const st = root && root._rp; if (!st) return;
-            st.label = label || '';
-            if (!query) { st.query = null; st.tok++; st.loaded = false; st.reserved = new Set(); st.suggested = new Set(); st.info = {}; if (active === st) close(false); return; }
-            if (query === st.query && st.loaded) return;
-            st.query = query; st.loaded = false;
-            const token = ++st.tok;
-            fetchRooms(st).then(rooms => {
-                if (token !== st.tok || !rooms) return;
-                apply(st, rooms);
-                const cur = st.input.value;
-                if (cur && cur !== 'outside' && st.reserved.has(+cur)) { clear(st); setHint(st, 'That room is reserved for the new time. Pick another room.', 'bad'); }
-                else if (!cur && st.suggested.size === 1) { pick(st, String(Array.from(st.suggested)[0]), true); }
-                else if (cur && st.hint.className.indexOf('bad') > -1) { setHint(st, ''); }
-                if (active === st) applyStates();
-            }).catch(() => { });
-        }
-        function reset(form) {
-            const root = form && form.querySelector('[data-bm-room]'); const st = root && root._rp; if (!st) return;
-            st.tok++; st.query = null; st.label = ''; st.loaded = false; st.reserved = new Set(); st.suggested = new Set(); st.info = {};
-            clear(st); setHint(st, ''); if (active === st) close(false);
-        }
-
-        /* ---- open / close --------------------------------------------- */
-        function open(st) {
-            if (!modalRefs()) return;
-            if (!st.query) { setHint(st, 'Choose your date, start time and how long you need it first, so we can show which rooms are free.', 'bad'); return; }
-            setHint(st, st.hint.className.indexOf('ok') > -1 ? st.hint.textContent : '');
-            active = st; lastFocus = document.activeElement; tab = 0;
-            M.sub.textContent = st.label ? st.label : 'Where will the equipment be used?';
-            M.search.value = '';
-            M.root.style.display = 'flex';
-            M.body.scrollTop = 0;
-            if (st.loaded) { build(); applyStates(); } else { paintMessage('Checking which rooms are free…', 'progress_activity', true); }
-            load(st, false);
-            clearInterval(pollTimer); pollTimer = setInterval(() => { if (active) load(active, false); }, 10000);
-            if (window.matchMedia && window.matchMedia('(pointer: fine)').matches) M.search.focus({ preventScroll: true });
-            else { const f = focusables(); if (f.length) f[0].focus({ preventScroll: true }); }
-        }
-        function close(restoreFocus) {
-            if (!M.root || M.root.style.display !== 'flex') { active = null; return; }
-            M.root.style.display = 'none'; clearInterval(pollTimer); pollTimer = null;
-            const st = active; active = null;
-            if (restoreFocus && st && st.trigger && st.trigger.offsetParent !== null) st.trigger.focus({ preventScroll: true });
-            else if (restoreFocus && lastFocus && lastFocus.focus) lastFocus.focus({ preventScroll: true });
-        }
-
-        /* ---- rendering -------------------------------------------------- */
-        function paintMessage(text, ic, spin, retry) {
-            M.tabs.hidden = true; M.tabs.innerHTML = ''; M.count.textContent = '';
-            M.body.innerHTML = '';
-            const box = el('div', 'rp-empty'); box.setAttribute('data-rp-msg', '1');
-            const i = icon(ic); if (spin) i.classList.add('rp-spin'); box.appendChild(i);
-            box.appendChild(el('p', '', text));
-            if (retry) { const b = el('button', 'btn-cancel-acc', 'Try again'); b.type = 'button'; b.setAttribute('data-rp-retry', '1'); box.appendChild(b); }
-            M.body.appendChild(box);
-        }
-
-        function quick(roomId, iconName, title, sub, grp) {
-            const b = el('button', 'rp-quick'); b.type = 'button'; b.dataset.room = roomId; if (grp) b.dataset.grp = grp;
-            b.appendChild(icon(iconName));
-            const t = el('span', 'rp-quick-txt'); t.appendChild(el('strong', '', title)); t.appendChild(el('small', '', sub)); b.appendChild(t);
-            b.appendChild(el('span', 'rp-quick-tag'));
-            return b;
-        }
-
-        function build() {
-            const m = meta(); M.body.innerHTML = '';
-            const buildings = (m.rooms || []).map(b => ({
-                name: b.name,
-                floors: (b.floors || []).map(f => ({ label: f.label, rooms: (f.rooms || []).filter(r => !r.status || r.status === 'Available') })).filter(f => f.rooms.length)
-            })).filter(b => b.floors.length);
-
-            // Outside + the faculty's own reservations
-            const top = el('section', 'rp-sec rp-top'); top.dataset.rpTop = '1';
-            // Recommended first: rooms you are using right now, rooms you will use later today,
-            // then rooms you reserved for another day (each group in time order).
-            const nowD = nowDate();
-            const mine = (m.mine || []).filter(r => index[r.room_id] && parseTs(r.start) && parseTs(r.end))
-                .map(r => { const a = parseTs(r.start), z = parseTs(r.end); return { r: r, a: a, z: z, grp: (a <= nowD && nowD < z) ? 'now' : (sameDay(a, nowD) ? 'today' : 'later') }; })
-                .sort((x, y) => x.a - y.a);
-            const groups = [
-                { key: 'now', label: 'Using now', icon: 'door_open', sub: x => 'Until ' + hm(x.z) + ' ' + meridiem(x.z) },
-                { key: 'today', label: 'Later today', icon: 'event_available', sub: x => rangeLabel(x.a, x.z) },
-                { key: 'later', label: 'Reserved for another day', icon: 'calendar_month', sub: x => dayLabel(x.a) + ' · ' + rangeLabel(x.a, x.z) }
-            ];
-            if (mine.length) {
-                top.appendChild(el('h4', 'rp-sec-title', 'Recommended for you'));
-                groups.forEach(g => {
-                    const list = mine.filter(x => x.grp === g.key); if (!list.length) return;
-                    top.appendChild(el('div', 'rp-grp-label', g.label));
-                    const grid = el('div', 'rp-quick-grid');
-                    list.forEach(x => grid.appendChild(quick(x.r.room_id, g.icon, x.r.name, g.sub(x) + ' · ' + x.r.building, g.key)));
-                    top.appendChild(grid);
-                });
-            }
-            const og = el('div', 'rp-quick-grid rp-quick-grid--one');
-            og.appendChild(quick('outside', 'park', 'Outside', 'Off-campus / outdoors'));
-            top.appendChild(og);
-            M.body.appendChild(top);
-
-            if (!buildings.length) {
-                const none = el('div', 'rp-empty rp-empty--inline'); none.appendChild(icon('meeting_room'));
-                none.appendChild(el('p', '', 'No rooms are open for equipment right now. You can still choose Outside.'));
-                M.body.appendChild(none);
-            }
-
-            if (tab >= buildings.length) tab = 0;
-            M.tabs.innerHTML = '';
-            buildings.forEach((b, i) => {
-                const t = el('button', 'rp-tab'); t.type = 'button'; t.dataset.rpTab = i; t.setAttribute('role', 'tab');
-                t.appendChild(el('span', 'rp-tab-name', b.name)); t.appendChild(el('span', 'rp-tab-n'));
-                M.tabs.appendChild(t);
-            });
-            M.tabs.hidden = buildings.length < 2;
-
-            buildings.forEach((b, i) => {
-                const wrap = el('section', 'rp-sec rp-bldg'); wrap.dataset.b = i;
-                wrap.appendChild(el('h4', 'rp-bhead', b.name));
-                b.floors.forEach(f => {
-                    const fl = el('div', 'rp-floor'); fl.appendChild(el('h5', 'rp-fhead', f.label));
-                    const grid = el('div', 'rp-grid');
-                    f.rooms.forEach(r => {
-                        const o = el('button', 'rp-room'); o.type = 'button'; o.dataset.room = r.room_id; o.dataset.b = i;
-                        o.dataset.search = (r.name + ' ' + b.name + ' ' + f.label).toLowerCase();
-                        const head = el('span', 'rp-room-top'); head.appendChild(el('span', 'rp-room-name', r.name)); head.appendChild(icon('check_circle')); o.appendChild(head);
-                        const sub = el('span', 'rp-room-meta'); sub.appendChild(el('span', 'rp-room-status')); sub.appendChild(el('span', 'rp-room-when')); o.appendChild(sub);
-                        grid.appendChild(o);
-                    });
-                    fl.appendChild(grid); wrap.appendChild(fl);
-                });
-                M.body.appendChild(wrap);
-            });
-            M.body.appendChild(Object.assign(el('div', 'rp-empty rp-empty--search', 'No rooms match your search.'), { hidden: true }));
-            applyStates(); filter();
-        }
-
-        function whenTaken(st, id) {
-            const list = (st.info && st.info[id]) || [];
-            return list.slice(0, 2).map(x => whenLabel(x.start, x.end)).filter(Boolean).join(', ') + (list.length > 2 ? ' +' + (list.length - 2) : '');
-        }
-
-        /* free / reserved / selected state of every tile (cheap; runs on each refresh) */
-        function applyStates() {
-            const st = active; if (!st || !M.body) return;
-            let free = 0, taken = 0;
-            M.body.querySelectorAll('.rp-room').forEach(o => {
-                const id = +o.dataset.room, isTaken = st.reserved.has(id), isMine = st.suggested.has(id), sel = st.input.value === o.dataset.room;
-                const name = o.querySelector('.rp-room-name').textContent, when = isTaken ? whenTaken(st, id) : '';
-                o.classList.toggle('is-taken', isTaken); o.classList.toggle('is-mine', isMine && !isTaken); o.classList.toggle('is-selected', sel && !isTaken);
-                if (isTaken) { o.setAttribute('aria-disabled', 'true'); taken++; } else { o.removeAttribute('aria-disabled'); free++; }
-                o.setAttribute('aria-pressed', sel && !isTaken ? 'true' : 'false');
-                o.querySelector('.rp-room-status').textContent = isTaken ? 'Reserved' : (isMine ? 'Your reservation' : 'Free');
-                o.querySelector('.rp-room-when').textContent = when;
-                if (when) o.setAttribute('data-when', '1'); else o.removeAttribute('data-when');
-                o.querySelector('.material-symbols-outlined').textContent = isTaken ? 'lock' : 'check_circle';
-                o.setAttribute('aria-label', isTaken ? name + ', already reserved' + (when ? ' ' + when : '') + ', not available' : name + ', ' + (isMine ? 'your reservation, ' : '') + 'free');
-            });
-            M.body.querySelectorAll('.rp-quick').forEach(b => {
-                const id = b.dataset.room, isOut = id === 'outside', isTaken = !isOut && st.reserved.has(+id), isMine = !isOut && st.suggested.has(+id), sel = st.input.value === id;
-                b.classList.toggle('is-taken', isTaken); b.classList.toggle('is-selected', sel && !isTaken);
-                if (isTaken) b.setAttribute('aria-disabled', 'true'); else b.removeAttribute('aria-disabled');
-                b.setAttribute('aria-pressed', sel && !isTaken ? 'true' : 'false');
-                const tag = b.querySelector('.rp-quick-tag'); tag.textContent = isTaken ? 'Reserved' : (isMine ? 'Fits your time' : (b.dataset.grp === 'now' ? 'In use now' : ''));
-                tag.classList.toggle('is-taken', isTaken);
-            });
-            M.tabs.querySelectorAll('.rp-tab').forEach(t => {
-                const n = M.body.querySelectorAll('.rp-room[data-b="' + t.dataset.rpTab + '"]:not(.is-taken)').length;
-                t.querySelector('.rp-tab-n').textContent = n;
-            });
-            M.count.textContent = free + ' free' + (taken ? ' · ' + taken + ' reserved' : '');
-        }
-
-        function filter() {
-            if (!M.body || !M.body.querySelector('.rp-bldg, .rp-top')) return;
-            const term = M.search.value.trim().toLowerCase();
-            M.tabs.querySelectorAll('.rp-tab').forEach(t => { const on = +t.dataset.rpTab === tab; t.classList.toggle('active', on); t.setAttribute('aria-selected', on ? 'true' : 'false'); });
-            const multi = !M.tabs.hidden;
-            M.tabs.classList.toggle('is-off', !!term);
-            const top = M.body.querySelector('.rp-top'); let any = false;
-            if (top) {
-                let topAny = false;
-                top.querySelectorAll('.rp-quick').forEach(b => { const hit = !term || b.textContent.toLowerCase().indexOf(term) > -1; b.hidden = !hit; if (hit) topAny = true; });
-                top.querySelectorAll('.rp-sec-title, .rp-grp-label').forEach(h => { h.hidden = !!term; });
-                top.hidden = !topAny; if (topAny) any = true;
-            }
-            M.body.querySelectorAll('.rp-bldg').forEach(w => {
-                let wAny = false;
-                w.querySelectorAll('.rp-floor').forEach(fl => {
-                    let fAny = false;
-                    fl.querySelectorAll('.rp-room').forEach(o => { const hit = !term || o.dataset.search.indexOf(term) > -1; o.hidden = !hit; if (hit) fAny = true; });
-                    fl.hidden = !fAny; if (fAny) wAny = true;
-                });
-                const showIt = term ? wAny : (!multi || +w.dataset.b === tab);
-                w.hidden = !showIt; w.classList.toggle('is-searching', !!term || !multi); if (term && wAny) any = true; if (!term && showIt) any = true;
-            });
-            const empty = M.body.querySelector('.rp-empty--search'); if (empty) empty.hidden = any;
-        }
-
-        return {
-            init: function () { buildIndex(); document.querySelectorAll('[data-bm-room]').forEach(setup); modalRefs(); },
-            setWindow: setWindow, reset: reset, close: function () { close(false); },
-            value: function (form) { const i = form && form.querySelector('[data-bm-room-input]'); return i ? i.value : ''; }
-        };
-    })();
-    window.RoomPicker = RoomPicker;
-
-    /* ================================================================
-       BORROW SCHEDULE  (Borrow Request modal: when / how long / how many)
-       ----------------------------------------------------------------
-       Today  : start time + 1 / 2 / 3 / 6 hours
-       Later  : date (tomorrow … 2 weeks ahead) + start time + 1 / 2 / 3 / 6 hours
-                + quantity (up to the item's TOTAL stock) + an optional request letter
-       Items that are out right now can still be booked for a later date.
-       The server re-checks every rule; this is the friendly front end.
-    ================================================================ */
-    const BorrowSchedule = (function () {
-        const pad = n => String(n).padStart(2, '0');
-        const meta = () => window.BOOKING_META || { items: {}, rules: {}, today: todayStr, nowMin: 0 };
-        const rules = () => Object.assign({
-            dayStart: '07:00', lastStart: '20:00', dayEnd: '21:00', slot: 60, maxAhead: 14, durationHours: [1, 2, 3, 6],
-            graceMin: 15
-        }, meta().rules || {});
-        const toMin = hhmm => { const p = String(hhmm).split(':'); return (+p[0]) * 60 + (+p[1]); };
-        const hhmm = min => pad(Math.floor(min / 60)) + ':' + pad(min % 60);
-        const nowMin = () => { const now = new Date(); return now.getHours() * 60 + now.getMinutes(); };
-        const localToday = () => fmtYmd(new Date());
-        const parseYmd = s => { const p = String(s).split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); };
-        const fmtYmd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
-        const addDays = (d, n) => { const x = new Date(d.getTime()); x.setDate(x.getDate() + n); return x; };
-        const fmtClock = min => { const h = Math.floor(min / 60) % 24, m = min % 60; return ((h % 12) || 12) + ':' + pad(m) + ' ' + (h < 12 ? 'AM' : 'PM'); };
-        const fmtDay = d => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-        const itemMeta = name => (meta().items || {})[name] || null;
-        const q = (root, sel) => root.querySelector(sel);
-
-        function setup(root) {
-            const st = {
-                root: root, mode: 'today', length: null, item: null, timer: null, ok: null, forcedOff: false,
-                form: root.closest('form'),
-                els: {
-                    modeInput: q(root, '[data-bm-mode-input]'), durInput: q(root, '[data-bm-duration-input]'),
-                    modeBtns: root.querySelectorAll('[data-bm-mode]'), todayInfo: q(root, '[data-bm-today-info]'), outRow: q(root, '[data-bm-outnow]'),
-                    todayWrapper: q(root, '[data-bm-today-wrapper]'),
-                    outToggle: q(root, '[data-bm-outnow-toggle]'), fields: q(root, '[data-bm-fields]'),
-                    date: q(root, '[data-bm-date]'), dateHint: q(root, '[data-bm-date-hint]'),
-                    time: q(root, '[data-bm-time]'), chips: q(root, '[data-bm-chips]'), lengthLabel: q(root, '[data-bm-length-label]'),
-                    qty: q(root, '[data-bm-qty]'), qtyHint: q(root, '[data-bm-qty-hint]'),
-                    summary: q(root, '[data-bm-summary]'), avail: q(root, '[data-bm-avail]'),
-                    futureOnly: root.querySelectorAll('[data-bm-future-only]')
-                }
-            };
-            root._bm = st;
-
-            st.els.modeBtns.forEach(b => b.addEventListener('click', () => { if (!b.disabled) setMode(st, b.dataset.bmMode); }));
-            st.els.time.addEventListener('change', () => { buildChips(st); refresh(st); });
-            if (st.els.date) st.els.date.addEventListener('change', () => refresh(st));
-            st.els.chips.addEventListener('click', e => {
-                const c = e.target.closest('[data-len]'); if (!c || c.disabled) return;
-                st.length = parseInt(c.dataset.len, 10);
-                buildChips(st); refresh(st);
-            });
-            if (st.els.qty) {
-                root.querySelector('[data-bm-qty-dec]').addEventListener('click', () => stepQty(st, -1));
-                root.querySelector('[data-bm-qty-inc]').addEventListener('click', () => stepQty(st, 1));
-                st.els.qty.addEventListener('input', () => { clampQty(st); refresh(st); });
-            }
-            if (st.els.outToggle) st.els.outToggle.addEventListener('change', () => {
-                st.forcedOff = !st.els.outToggle.checked;
-                st.els.fields.classList.toggle('is-off', st.forcedOff);
-                st.els.fields.querySelectorAll('input,select,button').forEach(x => { if (x !== st.els.outToggle) x.disabled = st.forcedOff && !x.closest('[data-bm-chips]') ? true : x.disabled; });
-                if (!st.forcedOff) { setMode(st, 'future'); }
-                refresh(st);
-            });
-            if (st.form) st.form.addEventListener('submit', e => {
-                const err = validate(st);
-                if (err) { e.preventDefault(); e.stopImmediatePropagation(); showError(st, err); }
-            }, true);
-            reset(st);
-            st.availabilityTimer = window.setInterval(() => syncTodayAvailability(st), 30000);
-        }
-
-        /* ---- item + state helpers ------------------------------------ */
-        function singleItem(st) { return st.item; }
-        function selectedItems(st) {
-            return st.item ? [{ name: st.item, qty: currentQty(st) }] : [];
-        }
-        function currentQty(st) { return st.mode === 'future' && st.els.qty ? (parseInt(st.els.qty.value, 10) || 1) : 1; }
-
-        /* ---- mode ----------------------------------------------------- */
-        function setMode(st, mode) {
-            st.mode = mode; st.length = null; st.ok = null;
-            st.els.modeInput.value = mode;
-            st.els.modeBtns.forEach(b => { const on = b.dataset.bmMode === mode; b.classList.toggle('active', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
-            st.els.futureOnly.forEach(el => { el.hidden = mode !== 'future'; });
-            if (mode !== 'future') clearLetter(st);   /* a same-day request never carries a request letter */
-            const r = rules(), today = parseYmd(localToday());
-            if (st.els.date) {
-                st.els.date.innerHTML = '';
-                const placeholder = document.createElement('option');
-                placeholder.value = '';
-                placeholder.textContent = 'Choose a borrowing date';
-                placeholder.disabled = true;
-                st.els.date.appendChild(placeholder);
-                for (let offset = 1; offset <= r.maxAhead; offset++) {
-                    const date = addDays(today, offset);
-                    if (date.getDay() === 0) continue;
-                    const option = document.createElement('option');
-                    option.value = fmtYmd(date);
-                    option.textContent = fmtDay(date);
-                    st.els.date.appendChild(option);
-                }
-                st.els.date.required = mode === 'future';
-                if (mode === 'future') st.els.date.value = st.els.date.options[1] ? st.els.date.options[1].value : '';
-                if (st.els.dateHint) st.els.dateHint.textContent = '';
-            }
-            st.els.lengthLabel.textContent = 'For how many hours?';
-            buildTimes(st); buildChips(st);
-            if (st.els.qty) clampQty(st, true);
-            refresh(st);
-        }
-
-        function buildTimes(st) {
-            const r = rules(), sel = st.els.time, prev = sel.value;
-            const opening = toMin(r.dayStart), lastStart = toMin(r.lastStart), step = +r.slot || 60;
-            let start = opening;
-            const opts = [];
-            if (st.mode === 'today') {
-                const now = nowMin();
-                start = Math.max(start, Math.ceil(now / step) * step);
-            } else {
-                start = opening;
-            }
-            for (let m = start; m <= lastStart; m += step) opts.push({ v: hhmm(m), t: fmtClock(m) });
-            sel.innerHTML = '';
-            if (!opts.length) { const o = document.createElement('option'); o.value = ''; o.textContent = 'No start times left today'; o.disabled = true; o.selected = true; sel.appendChild(o); return; }
-            opts.forEach(o => { const e = document.createElement('option'); e.value = o.v; e.textContent = o.t; sel.appendChild(e); });
-            const keep = opts.find(o => o.v === prev);
-            sel.value = keep ? keep.v : opts[0].v;
-        }
-
-        function buildChips(st) {
-            const r = rules(), box = st.els.chips; box.innerHTML = '';
-            const startMin = st.els.time.value ? toMin(st.els.time.value) : toMin(r.dayStart);
-            const list = r.durationHours;
-            list.forEach(n => {
-                const b = document.createElement('button'); b.type = 'button'; b.className = 'bm-chip'; b.dataset.len = n;
-                b.textContent = n + (n === 1 ? ' hr' : ' hrs');
-                const tooLong = startMin + n * 60 > toMin(r.dayEnd);
-                b.disabled = tooLong; if (tooLong && st.length === n) st.length = null;
-                const on = st.length === n;
-                b.classList.toggle('active', on); b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', on ? 'true' : 'false');
-                box.appendChild(b);
-            });
-        }
-
-        /* ---- request letter (Later bookings only) --------------------- */
-        function clearLetter(st) {
-            const f = st.root.querySelector('input[type="file"]');
-            if (f && f.value) { f.value = ''; if (typeof window.syncBorrowDrops === 'function') window.syncBorrowDrops(); }
-        }
-
-        /* ---- quantity (Later bookings) -------------------------------- */
-        function itemTotal(st) { const m = itemMeta(st.item); return m ? Math.max(0, m.total) : 0; }
-        function clampQty(st, silent) {
-            if (!st.els.qty) return;
-            const max = Math.max(1, itemTotal(st));
-            st.els.qty.max = max; if (!st.els.qty.value || +st.els.qty.value < 1) st.els.qty.value = 1;
-            if (+st.els.qty.value > max) st.els.qty.value = max;
-            if (st.els.qtyHint) st.els.qtyHint.textContent = st.item ? 'Up to ' + itemTotal(st) + ' in stock — counted from total stock, not what is on the shelf today.' : '';
-            const wrap = st.root.querySelector('[data-bm-qty-wrap]');
-            if (wrap) { wrap.querySelector('[data-bm-qty-dec]').disabled = +st.els.qty.value <= 1; wrap.querySelector('[data-bm-qty-inc]').disabled = +st.els.qty.value >= max; }
-        }
-        function stepQty(st, d) { st.els.qty.value = (parseInt(st.els.qty.value, 10) || 1) + d; clampQty(st); refresh(st); }
-
-        /* ---- summary + live availability ------------------------------ */
-        function windowOf(st) {
-            if (!st.length || !st.els.time.value) return null;
-            const startMin = toMin(st.els.time.value);
-            if (st.mode === 'today') {
-                const d = parseYmd(localToday());
-                return { start: d, startMin: startMin, endDate: d, endMin: startMin + st.length * 60 };
-            }
-            if (!st.els.date.value) return null;
-            const d = parseYmd(st.els.date.value);
-            return { start: d, startMin: startMin, endDate: d, endMin: startMin + st.length * 60 };
-        }
-        function refresh(st) {
-            const w = windowOf(st);
-            st.els.durInput.value = st.length || '';
-            if (st.els.qty) clampQty(st);
-            if (!w) { st.els.summary.textContent = ''; st.els.summary.classList.remove('has'); setAvail(st, '', ''); st.ok = null; RoomPicker.setWindow(st.form, null); return; }
-            const dayLabel = d => (st.mode === 'today' && d === w.start) ? 'Today' : fmtDay(d);
-            st.els.summary.innerHTML = '<span class="material-symbols-outlined">schedule</span><span><strong>' + dayLabel(w.start) + ' · ' + fmtClock(w.startMin) + '</strong> → <strong>' + fmtClock(w.endMin) + '</strong></span>';
-            st.els.summary.classList.add('has');
-            const winText = (st.mode === 'today' ? 'Today' : fmtDay(w.start)) + ' · ' + fmtClock(w.startMin) + ' → ' + fmtClock(w.endMin);
-            clearTimeout(st.timer); st.timer = setTimeout(() => { RoomPicker.setWindow(st.form, windowQuery(st), winText); check(st, w); }, 350);
-        }
-        /* window as query-string, shared by the availability and room checks */
-        function windowQuery(st) {
-            return new URLSearchParams({ mode: st.mode, date: st.mode === 'future' ? st.els.date.value : '', time: st.els.time.value, duration: String(st.length) }).toString();
-        }
-        function setAvail(st, msg, cls) { st.els.avail.textContent = msg; st.els.avail.className = 'bm-avail' + (cls ? ' ' + cls : ''); }
-
-        function check(st, w) {
-            const items = selectedItems(st); if (!items.length) { setAvail(st, '', ''); st.ok = null; return; }
-            if (st.mode === 'future' && !st.els.date.value) return;
-            const params = new URLSearchParams({ mode: st.mode, date: st.mode === 'future' ? st.els.date.value : '', time: st.els.time.value, duration: String(st.length), items: JSON.stringify(items.map(i => ({ n: i.name, q: i.qty }))) });
-            setAvail(st, 'Checking availability…', 'busy');
-            const token = st._tok = (st._tok || 0) + 1;
-            fetch('equipment-booking/api/check-booking-availability.php?' + params.toString(), { credentials: 'same-origin' })
-                .then(r => r.json()).then(j => {
-                    if (token !== st._tok) return;
-                    if (!j || j.ok !== true) { st.ok = false; setAvail(st, (j && j.error) || 'That schedule is not allowed.', 'bad'); return; }
-                    const bad = (j.results || []).filter(x => !x.ok);
-                    st.ok = bad.length === 0;
-                    setAvail(st, (j.results[0] || {}).message || '', st.ok ? 'ok' : 'bad');
-                }).catch(() => { st.ok = null; setAvail(st, '', ''); });
-        }
-
-        /* ---- validation + errors -------------------------------------- */
-        function validate(st) {
-            const items = selectedItems(st);
-            if (!items.length) return 'No equipment selected.';
-            if (st.forcedOff) return 'Turn on “Out right now” to book this item for a later date.';
-            if (st.mode === 'future') {
-                if (!st.els.date.value) return 'Please choose a borrow date.';
-                const today = parseYmd(localToday());
-                const selectedDate = parseYmd(st.els.date.value);
-                if (selectedDate <= today) return 'Choose a later date or use “Today” for same-day borrowing.';
-                if (selectedDate > addDays(today, rules().maxAhead)) return 'You can only book up to two weeks ahead.';
-                if (selectedDate.getDay() === 0) return 'Equipment borrowing is unavailable on Sundays.';
-            }
-            if (st.mode === 'today' && parseYmd(localToday()).getDay() === 0) return 'Borrowing equipment today is unavailable on Sundays. Please choose a later date.';
-            if (st.mode === 'today' && nowMin() > toMin(rules().lastStart)) return 'Same-day borrowing is unavailable after 8:00 PM. Please choose a later date.';
-            if (!st.els.time.value) return 'Please choose a start time.';
-            if (!st.length) return 'Please choose a duration of 1, 2, 3, or 6 hours.';
-            if (!RoomPicker.value(st.form)) return 'Please choose a room.';
-            if (st.ok === false) return st.els.avail.textContent || 'That schedule is not available.';
-            return null;
-        }
-        function showError(st, msg) { setAvail(st, msg, 'bad'); if (typeof showToast === 'function') showToast(msg, 'error'); st.els.avail.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
-
-        /* ---- public --------------------------------------------------- */
-        function reset(st) {
-            st.length = null; st.forcedOff = false; st.ok = null;
-            if (st.els.qty) st.els.qty.value = 1;
-            if (st.els.outToggle) st.els.outToggle.checked = true;
-            st.els.fields.classList.remove('is-off');
-            st.els.fields.querySelectorAll('input,select,button').forEach(x => { x.disabled = false; });
-            if (st.els.date) st.els.date.value = '';
-            const today = parseYmd(localToday());
-            const isSunday = today.getDay() === 0;
-            const reason = isSunday ? 'sunday' : nowMin() > toMin(rules().lastStart) ? 'closed' : '';
-            st.scheduleDisabledReason = reason;
-            const scheduleClosed = reason !== '';
-            const allowToday = (!st.item || (itemMeta(st.item) || {}).shelf > 0) && !scheduleClosed;
-            const outNow = st.item && (itemMeta(st.item) || {}).shelf <= 0;
-            if (st.els.outRow) st.els.outRow.hidden = !outNow;
-            st.els.modeBtns.forEach(b => {
-                if (b.dataset.bmMode !== 'today') return;
-                b.disabled = !allowToday;
-                const info = st.els.todayInfo;
-                const wrapper = st.els.todayWrapper;
-                if (info) {
-                    info.hidden = !scheduleClosed;
-                    info.setAttribute('aria-hidden', scheduleClosed ? 'false' : 'true');
-                    const message = reason === 'sunday'
-                        ? 'Same-day borrowing is unavailable on Sundays. Choose a later date.'
-                        : 'Same-day borrowing is unavailable after 8:00 PM. Choose a later date.';
-                    info.title = scheduleClosed ? message : '';
-                    info.setAttribute('aria-label', scheduleClosed ? message : '');
-                    b.title = scheduleClosed ? message : '';
-                    b.setAttribute('aria-label', scheduleClosed ? 'Today unavailable. ' + message : 'Today');
-                    if (wrapper) {
-                        wrapper.title = scheduleClosed ? message : '';
-                        wrapper.tabIndex = scheduleClosed ? 0 : -1;
-                        wrapper.setAttribute('aria-label', scheduleClosed ? message : '');
-                    }
-                }
-            });
-            setMode(st, allowToday ? 'today' : 'future');
-            setAvail(st, '', '');
-            RoomPicker.reset(st.form);
-        }
-
-        function syncTodayAvailability(st) {
-            const today = parseYmd(localToday());
-            const reason = today.getDay() === 0 ? 'sunday' : nowMin() > toMin(rules().lastStart) ? 'closed' : '';
-            if (reason !== st.scheduleDisabledReason) {
-                reset(st);
-                return;
-            }
-        }
-
-        return {
-            init: function () { RoomPicker.init(); document.querySelectorAll('[data-bm-sched]').forEach(setup); },
-            open: function (itemName) {
-                document.querySelectorAll('[data-bm-sched]').forEach(root => { const st = root._bm; if (!st) return; st.item = itemName; reset(st); });
-            },
-            resetAll: function () { document.querySelectorAll('[data-bm-sched]').forEach(root => { const st = root._bm; if (st) reset(st); }); },
-            setItemMeta: function () { document.querySelectorAll('[data-bm-sched]').forEach(root => { const st = root._bm; if (st) { clampQty(st); } }); }
-        };
-    })();
-    window.BorrowSchedule = BorrowSchedule;
-
-    function openBorrowForm(itemName) {
-        document.getElementById('selectedItem').value = itemName;
-        document.getElementById('selectedItemLabel').textContent = itemName;
-        const modal = document.getElementById('borrowModal');
-        if (modal) {
-            modal.style.display = 'flex';
-            // Reset the form fields each time the modal opens
-            const form = document.getElementById('borrowForm');
-            if (form) {
-                // Keep hidden collector name input in sync with the visible text field
-                const nameVis = document.getElementById('bm_collector_name_input');
-                const nameHid = document.getElementById('bm_collector_name');
-                if (nameVis && nameHid) nameVis.addEventListener('input', () => { nameHid.value = nameVis.value.trim(); });
-
-                // Validate student name on submit
-                form.addEventListener('submit', function (ev) {
-                    const type = form.querySelector('input[name="collector_type"]:checked');
-                    if (type && type.value === 'student') {
-                        const n = (nameVis?.value || '').trim();
-                        if (!n) {
-                            ev.preventDefault();
-                            alert('Please enter the student\'s name before submitting.');
-                        }
-                    }
-                }, { once: false });
-
-                const fileInp = document.getElementById('request_document');
-                if (fileInp) fileInp.value = '';
-                syncBorrowDrops();
-            }
-            // when / how long / how many (also decides Today vs "Later date only" for items that are out)
-            BorrowSchedule.open(itemName);
-        }
-    }
-
-    function closeBorrowModal() {
-        const modal = document.getElementById('borrowModal');
-        if (modal) modal.style.display = 'none';
-        if (window.RoomPicker) window.RoomPicker.close();
-    }
-
-    /* Borrow modal: show the chosen file's name inside the styled drop area */
+    /* Borrow modal: show the chosen file's name inside the styled drop area (also used by faculty-borrow-flow.js) */
     function syncBorrowDrops() {
         document.querySelectorAll('.bm-drop').forEach(function (drop) {
             const inp = drop.querySelector('input[type="file"]');
@@ -1274,22 +593,9 @@
     }
     window.syncBorrowDrops = syncBorrowDrops;
 
-    // Toggle student collector fields in borrow forms (personal + cart)
+    // Letter drop area: show the chosen file's name
     document.addEventListener('change', function (e) {
         const inp = e.target;
-
-        // Personal borrow form collector toggle
-        if (inp && inp.matches('input[name="collector_type"]')) {
-            const fields = document.getElementById('collectorStudentFields');
-            if (fields) fields.style.display = inp.value === 'student' ? 'block' : 'none';
-            // Sync hidden inputs from visible text inputs on every keystroke already wired below
-        }
-
-        // Cart checkout collector toggle
-        if (inp && inp.matches('input[name="cart_collector_type"]')) {
-            const fields = document.getElementById('cartCollectorStudentFields');
-            if (fields) fields.style.display = inp.value === 'student' ? 'block' : 'none';
-        }
 
         if (!inp || !inp.matches || !inp.matches('.bm-drop input[type="file"]')) return;
         syncBorrowDrops();
@@ -1905,6 +1211,10 @@
     // First paint from the server-embedded feed (badge, pills, counts)
     renderNotifPage();
 
+    // A Notification Preferences switch was flipped (Settings): re-pull the feed right away so the
+    // bell, its badge and the list match what the server will now send.
+    document.addEventListener('pupsync:notif-prefs-changed', function () { refreshNotifs(); });
+
     /* ── Settings: Theme ───────────────────────────────────────────────── */
     function applyTheme(theme) {
         _applyThemeDOM(theme);
@@ -1997,141 +1307,6 @@
         showToast('All settings reset to defaults.');
     }
 
-    /* ── Profile Edit ──────────────────────────────────────────────────── */
-    // Locked fields: dob, gender, nationality cannot be changed once set.
-    // The PHP template only renders their <input>/<select> elements when the
-    // value is empty, so we simply skip any [data-input] that has no matching
-    // element in the DOM.
-    function toggleProfileEdit() {
-        const editBtn = document.getElementById('editProfileBtn');
-        const saveBtn = document.getElementById('saveProfileBtn');
-        const cancelBtn = document.getElementById('cancelProfileBtn');
-        if (editBtn) editBtn.style.display = 'none';
-        if (saveBtn) saveBtn.style.display = 'flex';
-        if (cancelBtn) cancelBtn.style.display = 'flex';
-
-        document.querySelectorAll('[data-field]').forEach(span => {
-            const key = span.dataset.field;
-            const input = document.querySelector('[data-input="' + key + '"]');
-            if (!input) return; // locked — no input rendered, skip
-            span.style.display = 'none';
-            input.style.display = '';
-            input.disabled = false;
-            if (span.classList.contains('empty')) input.value = '';
-        });
-    }
-
-    function cancelProfileEdit() {
-        const editBtn = document.getElementById('editProfileBtn');
-        const saveBtn = document.getElementById('saveProfileBtn');
-        const cancelBtn = document.getElementById('cancelProfileBtn');
-        if (editBtn) editBtn.style.display = 'flex';
-        if (saveBtn) saveBtn.style.display = 'none';
-        if (cancelBtn) cancelBtn.style.display = 'none';
-        document.querySelectorAll('[data-input]').forEach(input => {
-            const key = input.dataset.input;
-            const span = document.querySelector('[data-field="' + key + '"]');
-            if (!span) return;
-            span.style.display = '';
-            input.style.display = 'none';
-            input.disabled = true;
-        });
-    }
-
-    function saveProfileEdit() {
-        const saveBtn = document.getElementById('saveProfileBtn');
-        const cancelBtn = document.getElementById('cancelProfileBtn');
-
-        // Collect values from visible inputs
-        const fd = new FormData();
-        fd.append('action', 'save_profile');
-        fd.append('csrf_token', getCsrfToken());
-
-        document.querySelectorAll('[data-input]').forEach(input => {
-            const key = input.dataset.input;
-            const val = input.tagName === 'SELECT'
-                ? input.options[input.selectedIndex].value
-                : input.value.trim();
-            fd.append(key, val);
-        });
-
-        // Optimistic UI: disable buttons while saving
-        if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
-        if (cancelBtn) cancelBtn.disabled = true;
-
-        fetch('settings/api/update-profile.php', { method: 'POST', body: fd })
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    // Update each span from the server-confirmed values
-                    const serverVals = {
-                        fullname: data.fullname || '',
-                        dob: data.dob || '',
-                        gender: data.gender || '',
-                        nationality: data.nationality || ''
-                    };
-
-                    document.querySelectorAll('[data-input]').forEach(input => {
-                        const key = input.dataset.input;
-                        const span = document.querySelector('[data-field="' + key + '"]');
-                        if (!span) return;
-
-                        let displayVal = serverVals[key] || '';
-
-                        // Format date of birth for display
-                        if (key === 'dob' && displayVal) {
-                            const d = new Date(displayVal + 'T00:00:00');
-                            displayVal = d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-                        }
-
-                        if (displayVal) {
-                            span.textContent = displayVal;
-                            span.classList.remove('empty');
-                            // If this field is now permanently locked, remove the input from DOM
-                            const locks = window.USER_PROFILE_LOCKS || {};
-                            if ((key === 'dob' || key === 'gender' || key === 'nationality') && !locks[key]) {
-                                // Mark as locked for this session without full reload
-                                input.parentElement.removeChild(input);
-                            }
-                        } else {
-                            span.textContent = '— Not provided';
-                            span.classList.add('empty');
-                        }
-                    });
-
-                    // Update header name display
-                    if (data.fullname) {
-                        document.querySelectorAll('.side-nav-user-name, .u-name, .acc-hero-info h2').forEach(el => {
-                            el.textContent = data.fullname;
-                        });
-                        // Update initials
-                        const parts = data.fullname.trim().split(' ');
-                        let ini = parts[0].charAt(0).toUpperCase();
-                        if (parts.length > 1) ini += parts[parts.length - 1].charAt(0).toUpperCase();
-                        document.querySelectorAll('.avatar-btn, .side-nav-avatar, .acc-avatar-large').forEach(el => {
-                            // Replace only text nodes (preserve child elements like .cam-btn)
-                            const textNode = [...el.childNodes].find(n => n.nodeType === Node.TEXT_NODE);
-                            if (textNode) textNode.textContent = ini;
-                            else if (!el.querySelector('.cam-btn')) el.textContent = ini;
-                            else { el.insertBefore(document.createTextNode(ini), el.firstChild); }
-                        });
-                    }
-
-                    cancelProfileEdit();
-                    showToast(data.msg || 'Profile updated!');
-                } else {
-                    if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;"><polyline points="20 6 9 17 4 12"/></svg> Save'; }
-                    if (cancelBtn) cancelBtn.disabled = false;
-                    showToast('Error: ' + (data.msg || 'Could not save profile.'));
-                }
-            })
-            .catch(() => {
-                if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;"><polyline points="20 6 9 17 4 12"/></svg> Save'; }
-                if (cancelBtn) cancelBtn.disabled = false;
-                showToast('Network error. Please try again.');
-            });
-    }
-
     /* ══════════════════════════════════════════════════════════════════
        SETTINGS > PERSONAL INFORMATION  ("Edit Account" -> Save / Cancel)
        The card is read-only until Edit Account is clicked. Save only becomes
@@ -2190,11 +1365,6 @@
     function _sovIsEditingAccount() {
         const card = _sovCard();
         return Boolean(card && card.dataset.editing === 'true');
-    }
-
-    // Same rules as the server: 09XXXXXXXXX, +639XXXXXXXXX, 639XXXXXXXXX or 9XXXXXXXXX (spaces / dashes allowed)
-    function _sovPhoneOk(v) {
-        return /^(?:\+?63|0)?9\d{9}$/.test(String(v).replace(/[\s\-().]/g, ''));
     }
 
     function sovStartEdit() {
@@ -2259,15 +1429,6 @@
         const nameView = document.getElementById('sovFullNameView');
         if (nameView) nameView.textContent = d.fullname;
 
-        const phoneIn = c.querySelector('[data-edit-field="phone"]');
-        if (phoneIn) phoneIn.value = d.phone_display || '';
-        const phoneView = document.getElementById('sovPhoneView');
-        if (phoneView) {
-            phoneView.textContent = d.phone_display || '— Not provided';
-            phoneView.classList.toggle('acct-row-static-muted', !d.phone_display);
-            phoneView.classList.toggle('acct-row-not-provided', !d.phone_display);
-        }
-
         // department: once chosen it becomes a permanent, read-only value
         const deptSel = c.querySelector('[data-edit-field="department"]');
         const deptView = document.getElementById('sovDepartmentView');
@@ -2314,11 +1475,6 @@
         const vals = {};
         _sovFields().forEach(el => { vals[el.dataset.editField] = el.value.trim(); });
         if (!vals.fullname) { _sovShowError('fullname', 'Full name cannot be empty.'); return; }
-        const phoneEl = c.querySelector('[data-edit-field="phone"]');
-        if (vals.phone && phoneEl && vals.phone !== (phoneEl.dataset.original || '') && !_sovPhoneOk(vals.phone)) {
-            _sovShowError('phone', 'Enter a valid mobile number, like 09XX XXX XXXX.');
-            return;
-        }
 
         const fd = new FormData();
         fd.append('action', 'save_account');
@@ -2402,10 +1558,10 @@
         fetch('settings/api/export-faculty-data.php', { method: 'POST', body: fd })
             .then(r => {
                 const type = r.headers.get('Content-Type') || '';
-                if (r.ok && type.indexOf('text/csv') !== -1) {
+                if (r.ok && type.indexOf('application/pdf') !== -1) {
                     const cd = r.headers.get('Content-Disposition') || '';
                     const m = /filename="?([^";]+)"?/.exec(cd);
-                    return r.blob().then(b => ({ blob: b, name: m ? m[1] : 'pupsync-my-data.csv' }));
+                    return r.blob().then(b => ({ blob: b, name: m ? m[1] : 'pupsync-activity-report.pdf' }));
                 }
                 return r.json().catch(() => ({})).then(j => {
                     throw new Error(j.msg || j.error || 'Could not export your data. Please try again.');
@@ -2420,7 +1576,7 @@
                 a.click();
                 a.remove();
                 setTimeout(() => URL.revokeObjectURL(url), 2000);
-                showToast('Your data was downloaded.', 'success');
+                showToast('Your activity report was downloaded.', 'success');
             })
             .catch(err => showToast(_sovEsc(err && err.message ? err.message : 'Could not export your data.'), 'error'))
             .finally(() => {
@@ -2970,34 +2126,13 @@
         // while the tab is open) — not on every check. The very first call
         // just establishes the baseline; the initial-load toast (if any) is
         // handled server-side via the session-gated data-should-show flag.
-        if (_prevOverdueCount !== null && overdueCount > 0 && _prevOverdueCount === 0) {
+        if (_prevOverdueCount !== null && overdueCount > 0 && _prevOverdueCount === 0 && notifFamilyOn('overdue')) {
             showOverdueToast();
         }
         _prevOverdueCount = overdueCount;
         // The bell badge is driven by the real notification feed now — pull
         // a fresh copy whenever the overdue count changes.
         if (_prevOverdueCount !== null && _prevOverdueCount !== overdueCount) refreshNotifs();
-    }
-
-    /* ── Borrow Form Init ──────────────────────────────────────────────── */
-    function initBorrowForm() {
-        // Schedule rules (Today / Later, hours, days, quantity) are enforced by BorrowSchedule's own
-        // submit listener, which runs first and stops the submit when something is wrong.
-        BorrowSchedule.init();
-
-        const form = document.getElementById('borrowForm');
-        if (!form) return;
-
-        form.addEventListener('submit', function (e) {
-            e.preventDefault();
-            document.getElementById('loading-overlay').classList.add('active');
-            const hidden = document.createElement('input');
-            hidden.type = 'hidden';
-            hidden.name = 'borrow_submit';
-            hidden.value = '1';
-            this.appendChild(hidden);
-            setTimeout(() => this.submit(), 2000);
-        });
     }
 
     /* ════════════════════════════════════════════════════════════════════
@@ -3086,17 +2221,11 @@
                 case 'ai-cancel-reservation':
                     if (typeof window.actAiCancel === 'function') window.actAiCancel();
                     break;
-                case 'open-borrow-form':
-                    openBorrowForm(el.dataset.item);
-                    break;
                 case 'equip-search-clear': {
                     var eqIn = document.getElementById('equipmentSearch');
                     if (eqIn) { eqIn.value = ''; eqIn.dispatchEvent(new Event('input', { bubbles: true })); eqIn.focus(); }
                     break;
                 }
-                case 'close-borrow-modal':
-                    closeBorrowModal();
-                    break;
                 case 'lending-back':
                     switchLendingSub('browse');
                     break;
@@ -3118,15 +2247,6 @@
                 // case 'reset-settings': — reset button removed from new settings design
                 //     resetAllSettings();
                 //     break;
-                case 'profile-edit':
-                    toggleProfileEdit();
-                    break;
-                case 'profile-save':
-                    saveProfileEdit();
-                    break;
-                case 'profile-cancel':
-                    cancelProfileEdit();
-                    break;
                 case 'open-pw-modal':
                     if (el.hasAttribute('data-sov-edit-gated') && !_sovIsEditingAccount()) break;
                     openPwModal();
@@ -3617,7 +2737,6 @@
                 if (sa) sa.style.display = 'none';
             }, 5000);
         }
-        initBorrowForm();
         checkOverdueState();
         const overdueToastEl = document.getElementById('overdue-alert');
         if (overdueToastEl && overdueToastEl.dataset.shouldShow === '1') showOverdueToast();
@@ -3653,14 +2772,6 @@
             });
         }
 
-        // Close borrow modal on backdrop click
-        const borrowModal = document.getElementById('borrowModal');
-        if (borrowModal) {
-            borrowModal.addEventListener('click', function (e) {
-                if (e.target === this) closeBorrowModal();
-            });
-        }
-
         // Password show/hide toggles
         document.addEventListener('click', function (e) {
             const btn = e.target.closest('.pw-toggle-btn');
@@ -3681,10 +2792,6 @@
             }
             if (modal && modal.style.display !== 'none' && e.key === 'Escape') {
                 closePwModal();
-            }
-            if (e.key === 'Escape') {
-                const bm = document.getElementById('borrowModal');
-                if (bm && bm.style.display !== 'none') closeBorrowModal();
             }
         });
     }
@@ -3835,178 +2942,6 @@
     }
 
     /* ══════════════════════════════════════════════════════════════════
-       CONTACT DETAILS - EDIT/SAVE/CANCEL
-    ══════════════════════════════════════════════════════════════════ */
-    let contactOriginalValues = {};
-
-    function initContactSection() {
-        const editBtn = document.getElementById('editContactBtn');
-        const saveBtn = document.getElementById('saveContactBtn');
-        const cancelBtn = document.getElementById('cancelContactBtn');
-
-        if (!editBtn) return;
-
-        editBtn.addEventListener('click', function () {
-            // Store original values
-            contactOriginalValues = {
-                phone: document.querySelector('[data-input="phone"]')?.value || '',
-                present_address: document.querySelector('[data-input="present_address"]')?.value || '',
-                permanent_address: document.querySelector('[data-input="permanent_address"]')?.value || '',
-                landline: document.querySelector('[data-input="landline"]')?.value || ''
-            };
-
-            // Show inputs, hide displays
-            document.querySelectorAll('#acc-contact .info-input-f').forEach(inp => {
-                const field = inp.getAttribute('data-input');
-                const display = document.querySelector(`#acc-contact [data-field="${field}"]`);
-                if (display) {
-                    const currentText = display.textContent.trim();
-                    if (currentText !== '— Not provided') {
-                        inp.value = currentText;
-                    }
-                    display.style.display = 'none';
-                }
-                inp.style.display = 'block';
-                inp.disabled = false;
-            });
-
-            editBtn.style.display = 'none';
-            saveBtn.style.display = 'inline-flex';
-            cancelBtn.style.display = 'inline-flex';
-        });
-
-        cancelBtn.addEventListener('click', function () {
-            document.querySelectorAll('#acc-contact .info-input-f').forEach(inp => {
-                const field = inp.getAttribute('data-input');
-                inp.value = contactOriginalValues[field] || '';
-                inp.style.display = 'none';
-                inp.disabled = true;
-                const display = document.querySelector(`#acc-contact [data-field="${field}"]`);
-                if (display) display.style.display = 'block';
-            });
-
-            editBtn.style.display = 'inline-flex';
-            saveBtn.style.display = 'none';
-            cancelBtn.style.display = 'none';
-        });
-
-        saveBtn.addEventListener('click', function () {
-            const formData = new FormData();
-            formData.append('action', 'save_contact');
-            formData.append('csrf_token', getCsrfToken());
-            formData.append('phone', document.querySelector('[data-input="phone"]')?.value || '');
-            formData.append('present_address', document.querySelector('[data-input="present_address"]')?.value || '');
-            formData.append('permanent_address', document.querySelector('[data-input="permanent_address"]')?.value || '');
-            formData.append('landline', document.querySelector('[data-input="landline"]')?.value || '');
-
-            fetch('settings/api/update-profile.php', {
-                method: 'POST',
-                body: formData
-            })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.needsConfirmation) {
-                        showConfirmationModal(data.changes, 'contact', data.data);
-                    } else if (data.success) {
-                        showToast(data.msg, 'success');
-                        updateCompletionProgress();
-                    } else {
-                        showToast(data.msg, 'error');
-                    }
-                })
-                .catch(err => {
-                    console.error(err);
-                    showToast('Failed to save contact details', 'error');
-                });
-        });
-    }
-
-    /* ══════════════════════════════════════════════════════════════════
-       EMERGENCY CONTACT - EDIT/SAVE/CANCEL
-    ══════════════════════════════════════════════════════════════════ */
-    let emergencyOriginalValues = {};
-
-    function initEmergencySection() {
-        const editBtn = document.getElementById('editEmergencyBtn');
-        const saveBtn = document.getElementById('saveEmergencyBtn');
-        const cancelBtn = document.getElementById('cancelEmergencyBtn');
-
-        if (!editBtn) return;
-
-        editBtn.addEventListener('click', function () {
-            // Store original values
-            emergencyOriginalValues = {
-                emergency_name: document.querySelector('[data-input="emergency_name"]')?.value || '',
-                emergency_relationship: document.querySelector('[data-input="emergency_relationship"]')?.value || '',
-                emergency_phone: document.querySelector('[data-input="emergency_phone"]')?.value || ''
-            };
-
-            // Show inputs, hide displays
-            document.querySelectorAll('#acc-emergency .info-input-f').forEach(inp => {
-                const field = inp.getAttribute('data-input');
-                const display = document.querySelector(`#acc-emergency [data-field="${field}"]`);
-                if (display) {
-                    const currentText = display.textContent.trim();
-                    if (currentText !== '— Not provided') {
-                        inp.value = currentText;
-                    }
-                    display.style.display = 'none';
-                }
-                inp.style.display = 'block';
-                inp.disabled = false;
-            });
-
-            editBtn.style.display = 'none';
-            saveBtn.style.display = 'inline-flex';
-            cancelBtn.style.display = 'inline-flex';
-        });
-
-        cancelBtn.addEventListener('click', function () {
-            document.querySelectorAll('#acc-emergency .info-input-f').forEach(inp => {
-                const field = inp.getAttribute('data-input');
-                inp.value = emergencyOriginalValues[field] || '';
-                inp.style.display = 'none';
-                inp.disabled = true;
-                const display = document.querySelector(`#acc-emergency [data-field="${field}"]`);
-                if (display) display.style.display = 'block';
-            });
-
-            editBtn.style.display = 'inline-flex';
-            saveBtn.style.display = 'none';
-            cancelBtn.style.display = 'none';
-        });
-
-        saveBtn.addEventListener('click', function () {
-            const formData = new FormData();
-            formData.append('action', 'save_emergency');
-            formData.append('csrf_token', getCsrfToken());
-            formData.append('emergency_name', document.querySelector('[data-input="emergency_name"]')?.value || '');
-            formData.append('emergency_relationship', document.querySelector('[data-input="emergency_relationship"]')?.value || '');
-            formData.append('emergency_phone', document.querySelector('[data-input="emergency_phone"]')?.value || '');
-
-            fetch('settings/api/update-profile.php', {
-                method: 'POST',
-                body: formData
-            })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.needsConfirmation) {
-                        showConfirmationModal(data.changes, 'emergency', data.data);
-                    } else if (data.success) {
-                        showToast(data.msg, 'success');
-                        updateCompletionProgress();
-                    } else {
-                        showToast(data.msg, 'error');
-                    }
-                })
-                .catch(err => {
-                    console.error(err);
-                    showToast('Failed to save emergency contact', 'error');
-                });
-        });
-    }
-
-    /* ══════════════════════════════════════════════════════════════════
        CONFIRMATION MODAL
     ══════════════════════════════════════════════════════════════════ */
     let pendingConfirmation = null;
@@ -4098,9 +3033,7 @@
                     });
 
                     // Reset edit mode
-                    const sectionId = section === 'profile' ? 'acc-overview' :
-                        section === 'academic' ? 'acc-academic' :
-                            section === 'contact' ? 'acc-contact' : 'acc-emergency';
+                    const sectionId = 'acc-academic';   // the only section that still uses this confirmation step
 
                     document.querySelectorAll(`#${sectionId} .info-input-f`).forEach(inp => {
                         inp.style.display = 'none';
@@ -4128,62 +3061,11 @@
     }
 
     /* ══════════════════════════════════════════════════════════════════
-       MODIFIED PROFILE SAVE TO USE CONFIRMATION
-    ══════════════════════════════════════════════════════════════════ */
-    // This function should be added to or replace the existing profile save handler
-    function handleProfileSaveWithConfirmation() {
-        const saveBtn = document.getElementById('saveProfileBtn');
-        if (!saveBtn) return;
-
-        // Remove existing listeners (if any) and add new one
-        const newSaveBtn = saveBtn.cloneNode(true);
-        saveBtn.parentNode.replaceChild(newSaveBtn, saveBtn);
-
-        newSaveBtn.addEventListener('click', function () {
-            const fullname = (document.querySelector('[data-input="fullname"]')?.value || '').trim();
-            const dob = document.querySelector('[data-input="dob"]')?.value || '';
-            const gender = document.querySelector('[data-input="gender"]')?.value || '';
-            const nationality = document.querySelector('[data-input="nationality"]')?.value || '';
-
-            const formData = new FormData();
-            formData.append('action', 'save_profile');
-            formData.append('csrf_token', getCsrfToken());
-            formData.append('fullname', fullname);
-            formData.append('dob', dob);
-            formData.append('gender', gender);
-            formData.append('nationality', nationality);
-
-            fetch('settings/api/update-profile.php', {
-                method: 'POST',
-                body: formData
-            })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.needsConfirmation) {
-                        showConfirmationModal(data.changes, 'profile', { fullname, dob, gender, nationality });
-                    } else if (data.success) {
-                        showToast(data.msg, 'success');
-                        updateCompletionProgress();
-                    } else {
-                        showToast(data.msg, 'error');
-                    }
-                })
-                .catch(err => {
-                    console.error(err);
-                    showToast('Failed to save profile', 'error');
-                });
-        });
-    }
-
-    /* ══════════════════════════════════════════════════════════════════
        EVENT LISTENERS FOR MODALS AND BUTTONS
     ══════════════════════════════════════════════════════════════════ */
     document.addEventListener('DOMContentLoaded', function () {
         // Initialize sections
         initAcademicSection();
-        initContactSection();
-        initEmergencySection();
-        handleProfileSaveWithConfirmation();
 
         // Confirmation modal buttons
         const confirmBtn = document.getElementById('confirmChangesBtn');
@@ -4511,18 +3393,9 @@
                                 badge.innerHTML = '<span class="material-symbols-outlined" style="font-size:12px;">cancel</span> Out of stock';
                             }
                         }
-
-                        // Update borrow button
-                        const btn = card.querySelector('.btn-borrow[data-action="open-borrow-form"]');
-                        if (btn) {
-                            // Out right now but it exists in stock: it can still be booked for a later date
-                            const canBookAhead = qty <= 0 && (isNaN(total) ? false : total > 0);
-                            btn.disabled = qty <= 0 && !canBookAhead;
-                            btn.classList.toggle('btn-borrow-ahead', canBookAhead);
-                            btn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">' + (qty > 0 ? 'add_shopping_cart' : (canBookAhead ? 'event' : 'block')) + '</span>' +
-                                '<span class="btn-borrow-label">' + (qty > 0 ? 'Borrow' : (canBookAhead ? 'Book ahead' : 'Unavailable')) + '</span>';
-                        }
                     });
+                    // Add buttons / quantity steppers / the open Borrow modal follow the new numbers
+                    if (window.BorrowFlow) window.BorrowFlow.refreshStock();
                 })
                 .catch(function () { });
         }
@@ -4562,12 +3435,12 @@
                             // request simply wasn't in the initial snapshot (e.g. it was
                             // already in a terminal state on page load) — no toast needed.
                             if (prev !== undefined) {
-                                if (r.status === 'Returned') {
+                                if (r.status === 'Returned' && notifFamilyOn('equipment')) {
                                     showToast(r.equipment_name + ' has been marked as Returned.', 'success');
                                 }
                                 // Coach mark: first time a Waiting request becomes Approved,
                                 // point faculty to My Activity where the Claim QR lives.
-                                if (r.status === 'Approved' && prev === 'Waiting') {
+                                if (r.status === 'Approved' && prev === 'Waiting' && notifFamilyOn('equipment')) {
                                     const _claimKey = 'eq_claim_hint_shown_' + r.id;
                                     if (!localStorage.getItem(_claimKey)) {
                                         localStorage.setItem(_claimKey, '1');
@@ -4612,7 +3485,7 @@
                     if (!Array.isArray(rows)) return;
                     rows.forEach(function (rr) {
                         var prev = lastStatuses[rr.id];
-                        if (primed && prev !== undefined && prev !== rr.status && rr.status === 'Cancelled') {
+                        if (primed && prev !== undefined && prev !== rr.status && rr.status === 'Cancelled' && notifFamilyOn('facilities')) {
                             showToast('Your reservation for ' + rr.room_name + ' was cancelled by admin.', 'error');
                         }
                         lastStatuses[rr.id] = rr.status;
@@ -6411,7 +5284,12 @@
 (function () {
     'use strict';
 
+    // The faculty pages carry the token in <meta name="csrf-token"> (faculty-shell-top.php). The hidden
+    // csrf_token <input> that this used to read only exists on admin screens, so the code request was sent
+    // with an empty token and rejected (403 "Invalid or expired session").
     var CSRF = function () {
+        var meta = document.querySelector('meta[name="csrf-token"]');
+        if (meta && meta.content) return meta.content;
         var el = document.querySelector('input[name="csrf_token"]');
         return el ? el.value : '';
     };
@@ -6459,6 +5337,30 @@
         errEl.style.display = '';
     }
 
+    /* The code panel floats over its card (see faculty-dashboard.css). Only one is open at a time, and it
+       closes when you click anywhere else or press Esc. */
+    function closeCodePanel(card) {
+        var p = card.querySelector('.eq-ic-panel');
+        if (p) p.style.display = 'none';
+        var b = card.querySelector('[data-action="toggle-item-code"]');
+        if (b) {
+            b.setAttribute('aria-expanded', 'false');
+            var ch = b.querySelector('.eq-ic-chevron');
+            if (ch) ch.style.transform = '';
+        }
+        card.classList.remove('eq-ic-open');
+    }
+
+    function closeAllCodePanels(exceptCard) {
+        document.querySelectorAll('.eq-item-card.eq-ic-open').forEach(function (c) {
+            if (c !== exceptCard) closeCodePanel(c);
+        });
+    }
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeAllCodePanels(null);
+    });
+
     function loadCode(itemId, panel) {
         showLoading(panel);
         var body = new URLSearchParams({ csrf_token: CSRF(), item_id: itemId });
@@ -6482,6 +5384,8 @@
     }
 
     document.addEventListener('click', function (e) {
+        // Click anywhere outside the code layer closes it
+        if (!e.target.closest('.eq-ic-panel, [data-action="toggle-item-code"]')) closeAllCodePanels(null);
         // ── Toggle chevron ──────────────────────────────────────────
         var toggleBtn = e.target.closest('[data-action="toggle-item-code"]');
         if (toggleBtn && !toggleBtn.disabled) {
@@ -6489,12 +5393,16 @@
             var panel = getPanel(itemId);
             if (!panel) return;
 
+            var card = toggleBtn.closest('.eq-item-card');
             var isOpen = panel.style.display !== 'none';
             if (isOpen) {
                 panel.style.display = 'none';
                 toggleBtn.setAttribute('aria-expanded', 'false');
                 toggleBtn.querySelector('.eq-ic-chevron').style.transform = '';
+                if (card) card.classList.remove('eq-ic-open');
             } else {
+                closeAllCodePanels(card);
+                if (card) card.classList.add('eq-ic-open');
                 panel.style.display = '';
                 toggleBtn.setAttribute('aria-expanded', 'true');
                 toggleBtn.querySelector('.eq-ic-chevron').style.transform = 'rotate(180deg)';
@@ -6578,537 +5486,4 @@
                 });
         }
     });
-})();
-
-/* ================================================================
-   EQUIPMENT CART — multi-item borrowing (today only)
-   Self-contained IIFE. Zero changes to any existing borrow logic.
-================================================================ */
-(function () {
-    'use strict';
-
-    // ── State ──────────────────────────────────────────────────────
-    // Map of item_id (string) → { name, shelf, qty }
-    var _cart = {};
-
-    function cartCount() { return Object.keys(_cart).length; }
-
-    function getCsrf() {
-        var m = document.querySelector('meta[name="csrf-token"]');
-        if (m && m.content) return m.content;
-        var i = document.querySelector('input[name="csrf_token"]');
-        return i ? i.value : '';
-    }
-
-    function _esc(s) {
-        return String(s == null ? '' : s)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
-    }
-
-    // ── Sync bar ────────────────────────────────────────────────────
-    function syncBar() {
-        var bar   = document.getElementById('eqCartBar');
-        var label = document.getElementById('eqCartBarLabel');
-        var n = cartCount();
-        if (!bar) return;
-        bar.style.display = n > 0 ? '' : 'none';
-        if (label) {
-            label.textContent = n === 1 ? '1 item selected' : n + ' items selected';
-        }
-    }
-
-    // ── Add / remove card from cart ─────────────────────────────────
-    function addToCart(card, itemId, itemName, shelf) {
-        _cart[itemId] = { name: itemName, shelf: shelf, qty: 1 };
-        card.classList.add('eq-item-card--in-cart');
-
-        var chkIcon = card.querySelector('.eq-cart-chk-icon');
-        var chkBtn  = card.querySelector('[data-action="toggle-cart-item"]');
-        var qtyWrap = card.querySelector('.eq-cart-qty');
-
-        if (chkIcon) chkIcon.textContent = 'check_box';
-        if (chkBtn)  chkBtn.setAttribute('aria-pressed', 'true');
-        syncBar();
-    }
-
-    function removeFromCart(card, itemId) {
-        delete _cart[itemId];
-        card.classList.remove('eq-item-card--in-cart');
-
-        var chkIcon = card.querySelector('.eq-cart-chk-icon');
-        var chkBtn  = card.querySelector('[data-action="toggle-cart-item"]');
-        var qtyWrap = card.querySelector('.eq-cart-qty');
-
-        if (chkIcon) chkIcon.textContent = 'check_box_outline_blank';
-        if (chkBtn)  chkBtn.setAttribute('aria-pressed', 'false');
-        syncBar();
-    }
-
-    function clearCart() {
-        Object.keys(_cart).forEach(function (id) {
-            var card = document.querySelector('[data-item-id="' + id + '"].eq-item-card');
-            if (card) removeFromCart(card, id);
-        });
-        _cart = {};
-        syncBar();
-    }
-
-    // ── Delegated click handler ─────────────────────────────────────
-    document.addEventListener('click', function (e) {
-
-        // Toggle cart item
-        var toggleBtn = e.target.closest('[data-action="toggle-cart-item"]');
-        if (toggleBtn) {
-            var card     = toggleBtn.closest('.eq-item-card');
-            var itemId   = toggleBtn.dataset.itemId;
-            var itemName = toggleBtn.dataset.itemName;
-            var shelf    = parseInt(toggleBtn.dataset.shelf, 10) || 0;
-            if (!card || !itemId) return;
-            if (_cart[itemId]) {
-                removeFromCart(card, itemId);
-            } else {
-                addToCart(card, itemId, itemName, shelf);
-            }
-            return;
-        }
-
-        // Quantity decrement
-        var decBtn = e.target.closest('[data-action="cart-qty-dec"]');
-        if (decBtn) {
-            var wrap = decBtn.closest('.eq-cart-qty');
-            var inp  = wrap && wrap.querySelector('.eq-cart-qty-input');
-            var card = decBtn.closest('.eq-item-card');
-            var id   = card && card.dataset.itemId;
-            if (!inp || !id || !_cart[id]) return;
-            var v = Math.max(1, parseInt(inp.value, 10) - 1);
-            inp.value = v;
-            _cart[id].qty = v;
-            return;
-        }
-
-        // Quantity increment
-        var incBtn = e.target.closest('[data-action="cart-qty-inc"]');
-        if (incBtn) {
-            var wrap = incBtn.closest('.eq-cart-qty');
-            var inp  = wrap && wrap.querySelector('.eq-cart-qty-input');
-            var card = incBtn.closest('.eq-item-card');
-            var id   = card && card.dataset.itemId;
-            if (!inp || !id || !_cart[id]) return;
-            var max = parseInt(inp.max, 10) || _cart[id].shelf;
-            var v   = Math.min(max, parseInt(inp.value, 10) + 1);
-            inp.value = v;
-            _cart[id].qty = v;
-            return;
-        }
-
-        // Clear cart
-        if (e.target.closest('[data-action="cart-clear"]')) {
-            clearCart();
-            return;
-        }
-
-        // Open checkout modal
-        if (e.target.closest('[data-action="cart-checkout"]')) {
-            openCartCheckout();
-            return;
-        }
-
-        // Close checkout modal
-        if (e.target.closest('[data-action="cart-checkout-close"]')) {
-            closeCartCheckout();
-            return;
-        }
-    });
-
-    // Live quantity input typing — checkout modal qty inputs
-    document.addEventListener('input', function (e) {
-        var inp = e.target;
-        if (!inp.classList.contains('eq-cco-qty-input')) return;
-        var id  = inp.dataset.id;
-        if (!id || !_cart[id]) return;
-        var max = parseInt(inp.max, 10) || _cart[id].shelf;
-        var v   = parseInt(inp.value, 10);
-        if (isNaN(v) || v < 1) v = 1;
-        if (v > max) v = max;
-        inp.value = v;
-        _cart[id].qty = v;
-    });
-
-    // Checkout modal qty buttons
-    document.addEventListener('click', function (e) {
-        var decBtn = e.target.closest('[data-cco-dec]');
-        if (decBtn) {
-            var id  = decBtn.dataset.id;
-            var inp = document.querySelector('.eq-cco-qty-input[data-id="' + id + '"]');
-            if (!inp || !_cart[id]) return;
-            var v = Math.max(1, parseInt(inp.value, 10) - 1);
-            inp.value = v;
-            _cart[id].qty = v;
-            return;
-        }
-        var incBtn = e.target.closest('[data-cco-inc]');
-        if (incBtn) {
-            var id  = incBtn.dataset.id;
-            var inp = document.querySelector('.eq-cco-qty-input[data-id="' + id + '"]');
-            if (!inp || !_cart[id]) return;
-            var max = parseInt(inp.max, 10) || _cart[id].shelf;
-            var v   = Math.min(max, parseInt(inp.value, 10) + 1);
-            inp.value = v;
-            _cart[id].qty = v;
-        }
-    });
-
-    // ── Cart schedule → room picker wiring ──────────────────────────
-    document.addEventListener('change', function(e) {
-        var t = e.target;
-        if (t.id !== 'cartBorrowDate' && t.id !== 'cartStartTime' && t.id !== 'cartDuration') return;
-        if (t.id === 'cartBorrowDate' || t.id === 'cartDuration') cartRefreshStartTimes();
-        cartUpdateRoomWindow();
-    });
-
-    function cartLocalDate(date) {
-        return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' +
-            String(date.getDate()).padStart(2, '0');
-    }
-
-    function cartBorrowDates() {
-        var dates = [];
-        var today = new Date();
-        for (var offset = 0; offset <= 14; offset++) {
-            var date = new Date(today.getFullYear(), today.getMonth(), today.getDate() + offset);
-            if (offset > 0 && date.getDay() === 0) continue;
-            var available = offset !== 0 || (date.getDay() !== 0 && today.getHours() * 60 + today.getMinutes() <= 20 * 60);
-            dates.push({
-                value: cartLocalDate(date),
-                available: available,
-                label: (offset === 0 ? 'Today · ' : '') +
-                    date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
-            });
-        }
-        return dates;
-    }
-
-    function cartStartTimes(date, duration) {
-        if (!date) return [];
-        var todayDate = cartLocalDate(new Date());
-        var start = date === todayDate
-            ? Math.max(7 * 60, Math.ceil((new Date().getHours() * 60 + new Date().getMinutes()) / 60) * 60)
-            : 7 * 60;
-        var hours = parseInt(duration, 10) || 1;
-        var times = [];
-        for (var minute = start; minute <= 20 * 60 && minute + hours * 60 <= 21 * 60; minute += 60) {
-            times.push(String(Math.floor(minute / 60)).padStart(2, '0') + ':00');
-        }
-        return times;
-    }
-
-    function cartRefreshStartTimes() {
-        var dateEl = document.getElementById('cartBorrowDate');
-        var startEl = document.getElementById('cartStartTime');
-        var durationEl = document.getElementById('cartDuration');
-        if (!dateEl || !startEl || !durationEl) return;
-        var previous = startEl.value;
-        var times = cartStartTimes(dateEl.value, durationEl.value);
-        startEl.innerHTML = '';
-        times.forEach(function (time) {
-            var option = document.createElement('option');
-            option.value = time;
-            option.textContent = new Date('2000-01-01T' + time + ':00').toLocaleTimeString('en-US', {
-                hour: 'numeric', minute: '2-digit'
-            });
-            startEl.appendChild(option);
-        });
-        if (!times.length) {
-            var empty = document.createElement('option');
-            empty.value = '';
-            empty.textContent = 'No hourly start times available';
-            empty.disabled = true;
-            empty.selected = true;
-            startEl.appendChild(empty);
-            return;
-        }
-        startEl.value = times.indexOf(previous) !== -1 ? previous : times[0];
-    }
-
-    function cartUpdateRoomWindow() {
-        var modal   = document.getElementById('cartCheckoutModal');
-        var dateEl  = document.getElementById('cartBorrowDate');
-        var startEl = document.getElementById('cartStartTime');
-        var durationEl = document.getElementById('cartDuration');
-        var hintEl  = document.getElementById('cartTimeHint');
-        if (!modal || !dateEl || !startEl || !durationEl || !window.RoomPicker) return;
-
-        var date = dateEl.value;
-        var start = startEl.value;  // HH:MM
-        var durationHours = parseInt(durationEl.value, 10) || 0;
-
-        if (!date || !start || !durationHours) { window.RoomPicker.setWindow(modal, null); return; }
-
-        var sParts = start.split(':');
-        var sMin = parseInt(sParts[0], 10) * 60 + parseInt(sParts[1], 10);
-        var eMin = sMin + durationHours * 60;
-        var todayStr = cartLocalDate(new Date());
-        var isToday = date === todayStr;
-        var parsedDate = new Date(date + 'T12:00:00');
-
-        if (parsedDate.getDay() === 0) {
-            if (hintEl) { hintEl.textContent = 'Equipment borrowing is unavailable on Sundays.'; hintEl.style.color = '#dc2626'; }
-            window.RoomPicker.setWindow(modal, null);
-            return;
-        }
-        if (date < todayStr || date > cartLocalDate(new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() + 14))) {
-            if (hintEl) { hintEl.textContent = 'Choose a date within the next two weeks.'; hintEl.style.color = '#dc2626'; }
-            window.RoomPicker.setWindow(modal, null);
-            return;
-        }
-        var nowMin = new Date().getHours() * 60 + new Date().getMinutes();
-        if (sMin < 7 * 60 || sMin > 20 * 60 || sMin % 60 !== 0 || eMin > 21 * 60 || (isToday && sMin < nowMin)) {
-            if (hintEl) { hintEl.textContent = isToday && sMin < nowMin
-                ? 'Start time must be in the future.' : 'Choose an hourly start time from 7:00 AM through 8:00 PM; bookings end by 9:00 PM.'; hintEl.style.color = '#dc2626'; }
-            window.RoomPicker.setWindow(modal, null);
-            return;
-        }
-        if (hintEl) { hintEl.textContent = ''; hintEl.style.color = ''; }
-
-        var mode = isToday ? 'today' : 'future';
-        var query = 'mode=' + mode
-            + '&date=' + encodeURIComponent(date)
-            + '&time=' + encodeURIComponent(start)
-            + '&duration=' + durationHours
-            + '&items=%5B%5D'
-            + '&rooms=1';
-        var dateLabel = isToday ? 'Today' : parsedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-        var end = String(Math.floor(eMin / 60)).padStart(2, '0') + ':' + String(eMin % 60).padStart(2, '0');
-        var label = dateLabel + ' · ' + start + ' → ' + end;
-        window.RoomPicker.setWindow(modal, query, label);
-    }
-
-    // ── Checkout modal ──────────────────────────────────────────────
-    function openCartCheckout() {
-        if (cartCount() === 0) return;
-        var modal = document.getElementById('cartCheckoutModal');
-        var list  = document.getElementById('cartCheckoutList');
-        var err   = document.getElementById('cartCheckoutError');
-        if (!modal || !list) return;
-
-        // Build item rows with quantity input per item
-        list.innerHTML = '';
-        Object.keys(_cart).forEach(function (id) {
-            var item = _cart[id];
-            var row = document.createElement('div');
-            row.className = 'eq-cart-checkout-item';
-            row.setAttribute('data-cart-id', id);
-            row.innerHTML =
-                '<span class="eq-cco-name">' + _esc(item.name) + '</span>' +
-                '<div class="eq-cco-qty">' +
-                '<button type="button" class="eq-cco-qty-btn" data-cco-dec data-id="' + id + '">\u2212</button>' +
-                '<input type="number" class="eq-cco-qty-input" value="' + item.qty + '" min="1" max="' + item.shelf + '" data-id="' + id + '" aria-label="Quantity for ' + _esc(item.name) + '">' +
-                '<button type="button" class="eq-cco-qty-btn" data-cco-inc data-id="' + id + '">+</button>' +
-                '</div>' +
-                '<span class="eq-cco-stock">of ' + item.shelf + ' available</span>';
-            list.appendChild(row);
-        });
-
-        if (err) { err.style.display = 'none'; err.textContent = ''; }
-
-        // Restrict borrowing dates to today or the next 14 days, excluding Sundays.
-        var dateEl = document.getElementById('cartBorrowDate');
-        var dates = cartBorrowDates();
-        if (dateEl) {
-            dateEl.innerHTML = '';
-            var firstAvailable = dates.find(function (date) { return date.available; });
-            dates.forEach(function (date, index) {
-                var option = document.createElement('option');
-                option.value = date.value;
-                option.textContent = date.label;
-                option.disabled = !date.available;
-                if (date === firstAvailable) option.selected = true;
-                dateEl.appendChild(option);
-            });
-        }
-        var todayInfo = document.getElementById('cartTodayInfo');
-        if (todayInfo) {
-            var now = new Date();
-            var reason = now.getDay() === 0 ? 'sunday' : now.getHours() * 60 + now.getMinutes() > 20 * 60 ? 'closed' : '';
-            var message = reason === 'sunday'
-                ? 'Same-day borrowing is unavailable on Sundays. Choose a later date.'
-                : 'Same-day borrowing is unavailable after 8:00 PM. Choose a later date.';
-            todayInfo.hidden = !reason;
-            todayInfo.title = reason ? message : '';
-            todayInfo.setAttribute('aria-label', reason ? message : '');
-        }
-
-        // Start at 7:00 AM, or recommend the next whole-hour slot for today.
-        var startEl = document.getElementById('cartStartTime');
-        var hintEl  = document.getElementById('cartTimeHint');
-        var durationEl = document.getElementById('cartDuration');
-        if (durationEl) durationEl.value = '1';
-        cartRefreshStartTimes();
-        if (hintEl)  hintEl.textContent = '';
-
-        // Reset room picker then set the pre-filled window
-        if (window.RoomPicker) window.RoomPicker.reset(modal);
-        cartUpdateRoomWindow();
-
-        modal.style.display = 'flex';
-    }
-
-    function closeCartCheckout() {
-        var modal = document.getElementById('cartCheckoutModal');
-        if (modal) modal.style.display = 'none';
-    }
-
-    // ── Submit ──────────────────────────────────────────────────────
-    var _submitting = false;
-
-    // Delegated on document so it works even if the modal isn't in the DOM yet
-    document.addEventListener('click', function (e) {
-        if (!e.target.closest('#cartCheckoutSubmit')) return;
-
-        if (_submitting) return;
-        var cartModal   = document.getElementById('cartCheckoutModal');
-        var roomIdInput = cartModal ? cartModal.querySelector('[data-bm-room-input]') : null;
-        var roomValEl   = cartModal ? cartModal.querySelector('[data-bm-room-value]') : null;
-        var roomId      = roomIdInput ? roomIdInput.value.trim() : '';
-        var room        = roomValEl ? (roomValEl.textContent || '').trim() : '';
-        if (room === 'Choose a room') room = '';
-        var borrowDate  = (document.getElementById('cartBorrowDate') || {}).value || '';
-        var startTime   = (document.getElementById('cartStartTime') || {}).value || '';
-        var duration    = parseInt((document.getElementById('cartDuration') || {}).value, 10) || 0;
-        var err  = document.getElementById('cartCheckoutError');
-
-        if (!borrowDate || !startTime || [1, 2, 3, 6].indexOf(duration) === -1) {
-            if (err) { err.textContent = 'Please choose a valid borrowing date, start time, and duration.'; err.style.display = ''; }
-            return;
-        }
-        var dateObj = new Date(borrowDate + 'T12:00:00');
-        var todayDate = cartLocalDate(new Date());
-        var latestDate = cartLocalDate(new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() + 14));
-        if (dateObj.getDay() === 0 || borrowDate < todayDate || borrowDate > latestDate) {
-            if (err) { err.textContent = 'Choose a non-Sunday date within the next two weeks.'; err.style.display = ''; }
-            return;
-        }
-        var startParts = startTime.split(':');
-        var startMinutes = parseInt(startParts[0], 10) * 60 + parseInt(startParts[1], 10);
-        var endMinutes = startMinutes + duration * 60;
-        if (startMinutes < 1 || startMinutes > 20 * 60 || endMinutes > 21 * 60) {
-            if (err) { err.textContent = 'Choose an hourly start time from 7:00 AM through 8:00 PM; the booking must end by 9:00 PM.'; err.style.display = ''; }
-            return;
-        }
-        if (borrowDate === todayDate) {
-            var now = new Date();
-            if (now.getHours() * 60 + now.getMinutes() > 20 * 60) {
-                if (err) { err.textContent = 'Same-day borrowing is unavailable after 8:00 PM. Choose a later date.'; err.style.display = ''; }
-                return;
-            }
-            if (startMinutes < now.getHours() * 60 + now.getMinutes()) {
-                if (err) { err.textContent = 'Start time must be in the future.'; err.style.display = ''; }
-                return;
-            }
-        }
-        if (!room || !roomId) {
-            if (err) {
-                err.textContent = 'Please choose a room before submitting.';
-                err.style.display = '';
-                var trigger = cartModal ? cartModal.querySelector('[data-bm-room-trigger]') : null;
-                if (trigger) trigger.focus();
-            }
-            return;
-        }
-
-        // Validate student collector fields if "Student" is selected
-        var cartCollectorType = (document.querySelector('input[name="cart_collector_type"]:checked') || {}).value || 'faculty';
-        var cartCollectorName = ((document.getElementById('cartCollectorName') || {}).value || '').trim();
-        if (cartCollectorType === 'student' && !cartCollectorName) {
-            if (err) {
-                err.textContent = 'Please enter the student\'s name before submitting.';
-                err.style.display = '';
-            }
-            return;
-        }
-
-        if (err) { err.style.display = 'none'; err.textContent = ''; }
-
-        if (Object.keys(_cart).length === 0) return;
-
-        _submitting = true;
-        var submitBtn = document.getElementById('cartCheckoutSubmit');
-        if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<span class="material-symbols-outlined">send</span> Submitting\u2026'; }
-
-        var csrf = getCsrf();
-        var itemsPayload = Object.values(_cart).map(function (it) {
-            return { name: it.name, qty: it.qty };
-        });
-        var timeSlot = startTime;  // start time chosen by faculty
-        var bookingMode = borrowDate === todayDate ? 'today' : 'future';
-
-        fetch('equipment-booking/api/submit-cart-borrow.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                csrf_token:          csrf,
-                room:                room,
-                room_id:             roomId,
-                items:               itemsPayload,
-                booking_mode:        bookingMode,
-                borrow_date:         borrowDate,
-                time_slot:           timeSlot,
-                duration:            duration,
-                collector_type:      cartCollectorType,
-                collector_name:      cartCollectorName,
-            }),
-        })
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-            _submitting = false;
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = '<span class="material-symbols-outlined">send</span> Submit Borrow Requests';
-            }
-
-            if (!data.ok) {
-                var errEl = document.getElementById('cartCheckoutError');
-                if (errEl) { errEl.textContent = data.error || 'An error occurred. Please try again.'; errEl.style.display = ''; }
-                return;
-            }
-
-            closeCartCheckout();
-            clearCart();
-
-            var okCount   = (data.submitted || []).length;
-            var failCount = (data.failed    || []).length;
-
-            if (failCount === 0) {
-                if (typeof showToast === 'function') {
-                    showToast(okCount + ' borrow request' + (okCount !== 1 ? 's' : '') + ' submitted.');
-                }
-            } else if (okCount > 0) {
-                if (typeof showToast === 'function') {
-                    var failNames = (data.failed || []).map(function (f) { return f.name; }).join(', ');
-                    showToast(okCount + ' submitted. Could not submit: ' + failNames);
-                }
-            } else {
-                var errEl2 = document.getElementById('cartCheckoutError');
-                var modal2 = document.getElementById('cartCheckoutModal');
-                if (modal2) modal2.style.display = 'flex';
-                var failMsg = (data.failed || []).map(function (f) { return f.name + ': ' + f.error; }).join(' | ');
-                if (errEl2) { errEl2.textContent = failMsg; errEl2.style.display = ''; }
-            }
-
-            document.dispatchEvent(new CustomEvent('pupsync:requests-changed'));
-        })
-        .catch(function () {
-            _submitting = false;
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = '<span class="material-symbols-outlined">send</span> Submit Borrow Requests';
-            }
-            var errEl = document.getElementById('cartCheckoutError');
-            if (errEl) { errEl.textContent = 'Network error. Please try again.'; errEl.style.display = ''; }
-        });
-    });
-
 })();

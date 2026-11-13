@@ -9,14 +9,15 @@ declare(strict_types=1);
  *
  * WHO CAN EXTEND
  *   The faculty member who holds the loan, once its return moment has been reached:
- *   status Overdue, or Approved with the return moment already behind us.
+ *   status On Loan (collected) with the return moment behind us, or Overdue. An Approved booking
+ *   that was never collected cannot be extended: nothing is out, and it ends as a no-show.
  *   (return moment = return_date + return_time, end of that day when no time was set.)
  *
  * HOW LONG
  *   Extension choices are independent of new booking durations and are counted from NOW
  *   (see mode(): counter loans made with a faculty item code are hourly too):
  *     hourly ("today") loans   +1 / 2 / 3 / 5 hours, rounded up to
- *                              the next 5 minutes, never past closing time (BookingSchedule::DAY_END)
+ *                              the next 5 minutes, never past closing time (BookingSchedule::dayEnd())
  *     day loans                +1 / 2 / 3 days, keeping the original return time of day
  *
  * AVAILABILITY (the same ledger the Borrow form and the arbitration engine use)
@@ -138,15 +139,25 @@ final class BorrowExtension
         return self::$ready;
     }
 
-    /** True when this loan has used up its extensions. */
+    /** Extensions allowed per loan (Settings → Arbitration → Extensions per loan; 0 = off). */
+    public static function maxExtensions(): int
+    {
+        return BookingSchedule::maxExtensions();
+    }
+
+    /** True when this loan has used up its extensions (always true when extensions are turned off). */
     public static function atLimit(array $row): bool
     {
-        return (int)($row['extension_count'] ?? 0) >= self::MAX_EXTENSIONS;
+        return (int)($row['extension_count'] ?? 0) >= self::maxExtensions();
     }
 
     private static function limitMessage(): string
     {
-        return 'This item has already been extended ' . self::MAX_EXTENSIONS . ' times, which is the limit. Please return it to the Admin Office.';
+        $max = self::maxExtensions();
+        if ($max === 0) {
+            return 'Extensions are turned off. Please return the item to the Admin Office.';
+        }
+        return 'This item has already been extended ' . $max . ($max === 1 ? ' time' : ' times') . ', which is the limit. Please return it to the Admin Office.';
     }
 
     /** "3 hours" / "1 day" — how long a loan had been overdue. */
@@ -206,7 +217,7 @@ final class BorrowExtension
         if ($status === 'Overdue') {
             return true;
         }
-        return $status === 'Approved' && self::dueAt($row) <= $now;
+        return $status === 'On Loan' && self::dueAt($row) <= $now;
     }
 
     /**
@@ -224,7 +235,7 @@ final class BorrowExtension
             // Hourly loan: more hours today, counted from now (office hours only)
             $day   = $now->format('Y-m-d');
             $open  = new DateTimeImmutable($day . ' ' . self::EXTENSION_DAY_START . ':00', $tz);
-            $close = new DateTimeImmutable($day . ' ' . BookingSchedule::DAY_END . ':00', $tz);
+            $close = new DateTimeImmutable($day . ' ' . BookingSchedule::dayEnd() . ':00', $tz);
             $base  = $now < $open ? $open : $now;
             $base  = (new DateTimeImmutable('@' . (int)(ceil($base->getTimestamp() / 300) * 300)))->setTimezone($tz);
 
@@ -242,9 +253,9 @@ final class BorrowExtension
         // Day loan (or an older request without a mode): more days, same return time of day
         $time = substr(trim((string)($row['return_time'] ?? '')), 0, 5);
         if ($time === '') {
-            $time = BookingSchedule::DAY_END;
+            $time = BookingSchedule::dayEnd();
         }
-        $time = max(self::EXTENSION_DAY_START, min(BookingSchedule::DAY_END, $time));
+        $time = max(self::EXTENSION_DAY_START, min(BookingSchedule::dayEnd(), $time));
 
         foreach (self::EXTENSION_DAYS as $days) {
             $days  = (int)$days;
@@ -326,7 +337,8 @@ final class BorrowExtension
     private static function notDueMessage(array $row): string
     {
         return match ((string)$row['status']) {
-            'Approved' => 'You can extend this item once its return time has arrived.',
+            'On Loan'  => 'You can extend this item once its return time has arrived.',
+            'Approved' => 'This item has not been collected yet, so there is nothing to extend.',
             'Returned' => 'This item has already been returned.',
             default    => 'This item is not currently on loan, so it cannot be extended.',
         };
@@ -339,6 +351,7 @@ final class BorrowExtension
      */
     public static function preview(mysqli $conn, string $facultyId, int $requestId): array
     {
+        BookingSchedule::loadRules($conn);
         $ready = self::ensureSchema($conn);
         $now   = new DateTimeImmutable('now', self::tz());
         $row   = $ready ? self::fetch($conn, $requestId, $facultyId, false) : null;
@@ -374,12 +387,12 @@ final class BorrowExtension
                 . (trim((string)($row['return_time'] ?? '')) !== '' ? ', ' . fact_time((string)$row['return_time']) : ''),
             'extended'  => (int)($row['extension_count'] ?? 0),
             'used'      => (int)($row['extension_count'] ?? 0),
-            'max'       => self::MAX_EXTENSIONS,
+            'max'       => self::maxExtensions(),
             'options'   => $options,
         ];
         if (!$options) {
             $out['error'] = self::mode($row) === 'today'
-                ? 'It is too late in the day to extend this item (the office closes at ' . fact_time(BookingSchedule::DAY_END . ':00') . '). Please return it to the Admin Office.'
+                ? 'It is too late in the day to extend this item (the office closes at ' . fact_time(BookingSchedule::dayEnd() . ':00') . '). Please return it to the Admin Office.'
                 : 'No extension length is available for this item.';
         }
         return $out;
@@ -392,6 +405,7 @@ final class BorrowExtension
      */
     public static function extend(mysqli $conn, string $facultyId, int $requestId, int $length): array
     {
+        BookingSchedule::loadRules($conn);
         $ready = self::ensureSchema($conn);          // before the transaction
         $now   = new DateTimeImmutable('now', self::tz());
         $peek  = $ready ? self::fetch($conn, $requestId, $facultyId, false) : null;
@@ -462,11 +476,11 @@ final class BorrowExtension
 
             $upd = $conn->prepare(
                 "UPDATE tbl_requests
-                    SET return_date = ?, return_time = ?, status = 'Approved',
+                    SET return_date = ?, return_time = ?, status = 'On Loan',
                         extension_count = extension_count + 1, reason = ?,
                         original_return_date = ?, original_return_time = ?,
                         extension_late_seconds = extension_late_seconds + ?
-                  WHERE id = ? AND faculty_id = ? AND status IN ('Overdue','Approved')"
+                  WHERE id = ? AND faculty_id = ? AND status IN ('Overdue','On Loan')"
             );
             if (!$upd) {
                 throw new \RuntimeException('prepare update failed: ' . $conn->error);

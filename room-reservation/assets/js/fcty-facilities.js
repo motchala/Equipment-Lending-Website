@@ -47,9 +47,9 @@
     var DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     var WEEK_ORDER = [1, 2, 3, 4, 5, 6];      /* Mon → Sat (Sunday is closed) */
     var CLOSED_DAY = 0;                        /* Sunday: no reservations       */
-    var TL_START_MIN = 8 * 60;                 /* schedule timelines: 8 AM …    */
+    var TL_START_MIN = 7 * 60;                 /* schedule timelines: 7 AM (classes start then) ... */
     var TL_END_MIN = 20 * 60;                  /* … 8 PM                        */
-    var TL_TICKS = [[8, '8 AM', 0], [10, '10 AM', 1], [12, '12 PM', 0], [14, '2 PM', 1], [16, '4 PM', 0], [18, '6 PM', 1], [20, '8 PM', 0]];   /* [hour, label, minor] */
+    var TL_TICKS = [[7, '7 AM', 0], [10, '10 AM', 1], [13, '1 PM', 0], [16, '4 PM', 1], [20, '8 PM', 0]];   /* [hour, label, minor] */
 
     var STATUS_UI = {
         'Available': { cls: 'status-available', text: 'Available' },
@@ -81,6 +81,34 @@
     }
 
     function plural(n, one, many) { return n + ' ' + (n === 1 ? one : (many || one + 's')); }
+
+    /* Weekly classes (the imported Rooms Assigned list) come from get-room-schedule.php with kind: 'class'.
+       They repeat every week and block the room exactly like an approved reservation. */
+    function isClass(s) { return !!s && s.kind === 'class'; }
+    /* 'COMP 017 · DIT 3-1 (Lecture) — Jane Doe' -> 'COMP 017 · DIT 3-1 (Lecture)': what the class is, not who teaches it */
+    function classTitle(s) { return decodeHtml(String(s.label || '')).split(' \u2014 ')[0] || 'a class'; }
+    /* What is still OPEN in a day: the gaps (at least 30 min) between everything that blocks the room.
+       list = the day's classes + reservations, from/to in minutes. Returns [[startMin, endMin], ...]. */
+    function freeWindows(list, from, to) {
+        var out = [], cursor = from;
+        sortByStart(list).forEach(function (b) {
+            var s = timeToMin(b.start), e = timeToMin(b.end);
+            if (e <= cursor) return;
+            if (s > cursor && s - cursor >= 30) out.push([cursor, Math.min(s, to)]);
+            cursor = Math.max(cursor, e);
+        });
+        if (to - cursor >= 30) out.push([cursor, to]);
+        return out.filter(function (w) { return w[1] > w[0]; });
+    }
+
+    var DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    /* '8 AM' / '12 PM' for an hour, '8-11 AM' / '11 AM-2 PM' for a block */
+    function hourLabel(h) { return (h % 12 === 0 ? 12 : h % 12) + (h >= 12 ? ' PM' : ' AM'); }
+    function clockShort(m) { var h = Math.floor(m / 60), mm = m % 60; return (h % 12 === 0 ? 12 : h % 12) + (mm ? ':' + pad(mm) : ''); }
+    function rangeShort(start, end) {
+        var a = timeToMin(start), b = timeToMin(end), ap = a >= 720 ? 'PM' : 'AM', bp = b >= 720 ? 'PM' : 'AM';
+        return clockShort(a) + (ap !== bp ? ' ' + ap : '') + '\u2013' + clockShort(b) + ' ' + bp;
+    }
 
     function apiBase() {
         var p = window.location.pathname;
@@ -479,17 +507,6 @@
         $('fcty-modal-availability-text').textContent = text;
     }
 
-    function setScheduleTab(name) {
-        roomOverlay.querySelectorAll('.fcty-seg-btn').forEach(function (t) {
-            var on = t.dataset.scheduleTab === name;
-            t.classList.toggle('active', on);
-            t.setAttribute('aria-selected', on ? 'true' : 'false');
-        });
-        roomOverlay.querySelectorAll('.fcty-schedule-panel').forEach(function (p) {
-            p.classList.toggle('active', p.dataset.schedulePanel === name);
-        });
-    }
-
     function note(text) {
         return '<div class="fcty-slot vacant is-note"><span class="fcty-slot-what">' + text + '</span></div>';
     }
@@ -498,7 +515,6 @@
        Reservation statuses come from the clock (reservationState). Records are only ever
        read here, never deleted, so history stays in the database when a day or week rolls over. */
     var schedule = null;       /* { monday, week, blocked } for the open room dialog */
-    var dayOpen = {};          /* 'scope|YYYY-MM-DD' → open?  (kept across re-renders) */
     var schedSig = '';
     var schedTimer = null;
 
@@ -519,58 +535,89 @@
 
     /* Positions are written as data-l / data-w here and applied through the DOM
        afterwards (positionTimeline), so no inline style="" attributes are emitted. */
-    function dayTimelineHTML(dateStr, list, now) {
-        var nowMin = now.getHours() * 60 + now.getMinutes();
-        var blocks = '', rows = '';
-        list.forEach(function (s) {
-            var st = reservationState(dateStr, s, now);
-            var a = tlPct(timeToMin(s.start)), b = tlPct(timeToMin(s.end));
-            var range = timeRange(s.start, s.end);
-            if (b > a) {
-                blocks += '<div class="fcty-dtl-block ' + st.cls + '" data-l="' + a + '" data-w="' + (b - a) + '" title="' +
-                    esc(range + ' \u00b7 ' + decodeHtml(s.label) + ' \u00b7 ' + st.label) + '"></div>';
-            }
-            rows += '<li class="fcty-dtl-item ' + st.cls + '"><div class="fcty-dtl-info"><time>' + range + '</time>' +
-                '<span class="fcty-dtl-what">' + s.label + '</span></div>' +
-                '<span class="fcty-dtl-state">' + st.label + '</span></li>';
-        });
-        var nowLine = (dateStr === ymd(now) && nowMin >= TL_START_MIN && nowMin <= TL_END_MIN)
-            ? '<div class="fcty-dtl-now" data-l="' + tlPct(nowMin) + '"></div>' : '';
-        var ticks = TL_TICKS.map(function (t) {
-            return '<span' + (t[2] ? ' class="is-minor"' : '') + ' data-l="' + tlPct(t[0] * 60) + '">' + t[1] + '</span>';
-        }).join('');
-        return '<div class="fcty-dtl">' +
-            '<div class="fcty-dtl-track" aria-hidden="true">' + blocks + nowLine + '</div>' +
-            '<div class="fcty-dtl-ticks" aria-hidden="true">' + ticks + '</div>' +
-            (rows ? '<ul class="fcty-dtl-list">' + rows + '</ul>' : '<p class="fcty-dtl-empty">No reservations</p>') +
-            '</div>';
-    }
-
-    function dayDropdownHTML(scope, date, list, now) {
-        var dateStr = ymd(date), today = ymd(now);
-        var key = scope + '|' + dateStr;
-        var open = key in dayOpen ? dayOpen[key] : dateStr === today;   /* today starts open */
-        var id = 'fcty-day-' + scope + '-' + dateStr;
-        var n = list.length;
-        return '<div class="fcty-day' + (dateStr === today ? ' is-today' : '') + (dateStr < today ? ' is-past' : '') + (open ? ' is-open' : '') + '">' +
-            '<button type="button" class="fcty-day-head" data-day-key="' + key + '" aria-expanded="' + (open ? 'true' : 'false') + '" aria-controls="' + id + '">' +
-            '<span class="fcty-day-main"><span class="fcty-day-title">' + longDate(date) + '</span>' +
-            (dateStr === today ? '<span class="fcty-day-tag">Today</span>' : '') + '</span>' +
-            '<span class="fcty-day-count' + (n ? ' has' : '') + '">' + (n ? plural(n, 'reservation') : 'No reservations') + '</span>' +
-            icon('expand_more') +
-            '</button>' +
-            '<div class="fcty-day-body" id="' + id + '"' + (open ? '' : ' hidden') + '>' + dayTimelineHTML(dateStr, list, now) + '</div>' +
-            '</div>';
-    }
-
     function positionTimeline(root) {
         root.querySelectorAll('[data-l]').forEach(function (el) {
             el.style.left = el.getAttribute('data-l') + '%';
             var w = el.getAttribute('data-w');
             if (w !== null) el.style.width = w + '%';
         });
+        root.querySelectorAll('[data-t]').forEach(function (el) {
+            el.style.top = el.getAttribute('data-t') + '%';
+            var h = el.getAttribute('data-h');
+            if (h !== null) el.style.height = h + '%';
+        });
     }
 
+    /* ── This week: a timetable (Mon-Sat x 7 AM-8 PM) of everything that blocks the room ──
+       Classes (Rooms Assigned import) and approved reservations of every faculty, one block each,
+       with who is using the room. Empty space is open time. */
+    var ttSel = '';        /* selected block: 'YYYY-MM-DD|HH:MM|HH:MM' */
+    var ttIndex = {};      /* key -> { s, date } for the detail line */
+
+    function ttPct(min) {
+        var c = Math.min(SCHOOL_END_MIN, Math.max(SCHOOL_START_MIN, min));
+        return (c - SCHOOL_START_MIN) / (SCHOOL_END_MIN - SCHOOL_START_MIN) * 100;
+    }
+
+    function ttDetailHTML(key) {
+        var it = ttIndex[key];
+        if (!it) return 'Tap a block to see who is using the room.';
+        var s = it.s, cls = isClass(s), st = reservationState(ymd(it.date), s, new Date());
+        var state = cls && st.label === 'Ongoing' ? 'In class' : st.label;
+        return '<span class="fcty-tt-tag ' + (cls ? 'is-class' : 'is-res') + '">' + (cls ? 'Class' : 'Reservation') + '</span> ' +
+            '<strong>' + esc(s.title || decodeHtml(String(s.label || ''))) + '</strong>' +
+            '<span class="fcty-tt-meta">' + esc(longDate(it.date)) + ' \u00b7 ' + timeRange(s.start, s.end) +
+            (s.who ? ' \u00b7 ' + esc(s.who) : '') + ' \u00b7 ' + state + '</span>';
+    }
+
+    function weekTimetableHTML(monday, week, now) {
+        var today = ymd(now), nowMin = now.getHours() * 60 + now.getMinutes();
+        var heads = '<div class="fcty-tt-corner" aria-hidden="true"></div>', cols = '', hours = '';
+        ttIndex = {};
+        for (var h = SCHOOL_START_MIN / 60; h < SCHOOL_END_MIN / 60; h++) {
+            hours += '<span data-t="' + ttPct(h * 60) + '">' + hourLabel(h) + '</span>';
+        }
+        WEEK_ORDER.forEach(function (d) {
+            var date = addDays(monday, (d + 6) % 7), ds = ymd(date), isToday = ds === today;
+            heads += '<div class="fcty-tt-head' + (isToday ? ' is-today' : '') + (ds < today ? ' is-past' : '') + '">' +
+                '<strong>' + DAY_SHORT[d] + '</strong><span>' + esc(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })) + '</span></div>';
+            var blocks = sortByStart(week[DAY_KEYS[d]]).map(function (s) {
+                var key = ds + '|' + s.start + '|' + s.end, cls = isClass(s);
+                ttIndex[key] = { s: s, date: date };
+                var st = reservationState(ds, s, now);
+                var a = ttPct(timeToMin(s.start)), b = ttPct(timeToMin(s.end));
+                var mins = timeToMin(s.end) - timeToMin(s.start);
+                var name = s.title || decodeHtml(String(s.label || '')), who = s.who || '';
+                return '<button type="button" class="fcty-tt-block ' + (cls ? 'is-class' : 'is-res') + ' ' + st.cls +
+                    (mins <= 60 ? ' is-short' : (mins <= 90 ? ' is-mid' : '')) + (key === ttSel ? ' is-selected' : '') + '" data-t="' + a + '" data-h="' + Math.max(1, b - a) +
+                    '" data-key="' + esc(key) + '" title="' + esc(timeRange(s.start, s.end) + ' \u00b7 ' + name + (who ? ' \u00b7 ' + who : '')) + '">' +
+                    '<span class="fcty-tt-time">' + rangeShort(s.start, s.end) + '</span>' +
+                    '<span class="fcty-tt-name">' + esc(name) + '</span>' +
+                    (who ? '<span class="fcty-tt-who">' + esc(who) + '</span>' : '') + '</button>';
+            }).join('');
+            var nowLine = isToday && nowMin >= SCHOOL_START_MIN && nowMin <= SCHOOL_END_MIN
+                ? '<div class="fcty-tt-now" data-t="' + ttPct(nowMin) + '"></div>' : '';
+            cols += '<div class="fcty-tt-col' + (isToday ? ' is-today' : '') + '">' + blocks + nowLine + '</div>';
+        });
+        return '<div class="fcty-tt" role="group" aria-label="Weekly timetable">' +
+            '<div class="fcty-tt-bar"><p class="fcty-week-range">' + longDate(monday) + ' \u2013 ' + longDate(addDays(monday, 5)) + '</p>' +
+            '<div class="fcty-tt-legend" aria-hidden="true"><span><i class="is-class"></i>Class</span>' +
+            '<span><i class="is-res"></i>Reservation</span><span><i class="is-open"></i>Open</span></div></div>' +
+            '<div class="fcty-tt-scroll"><div class="fcty-tt-grid">' + heads +
+            '<div class="fcty-tt-hours" aria-hidden="true">' + hours + '</div>' + cols + '</div></div>' +
+            '<div class="fcty-tt-detail" id="fcty-tt-detail" aria-live="polite">' + ttDetailHTML(ttSel) + '</div></div>';
+    }
+
+    function onTimetableClick(e) {
+        var b = e.target.closest ? e.target.closest('.fcty-tt-block') : null;
+        if (!b) return;
+        ttSel = b.getAttribute('data-key');
+        roomOverlay.querySelectorAll('.fcty-tt-block').forEach(function (x) { x.classList.toggle('is-selected', x === b); });
+        var d = $('fcty-tt-detail');
+        if (d) d.innerHTML = ttDetailHTML(ttSel);
+    }
+
+    /* open the Today timetable around "now" (or the first class of the day), once */
     /* Everything that changes what the schedule looks like as time passes */
     function scheduleSig(now) {
         var m = now.getHours() * 60 + now.getMinutes();
@@ -596,27 +643,13 @@
         if (!schedule) return;
         var now = new Date();
         var week = schedule.week || {};
-        var held = document.activeElement && document.activeElement.getAttribute
-            ? document.activeElement.getAttribute('data-day-key') : null;
-
-        var todays = isClosedDay(now) ? [] : sortByStart(week[DAY_KEYS[now.getDay()]]);
-        $('fcty-modal-daily-list').innerHTML = isClosedDay(now)
-            ? note('Closed on Sundays \u2014 reservations resume ' + longDate(nextOpenDay(now)) + '.')
-            : dayDropdownHTML('daily', now, todays, now);
+        var todays = isClosedDay(now) ? [] : sortByStart(week[DAY_KEYS[now.getDay()]]);   /* feeds the status pill ("Free until ...") */
 
         var monday = parseYmd(schedule.monday);
-        $('fcty-modal-weekly-grid').innerHTML =
-            '<p class="fcty-week-range">' + longDate(monday) + ' \u2013 ' + longDate(addDays(monday, 5)) + '</p>' +
-            WEEK_ORDER.map(function (d) {
-                return dayDropdownHTML('weekly', addDays(monday, (d + 6) % 7), sortByStart(week[DAY_KEYS[d]]), now);
-            }).join('');
+        $('fcty-modal-weekly-grid').innerHTML = weekTimetableHTML(monday, week, now);
 
         positionTimeline(roomOverlay);
         if (!schedule.blocked) applyAvailabilityBadge(todays);
-        if (held) {   /* a re-render must not drop keyboard focus */
-            var again = roomOverlay.querySelector('[data-day-key="' + held + '"]');
-            if (again) again.focus();
-        }
     }
 
     function loadSchedule(room, blocked) {
@@ -630,7 +663,7 @@
             })
             .catch(function () {
                 if (!currentRoom || currentRoom.room !== room || schedule) return;
-                $('fcty-modal-daily-list').innerHTML = note('Couldn\u2019t load the schedule right now.');
+                $('fcty-modal-weekly-grid').innerHTML = note('Couldn\u2019t load the schedule right now.');
                 if (!blocked) setStatusBadge('', 'Available');
             });
     }
@@ -659,17 +692,6 @@
         if (schedTimer) { clearInterval(schedTimer); schedTimer = null; }
     }
 
-    function onDayToggle(e) {
-        var head = e.target.closest('.fcty-day-head');
-        if (!head) return;
-        var open = head.getAttribute('aria-expanded') !== 'true';
-        head.setAttribute('aria-expanded', open ? 'true' : 'false');
-        head.parentNode.classList.toggle('is-open', open);
-        var body = $(head.getAttribute('aria-controls'));
-        if (body) body.hidden = !open;
-        dayOpen[head.getAttribute('data-day-key')] = open;
-    }
-
     /* "Free until 2:00 PM" / "In use until 10:30 AM" — shown in the status pill */
     function availabilityHint(daySchedule) {
         var now = new Date(), m = now.getHours() * 60 + now.getMinutes();
@@ -686,6 +708,28 @@
         return 'Free until ' + minToLabel(SCHOOL_END_MIN);
     }
 
+    function isBlocked(room) { return room.status === 'Maintenance' || room.status === 'Not Bookable'; }
+
+    /* Clicking a room: a room that can be reserved opens the reservation form straight away; the room's weekly
+       schedule is a secondary view (the form's "View weekly schedule" link). A room that cannot be reserved
+       (maintenance / not bookable) opens the room details instead, since there is nothing to reserve. */
+    function enterRoom(room, locationLabel) {
+        currentRoom = { room: room, name: room.name, location: locationLabel };
+        if (isBlocked(room)) openRoomModal(room, locationLabel);
+        else openReservationForm(room);
+    }
+
+    /* From the schedule view back to the reservation: pick up the form exactly where it was left */
+    function returnToForm(room) {
+        if (formOverlay.querySelector('#fcty-res-main')) {
+            closeOverlay(roomOverlay, true);
+            openOverlay(formOverlay, '#fcty-res-submit');
+        } else {
+            openReservationForm(room);
+        }
+    }
+
+    /* The room's weekly schedule (secondary view) */
     function openRoomModal(room, locationLabel) {
         currentRoom = { room: room, name: room.name, location: locationLabel };
 
@@ -698,14 +742,14 @@
         else setStatusBadge('', 'Checking\u2026');
 
         schedule = null;
-        dayOpen = {};
-        $('fcty-modal-daily-list').innerHTML = note('Loading schedule\u2026');
-        $('fcty-modal-weekly-grid').innerHTML = '';
-        setScheduleTab('daily');
+        ttSel = '';
+        $('fcty-modal-weekly-grid').innerHTML = note('Loading schedule\u2026');
 
+        /* the footer button leads back to the reservation (or simply closes, for a room that cannot be reserved) */
         var reserve = $('fcty-modal-reserve');
-        reserve.disabled = blocked;
-        reserve.title = blocked ? 'This room cannot be reserved' : '';
+        reserve.innerHTML = blocked ? icon('close') + 'Close' : icon('arrow_back') + 'Back to reservation';
+        reserve.title = blocked ? '' : 'Return to the reservation form';
+        reserve.disabled = false;
 
         closeOverlay(formOverlay, true);
         openOverlay(roomOverlay);
@@ -748,8 +792,9 @@
 
     function backToRoom() {
         closeOverlay(formOverlay, true);
-        if (currentRoom) openRoomModal(currentRoom.room, currentRoom.location);
-        else closeOverlay(formOverlay);
+        if (!currentRoom) { closeOverlay(formOverlay); return; }
+        if (isBlocked(currentRoom.room)) openRoomModal(currentRoom.room, currentRoom.location);
+        else openReservationForm(currentRoom.room);
     }
 
     function alertHTML(id, kind) {
@@ -779,10 +824,11 @@
        RESERVE — two-pane booking experience
        Left: live summary + day timeline.  Right: guided form.
     ══════════════════════════════════════════════════════════ */
-    function timeOptions(from, to, selected) {
+    /* disabledFn(minute) -> true greys an option out (taken by a class / reservation, or already past) */
+    function timeOptions(from, to, selected, disabledFn) {
         var html = '';
         for (var m = from; m <= to; m += 30) {
-            html += '<option value="' + minToHHMM(m) + '"' + (m === selected ? ' selected' : '') + '>' + minToLabel(m) + '</option>';
+            html += '<option value="' + minToHHMM(m) + '"' + (m === selected ? ' selected' : '') + (disabledFn && disabledFn(m) ? ' disabled' : '') + '>' + minToLabel(m) + '</option>';
         }
         return html;
     }
@@ -793,7 +839,7 @@
 
         /* Smart defaults: next half-hour today, or 8 AM on the next open day if it's too late
            (or today is Sunday) */
-        var st = { date: ymd(now), start: 0, end: 0, purpose: '' };
+        var st = { date: ymd(now), start: 0, end: 0, purpose: '', other: false };
         if (isClosedDay(now) || nowMin >= SCHOOL_END_MIN - 60) {
             st.date = ymd(nextOpenDay(addDays(now, 1))); st.start = SCHOOL_START_MIN + 60;
         } else {
@@ -803,7 +849,7 @@
 
         var firstOpenStr = ymd(nextOpenDay(now));   /* earliest bookable date: Sundays are closed */
         var weekData = null;          /* schedule for the week of st.date */
-        var serverClash = false;
+        var serverClash = false, serverClass = '';
         var availTimer = null, availCtl = null;
 
         /* Quick date chips: the next two open days (Sundays are skipped) */
@@ -828,10 +874,7 @@
             '<span class="fcty-pill" id="fcty-quota" hidden></span>' +
             '</div>' +
             '</div>' +
-            '<ul class="fcty-ticket" aria-live="polite">' +
-            '<li>' + icon('event') + '<div><small>Date</small><strong id="fcty-tk-date"></strong></div></li>' +
-            '<li>' + icon('schedule') + '<div><small>Time</small><strong id="fcty-tk-time"></strong></div></li>' +
-            '</ul>' +
+            '<p class="fcty-sum" aria-live="polite">' + icon('event') + '<strong id="fcty-sum-text"></strong></p>' +
             '<div class="fcty-tl">' +
             '<div class="fcty-tl-head"><span>Room schedule</span><span id="fcty-tl-day"></span></div>' +
             '<div class="fcty-tl-track" id="fcty-tl-track"><div class="fcty-tl-pick" id="fcty-tl-pick"></div></div>' +
@@ -841,7 +884,9 @@
             }).join('') +
             '</div>' +
             '<div class="fcty-tl-note" id="fcty-tl-note"></div>' +
+            '<div class="fcty-open fcty-open-form" id="fcty-open" aria-live="polite"></div>' +
             '</div>' +
+            '<button type="button" class="fcty-linkbtn" id="fcty-view-week">' + icon('calendar_view_week') + 'View weekly schedule' + icon('chevron_right') + '</button>' +
             '</aside>' +
 
             /* ── Right: form ── */
@@ -864,33 +909,26 @@
             '<div class="fcty-sub"><label class="fcty-sublabel" for="fcty-res-end">To</label>' +
             '<select id="fcty-res-end" class="fcty-input"></select></div>' +
             '</div>' +
-            '<div class="fcty-sub"><span class="fcty-sublabel">Quick Set</span>' +
-            '<div class="fcty-chips" id="fcty-dur-chips">' +
-            [60, 180, 300].map(function (m) {
-                return '<button type="button" class="fcty-chip" aria-pressed="false" data-min="' + m + '">' + durLabel(m) + '</button>';
-            }).join('') +
-            '</div></div>' +
-            alertHTML('fcty-res-avail', 'warn') +
             '</div>' +
 
             '<div class="fcty-step">' +
-            '<div class="fcty-sub"><label class="fcty-sublabel" for="fcty-res-purpose">Purpose</label>' +
-            chipRow('fcty-purpose-chips', PURPOSES) +
-            '<input type="text" id="fcty-res-purpose" class="fcty-input" placeholder="Or type your own\u2026" maxlength="200"></div>' +
-            '<div class="fcty-sub" id="fcty-doc-block" hidden>' +
-            '<span class="fcty-sublabel">Request letter <small>(recommended)</small></span>' +
+            '<div class="fcty-sub"><span class="fcty-sublabel">Purpose</span>' +
+            chipRow('fcty-purpose-chips', PURPOSES.concat(['Other'])) +
+            '<input type="text" id="fcty-res-purpose" class="fcty-input" placeholder="What is the room for?" maxlength="200" aria-label="Purpose" hidden></div>' +
+            '<details class="fcty-sub fcty-doc" id="fcty-doc-block" hidden>' +
+            '<summary class="fcty-sublabel">Request letter <small>(recommended)</small><span class="fcty-doc-state" id="fcty-doc-state"></span></summary>' +
             '<label class="fcty-drop" id="fcty-drop" for="fcty-res-doc">' + icon('upload_file') +
             '<span><strong>Upload a file</strong><small>JPG, PNG or PDF \u00b7 max 5 MB</small></span></label>' +
             '<input type="file" id="fcty-res-doc" class="fcty-sr-only" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf">' +
             '<button type="button" class="pslc-trigger" id="fcty-doc-cam" data-letter-camera="fcty-res-doc">' + icon('photo_camera') + 'Take a photo of the letter</button>' +
             '<div class="fcty-file" id="fcty-file" hidden></div>' +
             '<p class="fcty-hint" id="fcty-doc-hint"></p>' +
-            '</div>' +
+            '</details>' +
             '</div>' +
 
             '</div>' +
             '<footer class="fcty-res-foot">' +
-            '<button type="button" class="fcty-btn fcty-btn-ghost" id="fcty-res-back">' + icon('arrow_back') + 'Back</button>' +
+            '<button type="button" class="fcty-btn fcty-btn-ghost" id="fcty-res-report">' + icon('flag') + 'Report issue</button>' +
             '<button type="button" class="fcty-btn fcty-btn-primary" id="fcty-res-submit">' + icon('event_available') + 'Confirm reservation</button>' +
             '</footer>' +
             '</section>' +
@@ -901,7 +939,7 @@
         $('fcty-form-close').addEventListener('click', function () { closeOverlay(formOverlay); });
 
         var elDate = $('fcty-res-date'), elStart = $('fcty-res-start'), elEnd = $('fcty-res-end');
-        var elMsg = $('fcty-res-msg'), elAvail = $('fcty-res-avail'), btnSubmit = $('fcty-res-submit');
+        var elMsg = $('fcty-res-msg'), btnSubmit = $('fcty-res-submit');
         var elPurpose = $('fcty-res-purpose');
         var confirmHTML = icon('event_available') + 'Confirm reservation';
 
@@ -916,11 +954,12 @@
                 chip.innerHTML = icon('meeting_room') + quota.active + ' of ' + quota.max + ' rooms reserved' +
                     (quota.student_active ? ' (' + quota.student_active + ' student reservation' +
                         (quota.student_active === 1 ? '' : 's') + ')' : '');
+                chip.classList.toggle('is-full', isFull());
                 chip.hidden = false;
             }
             if (!lim) return;
 
-            if (!isFull()) { lim.hidden = true; btnSubmit.disabled = false; btnSubmit.title = ''; return; }
+            if (!isFull()) { lim.hidden = true; syncSubmit(); return; }
 
             btnSubmit.disabled = true;
             btnSubmit.title = 'Room limit reached';
@@ -969,6 +1008,7 @@
                 docFile = null; elDoc.value = '';
                 elFile.hidden = true; elDrop.hidden = false; docMessage('');
                 if (elCam) elCam.hidden = false;
+                $('fcty-doc-state').textContent = '';
                 return;
             }
             var kind = fileKind(f);
@@ -981,6 +1021,7 @@
                 '<button type="button" class="fcty-icon-btn" id="fcty-file-remove" aria-label="Remove file">' + icon('close') + '</button>';
             elFile.hidden = false; elDrop.hidden = true;
             if (elCam) elCam.hidden = true;
+            $('fcty-doc-state').textContent = '\u00b7 attached';
             $('fcty-file-remove').addEventListener('click', function () { setDoc(null); });
         }
         docMessage('');
@@ -1016,6 +1057,42 @@
             });
         }
 
+        /* The day's classes + reservations decide what is open: only a free slot can be reserved */
+        var touched = false;   /* has the user chosen anything yet? (until then the form jumps to the first open time) */
+        function isToday() { return st.date === ymd(now); }
+        function earliestStart() { return isToday() ? Math.max(SCHOOL_START_MIN, Math.ceil((nowMin + 1) / 30) * 30) : SCHOOL_START_MIN; }
+        function rangeFree(a, b) {
+            return !dayBookings().some(function (x) { return a < timeToMin(x.end) && b > timeToMin(x.start); });
+        }
+        function openWindows() {
+            return !weekData || isClosedDay(parseYmd(st.date)) ? [] : freeWindows(dayBookings(), earliestStart(), SCHOOL_END_MIN);
+        }
+        function jumpToFirstOpen() {
+            var ws = openWindows().filter(function (w) { return w[1] > st.start; });
+            if (!ws.length) return;
+            st.start = Math.max(ws[0][0], earliestStart());
+            st.end = Math.min(ws[0][1], st.start + 60);
+        }
+        function syncSubmit() {
+            var taken = (!!weekData && clashes().length > 0) || serverClash;
+            btnSubmit.disabled = isFull() || taken;
+            btnSubmit.title = isFull() ? 'Room limit reached' : (taken ? 'That time is not available. Pick one of the open times.' : '');
+        }
+        function renderOpen() {
+            var el = $('fcty-open');
+            if (!el) return;
+            if (!weekData || isClosedDay(parseYmd(st.date))) { el.innerHTML = ''; return; }
+            var ws = openWindows();
+            el.innerHTML = '<span class="fcty-open-title">' + icon('event_available') + 'Open on ' + DAY_NAMES[parseYmd(st.date).getDay()] + '</span>' +
+                (ws.length
+                    ? '<div class="fcty-open-chips">' + ws.map(function (w) {
+                        var on = st.start >= w[0] && st.end <= w[1];
+                        return '<button type="button" class="fcty-open-chip' + (on ? ' is-on' : '') + '" data-s="' + w[0] + '" data-e="' + w[1] + '">' +
+                            minToLabel(w[0]) + ' \u2013 ' + minToLabel(w[1]) + '</button>';
+                    }).join('') + '</div>'
+                    : '<p class="fcty-open-none">Nothing open this day. Try another date.</p>');
+        }
+
         function pct(min) {
             var c = Math.min(SCHOOL_END_MIN, Math.max(SCHOOL_START_MIN, min));
             return (c - SCHOOL_START_MIN) / (SCHOOL_END_MIN - SCHOOL_START_MIN) * 100;
@@ -1024,30 +1101,27 @@
         /* ── Rendering ── */
         function syncControls() {
             /* Start / end selects (end must be after start) */
-            elStart.innerHTML = timeOptions(SCHOOL_START_MIN, SCHOOL_END_MIN - 30, st.start);
+            elStart.innerHTML = timeOptions(SCHOOL_START_MIN, SCHOOL_END_MIN - 30, st.start, function (m) {
+                return !rangeFree(m, m + 30) || (isToday() && m <= nowMin);
+            });
             if (st.end <= st.start) st.end = Math.min(SCHOOL_END_MIN, st.start + 60);
-            elEnd.innerHTML = timeOptions(st.start + 30, SCHOOL_END_MIN, st.end);
+            elEnd.innerHTML = timeOptions(st.start + 30, SCHOOL_END_MIN, st.end, function (m) { return !rangeFree(st.start, m); });
 
             /* Date chips */
             var dateChips = $('fcty-date-chips');
             setPressed(dateChips, function (c) { return c.dataset.day !== undefined && st.date === ymd(addDays(now, +c.dataset.day)); });
 
-            /* Duration chips */
-            var dur = st.end - st.start;
-            setPressed($('fcty-dur-chips'), function (c) { return +c.dataset.min === dur; });
-            $('fcty-dur-chips').querySelectorAll('.fcty-chip').forEach(function (c) {
-                c.disabled = st.start + (+c.dataset.min) > SCHOOL_END_MIN;
+            /* Purpose chips ("Other" reveals the text box) */
+            setPressed($('fcty-purpose-chips'), function (c) {
+                return c.dataset.val === 'Other' ? st.other : (!st.other && c.dataset.val === st.purpose);
             });
-
-            /* Purpose chips */
-            setPressed($('fcty-purpose-chips'), function (c) { return c.dataset.val === st.purpose; });
+            elPurpose.hidden = !st.other;
 
         }
 
         function renderSummary() {
             var d = parseYmd(st.date);
-            $('fcty-tk-date').textContent = longDate(d);
-            $('fcty-tk-time').textContent = minToLabel(st.start) + ' \u2013 ' + minToLabel(st.end) +
+            $('fcty-sum-text').textContent = longDate(d) + ' \u00b7 ' + minToLabel(st.start) + ' \u2013 ' + minToLabel(st.end) +
                 ' \u00b7 ' + durLabel(st.end - st.start);
             $('fcty-tl-day').textContent = DAY_NAMES[d.getDay()];
 
@@ -1058,7 +1132,7 @@
             bookings.forEach(function (b) {
                 var s = pct(timeToMin(b.start)), e = pct(timeToMin(b.end));
                 var block = document.createElement('div');
-                block.className = 'fcty-tl-block';
+                block.className = 'fcty-tl-block' + (isClass(b) ? ' is-class' : '');
                 block.style.left = s + '%';
                 block.style.width = Math.max(0, e - s) + '%';
                 block.title = timeRange(b.start, b.end) + ' \u00b7 ' + decodeHtml(b.label);
@@ -1066,10 +1140,11 @@
             });
 
             var clash = clashes();
+            var taken = clash.length > 0 || serverClash;
             var pick = $('fcty-tl-pick');
             pick.style.left = pct(st.start) + '%';
             pick.style.width = Math.max(0, pct(st.end) - pct(st.start)) + '%';
-            pick.classList.toggle('is-clash', clash.length > 0);
+            pick.classList.toggle('is-clash', taken);
 
             var noteEl = $('fcty-tl-note');
             if (!weekData) {
@@ -1077,18 +1152,22 @@
                 noteEl.innerHTML = icon('schedule') + 'Checking the schedule\u2026';
             } else if (clash.length) {
                 noteEl.className = 'fcty-tl-note is-clash';
-                noteEl.innerHTML = icon('warning') + 'Overlaps ' + timeRange(clash[0].start, clash[0].end) + '. Pick another time.';
+                noteEl.innerHTML = icon('warning') + (isClass(clash[0])
+                    ? 'This room has a class, ' + esc(classTitle(clash[0])) + ', ' + timeRange(clash[0].start, clash[0].end) + '. Pick another time.'
+                    : 'Overlaps ' + timeRange(clash[0].start, clash[0].end) + '. Pick another time.');
+            } else if (serverClash) {
+                /* the server's own check (same rule as the submit) found a conflict the page did not */
+                noteEl.className = 'fcty-tl-note is-clash';
+                noteEl.innerHTML = icon('warning') + (serverClass
+                    ? 'This room has a class at that time (' + esc(serverClass) + '). Pick another time.'
+                    : 'Another reservation overlaps this time. Pick another time.');
             } else {
                 noteEl.className = 'fcty-tl-note';
                 noteEl.innerHTML = icon('check_circle') + 'This time is free.';
             }
 
-            /* Server-side conflict notice (only if the local check didn't already flag it) */
-            if (serverClash && !clash.length) {
-                setAlert(elAvail, 'warn', 'warning', 'Another reservation overlaps this time. Try a different slot.');
-            } else {
-                elAvail.hidden = true;
-            }
+            renderOpen();
+            syncSubmit();
         }
 
         function refresh() { syncControls(); renderSummary(); syncDocBlock(); }
@@ -1101,10 +1180,16 @@
                 .then(function (w) {
                     if (ymd(mondayOf(parseYmd(st.date))) !== wk) return;   /* date changed meanwhile */
                     weekData = w;
+                    var jumped = false;
+                    if (!touched && clashes().length) { jumpToFirstOpen(); jumped = true; }   /* start on a time that is actually open */
+                    if (jumped) { serverClash = false; serverClass = ''; }   /* an answer about the old time no longer applies */
+                    syncControls();
                     renderSummary();
+                    if (jumped) serverCheck();
                 })
                 .catch(function () {
                     weekData = {};
+                    syncControls();
                     renderSummary();
                 });
         }
@@ -1112,6 +1197,7 @@
         function serverCheck() {
             if (availCtl) availCtl.abort();
             availCtl = new AbortController();
+            var asked = st.date + '|' + st.start + '|' + st.end;   /* ignore an answer for a time that is no longer the one picked */
             fetch(apiBase() + 'room-reservation/api/check-room-availability.php?room_id=' + room.room_id +
                 '&reservation_date=' + encodeURIComponent(st.date) +
                 '&start_time=' + encodeURIComponent(minToHHMM(st.start)) +
@@ -1119,14 +1205,20 @@
                 credentials: 'same-origin', signal: availCtl.signal
             })
                 .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
-                .then(function (d) { serverClash = !!d.conflict; renderSummary(); })
-                .catch(function (err) { if (!err || err.name !== 'AbortError') { serverClash = false; } });
+                .then(function (d) {
+                    if (asked !== st.date + '|' + st.start + '|' + st.end) return;
+                    serverClash = !!d.conflict;
+                    serverClass = d.reason === 'class' ? String(d.class_label || 'a class') : '';
+                    renderSummary();
+                })
+                .catch(function (err) { if (!err || err.name !== 'AbortError') { serverClash = false; serverClass = ''; } });
         }
 
         function changed(dateChanged) {
-            serverClash = false;
+            serverClash = false; serverClass = '';
             elMsg.hidden = true;
-            if (dateChanged) { refresh(); loadWeek(); } else refresh();
+            touched = true;
+            if (dateChanged) { weekData = null; refresh(); loadWeek(); } else refresh();
             clearTimeout(availTimer);
             availTimer = setTimeout(serverCheck, 450);
         }
@@ -1155,32 +1247,40 @@
             changed(false);
         });
         elEnd.addEventListener('change', function () { st.end = timeToMin(elEnd.value); changed(false); });
-        $('fcty-dur-chips').addEventListener('click', function (e) {
-            var c = e.target.closest('.fcty-chip');
-            if (!c || c.disabled) return;
-            st.end = Math.min(SCHOOL_END_MIN, st.start + (+c.dataset.min));
+        $('fcty-open').addEventListener('click', function (e) {
+            var c = e.target.closest('.fcty-open-chip');
+            if (!c || c.tagName !== 'BUTTON') return;
+            st.start = +c.dataset.s;
+            st.end = Math.min(+c.dataset.e, st.start + 60);
             changed(false);
         });
         $('fcty-purpose-chips').addEventListener('click', function (e) {
             var c = e.target.closest('.fcty-chip');
             if (!c) return;
-            st.purpose = c.dataset.val;
-            elPurpose.value = st.purpose;
+            if (c.dataset.val === 'Other') {
+                st.other = true;
+                st.purpose = elPurpose.value;
+            } else {
+                st.other = false;
+                st.purpose = c.dataset.val;
+                elPurpose.value = '';
+            }
             elMsg.hidden = true;
             syncControls();
+            if (st.other) elPurpose.focus();
         });
-        elPurpose.addEventListener('input', function () {
-            st.purpose = elPurpose.value;
-            setPressed($('fcty-purpose-chips'), function (c) { return c.dataset.val === st.purpose; });
-        });
-        $('fcty-res-back').addEventListener('click', backToRoom);
+        elPurpose.addEventListener('input', function () { st.purpose = elPurpose.value; });
+        /* secondary actions: the room's weekly schedule, and reporting a problem with the room */
+        $('fcty-view-week').addEventListener('click', function () { openRoomModal(room, currentRoom ? currentRoom.location : ''); });
+        $('fcty-res-report').addEventListener('click', function () { openReportIssueForm(room); });
 
         btnSubmit.addEventListener('click', function () {
             function fail(t) { setAlert(elMsg, 'error', 'error', esc(t)); elMsg.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
-            var purpose = elPurpose.value.trim();
-            if (!purpose) return fail('Add a purpose \u2014 pick one above or type your own.');
+            var purpose = String(st.purpose || '').trim();
+            if (!purpose) return fail(st.other ? 'Tell us what the room is for.' : 'Pick what the room is for.');
             if (st.end <= st.start) return fail('End time must be after the start time.');
             if (isClosedDay(parseYmd(st.date))) return fail('Reservations are not available on Sundays. Please choose another day.');
+            if (weekData && clashes().length) return fail('That time is already taken. Pick one of the open times.');
 
             btnSubmit.disabled = true;
             btnSubmit.textContent = 'Submitting\u2026';
@@ -1201,8 +1301,8 @@
             })
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
-                    btnSubmit.disabled = isFull();
                     btnSubmit.innerHTML = confirmHTML;
+                    syncSubmit();
                     if (data.error) {
                         fail(data.error);
                         if (data.limit_reached) loadQuota();   /* sync the chip + lock the button */
@@ -1222,8 +1322,8 @@
                     showDone(data);
                 })
                 .catch(function () {
-                    btnSubmit.disabled = isFull();
                     btnSubmit.innerHTML = confirmHTML;
+                    syncSubmit();
                     fail('Network error. Please try again.');
                 });
         });
@@ -1397,14 +1497,12 @@
                         var activeFloor = b.floors[activeFloorIdx];
                         locationLabel = b.name + (activeFloor ? ' \u00b7 ' + activeFloor.label : '');
                     }
-                    openRoomModal(room, locationLabel);
+                    enterRoom(room, locationLabel);
 
-                    // If date/time provided, open the reservation form pre-filled
+                    // If date/time provided, pre-fill the reservation form that just opened
                     if (date && startT && endT) {
-                        // Wait for the room modal to finish rendering before opening the form
+                        // Wait for the form to finish rendering
                         setTimeout(function () {
-                            openReservationForm(room);
-
                             // Pre-fill the form fields after they're created
                             setTimeout(function () {
                                 var elDate = document.getElementById('fcty-res-date');
@@ -1489,19 +1587,16 @@
             if (!room) return;
             var b = BUILDINGS[activeBuildingId];
             var floor = b && b.floors[activeFloorIdx];
-            openRoomModal(room, b.name + (floor ? ' \u00b7 ' + floor.label : ''));
+            enterRoom(room, b.name + (floor ? ' \u00b7 ' + floor.label : ''));
         });
 
         /* Room dialog */
         $('fcty-modal-close').addEventListener('click', function () { closeOverlay(roomOverlay); });
-        roomOverlay.querySelectorAll('.fcty-seg-btn').forEach(function (t) {
-            t.addEventListener('click', function () { setScheduleTab(this.dataset.scheduleTab); });
-        });
-        $('fcty-modal-daily-list').addEventListener('click', onDayToggle);
-        $('fcty-modal-weekly-grid').addEventListener('click', onDayToggle);
+        $('fcty-modal-weekly-grid').addEventListener('click', onTimetableClick);
         $('fcty-modal-reserve').addEventListener('click', function () {
-            if (!currentRoom || this.disabled) return;
-            openReservationForm(currentRoom.room);
+            if (!currentRoom) return;
+            if (isBlocked(currentRoom.room)) closeOverlay(roomOverlay);
+            else returnToForm(currentRoom.room);
         });
         $('fcty-modal-report').addEventListener('click', function () {
             if (currentRoom) openReportIssueForm(currentRoom.room);

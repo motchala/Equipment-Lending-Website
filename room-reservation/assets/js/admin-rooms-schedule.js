@@ -25,6 +25,7 @@
                         let _weekOff = 0; // 0 = current week
                         let _mobDay = 1; // 1 = Mon … 7 = Sun (mobile single-day view)
                         let _rows = []; // normalized approved reservations for the open room
+                        let _classes = []; // weekly classes of the room (Rooms Assigned import): they repeat every week
                         let _timer = null;
                         let _reqToken = 0;
                         let _lastSig = '';
@@ -161,6 +162,40 @@
                                 .filter(Boolean);
                         }
 
+                        /* Weekly classes (imported Rooms Assigned list). "day" is 1 = Monday ... 6 = Saturday and
+                           repeats every week, so each shown week gets its own dated copy (see classRowsFor). */
+                        function apiClasses(list) {
+                            return (list || []).map(c => {
+                                const s = parseMin(c.start),
+                                    e = parseMin(c.end);
+                                if (!(c.day >= 1 && c.day <= 7) || s == null || e == null || e <= s) return null;
+                                return {
+                                    id: c.id,
+                                    day: +c.day,
+                                    s: s,
+                                    e: e,
+                                    label: c.class || [c.subject, c.section].filter(Boolean).join(' · ') || 'Class',
+                                    component: c.component || '',
+                                    instructor: c.instructor || ''
+                                };
+                            }).filter(Boolean);
+                        }
+
+                        function classRowsFor(monday) {
+                            return _classes.map(c => ({
+                                id: 'class-' + c.id,
+                                kind: 'class',
+                                date: addDays(monday, c.day - 1),
+                                s: c.s,
+                                e: c.e,
+                                faculty: c.instructor,
+                                purpose: c.label,
+                                component: c.component,
+                                asType: '',
+                                by: ''
+                            }));
+                        }
+
                         /* How far the week arrows may go: back to the earliest reservation, forward to
                            the latest one (always allowing at least next week). The system sets no
                            upper limit on how far ahead a room can be reserved, so the schedule follows
@@ -217,8 +252,9 @@
                         function buildBlock(r, axisStart, now) {
                             const top = (r.s - axisStart) / 60 * HOUR_PX;
                             const h = Math.max((r.e - r.s) / 60 * HOUR_PX, 22);
-                            const title = r.purpose || r.faculty || 'Reserved';
-                            const who = whoLabel(r);
+                            const isClass = r.kind === 'class';
+                            const title = isClass ? (r.purpose + (r.component ? ' (' + r.component + ')' : '')) : (r.purpose || r.faculty || 'Reserved');
+                            const who = isClass ? (r.faculty || 'No instructor yet') : whoLabel(r);
 
                             const b = el('div', 'rsm-block');
                             b.tabIndex = 0;
@@ -231,13 +267,15 @@
                             b.style.width = 'calc(' + (100 / lanes) + '% - 4px)';
                             if (h < 34) b.classList.add('rsm-block--xs');
                             else if (h < 52) b.classList.add('rsm-block--sm');
+                            if (isClass) b.classList.add('rsm-block--class');
                             if (r.date < now.iso || (r.date === now.iso && r.e <= now.min)) b.classList.add('is-past');
+                            else if (r.date === now.iso && r.s <= now.min && now.min < r.e) b.classList.add('is-live'); // in use right now
 
                             b.appendChild(el('span', 'rsm-block-time', fmtRange(r.s, r.e)));
                             b.appendChild(el('span', 'rsm-block-title', title));
-                            if (r.purpose && who) b.appendChild(el('span', 'rsm-block-sub', who));
+                            if (who && (isClass || r.purpose)) b.appendChild(el('span', 'rsm-block-sub', who));
 
-                            b.title = [fmtRange(r.s, r.e), r.purpose, who].filter(Boolean).join('\n');
+                            b.title = [fmtRange(r.s, r.e), isClass ? 'Class' : 'Reservation', title, who].filter(Boolean).join('\n');
                             return b;
                         }
 
@@ -293,7 +331,7 @@
 
                             const monday = addDays(mondayOf(now.iso), _weekOff * 7);
                             const sunday = addDays(monday, 6);
-                            const wk = _rows.filter(r => r.date >= monday && r.date <= sunday);
+                            const wk = _rows.filter(r => r.date >= monday && r.date <= sunday).concat(classRowsFor(monday));
 
                             /* Mon–Sat always; Sunday only if a reservation somehow sits on it */
                             const dayCount = wk.some(r => r.date === sunday) ? 7 : 6;
@@ -362,7 +400,7 @@
 
                             if (!wk.length) {
                                 const empty = el('div', 'rsm-empty');
-                                empty.appendChild(el('span', '', 'No reservations this week'));
+                                empty.appendChild(el('span', '', 'No classes or reservations this week'));
                                 body.appendChild(empty);
                             }
 
@@ -371,8 +409,12 @@
                             if (lbl) lbl.textContent = weekRangeLabel(days[0].iso, days[days.length - 1].iso);
                             const sub = $('rsm-week-sub');
                             if (sub) {
-                                sub.textContent = relativeWeek(_weekOff) + ' · ' +
-                                    (wk.length ? wk.length + (wk.length === 1 ? ' reservation' : ' reservations') : 'none reserved');
+                                const nc = wk.filter(r => r.kind === 'class').length,
+                                    nr = wk.length - nc;
+                                const parts = [];
+                                if (nc) parts.push(nc + (nc === 1 ? ' class' : ' classes'));
+                                if (nr) parts.push(nr + (nr === 1 ? ' reservation' : ' reservations'));
+                                sub.textContent = relativeWeek(_weekOff) + ' · ' + (parts.length ? parts.join(' · ') : 'nothing scheduled');
                             }
                             const prev = $('rsm-prev'),
                                 next = $('rsm-next');
@@ -408,7 +450,7 @@
                         }
 
                         function signature(now) {
-                            return JSON.stringify(_rows) + '|' + _weekOff + '|' + now.iso + '|' + Math.floor(now.min / 5);
+                            return JSON.stringify(_rows) + JSON.stringify(_classes) + '|' + _weekOff + '|' + now.iso + '|' + Math.floor(now.min / 5);
                         }
 
                         /* — Pull the latest reservations from the server — */
@@ -433,6 +475,7 @@
                                     if (token !== _reqToken || rid !== _roomId) return; // closed or switched room
                                     if (!j || !Array.isArray(j.reservations)) throw new Error('Bad response');
                                     _rows = apiRows(j.reservations);
+                                    _classes = apiClasses(j.classes);
                                     setSyncNote(false);
                                     if (signature(manilaNow()) !== _lastSig) renderGrid();
                                 })
@@ -466,6 +509,7 @@
                             _weekOff = 0;
                             _mobDay = todayColumn(manilaNow());
                             _rows = embeddedRows();
+                            _classes = [];
                             const title = $('rsm-title');
                             if (title) title.textContent = 'Facility Schedule – ' + _roomName;
                             const meta = $('rsm-meta');
@@ -504,14 +548,6 @@
                         document.addEventListener('click', function(e) {
                             const modal = $('roomScheduleModal');
                             if (!modal || modal.classList.contains('hidden')) return;
-                            if (e.target.closest('[data-action="room-schedule-today"]')) {
-                                _weekOff = 0;
-                                _mobDay = todayColumn(manilaNow());
-                                renderGrid({
-                                    scroll: true
-                                });
-                                return;
-                            }
                             const tab = e.target.closest('.rsm-daytab-btn');
                             if (tab) {
                                 _mobDay = +tab.dataset.day || 1;

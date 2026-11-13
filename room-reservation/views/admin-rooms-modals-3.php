@@ -15,7 +15,6 @@
             <div class="rsm-info-row">
                 <span class="rsm-room-meta" id="rsm-meta"></span>
                 <div class="rsm-week-ctrl">
-                    <button type="button" class="rsm-today-btn" data-action="room-schedule-today">Today</button>
                     <button class="rsm-week-nav-btn" id="rsm-prev" data-action="room-schedule-nav" data-dir="-1" title="Previous week" aria-label="Previous week">
                         <span class="material-symbols-outlined">chevron_left</span>
                     </button>
@@ -38,6 +37,9 @@
             </div>
             <div class="rsm-foot">
                 <div class="rsm-legend">
+                    <div class="rsm-legend-item">
+                        <div class="rsm-legend-dot class"></div> Class
+                    </div>
                     <div class="rsm-legend-item">
                         <div class="rsm-legend-dot reserved"></div> Reserved
                     </div>

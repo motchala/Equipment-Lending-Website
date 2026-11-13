@@ -33,7 +33,7 @@
  *                      1 hour before the start). Rules and side effects: core/borrow-cancellation.php.
  *                      A cancelled request moves to History as "Cancelled".
  *   Extend             offered on loans whose return moment has been reached (Overdue, or Approved and
- *                      due), up to BorrowExtension::MAX_EXTENSIONS times per loan. Rules and availability
+ *                      due), up to BorrowExtension::maxExtensions() times per loan (Settings → Arbitration). Rules and availability
  *                      check: core/borrow-extension.php. A granted extension moves the return moment, puts an
  *                      Overdue loan back to Approved and shows as "Extended once / N times, originally due ..."
  *                      on the row. Lateness is judged against the ORIGINAL return moment, so extending never
@@ -49,10 +49,7 @@ require_once __DIR__ . '/../../notifications/core/faculty-data.php';
 require_once __DIR__ . '/../../equipment-booking/core/borrow-extension.php';
 require_once __DIR__ . '/../../equipment-booking/core/borrow-cancellation.php';
 require_once __DIR__ . '/../../room-reservation/core/room-quota.php';
-
-if (!defined('FACT_EQ_REASON_EXPIRED')) {
-    define('FACT_EQ_REASON_EXPIRED', 'Request expired – borrow date has already passed');
-}
+require_once __DIR__ . '/../../shared/core/equipment-image.php';
 
 /** Same icon fallback the Home tab uses when an item has no catalogue photo. */
 if (!function_exists('actEquipIcon')) {
@@ -74,27 +71,24 @@ if (!function_exists('actEquipIcon')) {
 }
 
 /**
- * Housekeeping that has to run before the numbers are read: expired requests are
- * declined and overdue / start-of-booking states are brought up to date. The dashboard
+ * Housekeeping that has to run before the numbers are read: undecided requests past
+ * their deadline are declined and overdue / start-of-booking states are brought up to date. The dashboard
  * runs it on every page load; the live refresh runs it so a state change shows up
  * without reloading the page.
  */
 function fact_eq_housekeeping(mysqli $conn): void
 {
-    $today  = date('Y-m-d');
-    $reason = FACT_EQ_REASON_EXPIRED;
-    $stmt   = $conn->prepare("UPDATE tbl_requests SET status='Declined', reason=? WHERE status='Waiting' AND borrow_date < ?");
-    if ($stmt) {
-        $stmt->bind_param('ss', $reason, $today);
-        $stmt->execute();
-        $stmt->close();
-    }
-    BookingSchedule::tick($conn);
+    // Undecided requests past their deadline are declined; missed same-day requests are decided
     require_once __DIR__ . '/../../equipment-booking/core/auto-approve-tick.php';
     equipment_auto_approve_tick($conn);
+    // On Loan past the return time -> Overdue; uncollected bookings -> no-show; start-of-booking stock
+    BookingSchedule::tick($conn);
 }
 
-/** Catalogue photo per item name (tbl_requests only stores the name as text). */
+/**
+ * Picture per item name (tbl_requests only stores the name as text). An item with no photo, or whose
+ * photo file is gone, gets the shared default picture (uploads/default.png) instead of an icon tile.
+ */
 function fact_eq_image_map(mysqli $conn): array
 {
     static $map = null;
@@ -104,10 +98,7 @@ function fact_eq_image_map(mysqli $conn): array
     $map = [];
     $res = $conn->query('SELECT item_name, image_path FROM tbl_inventory');
     while ($res && ($row = $res->fetch_assoc())) {
-        $path = (string)($row['image_path'] ?? '');
-        if ($path !== '' && $path !== 'uploads/default.png') {
-            $map[strtolower(trim((string)$row['item_name']))] = $path;
-        }
+        $map[strtolower(trim((string)$row['item_name']))] = equipment_image_path((string)($row['image_path'] ?? ''));
     }
     return $map;
 }
@@ -211,7 +202,7 @@ function fact_eq_load(mysqli $conn, string $faculty_id): array
                     'claim_token' => fact_s($row, 'claim_token'),
                     'student'     => fact_s($row, 'submitted_as') === 'student' ? trim(fact_s($row, 'submitted_by_name')) : '',
                     'student_id'  => fact_s($row, 'submitted_as') === 'student' ? trim(fact_s($row, 'submitted_by_id')) : '',
-                    'image'       => $images[strtolower(trim($name))] ?? '',
+                    'image'       => $images[strtolower(trim($name))] ?? EQUIPMENT_DEFAULT_IMAGE,
                     'icon'        => actEquipIcon($name),
                     'start_date'  => $start->format('Y-m-d'),
                     'start_time'  => $borrowTime,
@@ -242,8 +233,8 @@ function fact_eq_load(mysqli $conn, string $faculty_id): array
                 // 'cancel_note' says why not, only for the "too late" case (same wording as room reservations).
                 $cancelWhy = in_array($status, ['Waiting', 'Approved'], true) ? BorrowCancellation::blocker($row, $now) : 'n/a';
                 $item['can_cancel']  = $cancelWhy === null;
-                $item['cancel_note'] = $cancelWhy !== null && str_contains($cancelWhy, 'within 1 hour')
-                    ? 'Can\'t be cancelled within 1 hour of the start' : '';
+                $item['cancel_note'] = $cancelWhy !== null && str_contains($cancelWhy, 'Cancellations are not allowed within')
+                    ? 'Can\'t be cancelled within ' . BorrowCancellation::cutoffLabel() . ' of the start' : '';
 
                 switch ($status) {
                     case 'Overdue':
@@ -498,7 +489,9 @@ function fact_eq_render_item(array $it, string $kind, string $rootUrl, DateTimeI
         $sub[] = fact_h(fact_s($it, 'cancel_note'));
     }
     if ($kind === 'live' && !empty($it['extend_limit'])) {
-        $sub[] = 'Extension limit reached (' . BorrowExtension::MAX_EXTENSIONS . ' of ' . BorrowExtension::MAX_EXTENSIONS . ')';
+        $sub[] = BorrowExtension::maxExtensions() === 0
+            ? 'Extensions are turned off'
+            : 'Extension limit reached (' . BorrowExtension::maxExtensions() . ' of ' . BorrowExtension::maxExtensions() . ')';
     }
 
     $isBundle = fact_i($it, 'bundle_count') > 1;
@@ -584,7 +577,7 @@ function fact_eq_action_slots(array $it, string $kind, string $status): array
         } elseif (fact_s($it, 'cancel_note') !== '') {
             $slots['end'] = fact_action_btn('Cancel', 'lock', [], [
                 'danger' => true, 'disabled' => true,
-                'title'  => 'Requests can\'t be cancelled within 1 hour of the start time',
+                'title'  => 'Requests can\'t be cancelled within ' . BorrowCancellation::cutoffLabel() . ' of the start time',
             ]);
         }
     }
@@ -779,7 +772,7 @@ function fact_eq_todo(array $d): array
         $late    = max(array_map(static fn(array $r): int => $nowTs - fact_i($r, 'due_ts'), $rows));
         $canExt  = (bool)array_filter($rows, static fn(array $r): bool => !empty($r['can_extend']));
         $atLimit = !$canExt && (bool)array_filter($rows, static fn(array $r): bool => !empty($r['extend_limit']));
-        $text    = [fact_eq_late_label($late), 'New borrowing is blocked until it is returned'];
+        $text    = [fact_eq_late_label($late), 'Still out · return it to the admin'];
         if ($canExt) {
             $text[] = 'You can also ask for more time';
         } elseif ($atLimit) {
@@ -843,10 +836,16 @@ function fact_eq_todo(array $d): array
         usort($groups, static fn(array $a, array $b): int => fact_i($a[0], 'start_ts') <=> fact_i($b[0], 'start_ts'));
         $n      = count($groups);
         $firstR = $groups[0][0];
+        // Real rule (core/request-decision.php): a later-date request waits for an admin and is declined
+        // automatically at 12:01 AM on its borrow date if nobody decides.
+        $startD = DateTimeImmutable::createFromFormat('Y-m-d', fact_s($firstR, 'start_date'), $tz);
+        $by     = $startD !== false && fact_s($firstR, 'start_date') > $today
+            ? 'before ' . fact_day_label($now, $startD, false)
+            : 'before it starts';
         $out[]  = fact_todo_item(
             'equipment', 4, 'wait', 'hourglass_top',
             $n === 1 ? $names($groups[0]) . ' is waiting for review' : $n . ' equipment requests are waiting for review',
-            'An admin will approve or decline ' . ($n === 1 ? 'it' : 'them') . ' · You can cancel ' . ($n === 1 ? 'it' : 'them') . ' until ' . ($n === 1 ? 'it starts' : 'they start'),
+            'An admin has to decide ' . $by . ', otherwise ' . ($n === 1 ? 'it is' : 'they are') . ' declined automatically · You can cancel ' . ($n === 1 ? 'it' : 'them') . ' until ' . ($n === 1 ? 'it starts' : 'they start'),
             'eq:' . fact_i($firstR, 'id'),
             fact_i($firstR, 'start_ts')
         );

@@ -1,0 +1,699 @@
+/* ================================================================
+   settings/assets/css/admin-arbitration.css
+   Settings → Arbitration tab (Super Admin only). UI only.
+   Everything is scoped to #sett-arbitration and uses arb-* classes.
+   It reuses the shared tokens, .sett-card, .toggle-sw, .ps-btn and
+   .form-control-custom, so light and dark themes follow the app.
+   Responsive rules live here (each module owns its own).
+================================================================ */
+
+#sett-arbitration {
+    max-width: 1100px;
+}
+
+/* ── Intro ───────────────────────────────────────────────────── */
+#sett-arbitration .arb-intro {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 1rem 1.25rem;
+    background: var(--card-bg);
+    border: 1px solid var(--khaki-border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+
+#sett-arbitration .arb-intro__icon {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    background: var(--accent-light);
+    color: var(--accent-maroon);
+}
+
+#sett-arbitration .arb-intro__icon .material-symbols-outlined {
+    font-size: 24px;
+}
+
+#sett-arbitration .arb-intro__body {
+    flex: 1 1 14rem;
+    min-width: 0;
+}
+
+#sett-arbitration .arb-intro__title {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-dark);
+}
+
+#sett-arbitration .arb-intro__sub {
+    margin: 2px 0 0;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--text-light);
+}
+
+#sett-arbitration .arb-pill {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0.3rem 0.7rem;
+    border-radius: 999px;
+    border: 1px solid var(--khaki-border);
+    background: var(--secondary-cream);
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--text-light);
+    white-space: nowrap;
+}
+
+#sett-arbitration .arb-pill .material-symbols-outlined {
+    font-size: 15px;
+    color: var(--accent-maroon);
+}
+
+#sett-arbitration .arb-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin: 0.75rem 0 1.25rem;
+    padding: 0.65rem 0.9rem;
+    border-radius: 10px;
+    background: var(--secondary-cream);
+    border: 1px solid var(--khaki-border);
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: var(--text-light);
+}
+
+#sett-arbitration .arb-note .material-symbols-outlined {
+    font-size: 18px;
+    color: var(--accent-maroon);
+    flex-shrink: 0;
+}
+
+/* ── Presets ─────────────────────────────────────────────────── */
+#sett-arbitration .arb-block {
+    margin-bottom: 1.25rem;
+}
+
+#sett-arbitration .arb-block__head {
+    margin-bottom: 0.6rem;
+}
+
+#sett-arbitration .arb-block__title,
+#sett-arbitration .arb-section__title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-dark);
+}
+
+#sett-arbitration .arb-block__title .material-symbols-outlined,
+#sett-arbitration .arb-section__title .material-symbols-outlined {
+    font-size: 19px;
+    color: var(--accent-maroon);
+}
+
+#sett-arbitration .arb-block__sub,
+#sett-arbitration .arb-section__sub {
+    margin: 2px 0 0;
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+#sett-arbitration .arb-presets {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.85rem;
+}
+
+#sett-arbitration .arb-preset {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 10px;
+    row-gap: 2px;
+    align-items: start;
+    text-align: left;
+    padding: 0.85rem 1rem;
+    border: 1.5px solid var(--khaki-border);
+    border-radius: 12px;
+    background: var(--card-bg);
+    font-family: 'Poppins', sans-serif;
+    color: var(--text-dark);
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+#sett-arbitration .arb-preset .material-symbols-outlined {
+    grid-row: 1 / span 2;
+    font-size: 22px;
+    color: var(--accent-maroon);
+    margin-top: 1px;
+}
+
+#sett-arbitration .arb-preset__title {
+    font-size: 13px;
+    font-weight: 700;
+}
+
+#sett-arbitration .arb-preset__sub {
+    font-size: 11.5px;
+    line-height: 1.4;
+    color: var(--text-light);
+}
+
+#sett-arbitration .arb-preset:hover {
+    border-color: var(--accent-maroon);
+}
+
+#sett-arbitration .arb-preset.is-active {
+    border-color: var(--accent-maroon);
+    background: var(--accent-light);
+}
+
+#sett-arbitration .arb-preset:focus-visible,
+#sett-arbitration .arb-stepper__btn:focus-visible,
+#sett-arbitration .arb-chip input:focus-visible+span {
+    outline: 2px solid var(--accent-maroon);
+    outline-offset: 2px;
+}
+
+/* ── Sections and grids ──────────────────────────────────────── */
+#sett-arbitration .arb-section {
+    margin: 1.75rem 0 0.75rem;
+}
+
+#sett-arbitration .arb-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem;
+    align-items: start;
+    margin-bottom: 0.25rem;
+}
+
+/* Cards in this tab are made of rows, so the body has no gap */
+#sett-arbitration .arb-card .sett-card-body {
+    gap: 0;
+    padding: 0.25rem 1.25rem 0.5rem;
+}
+
+/* ── Rows ────────────────────────────────────────────────────── */
+#sett-arbitration .arb-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.85rem 0;
+    border-bottom: 1px solid var(--khaki-border);
+}
+
+#sett-arbitration .arb-row:last-child {
+    border-bottom: none;
+}
+
+#sett-arbitration .arb-row__text {
+    flex: 1;
+    min-width: 0;
+}
+
+#sett-arbitration .arb-row__title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
+#sett-arbitration .arb-row__sub {
+    margin-top: 1px;
+    font-size: 11.5px;
+    line-height: 1.4;
+    color: var(--text-light);
+}
+
+#sett-arbitration .arb-row__ctl {
+    flex-shrink: 0;
+}
+
+#sett-arbitration .arb-row--stack {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.6rem;
+}
+
+/* ── Stepper ─────────────────────────────────────────────────── */
+#sett-arbitration .arb-stepper {
+    display: inline-flex;
+    align-items: stretch;
+    border: 1.5px solid var(--khaki-border);
+    border-radius: 10px;
+    background: var(--input-bg);
+    overflow: hidden;
+}
+
+#sett-arbitration .arb-stepper:focus-within {
+    border-color: var(--accent-maroon);
+    box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+#sett-arbitration .arb-stepper__btn {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    border: none;
+    background: var(--secondary-cream);
+    color: var(--text-light);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+#sett-arbitration .arb-stepper__btn .material-symbols-outlined {
+    font-size: 17px;
+}
+
+#sett-arbitration .arb-stepper__btn:hover {
+    background: var(--accent-light);
+    color: var(--accent-maroon);
+}
+
+#sett-arbitration .arb-stepper__mid {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 4px;
+    min-width: 84px;
+    padding: 0 0.6rem;
+    margin: 0;
+    cursor: text;
+}
+
+#sett-arbitration .arb-stepper__input {
+    width: 3ch;
+    min-width: 0;
+    padding: 0.4rem 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    text-align: right;
+    font-family: 'Poppins', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-dark);
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+#sett-arbitration .arb-stepper__input::-webkit-outer-spin-button,
+#sett-arbitration .arb-stepper__input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+#sett-arbitration .arb-stepper__unit {
+    font-size: 11.5px;
+    color: var(--text-light);
+    white-space: nowrap;
+}
+
+/* ── Time pair, select, textarea ─────────────────────────────── */
+#sett-arbitration .arb-timepair {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#sett-arbitration .arb-timepair__sep {
+    font-size: 11.5px;
+    color: var(--text-light);
+}
+
+#sett-arbitration .arb-time {
+    width: 8.5rem;
+    padding: 7px 10px;
+    font-size: 0.8rem;
+}
+
+#sett-arbitration .arb-select {
+    width: 15.5rem;
+    max-width: 100%;
+    padding: 7px 10px;
+    font-size: 0.8rem;
+}
+
+/* ── Chips (days, durations) ─────────────────────────────────── */
+#sett-arbitration .arb-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+#sett-arbitration .arb-chip {
+    position: relative;
+    margin: 0;
+    cursor: pointer;
+}
+
+#sett-arbitration .arb-chip input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+#sett-arbitration .arb-chip span {
+    display: inline-block;
+    min-width: 3.1rem;
+    padding: 0.35rem 0.75rem;
+    border: 1.5px solid var(--khaki-border);
+    border-radius: 999px;
+    background: var(--card-bg);
+    text-align: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-light);
+    transition: all 0.15s;
+    user-select: none;
+}
+
+#sett-arbitration .arb-chip:hover span {
+    border-color: var(--accent-maroon);
+    color: var(--text-dark);
+}
+
+#sett-arbitration .arb-chip input:checked+span {
+    border-color: var(--accent-maroon);
+    background: var(--accent-maroon);
+    color: #fff;
+}
+
+/* ── Priority faculty ────────────────────────────────────────── */
+#sett-arbitration .arb-prio {
+    padding: 0.85rem 0 0.5rem;
+}
+
+#sett-arbitration .arb-prio__top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.7rem;
+}
+
+#sett-arbitration .arb-prio__hint {
+    margin: 0;
+    font-size: 11.5px;
+    line-height: 1.4;
+    color: var(--text-light);
+}
+
+#sett-arbitration .arb-prio__count {
+    flex-shrink: 0;
+    padding: 0.15rem 0.6rem;
+    border-radius: 999px;
+    background: var(--accent-light);
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--accent-maroon);
+}
+
+#sett-arbitration #arbPrioSearch:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+#sett-arbitration .arb-pick__list {
+    margin: 6px 0 0;
+    padding: 4px;
+    list-style: none;
+    max-height: 14rem;
+    overflow-y: auto;
+    border: 1px solid var(--khaki-border);
+    border-radius: 10px;
+    background: var(--input-bg);
+}
+
+#sett-arbitration .arb-pick__list[hidden],
+#sett-arbitration .arb-prio__limit[hidden],
+#sett-arbitration .arb-pick__none[hidden],
+#sett-arbitration .arb-prio__empty[hidden] {
+    display: none;
+}
+
+#sett-arbitration .arb-pick__opt {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+    padding: 0.45rem 0.6rem;
+    border: none;
+    border-radius: 8px;
+    background: none;
+    text-align: left;
+    font-family: 'Poppins', sans-serif;
+    cursor: pointer;
+}
+
+#sett-arbitration .arb-pick__opt:hover,
+#sett-arbitration .arb-pick__opt:focus-visible {
+    background: var(--accent-light);
+    outline: none;
+}
+
+#sett-arbitration .arb-pick__name {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
+#sett-arbitration .arb-pick__meta {
+    font-size: 11px;
+    color: var(--text-light);
+}
+
+#sett-arbitration .arb-pick__none {
+    padding: 0.6rem;
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+#sett-arbitration .arb-prio__limit {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 0.6rem;
+    font-size: 11.5px;
+    color: var(--text-light);
+}
+
+#sett-arbitration .arb-prio__limit .material-symbols-outlined {
+    font-size: 16px;
+    color: var(--accent-maroon);
+}
+
+#sett-arbitration .arb-prio__list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0.75rem 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+#sett-arbitration .arb-prio__item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0.5rem 0.6rem;
+    border: 1px solid var(--khaki-border);
+    border-radius: 10px;
+    background: var(--secondary-cream);
+}
+
+#sett-arbitration .arb-prio__av {
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--accent-maroon);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+#sett-arbitration .arb-prio__who {
+    flex: 1;
+    min-width: 0;
+}
+
+#sett-arbitration .arb-prio__name {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-dark);
+    overflow-wrap: anywhere;
+}
+
+#sett-arbitration .arb-prio__meta {
+    font-size: 11px;
+    color: var(--text-light);
+    overflow-wrap: anywhere;
+}
+
+#sett-arbitration .arb-prio__remove {
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 8px;
+    background: none;
+    color: var(--text-light);
+    cursor: pointer;
+}
+
+#sett-arbitration .arb-prio__remove:hover {
+    background: var(--accent-light);
+    color: var(--accent-maroon);
+}
+
+#sett-arbitration .arb-prio__remove .material-symbols-outlined {
+    font-size: 18px;
+}
+
+#sett-arbitration .arb-prio__empty {
+    margin-top: 0.75rem;
+    padding: 0.9rem;
+    border: 1.5px dashed var(--khaki-border);
+    border-radius: 10px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+/* ── Unsaved-changes bar ─────────────────────────────────────── */
+#sett-arbitration .arb-savebar {
+    position: sticky;
+    bottom: 12px;
+    z-index: 5;
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 1.25rem;
+    padding: 0.7rem 1rem;
+    border: 1px solid var(--khaki-border);
+    border-radius: 14px;
+    background: var(--card-bg);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.16);
+}
+
+#sett-arbitration .arb-savebar.is-visible {
+    display: flex;
+}
+
+#sett-arbitration .arb-savebar__text {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
+#sett-arbitration .arb-savebar__text .material-symbols-outlined {
+    font-size: 18px;
+    color: var(--accent-maroon);
+}
+
+#sett-arbitration .arb-savebar__actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────
+   Follows #panel-settings[data-sett-size] (set by the shared
+   responsive script, so collapsing the sidebar re-flows this tab),
+   with plain viewport rules as the fallback. */
+@media (max-width: 900px) {
+
+    #sett-arbitration .arb-grid,
+    #sett-arbitration .arb-presets {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 560px) {
+
+    #sett-arbitration .arb-intro {
+        flex-wrap: wrap;
+    }
+
+    #sett-arbitration .arb-row:not(.arb-row--stack) {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.6rem;
+    }
+
+    #sett-arbitration .arb-row__ctl {
+        align-self: flex-start;
+    }
+
+    #sett-arbitration .arb-select {
+        width: 100%;
+    }
+
+    #sett-arbitration .arb-savebar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    #sett-arbitration .arb-savebar__actions>* {
+        flex: 1 1 auto;
+        justify-content: center;
+    }
+}
+
+#panel-settings[data-sett-size="narrow"] #sett-arbitration .arb-grid,
+#panel-settings[data-sett-size="narrow"] #sett-arbitration .arb-presets,
+#panel-settings[data-sett-size="tiny"] #sett-arbitration .arb-grid,
+#panel-settings[data-sett-size="tiny"] #sett-arbitration .arb-presets {
+    grid-template-columns: 1fr;
+}
+
+#panel-settings[data-sett-size="narrow"] #sett-arbitration .arb-intro,
+#panel-settings[data-sett-size="tiny"] #sett-arbitration .arb-intro {
+    flex-wrap: wrap;
+}
+
+#panel-settings[data-sett-size="tiny"] #sett-arbitration .arb-row:not(.arb-row--stack) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.6rem;
+}
+
+#panel-settings[data-sett-size="tiny"] #sett-arbitration .arb-row__ctl {
+    align-self: flex-start;
+}
+
+#panel-settings[data-sett-size="tiny"] #sett-arbitration .arb-select {
+    width: 100%;
+}
+
+#panel-settings[data-sett-size="tiny"] #sett-arbitration .arb-savebar {
+    flex-direction: column;
+    align-items: stretch;
+}
+
+#panel-settings[data-sett-size="tiny"] #sett-arbitration .arb-savebar__actions>* {
+    flex: 1 1 auto;
+    justify-content: center;
+}

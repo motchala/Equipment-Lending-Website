@@ -21,11 +21,12 @@ Everyone signs in on the same page (`landing-page.php`). The system works out wh
 
 **Equipment**
 - Faculty pick items, a room (or "Outside") and a time: today for 1, 2, 3 or 5 hours, or a later date up to 3 weeks ahead.
-- A **same-day** request is decided by the system straight away, based on availability and the borrowing rules. A **later-date** request waits for an admin to **approve or decline** it, and can carry a request letter (recommended, never required).
+- A **same-day** request is decided by the system straight away, based on availability and the borrowing rules. A **later-date** request waits for an admin to **approve or decline** it, and can carry a request letter (recommended, never required). If nobody decides, it is **declined automatically at 12:01 AM on the borrow date**, so the faculty knows with the whole day left. Nothing is ever auto-approved.
 - Once approved, the faculty gets a **Claim QR** in *My Activity*. The admin scans it at the Admin Office and the item becomes *On Loan*.
 - On return, the faculty shows a **Return QR** and the admin scans it. The stock goes back automatically. Admins can also record a manual return without a QR.
-- Late items become *Overdue*. The faculty cannot borrow more until it is returned, but can *Extend* up to 2 times if nobody else needs the item.
-- Students with a faculty code or item code are approved right away and get their own Claim QR.
+- A collected item that is not back by its return time becomes *Overdue* (only items that are actually out can be overdue). Optionally, the *overdue block* rule (Super Admin > rules, off by default) stops that faculty from borrowing more until it is returned. They can *Extend* an item that is due or overdue up to 2 times if nobody else needs it.
+- An approved booking that is never collected ends as *Cancelled* (a no-show) when its borrow period is over, and its units go back on the shelf.
+- Students with a faculty code or item code follow the **same rules as faculty**: a same-day request is decided right away (approved with their own Claim QR, or told why not), and a later-date request waits for an admin and is declined automatically at 12:01 AM on that date if nobody decides.
 
 **Rooms (Facilities)**
 - Rooms are organised by campus, building and floor. Booking hours are 7:00 AM to 8:00 PM, Monday to Saturday.
@@ -36,7 +37,7 @@ Everyone signs in on the same page (`landing-page.php`). The system works out wh
 **For admins**
 - A **Dashboard** with what needs attention, an **Activity** timeline of every decision, notifications, and exports.
 - **Equipment** (catalog and loans) and **Facilities** (rooms, reservations, issues, archive).
-- Super Admin only: **Faculty** accounts (the password is generated automatically, with a copy button), **Admins** (up to 5), and **Imports** (sidebar, under Data) for the faculty registry. (**Equipment Inventory** and **Rooms Assigned** import cards are there too, but they are not built yet.)
+- Super Admin only: **Faculty** accounts (the password is generated automatically, with a copy button), **Admins** (up to 5), and **Imports** (sidebar, under Data) for the faculty registry and the **Rooms Assigned** class schedule (an XLSX with each class's faculty, room and meeting times; it is separate from the registry and blocks those rooms for reservations). The **Equipment Inventory** import card is there too, but it is not built yet.
 - Both portals have a built-in **Help & Support** page inside Settings.
 
 ---

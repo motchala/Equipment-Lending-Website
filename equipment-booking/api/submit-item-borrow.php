@@ -122,7 +122,8 @@ try {
     $return_time = $booking['return_time'];
     $booking_mode = $booking['mode'];
 
-    // Insert as Waiting — tokens and inventory decrement happen at approval time
+    // Insert as Waiting; it is decided right after the commit below (core/request-decision.php).
+    // Tokens and inventory decrement happen at approval time
     // (auto-approve-tick.php or admin-override.php), not at insert time.
     $ins = $conn->prepare(
         "INSERT INTO tbl_requests
@@ -171,6 +172,14 @@ try {
 
     $conn->commit();
 
+    // Decide it now, same rules as every other way of submitting (core/request-decision.php).
+    // After the commit on purpose: the rules engine opens its own transaction.
+    require_once __DIR__ . '/../core/request-decision.php';
+    $decision = equipment_decide_on_submit($conn, [$request_id])[$request_id] ?? ['status' => 'Waiting', 'reason' => ''];
+    $tokens   = $decision['status'] === 'Approved'
+        ? equipment_request_tokens($conn, $request_id)
+        : ['claim_token' => null, 'return_token' => null];
+
     // Notify faculty via their notification feed
     fnotif_ensure_admin_notice_table($conn);
     $title   = 'Item Code Used: ' . $item_name;
@@ -179,7 +188,7 @@ try {
     $message = $student_label . ' requested ' . $qty_str
         . ' of ' . $item_name . ' using your item code for ' . $borrow_date . ' from '
         . substr($borrow_time, 0, 5) . ' to ' . substr($return_time, 0, 5)
-        . '. Room/Location: ' . $room . '.';
+        . '. Room/Location: ' . $room . '. Status: ' . $decision['status'] . '.';
     $admin_name = 'PUPSync System';
     $admin_id   = 0;
     $notice = $conn->prepare(
@@ -199,8 +208,10 @@ try {
         'borrow_date'  => $borrow_date,
         'return_date'  => $return_date,
         'return_time'  => $return_time,
-        'return_token' => null,
-        'claim_token'  => $claim_token,
+        'status'       => $decision['status'],
+        'reason'       => $decision['reason'],
+        'return_token' => $tokens['return_token'],
+        'claim_token'  => $tokens['claim_token'],
     ]);
 
 } catch (Throwable $e) {

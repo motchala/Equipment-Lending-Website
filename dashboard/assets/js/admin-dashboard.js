@@ -201,16 +201,9 @@
         const ac = LS.get('accentColor'), al = LS.get('accentLight');
         if (ac) _applyAccentDOM(ac, al || '#f3e5e6');
 
-        // Notification Preferences — checkboxes default to checked/unchecked
-        // in the markup itself, so only override when a stored value exists.
-        [['notifPrefRequestsToggle', 'notifPrefRequests'],
-        ['notifPrefOverdueToggle', 'notifPrefOverdue'],
-        ['notifPrefRoomToggle', 'notifPrefRoom']].forEach(([id, key]) => {
-            const el = document.getElementById(id);
-            if (!el) return;
-            const v = LS.get(key);
-            if (v !== null) el.checked = (v === 'true');
-        });
+        // Notification Preferences are saved on the server per admin account now
+        // (notifications/assets/js/notif-prefs.js + notifications/api/notif-prefs.php);
+        // this only clears what the old browser-only toggles left behind.
         _applyNotifPrefsDOM();
 
         // Notification read/unread state is no longer a client-side guess —
@@ -231,6 +224,10 @@
     function _switchTabDOM(tabName, clickedEl) {
         const panel = document.getElementById('panel-' + tabName);
         if (!panel) return;
+        // A real tab switch ends the "restored screen" state (see admin-shell-bottom.php), so the new screen slides in as usual
+        if (clickedEl !== false) document.documentElement.classList.remove('ps-restored');
+        // Remember the screen for a soft refresh (backup for the #tab- part of the URL; see admin-shell-top.php)
+        try { sessionStorage.setItem('adminCurrentTab', tabName); } catch (_) { }
         // If the pre-paint script already activated this panel (no flash), skip
         // the remove-all/re-add cycle so the slideIn animation doesn't re-fire.
         const alreadyActive = panel && panel.classList.contains('active');
@@ -336,6 +333,26 @@
         if (panel) panel.classList.add('active');
         const btn = tabsWrap && tabsWrap.querySelector('[data-sett-panel="' + panelId + '"]');
         if (btn) btn.classList.add('active');
+        if (panel) _saveSubView('settings', panelId);
+    }
+
+    /* ── Sub-tab memory for a soft refresh (F5) ─────────────────
+       Settings and Facilities keep their open sub-tab per browser tab.
+       Cleared by a hard refresh (see the head script in admin-shell-top.php). */
+    function _saveSubView(key, val) {
+        try {
+            const s = JSON.parse(sessionStorage.getItem('adminSubView') || '{}');
+            s[key] = val;
+            sessionStorage.setItem('adminSubView', JSON.stringify(s));
+        } catch (_) { }
+    }
+
+    function _restoreSubViews(tab) {
+        try {
+            const s = JSON.parse(sessionStorage.getItem('adminSubView') || '{}');
+            if (tab === 'settings' && s.settings && document.getElementById(s.settings)) switchSettMainTab(s.settings);
+            if (tab === 'rooms' && s.rooms && document.getElementById(s.rooms + '-panel')) switchRoomsTab(s.rooms);
+        } catch (_) { }
     }
 
     /* ── Borrow History toggle ───────────────────────────────── */
@@ -361,6 +378,7 @@
         const activeBtn = roomsPanel.querySelector('[data-rooms-tab="' + tabName + '"]');
         if (activePanel) activePanel.classList.add('active');
         if (activeBtn) activeBtn.classList.add('active');
+        if (activePanel) _saveSubView('rooms', tabName);
     }
 
     /* switchSettTab (legacy Settings-overlay tab helper) removed —
@@ -432,10 +450,9 @@
        Cards that are mid-removal, or in a category muted under Settings ->
        Notification Preferences, are not counted. */
     function _anMutedCats() {
-        const hidden = [];
-        if (LS.get('notifPrefRequests') === 'false') hidden.push('request');
-        if (LS.get('notifPrefOverdue') === 'false') hidden.push('overdue');
-        return hidden;
+        // Muted categories are filtered out on the server (they never reach the list),
+        // so there is nothing to hide here any more.
+        return [];
     }
 
     function _updateChipCounts() {
@@ -1060,35 +1077,21 @@
     /* ── Settings ────────────────────────────────────────────── */
     function applyTheme(theme) { _applyThemeDOM(theme); LS.set('theme', theme); showToast('Theme: ' + theme.charAt(0).toUpperCase() + theme.slice(1)); }
     function applyAccent(color, light) { _applyAccentDOM(color, light); LS.set('accentColor', color); LS.set('accentLight', light); showToast('Accent color updated!'); }
-    /* Notification Preferences (Preferences → Notification Preferences) —
-       mutes/unmutes categories of notification directly in the bell overlay,
-       via an injected stylesheet so it stays in effect regardless of which
-       overlay filter tab (All/Unread/etc.) is active. */
+    /* Notification Preferences used to be browser-only (localStorage + an injected
+       stylesheet that merely hid cards). They are now saved per admin on the server and
+       applied there, so this just removes the old stylesheet and stored keys, otherwise a
+       stale 'off' from the old toggles would keep hiding cards the server still sends. */
     function _applyNotifPrefsDOM() {
-        let s = document.getElementById('notifPrefStyle');
-        if (!s) { s = document.createElement('style'); s.id = 'notifPrefStyle'; document.head.appendChild(s); }
-        const hiddenCats = [];
-        if (LS.get('notifPrefRequests') === 'false') hiddenCats.push('request');
-        if (LS.get('notifPrefOverdue') === 'false') hiddenCats.push('overdue');
-        // "Room Issues" has no matching notif-item category yet — the
-        // preference is saved and ready for when that category is added.
-        s.textContent = hiddenCats.length
-            ? hiddenCats.map(c => '.notif-item[data-cat="' + c + '"]').join(',') + '{display:none !important;}'
-            : '';
-    }
-    function applyNotifPref(key, on) {
-        LS.set(key, on);
-        _applyNotifPrefsDOM();
-        showToast(on ? 'Notifications enabled.' : 'Notifications muted.');
+        const s = document.getElementById('notifPrefStyle');
+        if (s) s.remove();
+        ['notifPrefRequests', 'notifPrefOverdue', 'notifPrefRoom'].forEach(k => LS.del(k));
     }
 
     function resetAllSettings() {
         applyTheme('light');
 
-        const nReq = document.getElementById('notifPrefRequestsToggle'); if (nReq) nReq.checked = true;
-        const nOver = document.getElementById('notifPrefOverdueToggle'); if (nOver) nOver.checked = true;
-        const nRoom = document.getElementById('notifPrefRoomToggle'); if (nRoom) nRoom.checked = false;
-        LS.del('notifPrefRequests'); LS.del('notifPrefOverdue'); LS.del('notifPrefRoom');
+        // Notification preferences live on the server: put every switch back on there.
+        if (window.PSNotifPrefs) window.PSNotifPrefs.reset();
         _applyNotifPrefsDOM();
 
         LS.del('showAssetIds'); LS.del('verboseErrors');
@@ -1998,10 +2001,10 @@
     const facSubmitBtn = document.getElementById('fac-submit-btn');
     const facFormAlert = document.getElementById('fac-form-alert');
     const facPasswordInput = document.getElementById('fac-password');
-    const facPwCopyBtn = document.getElementById('fac-pw-copy');
-    const facPwRegenBtn = document.getElementById('fac-pw-regen');
-    const facGenHint = document.getElementById('fac-gen-hint');
-    const FAC_GEN_HINT_DEFAULT = facGenHint ? facGenHint.textContent : '';
+    const facPasswordStrength = document.getElementById('fac-password-strength');
+    const facPasswordStrengthMeter = document.getElementById('fac-password-strength-meter');
+    const facPasswordStrengthFill = document.getElementById('fac-password-strength-fill');
+    const facPasswordStrengthLabel = document.getElementById('fac-password-strength-label');
 
     function _getFacPasswordStrength(password) {
         if (password.length < 8) return null;
@@ -2037,128 +2040,41 @@
         return { level: 4, label: 'Very strong' };
     }
 
-    /* ── Generated temporary password ───────────────────────────
-       Nobody types a password for a new faculty account: one is generated here with the
-       browser's secure random source (Web Crypto, never Math.random). It is 12 characters from
-       an unambiguous alphabet (no 0/O, 1/l/I) with at least one upper-case letter, lower-case
-       letter, digit and symbol, and it is re-rolled until it rates Strong or better.
-       The server still checks it (create-faculty-account.php) and flags the new account so its
-       owner must replace the password on first sign-in (faculty-setup.php). */
-    const FAC_PW_LENGTH = 12;
-    const FAC_PW_SETS = [
-        'ABCDEFGHJKLMNPQRSTUVWXYZ',
-        'abcdefghijkmnopqrstuvwxyz',
-        '23456789',
-        '!@#$%&*?'
-    ];
+    function _updateFacPasswordStrength() {
+        if (!facPasswordInput || !facPasswordStrength || !facPasswordStrengthMeter ||
+            !facPasswordStrengthFill || !facPasswordStrengthLabel) return;
 
-    // Unbiased random integer in [0, max)
-    function _facRandInt(max) {
-        const buf = new Uint32Array(1);
-        const limit = Math.floor(0x100000000 / max) * max;
-        do { window.crypto.getRandomValues(buf); } while (buf[0] >= limit);
-        return buf[0] % max;
-    }
-
-    function _facGeneratePassword() {
-        if (!window.crypto || !window.crypto.getRandomValues) return null;
-        const all = FAC_PW_SETS.join('');
-        for (let attempt = 0; attempt < 50; attempt++) {
-            const chars = FAC_PW_SETS.map(function (set) { return set[_facRandInt(set.length)]; });
-            while (chars.length < FAC_PW_LENGTH) chars.push(all[_facRandInt(all.length)]);
-            for (let i = chars.length - 1; i > 0; i--) {          // Fisher-Yates shuffle
-                const j = _facRandInt(i + 1);
-                const tmp = chars[i]; chars[i] = chars[j]; chars[j] = tmp;
-            }
-            const pw = chars.join('');
-            const rated = _getFacPasswordStrength(pw);
-            if (rated && rated.level >= 3) return pw;
+        const password = facPasswordInput.value;
+        if (password.length < 8) {
+            facPasswordStrength.hidden = true;
+            facPasswordStrengthMeter.setAttribute('aria-valuenow', '0');
+            facPasswordStrengthMeter.setAttribute('aria-valuetext', password ? 'Enter at least 8 characters' : 'No password entered');
+            facPasswordStrengthFill.style.width = '0%';
+            facPasswordStrengthLabel.textContent = '';
+            return;
         }
-        return null;
-    }
 
-    function _facSetGeneratedPassword() {
-        if (!facPasswordInput) return;
-        const pw = _facGeneratePassword();
-        facPasswordInput.value = pw || '';
-        if (facSubmitBtn) facSubmitBtn.disabled = !pw;
-        if (facGenHint) {
-            facGenHint.textContent = pw
-                ? FAC_GEN_HINT_DEFAULT
-                : 'This browser cannot generate a secure password. Please use an up-to-date browser.';
-        }
-    }
-
-    // Copy text: the Clipboard API where the page is secure (https / localhost), otherwise the
-    // classic select-and-copy trick, so it also works when the site is opened by a LAN address.
-    function _facCopyFallback(text) {
-        const ta = document.createElement('textarea');
-        ta.value = text;
-        ta.setAttribute('readonly', '');
-        ta.style.position = 'fixed';
-        ta.style.top = '-1000px';
-        ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.select();
-        ta.setSelectionRange(0, text.length);
-        let ok = false;
-        try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
-        document.body.removeChild(ta);
-        return ok ? Promise.resolve() : Promise.reject(new Error('copy failed'));
-    }
-
-    function _facCopyText(text) {
-        if (navigator.clipboard && window.isSecureContext) {
-            return navigator.clipboard.writeText(text).catch(function () { return _facCopyFallback(text); });
-        }
-        return _facCopyFallback(text);
-    }
-
-    // The button briefly turns green with a tick, so there is no doubt it worked.
-    function _facFlashCopied(btn) {
-        const icon = btn.querySelector('.material-symbols-outlined');
-        const label = btn.getAttribute('data-label') || btn.getAttribute('aria-label') || 'Copy';
-        btn.setAttribute('data-label', label);
-        btn.classList.add('is-copied');
-        if (icon) icon.textContent = 'check';
-        btn.title = 'Copied!';
-        btn.setAttribute('aria-label', 'Copied');
-        clearTimeout(btn._facCopyTimer);
-        btn._facCopyTimer = setTimeout(function () {
-            btn.classList.remove('is-copied');
-            if (icon) icon.textContent = 'content_copy';
-            btn.title = label;
-            btn.setAttribute('aria-label', label);
-        }, 1600);
+        const levels = [
+            { label: 'Very weak', color: '#e53e3e' },
+            { label: 'Weak', color: '#dd6b20' },
+            { label: 'Fair', color: '#d69e2e' },
+            { label: 'Strong', color: '#38a169' },
+            { label: 'Very strong', color: '#2b6cb0' }
+        ];
+        const result = _getFacPasswordStrength(password);
+        const strength = result.level;
+        const level = levels[strength];
+        facPasswordStrength.hidden = false;
+        facPasswordStrengthMeter.setAttribute('aria-valuenow', String(strength));
+        facPasswordStrengthMeter.setAttribute('aria-valuetext', level.label);
+        facPasswordStrengthFill.style.width = (strength + 1) * 20 + '%';
+        facPasswordStrengthFill.style.backgroundColor = level.color;
+        facPasswordStrengthLabel.textContent = result.label;
+        facPasswordStrengthLabel.style.color = level.color;
     }
 
     if (facPasswordInput) {
-        _facSetGeneratedPassword();
-
-        if (facPwCopyBtn) {
-            facPwCopyBtn.addEventListener('click', function () {
-                const pw = facPasswordInput.value;
-                if (!pw) return;
-                _facCopyText(pw).then(function () {
-                    _facFlashCopied(facPwCopyBtn);
-                }).catch(function () {
-                    // Could not copy automatically: leave the password selected so Ctrl+C works.
-                    facPasswordInput.focus();
-                    facPasswordInput.select();
-                    if (facGenHint) facGenHint.textContent = 'Could not copy automatically. The password is selected: press Ctrl+C.';
-                });
-            });
-        }
-
-        if (facPwRegenBtn) {
-            facPwRegenBtn.addEventListener('click', function () {
-                _facSetGeneratedPassword();
-                if (facGenHint && facPasswordInput.value) facGenHint.textContent = FAC_GEN_HINT_DEFAULT;
-                facPwRegenBtn.classList.remove('is-spinning');
-                void facPwRegenBtn.offsetWidth;                  // restart the little spin
-                facPwRegenBtn.classList.add('is-spinning');
-            });
-        }
+        facPasswordInput.addEventListener('input', _updateFacPasswordStrength);
     }
 
     function _showFacAlert(msg, isError) {
@@ -2175,62 +2091,26 @@
         facFormAlert.textContent = '';
     }
 
-    /* After a successful create, an "Account created" card shows the sign-in details (PUPSync email
-       and the temporary password, each with a copy button). This is the last time the password is
-       visible: faculty passwords cannot be looked up or reset later, so the card stays until Done is
-       pressed. Done then returns to a clean Faculty tab with a freshly generated password and the
-       new account already in the list. */
+    /* After a successful create: show a small "Account created" overlay for a moment, then
+       load the Faculty tab fresh so the form, the list and its count are all back to a clean
+       state (the new account is simply part of the server-printed list).
+       FAC_CREATED_OVERLAY_MS must match the .fac-created-bar animation (2s) in admin-dashboard.css. */
+    const FAC_CREATED_OVERLAY_MS = 2000;
     let _facReloading = false;
 
     // Put the Create Account button back to its normal, clickable state.
     function _facResetSubmitBtn() {
         if (!facSubmitBtn) return;
-        facSubmitBtn.disabled = !(facPasswordInput && facPasswordInput.value);
+        facSubmitBtn.disabled = false;
         facSubmitBtn.innerHTML = '<span class="material-symbols-outlined">person_add</span> Create Account';
     }
 
-    function _facCredRow(label, value) {
-        const row = document.createElement('div');
-        row.className = 'fac-created-cred';
-
-        const lab = document.createElement('span');
-        lab.className = 'fac-created-cred-label';
-        lab.textContent = label;
-
-        const val = document.createElement('code');
-        val.className = 'fac-created-cred-val';
-        val.textContent = value;                                  // text, never parsed as HTML
-
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'fac-gen-btn';
-        btn.title = 'Copy ' + label.toLowerCase();
-        btn.setAttribute('aria-label', 'Copy ' + label.toLowerCase());
-        btn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">content_copy</span>';
-        btn.addEventListener('click', function () {
-            _facCopyText(value).then(function () {
-                _facFlashCopied(btn);
-            }).catch(function () {
-                const range = document.createRange();
-                range.selectNodeContents(val);
-                const sel = window.getSelection();
-                sel.removeAllRanges();
-                sel.addRange(range);
-            });
-        });
-
-        row.appendChild(lab);
-        row.appendChild(val);
-        row.appendChild(btn);
-        return row;
-    }
-
-    function _facAccountCreated(fullname, email, tempPassword) {
+    function _facAccountCreated(fullname) {
         _facReloading = true;
 
         // Empty the form right away so no browser can restore typed values (the password
-        // included) after a reload. The card below is now the only place the password lives.
-        ['fac-email', 'fac-faculty-id', 'fac-first', 'fac-last', 'fac-password']
+        // included) after the reload.
+        ['fac-email', 'fac-faculty-id', 'fac-first', 'fac-last', 'fac-password', 'fac-confirm']
             .forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.value = '';
@@ -2240,67 +2120,34 @@
 
         const ov = document.createElement('div');
         ov.className = 'fac-created-overlay';
-        ov.setAttribute('role', 'dialog');
-        ov.setAttribute('aria-modal', 'true');
-        ov.setAttribute('aria-labelledby', 'fac-created-title');
-
-        const card = document.createElement('div');
-        card.className = 'fac-created-card fac-created-card--creds';
-        card.innerHTML =
+        ov.setAttribute('role', 'status');
+        ov.setAttribute('aria-live', 'polite');
+        ov.innerHTML =
+            '<div class="fac-created-card">' +
             '<span class="fac-created-icon"><span class="material-symbols-outlined">check</span></span>' +
-            '<div class="fac-created-title" id="fac-created-title">Account created</div>' +
-            '<div class="fac-created-sub"></div>';
-        card.querySelector('.fac-created-sub').textContent = fullname;
-
-        const creds = document.createElement('div');
-        creds.className = 'fac-created-creds';
-        if (email) creds.appendChild(_facCredRow('PUPSync email', email));
-        creds.appendChild(_facCredRow('Temporary password', tempPassword));
-        card.appendChild(creds);
-
-        const note = document.createElement('p');
-        note.className = 'fac-created-note';
-        note.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">info</span><span></span>';
-        note.lastChild.textContent = 'Copy the password now. It is not shown again. ' +
-            'They will choose their own password the first time they sign in, and the account stays locked until they do.';
-        card.appendChild(note);
-
-        const done = document.createElement('button');
-        done.type = 'button';
-        done.className = 'ps-btn ps-btn--primary fac-created-done';
-        done.textContent = 'Done';
-        card.appendChild(done);
-
-        ov.appendChild(card);
+            '<div class="fac-created-title">Account created</div>' +
+            '<div class="fac-created-sub"></div>' +
+            '<span class="fac-created-bar"></span>' +
+            '</div>';
+        ov.querySelector('.fac-created-sub').textContent = fullname; // text, never parsed as HTML
         document.body.appendChild(ov);
 
-        function trapTab(e) {
-            if (e.key !== 'Tab') return;
-            const items = Array.prototype.slice.call(card.querySelectorAll('button'));
-            if (!items.length) return;
-            const first = items[0], last = items[items.length - 1];
-            if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-            else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-        }
-        document.addEventListener('keydown', trapTab);
-
-        done.addEventListener('click', function () {
-            document.removeEventListener('keydown', trapTab);
+        setTimeout(function () {
             // Unlock the button first: the click handler's .finally() skips its reset while
-            // _facReloading is true, so nothing else ever re-enables it.
+            // _facReloading is true, so nothing else ever re-enables it. Doing it up front
+            // also means an error further down can never leave it stuck on "Creating...".
             _facReloading = false;
-            _facSetGeneratedPassword();
             _facResetSubmitBtn();
-            document.body.removeChild(ov);
             // Switch to Faculty tab in-place — no page reload needed.
+            document.body.removeChild(ov);
             _switchTabDOM('faculty');
+            // Reset the create-account form so it's blank for the next account.
+            var form = document.getElementById('fac-create-form') || document.getElementById('facCreateForm');
+            if (form) form.reset();
+            _updateFacPasswordStrength();
             // Refresh the faculty list from the server so the new account appears immediately.
             if (typeof window.adminRefreshFacultyList === 'function') window.adminRefreshFacultyList();
-        });
-
-        // Land on the first copy button: copying is the one thing this card is for.
-        const firstCopy = card.querySelector('.fac-gen-btn');
-        (firstCopy || done).focus();
+        }, FAC_CREATED_OVERLAY_MS);
     }
 
     if (facSubmitBtn) {
@@ -2308,10 +2155,12 @@
             _clearFacAlert();
 
             const email = (document.getElementById('fac-email')?.value || '').trim();
+            const facultyId = (document.getElementById('fac-faculty-id')?.value || '').trim();
             const _nm = _facReadNames();
             const firstName = _nm.first;
             const lastName = _nm.last;
-            const password = facPasswordInput ? facPasswordInput.value : '';
+            const password = document.getElementById('fac-password')?.value || '';
+            const confirm = document.getElementById('fac-confirm')?.value || '';
 
             // Client-side pre-checks
             if (!_facRegistryMatch) {
@@ -2324,7 +2173,17 @@
                 _showFacAlert('Last name is required.', true); return;
             }
             if (!password) {
-                _showFacAlert('The password could not be generated. Reload the page and try again.', true); return;
+                _showFacAlert('Password is required.', true); return;
+            }
+            if (password.length < 8) {
+                _showFacAlert('Password must be at least 8 characters.', true); return;
+            }
+            const passwordStrength = _getFacPasswordStrength(password);
+            if (passwordStrength.level < 2) {
+                _showFacAlert('Password is too weak. Use a stronger password rated Fair or higher.', true); return;
+            }
+            if (password !== confirm) {
+                _showFacAlert('Passwords do not match.', true); return;
             }
             if (_facEmailEdited && email && !/^[^\s@]+@pupsync\.edu$/i.test(email)) {
                 _showFacAlert('The PUPSync email must be a valid address ending in @pupsync.edu.', true);
@@ -2338,7 +2197,8 @@
                 csrf_token: getCsrfToken(),
                 first_name: firstName,
                 last_name: lastName,
-                password: password
+                password: password,
+                confirm_password: confirm
             });
             // Only an email the admin changed by hand is sent; otherwise the server derives it.
             if (_facEmailEdited && email) body.append('pupsync_email', email);
@@ -2351,7 +2211,7 @@
                 .then(res => res.json())
                 .then(data => {
                     if (data.status === 'success') {
-                        _facAccountCreated([firstName, lastName].filter(Boolean).join(' '), data.email || email, password);
+                        _facAccountCreated([firstName, lastName].filter(Boolean).join(' '));
                     } else {
                         _showFacAlert(data.message || 'An error occurred.', true);
                     }
@@ -2360,7 +2220,7 @@
                     _showFacAlert('Network error. Please try again.', true);
                 })
                 .finally(() => {
-                    if (_facReloading) return; // stay locked until the "Account created" card is dismissed
+                    if (_facReloading) return; // stay locked until the "Account created" overlay finishes
                     _facResetSubmitBtn();
                 });
         });
@@ -2406,11 +2266,111 @@
         });
     }
 
+    /* ── Click the screen you are already on → refresh it in place ──────
+       Same as most apps and sites: tapping the active tab reloads its data. The screen, filters,
+       sub-tab and scroll position stay put, and a thin bar at the top shows that it is working.
+       Dashboard, Equipment, Faculty and Activity refresh in place. Facilities and Admins have no
+       in-place refresh yet, so they fall back to a normal soft refresh (which returns to the same screen).
+       Settings and Imports hold forms, so they only scroll back to the top. */
+    let _psRefreshBusy = false;
+
+    function _psRefreshBar(on) {
+        let bar = document.getElementById('ps-refresh-bar');
+        if (on) {
+            if (!bar) {
+                bar = document.createElement('div');
+                bar.id = 'ps-refresh-bar';
+                bar.setAttribute('role', 'progressbar');
+                bar.setAttribute('aria-label', 'Refreshing');
+                document.body.appendChild(bar);
+            }
+            void bar.offsetWidth;
+            bar.classList.add('on');
+        } else if (bar) {
+            bar.classList.remove('on');
+        }
+    }
+
+    /* The current admin page, fetched in the background and parsed (scripts in it do not run). */
+    function _psFetchPageDoc() {
+        return fetch('admin-dashboard.php', {
+            credentials: 'same-origin',
+            cache: 'no-store',
+            headers: { 'X-Requested-With': 'fetch' }
+        }).then(function (r) {
+            if (r.redirected || !r.ok) throw new Error('HTTP ' + r.status);   // signed out, or a server error
+            return r.text();
+        }).then(function (html) {
+            return new DOMParser().parseFromString(html, 'text/html');
+        });
+    }
+
+    /* Equipment: Catalog numbers (fragment endpoint) + the Loans table and its tab counts. */
+    function _psRefreshEquipment() {
+        const catalog = new Promise(function (resolve) {
+            if (typeof window.psRefreshInventoryTbody !== 'function') { resolve(); return; }
+            window.psRefreshInventoryTbody(resolve);
+            setTimeout(resolve, 15000);   // never leave the loading bar hanging
+        });
+        const loans = _psFetchPageDoc().then(function (doc) {
+            const fresh = doc.querySelector('#eq-loan-table tbody');
+            const live = document.querySelector('#eq-loan-table tbody');
+            if (!fresh || !live) return;
+            live.innerHTML = fresh.innerHTML;
+            doc.querySelectorAll('#eqLoanFilter [data-loan-filter]').forEach(function (f) {
+                const key = f.getAttribute('data-loan-filter');
+                const cur = document.querySelector('#eqLoanFilter [data-loan-filter="' + key + '"] .eq-loan-tab-count');
+                const nw = f.querySelector('.eq-loan-tab-count');
+                if (cur && nw) { cur.textContent = nw.textContent; cur.className = nw.className; }
+            });
+            if (typeof window.psRefreshEquipmentLoans === 'function') window.psRefreshEquipmentLoans(true);   // keeps filter + page
+        });
+        return Promise.all([catalog, loans]);
+    }
+
+    window.psRefreshActiveTab = function (tab) {
+        // back to the top, like most apps do when you tap the tab you are on
+        try {
+            const m = document.getElementById('app-main');
+            if (m && m.scrollTop > 0) m.scrollTo({ top: 0, behavior: 'smooth' });
+            if (window.scrollY > 0) window.scrollTo({ top: 0, behavior: 'smooth' });
+        } catch (_) { }
+        if (tab === 'settings' || tab === 'imports') return;   // forms: nothing to reload
+        if (_psRefreshBusy) return;
+
+        let job = null;
+        if (tab === 'dashboard' && typeof window.psRefreshDashboard === 'function') job = window.psRefreshDashboard;
+        else if (tab === 'inventory') job = _psRefreshEquipment;
+        else if (tab === 'faculty' && typeof window.adminRefreshFacultyList === 'function') job = window.adminRefreshFacultyList;
+        else if (tab === 'activity' && typeof window.psActivityRefresh === 'function') job = window.psActivityRefresh;
+
+        if (!job) { window.location.reload(); return; }   // Facilities, Admins: a normal soft refresh
+
+        _psRefreshBusy = true;
+        const started = Date.now();
+        _psRefreshBar(true);
+        Promise.resolve().then(job).catch(function () {
+            if (typeof showToast === 'function') showToast('Could not refresh. Please check your connection.');
+        }).then(function () {
+            // keep the bar up for a moment so a very quick refresh still reads as "refreshed"
+            setTimeout(function () { _psRefreshBar(false); _psRefreshBusy = false; }, Math.max(0, 450 - (Date.now() - started)));
+        });
+    };
+
     /* ── Sidebar nav items ────────────────────────────────────── */
     document.querySelectorAll('.nav-item[data-tab]').forEach(btn => {
         btn.addEventListener('click', function (e) {
             e.preventDefault();
-            _switchTabDOM(this.dataset.tab, this);
+            const tab = this.dataset.tab;
+            const cur = document.querySelector('.tab-panel.active');
+            // A real click on the tab you are already on refreshes it. Clicks made by code
+            // (e.g. a Dashboard card jumping to a screen) are not real clicks and still just open the screen.
+            if (e.isTrusted && cur && cur.id === 'panel-' + tab) {
+                _closeMobileSidebar();
+                window.psRefreshActiveTab(tab);
+                return;
+            }
+            _switchTabDOM(tab, this);
         });
     });
 
@@ -2679,7 +2639,7 @@
                     if (ev.actor_type === 'auto') who.appendChild(admEl('span', 'act-pill', 'Automatic'));
                     else {
                         who.appendChild(document.createTextNode(ev.actor_name));
-                        if (ev.actor_no) who.appendChild(admEl('span', 'act-no', 'Admin ' + ev.actor_no));
+                        if (ev.actor_label) who.appendChild(admEl('span', 'act-no', ev.actor_label));
                     }
                     li.appendChild(who);
                 }
@@ -2733,7 +2693,7 @@
             if (showLoading !== false) message('hourglass_top', 'Loading activity\u2026');
             const url = ADM_ACTIVITY_API + '?actor=' + encodeURIComponent(p.actor) +
                 '&filter=' + encodeURIComponent(p.filter) + '&range=' + encodeURIComponent(p.range) + '&page=' + page;
-            fetch(url, { credentials: 'same-origin' })
+            return fetch(url, { credentials: 'same-origin' })
                 .then(function (res) { return res.json().catch(function () { return {}; }).then(function (j) { return { ok: res.ok, data: j }; }); })
                 .then(function (r) {
                     if (myToken !== token) return; // the user moved on
@@ -2774,7 +2734,7 @@
         /* load(true) = filters changed → back to page 1 */
         function load(resetPage, showLoading) {
             if (resetPage) page = 1;
-            fetchPage(false, showLoading);
+            return fetchPage(false, showLoading);
         }
 
         return { load: load };
@@ -2860,13 +2820,18 @@
 
         /* ── seats (header counter + Add button) ──────────────── */
         /* The Activity page's "Who" list mirrors the admin accounts, so changes here show up there at once. */
-        function syncActorOption(id, name, adminNo) {
+        function adminLabel(role, no) {
+            const n = parseInt(no, 10) || 0;
+            return n > 0 ? (role === 'Super Admin' ? 'Super Admin ' : 'Admin ') + n : role;
+        }
+
+        function syncActorOption(id, name, adminNo, role) {
             const sel = document.getElementById('act-actor');
             if (!sel || !id) return;
             let opt = Array.from(sel.options).find(function (o) { return o.value === String(id); });
             if (name === null) { if (opt) opt.remove(); return; }
             if (!opt) { opt = document.createElement('option'); opt.value = String(id); sel.appendChild(opt); }
-            opt.textContent = name + (parseInt(adminNo, 10) > 0 ? ' (Admin ' + parseInt(adminNo, 10) + ')' : '');
+            opt.textContent = name + (parseInt(adminNo, 10) > 0 ? ' (' + adminLabel(role, adminNo) + ')' : '');
         }
 
         function updateSeats(count, remaining) {
@@ -2966,38 +2931,13 @@
             const role = item.getAttribute('data-role');
             const until = parseInt(item.getAttribute('data-locked-until'), 10) || 0;
             const you = item.getAttribute('data-you') === '1';
-            // Reset tag visibility at the start so switching between admins starts clean
-            const _noTagReset = document.getElementById('am-d-no');
-            const _roleTagReset = document.getElementById('am-d-role');
-            if (_noTagReset) _noTagReset.hidden = true;
-            if (_roleTagReset) _roleTagReset.hidden = false;
             const manage = item.getAttribute('data-manage') === '1';
 
             document.getElementById('am-d-avatar').textContent = initials(name);
             document.getElementById('am-d-name').textContent = name;
             document.getElementById('am-d-email').textContent = item.getAttribute('data-email');
-            const adminNo = parseInt(item.getAttribute('data-admin-no'), 10) || 0;
-            const noTag = document.getElementById('am-d-no');
-            const roleTagEl = document.getElementById('am-d-role');
-            if (noTag) {
-                if (role === 'Super Admin') {
-                    // Super Admin: show only the role tag ("Super Admin"), no number tag
-                    noTag.hidden = true;
-                    setTag(roleTagEl, role, 'super');
-                } else if (adminNo) {
-                    // Regular admin with a seat number: show "Admin N", hide the plain "Admin" role tag
-                    noTag.hidden = false;
-                    setTag(noTag, 'Admin ' + adminNo, 'no');
-                    roleTagEl.hidden = true;
-                } else {
-                    // No number assigned yet: show the plain "Admin" role tag only
-                    noTag.hidden = true;
-                    setTag(roleTagEl, role, '');
-                    roleTagEl.hidden = false;
-                }
-            } else {
-                setTag(roleTagEl, role, role === 'Super Admin' ? 'super' : '');
-            }
+            // One badge: "Super Admin 1" / "Admin 2" (just the role when the account has no number)
+            setTag(document.getElementById('am-d-role'), adminLabel(role, item.getAttribute('data-admin-no')), role === 'Super Admin' ? 'super' : '');
             if (until) setTag(document.getElementById('am-d-status'), 'Locked until ' + admShortDate(until), 'locked', 'lock');
             else setTag(document.getElementById('am-d-status'), 'Active', 'active');
 
@@ -3212,7 +3152,7 @@
                         created: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: ADM_TZ })
                     });
                     list.insertBefore(item, listEmpty);
-                    syncActorOption(data.id, fullName, data.admin_no);
+                    syncActorOption(data.id, fullName, data.admin_no, role);
                     refreshListEmpty();
                     if (typeof data.accounts_remaining === 'number') updateSeats(5 - data.accounts_remaining, data.accounts_remaining);
                     closeModal(addModal);
@@ -3272,7 +3212,7 @@
                 item.querySelector('.am-avatar').textContent = initials(r.data.full_name);
                 item.querySelector('.am-item-name').firstChild.textContent = r.data.full_name;
                 item.querySelector('.am-item-email').textContent = r.data.email;
-                syncActorOption(item.getAttribute('data-id'), r.data.full_name, item.getAttribute('data-admin-no'));
+                syncActorOption(item.getAttribute('data-id'), r.data.full_name, item.getAttribute('data-admin-no'), item.getAttribute('data-role'));
                 if (item === current) renderDetail(item);
                 closeModal(editModal);
                 showToast(r.data.signed_out ? 'Saved. They have been signed out everywhere.' : 'Admin details saved.', 'success');
@@ -3460,6 +3400,8 @@
         if (nav) nav.addEventListener('click', ensureLoaded);
         if (panel.classList.contains('active')) ensureLoaded();
         window.psActivityReady = ensureLoaded; // lets ?view=activity open it with data
+        /* Re-fetch the page you are on (same filters), without the "Loading…" message. Used by the click-the-active-tab refresh. */
+        window.psActivityRefresh = function () { loaded = true; return feed.load(false, false); };
 
         /* Open Activity with a preset — used by the Admins panel and My Account.
            opts: { actor: 'all' | 'auto' | 'me' | <admin id>, filter: chip key, range: today | 7d | 30d | all } */
@@ -3643,6 +3585,8 @@
                         toastMsg += ' ' + wn + (wn === 1 ? ' waitlisted faculty was' : ' waitlisted faculty were') + ' notified.';
                     }
                     showToast(toastMsg);
+                    // Reservations table: this row becomes Cancelled now (handled in admin-rooms-reservations-table.js)
+                    document.dispatchEvent(new CustomEvent('rr:cancelled', { detail: { id: parseInt(rrId, 10) } }));
                     if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
                 })
                 .catch(() => {
@@ -3975,10 +3919,6 @@
         btn.addEventListener('click', function () { filterNotifs(this.dataset.notifFilter); });
     });
 
-    /* ── Settings toggles ────────────────────────────────────── */
-    const nReqT = document.getElementById('notifPrefRequestsToggle'); if (nReqT) nReqT.addEventListener('change', function () { applyNotifPref('notifPrefRequests', this.checked); });
-    const nOverT = document.getElementById('notifPrefOverdueToggle'); if (nOverT) nOverT.addEventListener('change', function () { applyNotifPref('notifPrefOverdue', this.checked); });
-    const nRoomT = document.getElementById('notifPrefRoomToggle'); if (nRoomT) nRoomT.addEventListener('change', function () { applyNotifPref('notifPrefRoom', this.checked); });
 
     /* ── Change Password Form Handler ───────────────────────── */
     const cpForm = document.getElementById('changePasswordForm');
@@ -4053,15 +3993,10 @@
 
     /* ── Handle URL view param on load ──────────────────────── */
     function initView() {
-        // Hard-refresh flag: Ctrl+Shift+R / Ctrl+F5 sets this before the page unloads.
-        // On load we honour it by skipping hash restore, effectively landing on Dashboard.
-        try {
-            if (sessionStorage.getItem('adminHardRefresh') === '1') {
-                sessionStorage.removeItem('adminHardRefresh');
-                history.replaceState({ tab: 'dashboard' }, '');
-                return; // leave the default dashboard panel active
-            }
-        } catch (_) { }
+        // Refresh handling lives in the head script (admin-shell-top.php): a hard refresh
+        // (Ctrl+Shift+R / Ctrl+F5) and a soft refresh with an edit form open both reload
+        // the page once more with a clean URL, so there is nothing to restore here.
+        if (window._adminLeaving) return;
 
         const params = new URLSearchParams(window.location.search);
         const view = params.get('view');
@@ -4070,6 +4005,21 @@
         // ── Hash-based restore (F5 / normal reload) ───────────────────────
         const hash = window.location.hash; // e.g. '#tab-inventory'
         const hashTab = hash.startsWith('#tab-') ? hash.slice(5) : null;
+
+        // Soft refresh: the screen you were on (hash) beats leftover URL params, and its sub-tab comes back too.
+        const restoreTab = window._adminIsReload ? (hashTab || window._adminStoredTab) : null;
+        if (restoreTab) {
+            if (restoreTab !== 'dashboard') {
+                _switchTabDOM(restoreTab, false);
+                if (restoreTab === 'activity' && typeof window.psActivityReady === 'function') window.psActivityReady();
+                if (restoreTab === 'admins' && typeof window.psAdminsPanelReady === 'function') window.psAdminsPanelReady();
+                _restoreSubViews(restoreTab);
+                history.replaceState({ tab: restoreTab }, '', window.location.pathname + window.location.search + '#tab-' + restoreTab);
+            } else {
+                history.replaceState({ tab: 'dashboard' }, '');
+            }
+            return;
+        }
 
         // URL params take priority over hash (they come from PHP redirects/links
         // and carry more context, e.g. edit_item). Hash is the F5 restore path.
@@ -4141,17 +4091,6 @@
         window._setupInventoryListFn = setupInventoryList;
         window._exitEditModeFn = _exitEditMode;
 
-        // Hard-refresh detection: set flag on Ctrl+Shift+R / Ctrl+F5 so initView
-        // can skip hash restore and land on Dashboard (mimics a true fresh load).
-        document.addEventListener('keydown', function (e) {
-            if ((e.ctrlKey || e.metaKey) && (
-                (e.shiftKey && (e.key === 'r' || e.key === 'R')) ||
-                e.key === 'F5'
-            )) {
-                try { sessionStorage.setItem('adminHardRefresh', '1'); } catch (_) { }
-            }
-        });
-
         restoreState();
 
         initView();
@@ -4167,6 +4106,9 @@
         // Poll for new notifications (new requests, overdue items, room
         // issues, stock drops) every 25s without a full page reload.
         setInterval(_notifPoll, 25000);
+        // A Notification Preferences switch was flipped (Settings): pull the feed right away so
+        // the bell, its badge and the cards match what the server will now send.
+        document.addEventListener('pupsync:notif-prefs-changed', function () { _notifPoll(); });
         // Timers are throttled in background tabs, so also refresh the bell
         // the moment the admin comes back to this tab or window.
         // (Throttled: returning to a tab fires both events at once.)
@@ -4865,19 +4807,19 @@
                             if (data.success && data.checklist) {
                                 // Show inline checklist inside the scanner modal
                                 scanning = false;
-                                const cameraView    = document.getElementById('qrCameraView');
+                                const cameraView = document.getElementById('qrCameraView');
                                 const checklistView = document.getElementById('qrChecklistView');
-                                const itemsEl       = document.getElementById('qrChecklistItems');
-                                const hintEl        = document.getElementById('qrChecklistHint');
-                                const confirmBtn    = document.getElementById('qrChecklistConfirm');
-                                const cancelBtn     = document.getElementById('qrChecklistCancel');
-                                const titleEl       = document.getElementById('qrScannerTitle');
-                                const subtitleEl    = document.getElementById('qrScannerSubtitle');
+                                const itemsEl = document.getElementById('qrChecklistItems');
+                                const hintEl = document.getElementById('qrChecklistHint');
+                                const confirmBtn = document.getElementById('qrChecklistConfirm');
+                                const cancelBtn = document.getElementById('qrChecklistCancel');
+                                const titleEl = document.getElementById('qrScannerTitle');
+                                const subtitleEl = document.getElementById('qrScannerSubtitle');
 
                                 // Switch view
-                                cameraView.style.display    = 'none';
+                                cameraView.style.display = 'none';
                                 checklistView.style.display = '';
-                                titleEl.textContent    = isClaimQr ? 'Claim Checklist' : 'Return Checklist';
+                                titleEl.textContent = isClaimQr ? 'Claim Checklist' : 'Return Checklist';
                                 subtitleEl.textContent = isClaimQr
                                     ? 'Hand over to ' + (data.collector || data.borrower)
                                     : 'Return from ' + data.borrower;
@@ -4885,7 +4827,7 @@
                                 // Build item rows
                                 itemsEl.innerHTML = '';
                                 const CONDITIONS = ['Good', 'Fair', 'Damaged', 'Missing'];
-                                data.items.forEach(function(item, idx) {
+                                data.items.forEach(function (item, idx) {
                                     const bg = idx % 2 === 0 ? '#fff' : '#fafafa';
                                     const row = document.createElement('div');
                                     row.style.cssText = 'display:flex;align-items:center;gap:.65rem;padding:.75rem 1rem;background:' + bg + ';border-bottom:1px solid #f0f0f0;';
@@ -4936,30 +4878,30 @@
 
                                 // Wire qty +/- buttons and condition dropdown visibility
                                 if (isClaimQr) {
-                                    itemsEl.addEventListener('click', function(e) {
+                                    itemsEl.addEventListener('click', function (e) {
                                         var dec = e.target.closest('[data-claim-dec]');
                                         var inc = e.target.closest('[data-claim-inc]');
                                         var btn = dec || inc;
                                         if (!btn) return;
-                                        var rid  = btn.dataset.reqId || btn.getAttribute('data-req-id');
-                                        var inp  = itemsEl.querySelector('input[data-claim-qty][data-req-id="' + rid + '"]');
+                                        var rid = btn.dataset.reqId || btn.getAttribute('data-req-id');
+                                        var inp = itemsEl.querySelector('input[data-claim-qty][data-req-id="' + rid + '"]');
                                         var cond = itemsEl.querySelector('select[data-claim-cond][data-req-id="' + rid + '"]');
                                         if (!inp) return;
                                         var max = parseInt(inp.dataset.maxQty || inp.max, 10);
-                                        var v   = parseInt(inp.value, 10);
+                                        var v = parseInt(inp.value, 10);
                                         if (dec) v = Math.max(0, v - 1);
                                         if (inc) v = Math.min(max, v + 1);
                                         inp.value = v;
                                         // Show condition dropdown only when some units are withheld
                                         if (cond) cond.style.display = (v < max) ? '' : 'none';
                                     });
-                                    itemsEl.addEventListener('change', function(e) {
+                                    itemsEl.addEventListener('change', function (e) {
                                         var inp = e.target.closest('input[data-claim-qty]');
                                         if (!inp) return;
-                                        var max  = parseInt(inp.dataset.maxQty || inp.max, 10);
-                                        var v    = Math.max(0, Math.min(max, parseInt(inp.value, 10) || 0));
+                                        var max = parseInt(inp.dataset.maxQty || inp.max, 10);
+                                        var v = Math.max(0, Math.min(max, parseInt(inp.value, 10) || 0));
                                         inp.value = v;
-                                        var rid  = inp.getAttribute('data-req-id');
+                                        var rid = inp.getAttribute('data-req-id');
                                         var cond = itemsEl.querySelector('select[data-claim-cond][data-req-id="' + rid + '"]');
                                         if (cond) cond.style.display = (v < max) ? '' : 'none';
                                     });
@@ -4970,7 +4912,7 @@
                                     : 'Tick only items being returned now. Unticked items stay On Loan. "Damaged" or "Missing" flags the record.';
 
                                 // Confirm handler
-                                confirmBtn.onclick = function() {
+                                confirmBtn.onclick = function () {
                                     confirmBtn.disabled = true;
                                     confirmBtn.textContent = 'Saving...';
 
@@ -4983,22 +4925,22 @@
 
                                     if (isClaimQr) {
                                         // Collect actual qty per item from the spinners
-                                                                                const claimRows = [];
-                                        itemsEl.querySelectorAll('input[data-claim-qty][data-req-id]').forEach(function(inp) {
-                                            const rid     = inp.getAttribute('data-req-id');
-                                            const maxQty  = parseInt(inp.dataset.maxQty || inp.max, 10);
+                                        const claimRows = [];
+                                        itemsEl.querySelectorAll('input[data-claim-qty][data-req-id]').forEach(function (inp) {
+                                            const rid = inp.getAttribute('data-req-id');
+                                            const maxQty = parseInt(inp.dataset.maxQty || inp.max, 10);
                                             const giveQty = Math.max(0, Math.min(maxQty, parseInt(inp.value, 10) || 0));
                                             const condSel = itemsEl.querySelector('select[data-claim-cond][data-req-id="' + rid + '"]');
-                                            const held    = maxQty - giveQty;
-                                            const cond    = (held > 0 && condSel) ? condSel.value : 'Good';
+                                            const held = maxQty - giveQty;
+                                            const cond = (held > 0 && condSel) ? condSel.value : 'Good';
                                             claimRows.push({ id: rid, give: giveQty, max: maxQty, withheld: held, condition: cond });
                                         });
 
                                         // Reason required only when a GOOD-condition item is withheld.
                                         // Damaged / Missing are self-explanatory — automatic reason applied.
-                                        const needReason = claimRows.filter(function(r) { return r.withheld > 0 && r.condition === 'Good'; });
+                                        const needReason = claimRows.filter(function (r) { return r.withheld > 0 && r.condition === 'Good'; });
                                         if (needReason.length > 0) {
-                                            const lines = needReason.map(function(r) {
+                                            const lines = needReason.map(function (r) {
                                                 const inp2 = itemsEl.querySelector('input[data-claim-qty][data-req-id="' + r.id + '"]');
                                                 const prev = inp2 ? inp2.closest('div') : null;
                                                 const nameEl = prev ? prev.previousElementSibling.querySelector('strong') : null;
@@ -5015,17 +4957,17 @@
                                                 confirmBtn.textContent = 'Confirm';
                                                 return;
                                             }
-                                            needReason.forEach(function(r) {
+                                            needReason.forEach(function (r) {
                                                 formData.append('reason[' + r.id + ']', reason.trim());
                                             });
                                         }
 
                                         // Damaged / Missing: automatic reason, no prompt needed
-                                        claimRows.filter(function(r) { return r.withheld > 0 && r.condition !== 'Good'; }).forEach(function(r) {
+                                        claimRows.filter(function (r) { return r.withheld > 0 && r.condition !== 'Good'; }).forEach(function (r) {
                                             formData.append('reason[' + r.id + ']', r.condition + ' at handover — item kept in cabinet.');
                                         });
 
-                                        claimRows.forEach(function(r) {
+                                        claimRows.forEach(function (r) {
                                             formData.append('give_qty[' + r.id + ']', r.give);
                                             if (r.withheld > 0) {
                                                 formData.append('withheld_qty[' + r.id + ']', r.withheld);
@@ -5035,22 +4977,22 @@
 
                                         fetch('equipment-booking/api/partial-claim.php', {
                                             method: 'POST', credentials: 'same-origin', body: formData
-                                        }).then(function(r) { return r.json(); })
-                                        .then(function(result) {
-                                            const msg = (result.claimed || 0) + ' item(s) handed over' +
-                                                (result.withheld > 0 ? ', ' + result.withheld + ' unit(s) withheld.' : '.');
-                                            showToast('✅ ' + msg);
-                                            resetToCamera();
-                                            if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
-                                        }).catch(function() {
-                                            showToast('Network error. Please try again.');
-                                            confirmBtn.disabled = false;
-                                            confirmBtn.textContent = 'Confirm';
-                                        });
+                                        }).then(function (r) { return r.json(); })
+                                            .then(function (result) {
+                                                const msg = (result.claimed || 0) + ' item(s) handed over' +
+                                                    (result.withheld > 0 ? ', ' + result.withheld + ' unit(s) withheld.' : '.');
+                                                showToast('✅ ' + msg);
+                                                resetToCamera();
+                                                if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
+                                            }).catch(function () {
+                                                showToast('Network error. Please try again.');
+                                                confirmBtn.disabled = false;
+                                                confirmBtn.textContent = 'Confirm';
+                                            });
 
                                     } else {
                                         // Only process items whose checkbox is ticked
-                                        itemsEl.querySelectorAll('input[type="checkbox"]:checked[data-req-id]').forEach(function(cb) {
+                                        itemsEl.querySelectorAll('input[type="checkbox"]:checked[data-req-id]').forEach(function (cb) {
                                             const rid = cb.dataset.reqId;
                                             const sel = itemsEl.querySelector('select[data-req-id="' + rid + '"]');
                                             if (sel) {
@@ -5062,17 +5004,17 @@
                                         });
                                         fetch('equipment-booking/api/partial-return.php', {
                                             method: 'POST', credentials: 'same-origin', body: formData
-                                        }).then(function(r) { return r.json(); })
-                                        .then(function(result) {
-                                            const n = result.returned || 0;
-                                            showToast('✅ ' + n + ' item' + (n === 1 ? '' : 's') + ' marked as returned.');
-                                            resetToCamera();
-                                            if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
-                                        }).catch(function() {
-                                            showToast('Network error. Please try again.');
-                                            confirmBtn.disabled = false;
-                                            confirmBtn.textContent = 'Confirm';
-                                        });
+                                        }).then(function (r) { return r.json(); })
+                                            .then(function (result) {
+                                                const n = result.returned || 0;
+                                                showToast('✅ ' + n + ' item' + (n === 1 ? '' : 's') + ' marked as returned.');
+                                                resetToCamera();
+                                                if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
+                                            }).catch(function () {
+                                                showToast('Network error. Please try again.');
+                                                confirmBtn.disabled = false;
+                                                confirmBtn.textContent = 'Confirm';
+                                            });
                                     }
                                 };
 
@@ -5083,8 +5025,8 @@
                                     confirmBtn.disabled = false;
                                     confirmBtn.textContent = 'Confirm';
                                     checklistView.style.display = 'none';
-                                    cameraView.style.display    = '';
-                                    titleEl.textContent    = 'Scan QR Code';
+                                    cameraView.style.display = '';
+                                    titleEl.textContent = 'Scan QR Code';
                                     subtitleEl.textContent = 'Point the camera at the faculty member\'s QR code.';
                                     status.textContent = 'Point camera at the next QR code.';
                                     status.style.color = '#888';
@@ -5455,9 +5397,11 @@ function psSelectFmt(btn) {
         if (studentIdRow) studentIdRow.hidden = !(d.whoSub && d.whoSub.indexOf('Student via') === 0 && d.whoId);
 
         var badge = el('ps-rr-status');
-        var cls = { Approved: 'ps-badge--active', Declined: 'ps-badge--overdue', Cancelled: 'ps-badge--returned', Waiting: 'ps-badge--waiting' };
-        badge.className = 'ps-badge ps-badge--dot ' + (cls[d.status] || 'ps-badge--returned');
-        badge.textContent = d.status;
+        var cls = { Approved: 'ps-badge--active', Declined: 'ps-badge--overdue', Cancelled: 'ps-badge--cancelled', Waiting: 'ps-badge--waiting' };
+        // Same stage name + colour as the table row (the table script sets data-phase / data-phase-label)
+        var phaseCls = { pending: 'ps-badge--waiting', upcoming: 'ps-badge--scheduled', live: 'ps-badge--active', completed: 'ps-badge--returned', cancelled: 'ps-badge--cancelled', declined: 'ps-badge--overdue' };
+        badge.className = 'ps-badge ps-badge--dot ' + (phaseCls[d.phase] || cls[d.status] || 'ps-badge--returned');
+        badge.textContent = d.phaseLabel || d.status;
 
         var notes = [];
         if (d.notes) notes.push(d.notes);
@@ -5543,11 +5487,24 @@ function psSelectFmt(btn) {
                 reasonRow.hidden = false;
                 reasonEl.textContent = arbReason || (hasDoc ? 'Supporting document attached to this reservation.' : 'No decision reason recorded.');
             }
-            // Waiting: nothing has been decided yet
+            // The Reason row is relabelled for cancelled reservations; put it back for everything else
+            var reasonLabel = reasonRow ? reasonRow.querySelector('span') : null;
+            if (reasonLabel) reasonLabel.textContent = 'Reason';
+            // Waiting: nothing has been decided yet (any admin can decide - a letter does not change who)
             if (d.status === 'Waiting') {
-                if (methodEl) methodEl.textContent = hasDoc ? 'Awaiting Super Admin review' : 'Awaiting admin review';
+                if (methodEl) methodEl.textContent = 'Awaiting admin review';
                 if (ruleRow) ruleRow.hidden = true;
                 if (reasonRow) reasonRow.hidden = true;
+            }
+            // Cancelled: describe the cancellation, not the approval it replaced
+            if (d.status === 'Cancelled') {
+                if (methodEl) methodEl.textContent = d.cancelledBy === 'requester' ? 'Cancelled by the requester' : (d.cancelledBy === 'admin' ? 'Cancelled by an admin' : 'Cancelled');
+                if (ruleRow) ruleRow.hidden = true;
+                if (reasonRow && reasonEl) {
+                    reasonRow.hidden = false;
+                    if (reasonLabel) reasonLabel.textContent = 'When';
+                    reasonEl.textContent = d.cancelledAt || 'Time not recorded.';
+                }
             }
             decSec.hidden = false;
         }
@@ -6105,8 +6062,8 @@ function psSelectFmt(btn) {
             if (nav) {
                 nav.click();
                 // Defer sub-panel navigation until the tab panel has activated (next tick).
-                var loanFilter  = go.getAttribute('data-dash-loan-filter');
-                var roomsTab    = go.getAttribute('data-dash-rooms-tab');
+                var loanFilter = go.getAttribute('data-dash-loan-filter');
+                var roomsTab = go.getAttribute('data-dash-rooms-tab');
                 var roomsFilter = go.getAttribute('data-dash-rooms-filter');
                 if (loanFilter || roomsTab) {
                     setTimeout(function () {
@@ -6155,9 +6112,9 @@ function psSelectFmt(btn) {
         return !!panel && panel.classList.contains('active') && !document.hidden;
     }
     function refresh() {
-        if (stopped || inflight || !dashboardVisible()) return;
+        if (stopped || inflight || !dashboardVisible()) return Promise.resolve();
         inflight = true;
-        fetch(window.location.pathname + '?fragment=dashboard', {
+        return fetch(window.location.pathname + '?fragment=dashboard', {
             credentials: 'same-origin',
             cache: 'no-store',
             headers: { 'X-Requested-With': 'fetch' }
@@ -6186,6 +6143,7 @@ function psSelectFmt(btn) {
     }
 
     setInterval(refresh, POLL_MS);
+    window.psRefreshDashboard = refresh;   // used by the click-the-active-tab refresh
     document.addEventListener('visibilitychange', function () { if (!document.hidden) refresh(); });
     // coming back to the Dashboard tab -> refresh right away (after admin-dashboard.js flips the panel)
     document.addEventListener('click', function (e) {
@@ -6358,7 +6316,8 @@ function psSelectFmt(btn) {
            tab; it is now the bottom-centre pop-up alert and goes away on its own. */
         function announceOverdue() {
             var n = document.querySelectorAll('#eq-loan-table tbody tr.eq-loan-row[data-loan-state="overdue"]').length;
-            if (n > 0 && typeof window.showToast === 'function') {
+            // Skipped when this admin turned off Overdue equipment (or all) notifications.
+            if (n > 0 && typeof window.showToast === 'function' && (!window.PSNotifPrefs || window.PSNotifPrefs.isOn('overdue'))) {
                 window.showToast(n + ' item(s) are overdue. Contact the borrowers.', 'warning');
             }
         }
@@ -6582,7 +6541,7 @@ function psSelectFmt(btn) {
             }
         }
 
-        window.psRefreshEquipmentLoans = function () {
+        window.psRefreshEquipmentLoans = function (keepPage) {
             rows = Array.prototype.slice.call(table.querySelectorAll('tbody tr.eq-loan-row'));
             orderRowsTogether();
             var pendingByBatch = {};
@@ -6620,7 +6579,7 @@ function psSelectFmt(btn) {
                 actionCell.appendChild(button);
                 actionCell.classList.add('has-bundle-approve');
             });
-            page = 1;
+            if (!keepPage) page = 1;
             render();
         };
 
@@ -6689,6 +6648,173 @@ function psSelectFmt(btn) {
             });
         }
 
+        /* ── In-place action helpers (Manual Return / Send Notice / Cancel Booking) ──────────
+           The buttons show a spinner while the request runs, the row dims, and when the server
+           answers the row / counts are updated right here. No page reload. */
+        var SPIN_HTML = '<span class="material-symbols-outlined" style="animation:spin 0.8s linear infinite">progress_activity</span> ';
+
+        function btnBusy(btn, label) {
+            if (!btn) return;
+            if (btn.getAttribute('aria-busy') !== 'true') btn.dataset.idleHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.setAttribute('aria-busy', 'true');
+            btn.innerHTML = SPIN_HTML + label;
+        }
+        function btnIdle(btn) {
+            if (!btn) return;
+            if (btn.dataset.idleHtml) btn.innerHTML = btn.dataset.idleHtml;
+            btn.removeAttribute('aria-busy');
+            btn.disabled = false;
+        }
+        function rowBusy(tr, on) {
+            if (!tr) return;
+            tr.style.transition = 'opacity .15s';
+            tr.style.opacity = on ? '.5' : '';
+            tr.style.pointerEvents = on ? 'none' : '';
+        }
+        function loanRow(id) {
+            return table.querySelector('tr.eq-loan-row[data-id="' + id + '"]');
+        }
+        function toast(msg, type) {
+            if (typeof window.showToast === 'function') window.showToast(msg, type);
+        }
+        /* POST as an AJAX call. Always resolves to { ok, data } (data is {} if the reply was not JSON);
+           rejects on a network error or after 25 s so a button can never stay stuck on a spinner. */
+        function postAjax(url, fd) {
+            var ctl = (typeof AbortController === 'function') ? new AbortController() : null;
+            var timer = ctl ? setTimeout(function () { ctl.abort(); }, 25000) : null;
+            return fetch(url, {
+                method: 'POST',
+                body: fd,
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                signal: ctl ? ctl.signal : undefined
+            }).then(function (r) {
+                return r.json().catch(function () { return {}; }).then(function (data) {
+                    return { ok: r.ok, data: data || {} };
+                });
+            }).then(function (res) {
+                if (timer) clearTimeout(timer);
+                return res;
+            }, function (err) {
+                if (timer) clearTimeout(timer);
+                throw err;
+            });
+        }
+        /* +/- the little number on a status tab (Waiting / Pickup / Active / Overdue) */
+        function bumpTab(key, delta) {
+            var chip = tabBar ? tabBar.querySelector('[data-loan-filter="' + key + '"] .eq-loan-tab-count') : null;
+            if (!chip) return;
+            var n = Math.max(0, (parseInt(chip.textContent, 10) || 0) + delta);
+            chip.textContent = String(n);
+            if (key !== 'active') chip.classList.toggle('has', n > 0);
+        }
+        function afterLoanChange() {
+            if (typeof window.adminDoPoll === 'function') window.adminDoPoll();   /* dashboard numbers */
+        }
+
+        /* A loan that was just returned: turn the row into a "Returned" row (same cells the server draws). */
+        function markRowReturned(tr, d) {
+            var prev = tr.dataset.loanState;
+            tr.className = tr.className.replace(/\bis-\S+/g, '').trim() + ' is-returned';
+            tr.dataset.loanState = 'returned';
+            tr.dataset.status = 'Returned';
+            tr.dataset.returnedAtDisplay = d.returned_at_label || '';
+            tr.dataset.handledBy = d.handled_by || '';
+
+            var c4 = tr.querySelector('td[data-col="col4"]');
+            if (c4) {
+                c4.removeAttribute('style');
+                c4.textContent = d.returned_date || '';
+                var sub = document.createElement('div');
+                sub.className = 'eq-cell-sub';
+                sub.textContent = d.returned_time || '';
+                c4.appendChild(sub);
+            }
+            var c5 = tr.querySelector('td[data-col="col5"]');
+            if (c5) {
+                c5.textContent = '';
+                var wrap = document.createElement('span');
+                wrap.className = 'ps-decider';
+                var nm = document.createElement('span');
+                nm.className = 'ps-decider-name';
+                nm.textContent = d.handled_by || '';
+                var when = document.createElement('span');
+                when.className = 'ps-decider-sub';
+                when.textContent = d.handled_label || '';
+                wrap.appendChild(nm);
+                wrap.appendChild(when);
+                c5.appendChild(wrap);
+            }
+            var act = tr.querySelector('td[data-col="actions"] > div');
+            if (act) act.innerHTML = '<button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-action="eq-open-loan-detail">View</button>';
+
+            bumpTab(prev === 'overdue' ? 'overdue' : (prev === 'pickup' ? 'pickup' : 'active'), -1);
+        }
+
+        /* Notice button states. A faculty member can be noticed once per day, so after a notice every
+           overdue row of that faculty shows "Sent today" (disabled) until midnight. */
+        var NOTICE_LOCK_TIP = 'A notice was already sent to this faculty today. You can send another one tomorrow.';
+        function noticeIcon(name) {
+            return '<span class="material-symbols-outlined" style="font-size:14px;">' + name + '</span> ';
+        }
+        function lockNoticeBtn(btn, unlockTs) {
+            if (!btn) return;
+            btn.removeAttribute('aria-busy');
+            btn.disabled = true;
+            btn.dataset.unlockTs = String(unlockTs || 0);
+            btn.classList.remove('ps-btn--outline');
+            btn.classList.add('ps-btn--ghost');
+            btn.title = NOTICE_LOCK_TIP;
+            btn.innerHTML = noticeIcon('mark_email_read') + 'Sent today';
+        }
+        function unlockNoticeBtn(btn) {
+            var tr = btn.closest('tr.eq-loan-row');
+            var n = tr ? (parseInt(tr.dataset.noticeCount || '0', 10) || 0) : 0;
+            delete btn.dataset.unlockTs;
+            btn.removeAttribute('aria-busy');
+            btn.disabled = false;
+            btn.classList.toggle('ps-btn--ghost', n > 0);
+            btn.classList.toggle('ps-btn--outline', n === 0);
+            btn.title = n > 0 ? 'Notice already sent (' + n + 'x). Click to send another.' : 'Send overdue notice';
+            btn.innerHTML = noticeIcon(n > 0 ? 'mark_email_read' : 'mail') + (n > 0 ? 'Notice (' + n + ')' : 'Notice');
+        }
+        function lockFacultyNotices(facultyKey, unlockTs) {
+            table.querySelectorAll('tr.eq-loan-row[data-loan-state="overdue"]').forEach(function (tr) {
+                if (facultyKey && tr.dataset.facultyKey !== facultyKey) return;
+                lockNoticeBtn(tr.querySelector('[data-notice-btn]'), unlockTs);
+            });
+        }
+        function unlockExpiredNotices() {
+            var now = Date.now();
+            table.querySelectorAll('[data-notice-btn][data-unlock-ts]').forEach(function (btn) {
+                if (now >= (parseInt(btn.dataset.unlockTs, 10) || 0) * 1000) unlockNoticeBtn(btn);
+            });
+        }
+        setInterval(unlockExpiredNotices, 60000);
+        document.addEventListener('visibilitychange', function () { if (!document.hidden) unlockExpiredNotices(); });
+
+        function markNoticeSent(d) {
+            var tr = loanRow(d.request_id);
+            if (tr) {
+                tr.dataset.noticeCount = String(d.notice_count || 1);
+                tr.dataset.noticeLast = d.last_label || '';
+                var c4 = tr.querySelector('td[data-col="col4"]');
+                if (c4) {
+                    var line = c4.querySelector('.eq-cell-sub[title^="Notice sent"]');
+                    if (!line) {
+                        line = document.createElement('div');
+                        line.className = 'eq-cell-sub';
+                        line.style.cssText = 'color:#059669;font-weight:500;display:flex;align-items:center;gap:3px;margin-top:2px;';
+                        c4.appendChild(line);
+                    }
+                    line.title = 'Notice sent: ' + (d.last_label || '');
+                    line.innerHTML = '<span class="material-symbols-outlined" style="font-size:12px;">mark_email_read</span> Notice sent (just now)';
+                }
+            }
+            lockFacultyNotices(d.faculty_id, d.unlock_ts);
+        }
+
         /* ── Scheduled (later-date) bookings: cancel / revoke before they start ──
            They are approved by default, so an admin can still revoke one here. Uses the existing
            admin-override endpoint (Approved → Declined, reason required). A booking that has not
@@ -6748,8 +6874,9 @@ function psSelectFmt(btn) {
                     return;
                 }
                 var orig = cBtn.innerHTML;
-                cBtn.disabled = true;
-                cBtn.textContent = 'Cancelling\u2026';
+                var cRow = loanRow(id);
+                btnBusy(cBtn, 'Cancelling\u2026');
+                rowBusy(cRow, true);
                 cClearAlert();
 
                 var tok = document.querySelector('input[name="csrf_token"]');
@@ -6765,7 +6892,8 @@ function psSelectFmt(btn) {
                         if (data && data.status === 'success') {
                             if (typeof window.showToast === 'function') window.showToast('Booking cancelled.');
                             cModal.classList.remove('ps-modal-open');
-                            cBtn.innerHTML = orig;
+                            btnIdle(cBtn);
+                            cBtn.disabled = true;   /* the next booking starts with an empty reason */
 
                             /* take the row out of the table and update the Waiting count */
                             var tr = table.querySelector('tr.eq-loan-row[data-id="' + id + '"]');
@@ -6776,16 +6904,19 @@ function psSelectFmt(btn) {
                             var cnt = tabBar ? tabBar.querySelector('[data-loan-filter="waiting"] .eq-loan-tab-count') : null;
                             if (cnt) cnt.textContent = String(Math.max(0, (parseInt(cnt.textContent, 10) || 0) - 1));
                             render();
+                            afterLoanChange();
                         } else {
+                            rowBusy(cRow, false);
                             cShowAlert((data && data.message) || 'Action failed. Please try again.');
-                            cBtn.disabled = false;
-                            cBtn.innerHTML = orig;
+                            btnIdle(cBtn);
+                            cBtn.disabled = cReason ? cReason.value.trim().length < 5 : false;
                         }
                     })
                     .catch(function () {
+                        rowBusy(cRow, false);
                         cShowAlert('Network error. Please try again.');
-                        cBtn.disabled = false;
-                        cBtn.innerHTML = orig;
+                        btnIdle(cBtn);
+                        cBtn.disabled = cReason ? cReason.value.trim().length < 5 : false;
                     });
             });
         }
@@ -6821,20 +6952,47 @@ function psSelectFmt(btn) {
                 if (returnNotes) returnNotes.value = '';
             });
 
+            var returnBusy = false;
             returnForm.addEventListener('submit', function (e) {
+                e.preventDefault();
+                if (returnBusy) return;
                 var id = returnId ? returnId.value : '';
                 if (!id) {
-                    e.preventDefault();
-                    if (typeof window.showToast === 'function') window.showToast('Select a loan to return first.');
+                    toast('Select a loan to return first.');
                     return;
                 }
                 var selected = returnCondition && returnCondition.options[returnCondition.selectedIndex];
                 if (returnConditionValue) {
                     returnConditionValue.value = selected ? selected.text.split(/\s+/)[0] : 'Good';
                 }
-                returnBtn.disabled = true;
-                returnBtn.textContent = 'Recording\u2026';
-                try { sessionStorage.setItem('openManualReturnLoanTab', '1'); } catch (_) { }
+                var tr = loanRow(id);
+                returnBusy = true;
+                btnBusy(returnBtn, 'Recording\u2026');
+                rowBusy(tr, true);
+
+                postAjax('equipment-booking/api/manual-return.php', new FormData(returnForm))
+                    .then(function (res) {
+                        if (res.ok && res.data.status === 'success') {
+                            if (typeof psCloseModal === 'function') psCloseModal('ps-return-modal');
+                            toast('Manual return recorded.');
+                            var row = loanRow(id);
+                            if (row) markRowReturned(row, res.data);
+                            if (typeof window.psRefreshEquipmentLoans === 'function') window.psRefreshEquipmentLoans(true);
+                            afterLoanChange();
+                            /* the returned units are back in stock: refresh the Catalog numbers too */
+                            if (typeof window.psRefreshInventoryTbody === 'function') window.psRefreshInventoryTbody();
+                        } else {
+                            toast(res.data.message || 'Could not record the return. Please try again.');
+                        }
+                    })
+                    .catch(function () {
+                        toast('Network error. The return may not have been saved, so check the list before trying again.');
+                    })
+                    .then(function () {
+                        returnBusy = false;
+                        btnIdle(returnBtn);
+                        rowBusy(loanRow(id), false);
+                    });
             });
         }
 
@@ -6868,8 +7026,8 @@ function psSelectFmt(btn) {
 
                 // Show "notice already sent" warning banner inside the modal
                 var histAlert = document.getElementById('overdue-notice-history-alert');
-                var histText  = document.getElementById('overdue-notice-history-text');
-                var nCount    = parseInt(d.noticeCount || '0', 10);
+                var histText = document.getElementById('overdue-notice-history-text');
+                var nCount = parseInt(d.noticeCount || '0', 10);
                 if (histAlert && histText) {
                     if (nCount > 0) {
                         var nLast = d.noticeLast || '';
@@ -6894,35 +7052,64 @@ function psSelectFmt(btn) {
                 }
             });
 
+            var noticeBusy = false;
             noticeForm.addEventListener('submit', function (e) {
+                e.preventDefault();
+                if (noticeBusy) return;
                 if (!noticeId || !noticeId.value) {
-                    e.preventDefault();
-                    if (typeof window.showToast === 'function') window.showToast('Select an overdue loan first.');
+                    toast('Select an overdue loan first.');
                     return;
                 }
-                noticeBtn.disabled = true;
-                noticeBtn.textContent = 'Sending\u2026';
-                try { sessionStorage.setItem('openOverdueLoanTab', '1'); } catch (_) { }
+                var id = noticeId.value;
+                var tr = loanRow(id);
+                noticeBusy = true;
+                btnBusy(noticeBtn, 'Sending\u2026');
+                rowBusy(tr, true);
+
+                postAjax('equipment-booking/api/send-overdue-notice.php', new FormData(noticeForm))
+                    .then(function (res) {
+                        var d = res.data;
+                        if (res.ok && d.status === 'success') {
+                            if (typeof psCloseModal === 'function') psCloseModal('ps-notice-modal');
+                            toast(d.message || 'Overdue notice sent to the borrower.');
+                            markNoticeSent(d);
+                        } else if (d.code === 'already_sent_today') {
+                            /* once per faculty per day: another admin (or an earlier click) already noticed them */
+                            if (typeof psCloseModal === 'function') psCloseModal('ps-notice-modal');
+                            toast(d.message || NOTICE_LOCK_TIP, 'warning');
+                            lockFacultyNotices(d.faculty_id, d.unlock_ts);
+                        } else {
+                            toast(d.message || 'Could not send the overdue notice. Please try again.');
+                        }
+                    })
+                    .catch(function () {
+                        toast('Network error. Please try again.');
+                    })
+                    .then(function () {
+                        noticeBusy = false;
+                        btnIdle(noticeBtn);
+                        rowBusy(loanRow(id), false);
+                    });
             });
         }
 
         /* ── Manual Claim ──────────────────────────────────────────────────
            Lets an admin record an equipment handover without the borrower's
            QR code. Shown as a small "Manual" button on every pickup-tab row. */
-        var mcModal    = document.getElementById('ps-manual-claim-modal');
-        var mcReqId    = document.getElementById('manual-claim-request-id');
-        var mcAlert    = document.getElementById('ps-manual-claim-alert');
+        var mcModal = document.getElementById('ps-manual-claim-modal');
+        var mcReqId = document.getElementById('manual-claim-request-id');
+        var mcAlert = document.getElementById('ps-manual-claim-alert');
         var mcBorrower = document.getElementById('mc-borrower');
         var mcEquipment = document.getElementById('mc-equipment');
-        var mcDue      = document.getElementById('mc-due');
-        var mcQtyInp   = document.getElementById('mc-qty');
-        var mcQtyOf    = document.getElementById('mc-qty-of');
-        var mcWrap     = document.getElementById('mc-withheld-wrap');
-        var mcCondSel  = document.getElementById('mc-withheld-cond');
+        var mcDue = document.getElementById('mc-due');
+        var mcQtyInp = document.getElementById('mc-qty');
+        var mcQtyOf = document.getElementById('mc-qty-of');
+        var mcWrap = document.getElementById('mc-withheld-wrap');
+        var mcCondSel = document.getElementById('mc-withheld-cond');
         var mcReasonWrap = document.getElementById('mc-reason-wrap');
-        var mcReasonInp  = document.getElementById('mc-reason');
-        var mcConfirm  = document.getElementById('manual-claim-confirm-btn');
-        var mcMaxQty   = 1;
+        var mcReasonInp = document.getElementById('mc-reason');
+        var mcConfirm = document.getElementById('manual-claim-confirm-btn');
+        var mcMaxQty = 1;
 
         function mcUpdateUI() {
             if (!mcQtyInp) return;
@@ -6946,15 +7133,15 @@ function psSelectFmt(btn) {
                 var d = tr.dataset;
                 if (mcReqId) mcReqId.value = d.id || '';
                 mcMaxQty = Math.max(1, parseInt(d.qty, 10) || 1);
-                if (mcBorrower)  mcBorrower.textContent  = d.borrower  || '—';
+                if (mcBorrower) mcBorrower.textContent = d.borrower || '—';
                 if (mcEquipment) mcEquipment.textContent = d.equipment + (mcMaxQty > 1 ? ' \u00d7' + mcMaxQty : '');
-                if (mcDue)       mcDue.textContent       = d.dueLabel  || '—';
-                if (mcQtyInp)    { mcQtyInp.max = mcMaxQty; mcQtyInp.value = mcMaxQty; }
-                if (mcQtyOf)     mcQtyOf.textContent = 'of ' + mcMaxQty;
-                if (mcCondSel)   mcCondSel.selectedIndex = 0;
+                if (mcDue) mcDue.textContent = d.dueLabel || '—';
+                if (mcQtyInp) { mcQtyInp.max = mcMaxQty; mcQtyInp.value = mcMaxQty; }
+                if (mcQtyOf) mcQtyOf.textContent = 'of ' + mcMaxQty;
+                if (mcCondSel) mcCondSel.selectedIndex = 0;
                 if (mcReasonInp) mcReasonInp.value = '';
-                if (mcAlert)     { mcAlert.style.display = 'none'; mcAlert.textContent = ''; }
-                if (mcConfirm)   { mcConfirm.disabled = false; mcConfirm.innerHTML = '<span class="material-symbols-outlined">check</span> Record Handover'; }
+                if (mcAlert) { mcAlert.style.display = 'none'; mcAlert.textContent = ''; }
+                if (mcConfirm) { mcConfirm.disabled = false; mcConfirm.innerHTML = '<span class="material-symbols-outlined">check</span> Record Handover'; }
                 mcUpdateUI();
             });
 
@@ -7259,7 +7446,7 @@ function psSelectFmt(btn) {
 
     /* ── Admin inventory form: filter category options by selected campus ── */
     (function () {
-        var campusSel   = document.getElementById('inv-campus');
+        var campusSel = document.getElementById('inv-campus');
         var categorySel = document.getElementById('inv-category');
         if (!campusSel || !categorySel) return;
 
@@ -7282,226 +7469,6 @@ function psSelectFmt(btn) {
         syncCategoryOptions(); // run once on page load for the edit form
     }());
 
-        /* ── Equipment Category Manager (Settings → Equipment tab) ──────────── */
-    (function () {
-        var campusSel = document.getElementById('catMgrCampus');
-        var listEl    = document.getElementById('catMgrList');
-        var input     = document.getElementById('catMgrInput');
-        var addBtn    = document.getElementById('catMgrAdd');
-        var msgEl     = document.getElementById('catMgrMsg');
-        if (!campusSel || !listEl) return;
-
-        var csrfToken = (function () {
-            var m = document.querySelector('meta[name="csrf-token"]');
-            if (m) return m.content;
-            var i = document.querySelector('input[name="csrf_token"]');
-            return i ? i.value : '';
-        }());
-
-        function showMsg(text, isError) {
-            if (!msgEl) return;
-            msgEl.textContent = text;
-            msgEl.style.color = isError ? 'var(--color-error, #c62828)' : 'var(--color-success, #2e7d32)';
-            msgEl.style.display = '';
-            setTimeout(function () { msgEl.style.display = 'none'; }, 4000);
-        }
-
-        function loadCategories() {
-            var campusId = campusSel.value;
-            listEl.innerHTML = '<span style="color:var(--text-light);font-size:.875rem;">Loading…</span>';
-            fetch('equipment-booking/api/manage-categories.php?action=list&campus_id=' + encodeURIComponent(campusId), {
-                credentials: 'same-origin'
-            })
-            .then(function (r) { return r.json(); })
-            .then(function (data) {
-                if (!data.categories || !data.categories.length) {
-                    listEl.innerHTML = '<span style="color:var(--text-light);font-size:.875rem;">No categories yet. Add one below.</span>';
-                    return;
-                }
-                listEl.innerHTML = '';
-                var ul = document.createElement('ul');
-                ul.style.cssText = 'list-style:none;padding:0;margin:0;display:flex;flex-wrap:wrap;gap:8px;';
-                data.categories.forEach(function (cat) {
-                    var li = document.createElement('li');
-                    li.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:5px 10px 5px 14px;background:var(--color-surface-container,#f5f0f0);border-radius:20px;font-size:.82rem;';
-                    li.innerHTML = '<span>' + cat.name.replace(/&/g,'&').replace(/</g,'<').replace(/>/g,'>') + '</span>'
-                        + '<button type="button" title="Delete this category" data-cat-id="' + cat.category_id + '" style="background:none;border:none;cursor:pointer;padding:0;line-height:1;color:var(--text-light);">'
-                        + '<span class="material-symbols-outlined" style="font-size:15px;">close</span></button>';
-                    ul.appendChild(li);
-                });
-                listEl.appendChild(ul);
-
-                listEl.querySelectorAll('[data-cat-id]').forEach(function (btn) {
-                    btn.addEventListener('click', function () {
-                        if (!confirm('Delete this category? Items already assigned to it are not affected.')) return;
-                        var fd = new FormData();
-                        fd.append('action', 'delete');
-                        fd.append('csrf_token', csrfToken);
-                        fd.append('category_id', btn.dataset.catId);
-                        fetch('equipment-booking/api/manage-categories.php', {
-                            method: 'POST', credentials: 'same-origin', body: fd
-                        })
-                        .then(function (r) { return r.json(); })
-                        .then(function (d) {
-                            if (d.status === 'success') { loadCategories(); showMsg('Deleted.', false); }
-                            else showMsg(d.error || 'Could not delete.', true);
-                        });
-                    });
-                });
-            })
-            .catch(function () { listEl.innerHTML = '<span style="color:var(--color-error,#c62828);font-size:.875rem;">Could not load categories.</span>'; });
-        }
-
-        campusSel.addEventListener('change', loadCategories);
-        loadCategories();
-
-        if (addBtn) {
-            addBtn.addEventListener('click', function () {
-                var name = input ? input.value.trim() : '';
-                if (!name) { showMsg('Enter a category name.', true); return; }
-                var fd = new FormData();
-                fd.append('action', 'add');
-                fd.append('csrf_token', csrfToken);
-                fd.append('campus_id', campusSel.value);
-                fd.append('name', name);
-                fetch('equipment-booking/api/manage-categories.php', {
-                    method: 'POST', credentials: 'same-origin', body: fd
-                })
-                .then(function (r) { return r.json(); })
-                .then(function (d) {
-                    if (d.status === 'success') {
-                        if (input) input.value = '';
-                        loadCategories();
-                        showMsg('Category added.', false);
-                    } else {
-                        showMsg(d.error || 'Could not add.', true);
-                    }
-                });
-            });
-
-            if (input) {
-                input.addEventListener('keydown', function (e) {
-                    if (e.key === 'Enter') { e.preventDefault(); addBtn.click(); }
-                });
-            }
-        }
-    }());
-
-    /* ── Google Sheets Sync (Settings → Equipment tab) ──────────────────── */
-    (function () {
-        var urlInput  = document.getElementById('gsheetUrl');
-        var saveBtn   = document.getElementById('gsheetSaveUrl');
-        var syncBtn   = document.getElementById('gsheetSyncNow');
-        var resultEl  = document.getElementById('gsheetSyncResult');
-        var lastSyncEl = document.getElementById('gsheetLastSync');
-        if (!syncBtn) return;
-
-        var csrfToken = (function () {
-            var m = document.querySelector('meta[name="csrf-token"]');
-            if (m) return m.content;
-            var i = document.querySelector('input[name="csrf_token"]');
-            return i ? i.value : '';
-        }());
-
-        function showResult(msg, isError) {
-            if (!resultEl) return;
-            resultEl.style.display = '';
-            resultEl.style.background = isError ? '#fdecea' : '#e8f5e9';
-            resultEl.style.color = isError ? '#c62828' : '#2e7d32';
-            resultEl.textContent = msg;
-        }
-
-        // Save URL
-        if (saveBtn && urlInput) {
-            saveBtn.addEventListener('click', function () {
-                var fd = new FormData();
-                fd.append('action', 'save_url');
-                fd.append('csrf_token', csrfToken);
-                fd.append('url', urlInput.value.trim());
-                fetch('equipment-booking/api/sync-config.php', { method: 'POST', credentials: 'same-origin', body: fd })
-                    .then(function (r) { return r.json(); })
-                    .then(function (d) {
-                        showResult(d.status === 'success' ? 'URL saved.' : (d.error || 'Could not save.'), d.status !== 'success');
-                    });
-            });
-        }
-
-        // Sync Now
-        syncBtn.addEventListener('click', function () {
-            syncBtn.disabled = true;
-            syncBtn.innerHTML = '<span class="material-symbols-outlined" style="animation:spin .8s linear infinite">sync</span> Syncing…';
-            if (resultEl) resultEl.style.display = 'none';
-
-            var fd = new FormData();
-            fd.append('csrf_token', csrfToken);
-            fetch('equipment-booking/api/sync-inventory.php', { method: 'POST', credentials: 'same-origin', body: fd })
-                .then(function (r) { return r.json(); })
-                .then(function (d) {
-                    syncBtn.disabled = false;
-                    syncBtn.innerHTML = '<span class="material-symbols-outlined">sync</span> Sync Now';
-                    if (d.status === 'success') {
-                        var s = d.summary;
-                        var msg = 'Sync complete — ' + s.added + ' added, ' + s.updated + ' updated.';
-                        if (s.archived > 0) msg += ' ' + s.archived + ' item(s) removed from sheet (archived).';
-                        if (s.skipped_sheets && s.skipped_sheets.length) msg += ' Skipped: ' + s.skipped_sheets.join(', ') + '.';
-                        showResult(msg, false);
-                        if (lastSyncEl) lastSyncEl.textContent = 'Last synced: just now';
-                        // Refresh the inventory table in-place instead of a full reload.
-                        if (s.added > 0 || s.updated > 0 || s.archived > 0) {
-                            setTimeout(function () {
-                                fetch('admin-dashboard.php?fragment=inventory-tbody', {
-                                    credentials: 'same-origin',
-                                    cache: 'no-store'
-                                })
-                                .then(function (r) { return r.ok ? r.json() : null; })
-                                .then(function (frag) {
-                                    if (!frag || frag.status !== 'success') {
-                                        window.location.reload();
-                                        return;
-                                    }
-                                    var tbody = document.getElementById('inventory-body');
-                                    if (tbody) {
-                                        tbody.innerHTML = frag.active_html;
-                                        if (typeof window._setupInventoryListFn === 'function') {
-                                            window._setupInventoryListFn();
-                                        }
-                                    }
-                                })
-                                .catch(function () { window.location.reload(); });
-                            }, 800);
-                        }
-                    } else {
-                        showResult(d.error || 'Sync failed.', true);
-                    }
-                })
-                .catch(function () {
-                    syncBtn.disabled = false;
-                    syncBtn.innerHTML = '<span class="material-symbols-outlined">sync</span> Sync Now';
-                    showResult('Network error. Please try again.', true);
-                });
-        });
-
-        // Pending deletion actions
-        document.querySelectorAll('[data-pd-action]').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                var action = btn.dataset.pdAction;
-                var pdId   = btn.dataset.pdId;
-                var fd = new FormData();
-                fd.append('action', action === 'archive' ? 'pd_archive' : 'pd_keep');
-                fd.append('csrf_token', csrfToken);
-                fd.append('pd_id', pdId);
-                fetch('equipment-booking/api/sync-config.php', { method: 'POST', credentials: 'same-origin', body: fd })
-                    .then(function (r) { return r.json(); })
-                    .then(function (d) {
-                        if (d.status === 'success') {
-                            var row = document.querySelector('.pd-row[data-pd-id="' + pdId + '"]');
-                            if (row) row.remove();
-                        }
-                    });
-            });
-        });
-    }());
-
     // ── Live sync poller (always active — not gated on the Settings tab) ────────
     // Checks every 5 s whether the Google Sheet changed; if yes, runs sync and
     // swaps the inventory tbody in-place without a page reload.
@@ -7522,18 +7489,18 @@ function psSelectFmt(btn) {
                 credentials: 'same-origin',
                 cache: 'no-store'
             })
-            .then(function (r) { return r.ok ? r.json() : null; })
-            .then(function (frag) {
-                if (!frag || frag.status !== 'success') return;
-                var tbody = document.getElementById('inventory-body');
-                if (tbody) {
-                    tbody.innerHTML = frag.active_html;
-                    if (typeof window._setupInventoryListFn === 'function') {
-                        window._setupInventoryListFn();
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (frag) {
+                    if (!frag || frag.status !== 'success') return;
+                    var tbody = document.getElementById('inventory-body');
+                    if (tbody) {
+                        tbody.innerHTML = frag.active_html;
+                        if (typeof window._setupInventoryListFn === 'function') {
+                            window._setupInventoryListFn();
+                        }
                     }
-                }
-            })
-            .catch(function () {});
+                })
+                .catch(function () { });
         }
 
         function poll() {
@@ -7542,42 +7509,42 @@ function psSelectFmt(btn) {
                 credentials: 'same-origin',
                 cache: 'no-store'
             })
-            .then(function (r) { return r.ok ? r.json() : null; })
-            .then(function (d) {
-                if (!d || !d.changed) return;
-                syncing = true;
-                var fd = new FormData();
-                fd.append('csrf_token', csrfTokenForSync);
-                fetch('equipment-booking/api/sync-inventory.php', {
-                    method: 'POST',
-                    credentials: 'same-origin',
-                    body: fd
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (d) {
+                    if (!d || !d.changed) return;
+                    syncing = true;
+                    var fd = new FormData();
+                    fd.append('csrf_token', csrfTokenForSync);
+                    fetch('equipment-booking/api/sync-inventory.php', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        body: fd
+                    })
+                        .then(function (r) { return r.json(); })
+                        .then(function (syncData) {
+                            syncing = false;
+                            if (!syncData || syncData.status !== 'success') return;
+                            var s = syncData.summary;
+                            // Always refresh the table when the sheet was detected as changed —
+                            // even if added/updated/archived are all 0 (Google export cache may
+                            // lag behind Ctrl+Z / Ctrl+Y for a cycle or two, but the DB is still
+                            // re-read fresh so the next render will reflect the true state).
+                            refreshInventoryTable();
+                            var parts = [];
+                            if (s.added > 0) parts.push(s.added + ' added');
+                            if (s.updated > 0) parts.push(s.updated + ' updated');
+                            if (s.archived > 0) parts.push(s.archived + ' archived');
+                            var now = Date.now();
+                            if (parts.length > 0 && now - lastSyncToastAt >= syncToastInterval
+                                && typeof window.showToast === 'function') {
+                                lastSyncToastAt = now;
+                                LS.set('inventorySyncToastAt', now);
+                                window.showToast('Inventory synced: ' + parts.join(', ') + '.', 'success');
+                            }
+                        })
+                        .catch(function () { syncing = false; });
                 })
-                .then(function (r) { return r.json(); })
-                .then(function (syncData) {
-                    syncing = false;
-                    if (!syncData || syncData.status !== 'success') return;
-                    var s = syncData.summary;
-                    // Always refresh the table when the sheet was detected as changed —
-                    // even if added/updated/archived are all 0 (Google export cache may
-                    // lag behind Ctrl+Z / Ctrl+Y for a cycle or two, but the DB is still
-                    // re-read fresh so the next render will reflect the true state).
-                    refreshInventoryTable();
-                    var parts = [];
-                    if (s.added    > 0) parts.push(s.added    + ' added');
-                    if (s.updated  > 0) parts.push(s.updated  + ' updated');
-                    if (s.archived > 0) parts.push(s.archived + ' archived');
-                    var now = Date.now();
-                    if (parts.length > 0 && now - lastSyncToastAt >= syncToastInterval
-                        && typeof window.showToast === 'function') {
-                        lastSyncToastAt = now;
-                        LS.set('inventorySyncToastAt', now);
-                        window.showToast('Inventory synced: ' + parts.join(', ') + '.', 'success');
-                    }
-                })
-                .catch(function () { syncing = false; });
-            })
-            .catch(function () {});
+                .catch(function () { });
         }
 
         setInterval(poll, 5000);

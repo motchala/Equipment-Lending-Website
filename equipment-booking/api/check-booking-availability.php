@@ -10,7 +10,8 @@
  *   mode      today | future
  *   date      YYYY-MM-DD   (future only)
  *   time      HH:MM        start time
- *   duration  hours (today and future)
+ *   duration  length (today and future)
+ *   unit      hours (default) | days
  *   items     JSON [{"n":"Projector","q":2}, ...]
  *   rooms     1 = also report which rooms are reserved by someone else (blocked) and which
  *             are reserved by this faculty member (suggested) during that window
@@ -40,13 +41,14 @@ $mode     = (string)($_GET['mode'] ?? '');
 $date     = trim((string)($_GET['date'] ?? ''));
 $time     = trim((string)($_GET['time'] ?? ''));
 $duration = (int)($_GET['duration'] ?? 0);
+$unit     = ((string)($_GET['unit'] ?? 'hours')) === 'days' ? 'days' : 'hours';
 $items    = json_decode((string)($_GET['items'] ?? '[]'), true);
 if (!is_array($items)) {
     $items = [];
 }
 $items = array_slice($items, 0, 40);
 
-$w = BookingSchedule::window($mode, $date, $time, $duration);
+$w = BookingSchedule::window($mode, $date, $time, $duration, $unit);
 if (!$w['ok']) {
     echo json_encode(['ok' => false, 'error' => $w['error'], 'results' => []]);
     exit();
@@ -87,6 +89,10 @@ foreach ($items as $it) {
             $row['message'] = 'Out right now — book it for a later date.';
         } elseif ($qty > $total) {
             $row['message'] = 'Only ' . $total . ' in stock.';
+        } elseif (!empty($_SESSION['faculty_id'])
+            && ($ruleErr = BookingSchedule::itemsLimitError($conn, (string)$_SESSION['faculty_id'], $qty, $win['start_ts'], $win['end_ts'])) !== null) {
+            // "Items per borrower" from Settings → Arbitration, shown before the faculty member submits
+            $row['message'] = $ruleErr;
         } elseif ($free >= $qty) {
             $row['ok']      = true;
             $row['message'] = $mode === 'today'
@@ -103,7 +109,8 @@ foreach ($items as $it) {
                     $qty,
                     substr($win['borrow_time'], 0, 5),
                     $duration,
-                    date('Y-m-d', strtotime($win['borrow_date'] . ' +1 day'))
+                    date('Y-m-d', strtotime($win['borrow_date'] . ' +1 day')),
+                    $unit
                 );
                 if ($next) {
                     $row['earliest'] = $next;

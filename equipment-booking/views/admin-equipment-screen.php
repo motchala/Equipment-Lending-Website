@@ -1,28 +1,28 @@
-            <!-- ============================================================
+<!-- ============================================================
          TAB: INVENTORY
     ============================================================ -->
-            <div class="tab-panel" id="panel-inventory">
+<div class="tab-panel" id="panel-inventory">
 
-                <!-- ── INVENTORY SCREEN (REDESIGNED) ─────────────────── -->
-                <div id="lending-inventory">
+    <!-- ── INVENTORY SCREEN (REDESIGNED) ─────────────────── -->
+    <div id="lending-inventory">
 
-                    <!-- Page Header -->
-                    <div class="inv-redesign-header admin-screen-header">
-                        <div>
-                            <h1 class="inv-page-title">Equipment Inventory</h1>
-                            <p class="inv-page-sub">Manage the equipment catalog, stock quantities, and item details.</p>
-                        </div>
-                    </div>
+        <!-- Page Header -->
+        <div class="inv-redesign-header admin-screen-header">
+            <div>
+                <h1 class="inv-page-title">Equipment Inventory</h1>
+                <p class="inv-page-sub">Manage the equipment catalog, stock quantities, and item details.</p>
+            </div>
+        </div>
 
-                    <?php
-                    // ── On Loan tab data (read-only; does not touch the shared $approved_result / $waiting_result) ──
-                    require_once PS_ROOT . '/equipment-booking/core/booking-schedule.php';
-                    BookingSchedule::ensureSchema($conn);   // later-date booking columns (idempotent, same call the return handler uses)
-                    $eq_today        = date('Y-m-d');
-                    $eq_now          = date('Y-m-d H:i:s');   // Asia/Manila
-                    $eq_loan_rows    = [];
-                    $eq_loan_overdue = 0;
-                    $eq_loan_q = mysqli_query($conn, "SELECT r.*,
+        <?php
+        // ── On Loan tab data (read-only; does not touch the shared $approved_result / $waiting_result) ──
+        require_once PS_ROOT . '/equipment-booking/core/booking-schedule.php';
+        BookingSchedule::ensureSchema($conn);   // later-date booking columns (idempotent, same call the return handler uses)
+        $eq_today        = date('Y-m-d');
+        $eq_now          = date('Y-m-d H:i:s');   // Asia/Manila
+        $eq_loan_rows    = [];
+        $eq_loan_overdue = 0;
+        $eq_loan_q = mysqli_query($conn, "SELECT r.*,
                             (SELECT i.`condition` FROM tbl_inventory i WHERE i.item_name = r.equipment_name LIMIT 1) AS item_condition
                         FROM tbl_requests r
                         WHERE r.status IN ('Approved','On Loan','Overdue')
@@ -30,773 +30,838 @@
                                 AND COALESCE(r.booking_mode, '') = 'future'
                                 AND TIMESTAMP(r.borrow_date, COALESCE(r.borrow_time, '00:00:00')) > '{$eq_now}'), 0)
                         ORDER BY r.return_date ASC, r.id ASC");
-                    if ($eq_loan_q) {
-                        while ($lr = mysqli_fetch_assoc($eq_loan_q)) {
-                            $lr['_days']  = (int)floor((strtotime($eq_today) - strtotime($lr['return_date'])) / 86400);
-                            if ($lr['status'] === 'Approved') {
-                                // Approved but not yet claimed — show as "ready for pickup", never as overdue
-                                $lr['_state'] = 'pickup';
-                            } elseif ($lr['status'] === 'Overdue' || $lr['_days'] > 0) {
-                                $lr['_state'] = 'overdue';
-                            } elseif ($lr['_days'] === 0) {
-                                $lr['_state'] = 'due';
-                            } else {
-                                $lr['_state'] = 'ok';
-                            }
-                            if ($lr['_state'] === 'overdue') $eq_loan_overdue++;
-                            $eq_loan_rows[] = $lr;
-                        }
-                    }
-                    $eq_loan_total   = count($eq_loan_rows);
-                    $eq_loan_pickup  = count(array_filter($eq_loan_rows, fn($r) => $r['_state'] === 'pickup'));
-                    $eq_loan_active  = $eq_loan_total - $eq_loan_overdue - $eq_loan_pickup;
+        if ($eq_loan_q) {
+            while ($lr = mysqli_fetch_assoc($eq_loan_q)) {
+                $lr['_days']  = (int)floor((strtotime($eq_today) - strtotime($lr['return_date'])) / 86400);
+                if ($lr['status'] === 'Approved') {
+                    // Approved but not yet claimed — show as "ready for pickup", never as overdue
+                    $lr['_state'] = 'pickup';
+                } elseif ($lr['status'] === 'Overdue' || $lr['_days'] > 0) {
+                    $lr['_state'] = 'overdue';
+                } elseif ($lr['_days'] === 0) {
+                    $lr['_state'] = 'due';
+                } else {
+                    $lr['_state'] = 'ok';
+                }
+                if ($lr['_state'] === 'overdue') $eq_loan_overdue++;
+                $eq_loan_rows[] = $lr;
+            }
+        }
+        $eq_loan_total   = count($eq_loan_rows);
+        $eq_loan_pickup  = count(array_filter($eq_loan_rows, fn($r) => $r['_state'] === 'pickup'));
+        $eq_loan_active  = $eq_loan_total - $eq_loan_overdue - $eq_loan_pickup;
 
-                    // Overdue notices sent to borrowers (indexed by request_id)
-                    $eq_notices = [];
-                    $_notices_tbl = mysqli_query($conn, "SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tbl_faculty_admin_notice' LIMIT 1");
-                    if ($_notices_tbl && mysqli_num_rows($_notices_tbl) > 0) {
-                        $nq = mysqli_query($conn, "SELECT request_id, MAX(created_at) AS last_notice_at, COUNT(*) AS notice_count
+        // Overdue notices sent to borrowers (indexed by request_id)
+        $eq_notices = [];
+        $_notices_tbl = mysqli_query($conn, "SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tbl_faculty_admin_notice' LIMIT 1");
+        if ($_notices_tbl && mysqli_num_rows($_notices_tbl) > 0) {
+            $nq = mysqli_query($conn, "SELECT request_id, MAX(created_at) AS last_notice_at, COUNT(*) AS notice_count
                                                      FROM tbl_faculty_admin_notice
                                                     WHERE request_id IS NOT NULL
                                                     GROUP BY request_id");
-                        if ($nq) {
-                            while ($nr = mysqli_fetch_assoc($nq)) {
-                                $eq_notices[(int)$nr['request_id']] = [
-                                    'count' => (int)$nr['notice_count'],
-                                    'last_at' => $nr['last_notice_at'],
-                                ];
-                            }
-                        }
-                    }
+            if ($nq) {
+                while ($nr = mysqli_fetch_assoc($nq)) {
+                    $eq_notices[(int)$nr['request_id']] = [
+                        'count' => (int)$nr['notice_count'],
+                        'last_at' => $nr['last_notice_at'],
+                    ];
+                }
+            }
+        }
 
-                    // Admin notes from the arbitration log (indexed by request_id)
-                    $eq_arb_notes = [];
-                    $_arb_col = mysqli_query($conn, "SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tbl_arbitration_log' AND COLUMN_NAME = 'admin_notes' LIMIT 1");
-                    if ($_arb_col && mysqli_num_rows($_arb_col) > 0) {
-                        $aq = mysqli_query($conn, "SELECT request_id, admin_notes FROM tbl_arbitration_log WHERE admin_notes IS NOT NULL AND admin_notes <> ''");
-                        if ($aq) {
-                            while ($ar = mysqli_fetch_assoc($aq)) {
-                                $eq_arb_notes[(int)$ar['request_id']] = (string)$ar['admin_notes'];
-                            }
-                        }
-                    }
+        // Faculty who already got an overdue notice today (limit: one per faculty per day).
+        // Value = when the lock lifts (next midnight, Asia/Manila) as a unix timestamp.
+        $eq_noticed_today = [];
+        $eq_notice_unlock = strtotime('tomorrow');
+        if (!empty($_notices_tbl) && mysqli_num_rows($_notices_tbl) > 0) {
+            $eq_day_start = $conn->real_escape_string(date('Y-m-d') . ' 00:00:00');
+            $ntq = mysqli_query($conn, "SELECT DISTINCT faculty_id
+                                                      FROM tbl_faculty_admin_notice
+                                                     WHERE title LIKE 'Immediate Return Required: %'
+                                                       AND created_at >= '{$eq_day_start}'");
+            if ($ntq) {
+                while ($ntr = mysqli_fetch_assoc($ntq)) {
+                    $eq_noticed_today[(string)$ntr['faculty_id']] = $eq_notice_unlock;
+                }
+            }
+        }
 
-                    // Returned history for the Returned / All tabs (newest first, last 100)
-                    $eq_ret_rows = [];
-                    $eq_ret_q = mysqli_query($conn, "SELECT r.*,
+        // Admin notes from the arbitration log (indexed by request_id)
+        $eq_arb_notes = [];
+        $_arb_col = mysqli_query($conn, "SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tbl_arbitration_log' AND COLUMN_NAME = 'admin_notes' LIMIT 1");
+        if ($_arb_col && mysqli_num_rows($_arb_col) > 0) {
+            $aq = mysqli_query($conn, "SELECT request_id, admin_notes FROM tbl_arbitration_log WHERE admin_notes IS NOT NULL AND admin_notes <> ''");
+            if ($aq) {
+                while ($ar = mysqli_fetch_assoc($aq)) {
+                    $eq_arb_notes[(int)$ar['request_id']] = (string)$ar['admin_notes'];
+                }
+            }
+        }
+
+        // Returned history for the Returned / All tabs (newest first, last 100)
+        $eq_ret_rows = [];
+        $eq_ret_q = mysqli_query($conn, "SELECT r.*,
                             (SELECT i.`condition` FROM tbl_inventory i WHERE i.item_name = r.equipment_name LIMIT 1) AS item_condition
                         FROM tbl_requests r
                         WHERE r.status = 'Returned'
                         ORDER BY COALESCE(r.returned_at, r.return_date) DESC, r.id DESC
                         LIMIT 100");
-                    if ($eq_ret_q) {
-                        while ($rr = mysqli_fetch_assoc($eq_ret_q)) {
-                            $rr['_days']  = 0;
-                            $rr['_state'] = 'returned';
-                            $eq_ret_rows[] = $rr;
-                        }
-                    }
-                    $eq_ret_total  = count($eq_ret_rows);
-                    // Waiting (Pending Review) rows. Rows that came with a request letter come first.
-                    $eq_wait_sql = "SELECT tbl_requests.*,
+        if ($eq_ret_q) {
+            while ($rr = mysqli_fetch_assoc($eq_ret_q)) {
+                $rr['_days']  = 0;
+                $rr['_state'] = 'returned';
+                $eq_ret_rows[] = $rr;
+            }
+        }
+        $eq_ret_total  = count($eq_ret_rows);
+        // Waiting (Pending Review) rows. Rows that came with a request letter come first.
+        $eq_wait_sql = "SELECT tbl_requests.*,
                             (SELECT i.`condition` FROM tbl_inventory i WHERE i.item_name = tbl_requests.equipment_name LIMIT 1) AS item_condition
                         FROM tbl_requests
                         WHERE tbl_requests.status = 'Waiting'";
-                    $eq_wait_sql .= " ORDER BY tbl_requests.request_date DESC";
-                    $eq_wait_with = [];
-                    $eq_wait_without = [];
-                    $eq_wait_q = mysqli_query($conn, $eq_wait_sql);
-                    if ($eq_wait_q) {
-                        while ($wr = mysqli_fetch_assoc($eq_wait_q)) {
-                            $wr['_days']  = 0;
-                            $wr['_state'] = 'waiting';
-                            $wr['_doc']   = ps_doc_info($wr['document_path'] ?? '');
-                            if ($wr['_doc']) $eq_wait_with[] = $wr;
-                            else $eq_wait_without[] = $wr;
-                        }
-                    }
-                    $eq_wait_rows  = array_merge($eq_wait_with, $eq_wait_without);
-                    $eq_pend_total = count($eq_wait_rows);   // pending-review requests only
-                    // Scheduled (later-date) bookings: approved by default but not started yet. They wait here
-                    // until their start time (then they move to Active) and an admin can cancel / revoke them.
-                    $eq_sched_rows = [];
-                    $eq_sched_q = mysqli_query($conn, "SELECT tbl_requests.*,
+        $eq_wait_sql .= " ORDER BY tbl_requests.request_date DESC";
+        $eq_wait_with = [];
+        $eq_wait_without = [];
+        $eq_wait_q = mysqli_query($conn, $eq_wait_sql);
+        if ($eq_wait_q) {
+            while ($wr = mysqli_fetch_assoc($eq_wait_q)) {
+                $wr['_days']  = 0;
+                $wr['_state'] = 'waiting';
+                $wr['_doc']   = ps_doc_info($wr['document_path'] ?? '');
+                if ($wr['_doc']) $eq_wait_with[] = $wr;
+                else $eq_wait_without[] = $wr;
+            }
+        }
+        $eq_wait_rows  = array_merge($eq_wait_with, $eq_wait_without);
+        $eq_pend_total = count($eq_wait_rows);   // pending-review requests only
+        // Scheduled (later-date) bookings: approved by default but not started yet. They wait here
+        // until their start time (then they move to Active) and an admin can cancel / revoke them.
+        $eq_sched_rows = [];
+        $eq_sched_q = mysqli_query($conn, "SELECT tbl_requests.*,
                             (SELECT i.`condition` FROM tbl_inventory i WHERE i.item_name = tbl_requests.equipment_name LIMIT 1) AS item_condition
                         FROM tbl_requests
                         WHERE tbl_requests.status = 'Approved'
                           AND COALESCE(tbl_requests.booking_mode, '') = 'future'
                           AND TIMESTAMP(tbl_requests.borrow_date, COALESCE(tbl_requests.borrow_time, '00:00:00')) > '{$eq_now}'
                         ORDER BY tbl_requests.borrow_date ASC, tbl_requests.borrow_time ASC, tbl_requests.id ASC");
-                    if ($eq_sched_q) {
-                        while ($sr = mysqli_fetch_assoc($eq_sched_q)) {
-                            $sr['_days']  = (int)floor((strtotime($sr['borrow_date']) - strtotime($eq_today)) / 86400);   // days until it starts
-                            $sr['_state'] = 'scheduled';
-                            $eq_sched_rows[] = $sr;
-                        }
-                    }
-                    $eq_wait_rows  = array_merge($eq_wait_rows, $eq_sched_rows);
-                    $eq_wait_total = count($eq_wait_rows);
-                    $eq_view_rows  = array_merge($eq_wait_rows, $eq_loan_rows, $eq_ret_rows);
-                    $eq_view_total = count($eq_view_rows);
-                    $eq_bundle_counts = [];
-                    $eq_wait_bundle_counts = [];
-                    foreach ($eq_view_rows as $row) {
-                        $batch = trim((string)($row['batch_id'] ?? ''));
-                        if ($batch !== '') {
-                            $eq_bundle_counts[$batch] = ($eq_bundle_counts[$batch] ?? 0) + 1;
-                        }
-                    }
-                    foreach ($eq_wait_rows as $row) {
-                        if (($row['_state'] ?? '') !== 'waiting') continue;
-                        $batch = trim((string)($row['batch_id'] ?? ''));
-                        if ($batch !== '') {
-                            $eq_wait_bundle_counts[$batch] = ($eq_wait_bundle_counts[$batch] ?? 0) + 1;
-                        }
-                    }
-                    if ($eq_bundle_counts) {
-                        $batch_list = implode(',', array_map(function ($batch) use ($conn) {
-                            return "'" . $conn->real_escape_string($batch) . "'";
-                        }, array_keys($eq_bundle_counts)));
-                        $count_result = $conn->query(
-                            "SELECT batch_id, COUNT(*) AS total
+        if ($eq_sched_q) {
+            while ($sr = mysqli_fetch_assoc($eq_sched_q)) {
+                $sr['_days']  = (int)floor((strtotime($sr['borrow_date']) - strtotime($eq_today)) / 86400);   // days until it starts
+                $sr['_state'] = 'scheduled';
+                $eq_sched_rows[] = $sr;
+            }
+        }
+        $eq_wait_rows  = array_merge($eq_wait_rows, $eq_sched_rows);
+        $eq_wait_total = count($eq_wait_rows);
+        $eq_view_rows  = array_merge($eq_wait_rows, $eq_loan_rows, $eq_ret_rows);
+        $eq_view_total = count($eq_view_rows);
+        $eq_bundle_counts = [];
+        $eq_wait_bundle_counts = [];
+        foreach ($eq_view_rows as $row) {
+            $batch = trim((string)($row['batch_id'] ?? ''));
+            if ($batch !== '') {
+                $eq_bundle_counts[$batch] = ($eq_bundle_counts[$batch] ?? 0) + 1;
+            }
+        }
+        foreach ($eq_wait_rows as $row) {
+            if (($row['_state'] ?? '') !== 'waiting') continue;
+            $batch = trim((string)($row['batch_id'] ?? ''));
+            if ($batch !== '') {
+                $eq_wait_bundle_counts[$batch] = ($eq_wait_bundle_counts[$batch] ?? 0) + 1;
+            }
+        }
+        if ($eq_bundle_counts) {
+            $batch_list = implode(',', array_map(function ($batch) use ($conn) {
+                return "'" . $conn->real_escape_string($batch) . "'";
+            }, array_keys($eq_bundle_counts)));
+            $count_result = $conn->query(
+                "SELECT batch_id, COUNT(*) AS total
                                FROM tbl_requests
                               WHERE batch_id IN ({$batch_list})
                               GROUP BY batch_id"
-                        );
-                        if ($count_result) {
-                            while ($count_row = $count_result->fetch_assoc()) {
-                                $eq_bundle_counts[(string)$count_row['batch_id']] = (int)$count_row['total'];
-                            }
-                        } else {
-                            error_log('[admin-equipment] Bundle count query failed: ' . $conn->error);
-                        }
-                    }
-                    $eq_loan_dec   = admin_request_decisions($conn, array_map(function ($x) {
-                        return (int)$x['id'];
-                    }, $eq_view_rows));
-                    $eq_bundle_approve_shown = [];
-                    ?>
+            );
+            if ($count_result) {
+                while ($count_row = $count_result->fetch_assoc()) {
+                    $eq_bundle_counts[(string)$count_row['batch_id']] = (int)$count_row['total'];
+                }
+            } else {
+                error_log('[admin-equipment] Bundle count query failed: ' . $conn->error);
+            }
+        }
+        $eq_loan_dec   = admin_request_decisions($conn, array_map(function ($x) {
+            return (int)$x['id'];
+        }, $eq_view_rows));
+        $eq_bundle_approve_shown = [];
+        ?>
 
-                    <!-- Equipment sub-tabs: Catalog (the existing screen, unchanged) | On Loan -->
-                    <div class="rq-filter-chips eq-tabs" id="eqTabs">
-                        <button type="button" class="rq-filter-chip active" data-eq-panel="eq-catalog">
-                            <span class="material-symbols-outlined eq-tab-ico" aria-hidden="true">inventory_2</span> Catalog
-                        </button>
-                        <button type="button" class="rq-filter-chip" data-eq-panel="eq-onloan">
-                            <span class="material-symbols-outlined eq-tab-ico" aria-hidden="true">assignment_return</span> Loans
-                            <?php if ($eq_loan_total > 0): ?>
-                                <span class="rq-chip-count<?php echo $eq_loan_overdue > 0 ? '' : ' rq-chip-count--ok'; ?>" id="eqLoanChipCount"><?php echo $eq_loan_total; ?></span>
-                            <?php endif; ?>
-                        </button>
-                    </div>
+        <!-- Equipment sub-tabs: Catalog (the existing screen, unchanged) | On Loan -->
+        <div class="rq-filter-chips eq-tabs" id="eqTabs">
+            <button type="button" class="rq-filter-chip active" data-eq-panel="eq-catalog">
+                <span class="material-symbols-outlined eq-tab-ico" aria-hidden="true">inventory_2</span> Catalog
+            </button>
+            <button type="button" class="rq-filter-chip" data-eq-panel="eq-onloan">
+                <span class="material-symbols-outlined eq-tab-ico" aria-hidden="true">assignment_return</span> Loans
+                <?php if ($eq_loan_total > 0): ?>
+                    <span class="rq-chip-count<?php echo $eq_loan_overdue > 0 ? '' : ' rq-chip-count--ok'; ?>" id="eqLoanChipCount"><?php echo $eq_loan_total; ?></span>
+                <?php endif; ?>
+            </button>
+        </div>
 
-                    <!-- ── CATALOG (existing form + list + archived, wrapped as-is) ── -->
-                    <div class="eq-sub-panel active" id="eq-catalog">
+        <!-- ── CATALOG (existing form + list + archived, wrapped as-is) ── -->
+        <div class="eq-sub-panel active" id="eq-catalog">
 
-                        <!-- Equipment layout: Add form (left) + All Equipment list (right).
+            <!-- Equipment layout: Add form (left) + All Equipment list (right).
                          Same two-column pattern as the Faculty tab (.faculty-layout). -->
-                        <div class="faculty-layout inv-layout">
+            <div class="faculty-layout inv-layout">
 
-                            <!-- ADD EQUIPMENT FORM -->
-                            <div class="eq-card inv-form-card" id="item-form-wrap">
-                                <div class="eq-card-header">
-                                    <h2>
-                                        <span class="material-symbols-outlined inv-head-icon">add_box</span>
-                                        <span id="form-title"><?php echo $edit_item ? 'Edit Equipment' : 'Add Equipment'; ?></span>
-                                    </h2>
-                                </div>
-                                <div class="eq-card-body">
-                                    <form method="POST" enctype="multipart/form-data" id="itemForm">
-                                        <?= csrf_field() ?>
-                                        <?php if ($edit_item): ?>
-                                            <input type="hidden" name="item_id"
-                                                value="<?php echo $edit_item['item_id']; ?>">
-                                            <input type="hidden" name="old_image"
-                                                value="<?php echo htmlspecialchars($edit_item['image_path']); ?>">
-                                        <?php endif; ?>
+                <!-- ADD EQUIPMENT FORM -->
+                <div class="eq-card inv-form-card" id="item-form-wrap">
+                    <div class="eq-card-header">
+                        <h2>
+                            <span class="material-symbols-outlined inv-head-icon">add_box</span>
+                            <span id="form-title"><?php echo $edit_item ? 'Edit Equipment' : 'Add Equipment'; ?></span>
+                        </h2>
+                    </div>
+                    <div class="eq-card-body">
+                        <form method="POST" enctype="multipart/form-data" id="itemForm">
+                            <?= csrf_field() ?>
+                            <?php if ($edit_item): ?>
+                                <input type="hidden" name="item_id"
+                                    value="<?php echo $edit_item['item_id']; ?>">
+                                <input type="hidden" name="old_image"
+                                    value="<?php echo htmlspecialchars($edit_item['image_path']); ?>">
+                            <?php endif; ?>
 
-                                        <div class="fac-edit-section inv-section--first">Details</div>
+                            <div class="fac-edit-section inv-section--first">Details</div>
 
-                                        <div class="form-group">
-                                            <label for="inv-item-name">Item name <span class="req-star">*</span></label>
-                                            <input type="text" id="inv-item-name" name="item_name"
-                                                class="form-control-custom" maxlength="150"
-                                                value="<?php echo $edit_item ? htmlspecialchars($edit_item['item_name']) : ''; ?>"
-                                                placeholder="e.g. Extension Cord" required>
-                                        </div>
+                            <div class="form-group">
+                                <label for="inv-item-name">Item name <span class="req-star">*</span></label>
+                                <input type="text" id="inv-item-name" name="item_name"
+                                    class="form-control-custom" maxlength="150"
+                                    value="<?php echo $edit_item ? htmlspecialchars($edit_item['item_name']) : ''; ?>"
+                                    placeholder="e.g. Extension Cord" required>
+                            </div>
 
-                                        <div class="form-group">
-                                            <label for="inv-campus">Campus <span class="req-star">*</span></label>
-                                            <select id="inv-campus" name="campus_id"
-                                                class="form-control-custom" required>
-                                                <?php
-                                                $campuses_q = $conn->query("SELECT campus_id, campus_name FROM tbl_campuses ORDER BY campus_id ASC");
-                                                while ($campuses_q && ($cr = $campuses_q->fetch_assoc())):
-                                                    $sel = ($edit_item && (int)($edit_item['campus_id'] ?? 1) === (int)$cr['campus_id']) ? 'selected' : '';
-                                                ?>
-                                                    <option value="<?php echo (int)$cr['campus_id']; ?>" <?php echo $sel; ?>><?php echo htmlspecialchars($cr['campus_name']); ?></option>
-                                                <?php endwhile; ?>
-                                            </select>
-                                        </div>
+                            <div class="form-group">
+                                <label for="inv-campus">Campus <span class="req-star">*</span></label>
+                                <select id="inv-campus" name="campus_id"
+                                    class="form-control-custom" required>
+                                    <?php
+                                    $campuses_q = $conn->query("SELECT campus_id, campus_name FROM tbl_campuses ORDER BY campus_id ASC");
+                                    while ($campuses_q && ($cr = $campuses_q->fetch_assoc())):
+                                        $sel = ($edit_item && (int)($edit_item['campus_id'] ?? 1) === (int)$cr['campus_id']) ? 'selected' : '';
+                                    ?>
+                                        <option value="<?php echo (int)$cr['campus_id']; ?>" <?php echo $sel; ?>><?php echo htmlspecialchars($cr['campus_name']); ?></option>
+                                    <?php endwhile; ?>
+                                </select>
+                            </div>
 
-                                        <div class="form-group">
-                                            <label for="inv-category">Category <span class="req-star">*</span></label>
-                                            <select id="inv-category" name="category"
-                                                class="form-control-custom inv-category-select" required>
-                                                <option value="">Select category...</option>
-                                                <?php
-                                                // Categories loaded from tbl_equipment_categories, grouped by campus.
-                                                // Super Admin manages this list in Settings → Equipment Categories.
-                                                $cats_q = $conn->query(
-                                                    "SELECT ec.category_id, ec.campus_id, ec.name
+                            <div class="form-group">
+                                <label for="inv-category">Category <span class="req-star">*</span></label>
+                                <select id="inv-category" name="category"
+                                    class="form-control-custom inv-category-select" required>
+                                    <option value="">Select category...</option>
+                                    <?php
+                                    // Categories loaded from tbl_equipment_categories, grouped by campus.
+                                    // Super Admin manages this list in Settings → Equipment Categories.
+                                    $cats_q = $conn->query(
+                                        "SELECT ec.category_id, ec.campus_id, ec.name
                                                        FROM tbl_equipment_categories ec
                                                       ORDER BY ec.campus_id ASC, ec.sort_order ASC, ec.name ASC"
-                                                );
-                                                $cats_by_campus = [];
-                                                while ($cats_q && ($cr2 = $cats_q->fetch_assoc())) {
-                                                    $cats_by_campus[(int)$cr2['campus_id']][] = $cr2['name'];
-                                                }
-                                                foreach ($cats_by_campus as $cid => $cats) {
-                                                    echo '<optgroup label="" data-campus-id="' . $cid . '">';
-                                                    foreach ($cats as $c) {
-                                                        $sel = ($edit_item && $edit_item['category'] === $c) ? 'selected' : '';
-                                                        echo '<option value="' . htmlspecialchars($c) . '" data-campus-id="' . $cid . '" ' . $sel . '>' . htmlspecialchars($c) . '</option>';
-                                                    }
-                                                    echo '</optgroup>';
-                                                }
-                                                ?>
-                                            </select>
-                                        </div>
-
-                                        <div class="fac-edit-section">Stock</div>
-
-                                        <div class="form-row">
-                                            <div class="form-group">
-                                                <label for="inv-quantity">Quantity <span class="req-star">*</span></label>
-                                                <input type="number" id="inv-quantity" name="quantity"
-                                                    class="form-control-custom" min="0"
-                                                    value="<?php echo $edit_item ? (int)$edit_item['quantity'] : '1'; ?>"
-                                                    required>
-                                            </div>
-                                            <div class="form-group">
-                                                <label for="inv-condition">Condition</label>
-                                                <select id="inv-condition" name="condition" class="form-control-custom">
-                                                    <?php
-                                                    $cur_condition = $edit_item['condition'] ?? 'Good';
-                                                    foreach (['Good', 'Fair', 'For Repair'] as $condOpt) {
-                                                        $sel = ($cur_condition === $condOpt) ? 'selected' : '';
-                                                        echo "<option value=\"$condOpt\" $sel>$condOpt</option>";
-                                                    }
-                                                    ?>
-                                                </select>
-                                            </div>
-                                        </div>
-
-                                        <div class="fac-edit-section">Image <span class="inv-opt">(optional)</span></div>
-
-                                        <div class="form-group">
-                                            <div class="drop-zone inv-drop" id="dropZone">
-                                                <span class="material-symbols-outlined">add_photo_alternate</span>
-                                                <p>Click, drag &amp; drop, or paste an image</p>
-                                                <p class="inv-drop-sub">JPG or PNG, up to 2 MB</p>
-                                                <input type="file" name="item_image" id="itemImageInput"
-                                                    accept="image/jpeg,image/png" hidden>
-                                                <?php if ($edit_item && $edit_item['image_path'] !== 'uploads/default.png'): ?>
-                                                    <img src="<?php echo $root_url . htmlspecialchars($edit_item['image_path']); ?>"
-                                                        class="drop-zone-preview" id="imagePreview" style="display:block;" alt="">
-                                                <?php else: ?>
-                                                    <img id="imagePreview" class="drop-zone-preview" alt="">
-                                                <?php endif; ?>
-                                            </div>
-                                            <button type="button" id="removeImageBtn"
-                                                class="inv-remove-img<?php echo ($edit_item && $edit_item['image_path'] !== 'uploads/default.png') ? '' : ' hidden'; ?>">
-                                                &#x2715; Remove image
-                                            </button>
-                                        </div>
-
-                                        <div class="inv-form-actions">
-                                            <button type="submit"
-                                                name="<?php echo $edit_item ? 'update_item' : 'add_item'; ?>"
-                                                class="ps-btn ps-btn--primary inv-submit">
-                                                <span class="material-symbols-outlined">save</span>
-                                                <?php echo $edit_item ? 'Update Item' : 'Save Equipment'; ?>
-                                            </button>
-                                            <?php if ($edit_item): ?>
-                                                <a href="admin-dashboard.php?delete_item=<?php echo $edit_item['item_id']; ?>"
-                                                    class="btn-inv-delete" title="Archive item"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                                                        fill="none" stroke="currentColor" stroke-width="2"
-                                                        stroke-linecap="round" stroke-linejoin="round"
-                                                        width="15" height="15">
-                                                        <polyline points="3 6 5 6 21 6" />
-                                                        <path d="M19 6l-1 14H6L5 6" />
-                                                        <path d="M10 11v6" />
-                                                        <path d="M14 11v6" />
-                                                        <path d="M9 6V4h6v2" />
-                                                    </svg>
-                                                </a>
-                                            <?php endif; ?>
-                                        </div>
-
-                                    </form>
-                                </div><!-- /eq-card-body -->
-                            </div><!-- /inv-form-card -->
-
-
-                            <!-- ALL EQUIPMENT LIST -->
-                            <div class="eq-card inv-list-card" id="inv-table-card">
-                                <div class="eq-card-header fac-list-head">
-                                    <h2>
-                                        <span class="material-symbols-outlined inv-head-icon">inventory_2</span>
-                                        All Equipment
-                                        <span class="fac-count-badge" id="inv-count-badge">(<?php echo (int)mysqli_num_rows($inventory_result); ?>)</span>
-                                    </h2>
-                                    <div class="fac-search">
-                                        <span class="material-symbols-outlined">search</span>
-                                        <input type="text" id="inventorySearch" class="form-control-custom"
-                                            placeholder="Search name or category" autocomplete="off">
-                                    </div>
-                                </div>
-                                <div class="tbl-wrap">
-                                    <table class="admin-table fac-table inv-table" id="inv-list-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Equipment</th>
-                                                <th>Category</th>
-                                                <th>Condition</th>
-                                                <th>Stock</th>
-                                                <th>Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="inventory-body">
-                                            <?php
-                                            mysqli_data_seek($inventory_result, 0);
-                                            if (mysqli_num_rows($inventory_result) === 0): ?>
-                                                <tr id="inv-empty-row">
-                                                    <td colspan="5" class="inv-empty-cell">
-                                                        <span class="material-symbols-outlined">inventory_2</span>
-                                                        No equipment yet. Add your first item using the form.
-                                                    </td>
-                                                </tr>
-                                                <?php else:
-                                                while ($item = mysqli_fetch_assoc($inventory_result)):
-                                                    $inv_qty        = (int)$item['quantity'];
-                                                    $inv_cond       = $item['condition'] ?? 'Good';
-                                                    $inv_condClass  = ($inv_cond === 'For Repair') ? 'repair' : (($inv_cond === 'Fair') ? 'fair' : 'good');
-                                                    if ($inv_qty === 0) {
-                                                        $inv_stockClass = 'none';
-                                                        $inv_stockLabel = 'No stock';
-                                                    } elseif ($inv_qty <= 2) {
-                                                        $inv_stockClass = 'low';
-                                                        $inv_stockLabel = 'Low stock';
-                                                    } else {
-                                                        $inv_stockClass = 'ok';
-                                                        $inv_stockLabel = 'In stock';
-                                                    }
-                                                    $inv_addedTs    = !empty($item['created_at']) ? strtotime($item['created_at']) : false;
-                                                ?>
-                                                    <tr class="inv-row-item"
-                                                        data-item-id="<?php echo (int)$item['item_id']; ?>"
-                                                        data-item-name="<?php echo htmlspecialchars($item['item_name'], ENT_QUOTES); ?>"
-                                                        data-item-category="<?php echo htmlspecialchars($item['category'], ENT_QUOTES); ?>"
-                                                        data-item-quantity="<?php echo $inv_qty; ?>"
-                                                        data-item-condition="<?php echo htmlspecialchars($inv_cond, ENT_QUOTES); ?>"
-                                                        data-item-image="<?php echo htmlspecialchars($item['image_path'], ENT_QUOTES); ?>"
-                                                        data-item-image-full="<?php echo htmlspecialchars($root_url . $item['image_path'], ENT_QUOTES); ?>">
-                                                        <td>
-                                                            <div class="fac-person">
-                                                                <span class="inv-thumb">
-                                                                    <img src="<?php echo $root_url . htmlspecialchars($item['image_path']); ?>"
-                                                                        alt="<?php echo htmlspecialchars($item['item_name']); ?>"
-                                                                        loading="lazy">
-                                                                    <span class="material-symbols-outlined inv-thumb-ph">inventory_2</span>
-                                                                </span>
-                                                                <div class="fac-person-text">
-                                                                    <div class="fac-person-name"><?php echo htmlspecialchars($item['item_name']); ?></div>
-                                                                    <?php if ($inv_addedTs): ?>
-                                                                        <div class="fac-person-sub">Added <?php echo date('M j, Y', $inv_addedTs); ?></div>
-                                                                    <?php endif; ?>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        <td><span class="inv-pill inv-pill--cat"><?php echo htmlspecialchars($item['category']); ?></span></td>
-                                                        <td><span class="inv-pill inv-pill--<?php echo $inv_condClass; ?>"><?php echo htmlspecialchars($inv_cond); ?></span></td>
-                                                        <td>
-                                                            <span class="inv-pill inv-pill--stock inv-pill--<?php echo $inv_stockClass; ?>"><strong><?php echo $inv_qty; ?></strong> <?php echo $inv_stockLabel; ?></span>
-                                                        </td>
-                                                        <td class="fac-actions">
-                                                            <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm inv-edit-btn"
-                                                                data-action="eq-open-edit" aria-label="Edit equipment">
-                                                                <span class="material-symbols-outlined">edit</span>
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                <?php endwhile; ?>
-                                                <tr id="inv-nomatch-row" class="inv-row-hidden">
-                                                    <td colspan="5" class="inv-empty-cell">
-                                                        <span class="material-symbols-outlined">search_off</span>
-                                                        No equipment matches your search.
-                                                    </td>
-                                                </tr>
-                                            <?php endif; ?>
-                                        </tbody>
-                                    </table>
-                                </div>
-
-                                <!-- Pagination (10 per page, client-side; works together with the search box) -->
-                                <div class="inv-pager" id="inv-pager" hidden>
-                                    <span class="inv-pager-info" id="inv-pager-info"></span>
-                                    <div class="inv-pager-ctl" id="inv-pager-ctl">
-                                        <button type="button" class="inv-pager-btn" id="inv-pg-prev" aria-label="Previous page">
-                                            <span class="material-symbols-outlined">chevron_left</span>
-                                        </button>
-                                        <div class="inv-pager-nums" id="inv-pg-nums"></div>
-                                        <button type="button" class="inv-pager-btn" id="inv-pg-next" aria-label="Next page">
-                                            <span class="material-symbols-outlined">chevron_right</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div><!-- /inv-list-card -->
-
-                        </div><!-- /faculty-layout inv-layout -->
-
-                        <!-- Archived Items -->
-                        <div class="inv-archived-wrap">
-                            <div class="history-toggle-wrap inv-arch-toggle" id="registry-toggle-wrap">
-                                <button class="history-toggle-btn" data-history-tab="reg-archived">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                        stroke-linejoin="round" width="14" height="14">
-                                        <polyline points="21 8 21 21 3 21 3 8" />
-                                        <rect x="1" y="3" width="22" height="5" />
-                                        <line x1="10" y1="12" x2="14" y2="12" />
-                                    </svg>
-                                    Archived Items
-                                </button>
+                                    );
+                                    $cats_by_campus = [];
+                                    while ($cats_q && ($cr2 = $cats_q->fetch_assoc())) {
+                                        $cats_by_campus[(int)$cr2['campus_id']][] = $cr2['name'];
+                                    }
+                                    foreach ($cats_by_campus as $cid => $cats) {
+                                        echo '<optgroup label="" data-campus-id="' . $cid . '">';
+                                        foreach ($cats as $c) {
+                                            $sel = ($edit_item && $edit_item['category'] === $c) ? 'selected' : '';
+                                            echo '<option value="' . htmlspecialchars($c) . '" data-campus-id="' . $cid . '" ' . $sel . '>' . htmlspecialchars($c) . '</option>';
+                                        }
+                                        echo '</optgroup>';
+                                    }
+                                    ?>
+                                </select>
                             </div>
-                            <div class="history-panel" id="history-reg-archived">
-                                <div class="eq-card">
-                                    <div class="tbl-wrap">
-                                        <table class="admin-table">
-                                            <thead>
-                                                <tr>
-                                                    <th>Image</th>
-                                                    <th>Item Name</th>
-                                                    <th>Category</th>
-                                                    <th>Actions</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody id="inv-archive-body">
-                                                <?php if (mysqli_num_rows($archive_result) === 0): ?>
-                                                    <tr>
-                                                        <td colspan="4" class="text-muted"
-                                                            style="text-align:center;padding:2.5rem;">
-                                                            No archived items.
-                                                        </td>
-                                                    </tr>
-                                                    <?php else: while ($item = mysqli_fetch_assoc($archive_result)): ?>
-                                                        <tr>
-                                                            <td>
-                                                                <img src="<?php echo $root_url . htmlspecialchars($item['image_path']); ?>"
-                                                                    class="item-img"
-                                                                    onerror="this.src='../uploads/default.png'">
-                                                            </td>
-                                                            <td class="fw-bold"><?php echo htmlspecialchars($item['item_name']); ?></td>
-                                                            <td><?php echo htmlspecialchars($item['category']); ?></td>
-                                                            <td class="action-cell">
-                                                                <div class="action-btns">
-                                                                    <a href="admin-dashboard.php?restore_item=<?php echo $item['item_id']; ?>"
-                                                                        class="btn-action btn-restore" title="Restore">
-                                                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                                                                            fill="none" stroke="currentColor" stroke-width="2"
-                                                                            stroke-linecap="round" stroke-linejoin="round"
-                                                                            width="14" height="14">
-                                                                            <polyline points="1 4 1 10 7 10" />
-                                                                            <path d="M3.51 15a9 9 0 1 0 .49-3.51" />
-                                                                        </svg>
-                                                                    </a>
-                                                                    <a href="admin-dashboard.php?force_delete=<?php echo $item['item_id']; ?>"
-                                                                        class="btn-action btn-force-del" title="Delete permanently"
-                                                                        onclick="return confirm('Permanently delete? This cannot be undone.')">
-                                                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                                                                            fill="none" stroke="currentColor" stroke-width="2"
-                                                                            stroke-linecap="round" stroke-linejoin="round"
-                                                                            width="14" height="14">
-                                                                            <polyline points="3 6 5 6 21 6" />
-                                                                            <path d="M19 6l-1 14H6L5 6" />
-                                                                            <path d="M10 11v6" />
-                                                                            <path d="M14 11v6" />
-                                                                            <path d="M9 6V4h6v2" />
-                                                                        </svg>
-                                                                    </a>
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                <?php endwhile;
-                                                endif; ?>
-                                            </tbody>
-                                        </table>
-                                    </div>
+
+                            <div class="fac-edit-section">Stock</div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="inv-quantity">Quantity <span class="req-star">*</span></label>
+                                    <input type="number" id="inv-quantity" name="quantity"
+                                        class="form-control-custom" min="0"
+                                        value="<?php echo $edit_item ? (int)$edit_item['quantity'] : '1'; ?>"
+                                        required>
                                 </div>
-                            </div><!-- /history-reg-archived -->
-                        </div><!-- /inv-archived-wrap -->
+                                <div class="form-group">
+                                    <label for="inv-condition">Condition</label>
+                                    <select id="inv-condition" name="condition" class="form-control-custom">
+                                        <?php
+                                        $cur_condition = $edit_item['condition'] ?? 'Good';
+                                        foreach (['Good', 'Fair', 'For Repair'] as $condOpt) {
+                                            $sel = ($cur_condition === $condOpt) ? 'selected' : '';
+                                            echo "<option value=\"$condOpt\" $sel>$condOpt</option>";
+                                        }
+                                        ?>
+                                    </select>
+                                </div>
+                            </div>
 
-                    </div><!-- /eq-catalog -->
+                            <div class="fac-edit-section">Image <span class="inv-opt">(optional)</span></div>
 
-                    <!-- ── ON LOAN (equipment currently out: Approved + Overdue) ───────────── -->
-                    <div class="eq-sub-panel" id="eq-onloan">
-                        <!-- Overdue warning: no inline banner here any more. It pops up at the bottom-centre of the
-                             screen when this tab is opened (announceOverdue() in admin-dashboard.js). -->
-                        <div class="ps-card">
-                            <div class="ps-card-header eq-loan-head">
-                                <!-- Table title: text changes with the selected tab (see TITLES in admin-dashboard.js) -->
-                                <h2 class="eq-loan-title" id="eqLoanTitle">All Loans</h2>
-                                <div class="eq-loan-tools">
-                                    <input class="ps-form-control" style="width:230px" placeholder="Search borrower or item..." id="eq-loan-search" autocomplete="off">
-                                    <?php if ($is_super_admin): ?>
-                                        <!-- Super Admin only: deletes the whole list after a password check (see the modal near the bottom of this file) -->
-                                        <button type="button" class="ps-btn ps-btn--danger" id="eq-loan-wipe-btn"
-                                            title="Permanently delete every record in this list" <?php echo $eq_view_total === 0 ? ' disabled' : ''; ?>>
-                                            <span class="material-symbols-outlined">delete_forever</span> Delete All
-                                        </button>
+                            <div class="form-group">
+                                <div class="drop-zone inv-drop" id="dropZone">
+                                    <span class="material-symbols-outlined">add_photo_alternate</span>
+                                    <p>Click, drag &amp; drop, or paste an image</p>
+                                    <p class="inv-drop-sub">JPG or PNG, up to 2 MB</p>
+                                    <input type="file" name="item_image" id="itemImageInput"
+                                        accept="image/jpeg,image/png" hidden>
+                                    <?php if ($edit_item && $edit_item['image_path'] !== 'uploads/default.png'): ?>
+                                        <img src="<?php echo $root_url . htmlspecialchars($edit_item['image_path']); ?>"
+                                            class="drop-zone-preview" id="imagePreview" style="display:block;" alt="">
+                                    <?php else: ?>
+                                        <img id="imagePreview" class="drop-zone-preview" alt="">
                                     <?php endif; ?>
                                 </div>
+                                <button type="button" id="removeImageBtn"
+                                    class="inv-remove-img<?php echo ($edit_item && $edit_item['image_path'] !== 'uploads/default.png') ? '' : ' hidden'; ?>">
+                                    &#x2715; Remove image
+                                </button>
                             </div>
-                            <!-- Status tabs + sort controls (mirrors the Reservations table layout) -->
-                            <div class="eq-loan-status-bar">
-                                <div class="eq-loan-tabs" id="eqLoanFilter" role="tablist" aria-label="Filter loans by status">
-                                    <button type="button" class="eq-loan-tab active" data-loan-filter="all" role="tab" aria-selected="true">All</button>
-                                    <button type="button" class="eq-loan-tab" data-loan-filter="waiting" role="tab" aria-selected="false">Waiting <span class="eq-loan-tab-count<?php echo $eq_pend_total > 0 ? ' has' : ''; ?>"><?php echo (int)$eq_wait_total; ?></span></button>
-                                    <button type="button" class="eq-loan-tab" data-loan-filter="pickup" role="tab" aria-selected="false">Pickup <span class="eq-loan-tab-count<?php echo $eq_loan_pickup > 0 ? ' has' : ''; ?>"><?php echo (int)$eq_loan_pickup; ?></span></button>
-                                    <button type="button" class="eq-loan-tab" data-loan-filter="active" role="tab" aria-selected="false">Active <span class="eq-loan-tab-count"><?php echo (int)$eq_loan_active; ?></span></button>
-                                    <button type="button" class="eq-loan-tab" data-loan-filter="overdue" role="tab" aria-selected="false">Overdue <span class="eq-loan-tab-count<?php echo $eq_loan_overdue > 0 ? ' has' : ''; ?>"><?php echo (int)$eq_loan_overdue; ?></span></button>
-                                    <button type="button" class="eq-loan-tab" data-loan-filter="returned" role="tab" aria-selected="false">Returned</button>
-                                </div>
-                                <div class="eq-loan-sort">
-                                    <select id="eqLoanSort" class="pr-filter-select" aria-label="Sort loans by">
-                                        <option value="recent" selected>Recent requests</option>
-                                        <option value="due">Due date</option>
-                                    </select>
-                                    <button type="button" class="eq-loan-sort-dir" id="eqLoanSortDir" data-dir="desc"
-                                        title="Newest requests first (click to reverse)"
-                                        aria-label="Sort direction: newest requests first. Click to reverse.">
-                                        <span class="material-symbols-outlined" aria-hidden="true">arrow_downward</span>
-                                    </button>
-                                </div>
+
+                            <div class="inv-form-actions">
+                                <button type="submit"
+                                    name="<?php echo $edit_item ? 'update_item' : 'add_item'; ?>"
+                                    class="ps-btn ps-btn--primary inv-submit">
+                                    <span class="material-symbols-outlined">save</span>
+                                    <?php echo $edit_item ? 'Update Item' : 'Save Equipment'; ?>
+                                </button>
+                                <?php if ($edit_item): ?>
+                                    <a href="admin-dashboard.php?delete_item=<?php echo $edit_item['item_id']; ?>"
+                                        class="btn-inv-delete" title="Archive item"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                            fill="none" stroke="currentColor" stroke-width="2"
+                                            stroke-linecap="round" stroke-linejoin="round"
+                                            width="15" height="15">
+                                            <polyline points="3 6 5 6 21 6" />
+                                            <path d="M19 6l-1 14H6L5 6" />
+                                            <path d="M10 11v6" />
+                                            <path d="M14 11v6" />
+                                            <path d="M9 6V4h6v2" />
+                                        </svg>
+                                    </a>
+                                <?php endif; ?>
                             </div>
-                            <div class="ps-table-wrap">
-                                <table class="ps-table" id="eq-loan-table">
-                                    <!-- Per-tab headers: only one is visible at a time (toggled by JS) -->
-                                    <thead data-loan-head="all">
-                                        <tr><th>Borrower</th><th>Equipment</th><th>Issued</th><th>Due / Returned</th><th>Info</th><th>Actions</th></tr>
-                                    </thead>
-                                    <thead data-loan-head="waiting" hidden>
-                                        <tr><th>Borrower</th><th>Equipment</th><th>Requested</th><th>Needed By</th><th>Document</th><th>Actions</th></tr>
-                                    </thead>
-                                    <thead data-loan-head="pickup" hidden>
-                                        <tr><th>Borrower</th><th>Equipment</th><th>Issued</th><th>Due</th><th>Condition</th><th>Actions</th></tr>
-                                    </thead>
-                                    <thead data-loan-head="active" hidden>
-                                        <tr><th>Borrower</th><th>Equipment</th><th>Issued</th><th>Due</th><th>Condition</th><th>Actions</th></tr>
-                                    </thead>
-                                    <thead data-loan-head="overdue" hidden>
-                                        <tr><th>Borrower</th><th>Equipment</th><th>Issued</th><th>Overdue</th><th>Condition</th><th>Actions</th></tr>
-                                    </thead>
-                                    <thead data-loan-head="returned" hidden>
-                                        <tr><th>Borrower</th><th>Equipment</th><th>Issued</th><th>Returned</th><th>Handled by</th><th>Actions</th></tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php if ($eq_view_total > 0):
-                                            $eq_prev_state = null;
-                                            foreach ($eq_view_rows as $r):
-                                                $lqty  = max(1, (int)($r['borrow_qty'] ?? 1));
-                                                $ltype = ps_submitted_as_label($r['submitted_as'] ?? '');
-                                                $ldays = (int)$r['_days'];
-                                                $lst   = $r['_state'];
-                                                $ldec  = $lst === 'returned'
-                                                    ? ($eq_loan_dec[(int)$r['id']]['returned'] ?? null)
-                                                    : ($eq_loan_dec[(int)$r['id']]['approved'] ?? null);
-                                                $lret  = !empty($r['returned_at']) ? $r['returned_at'] : $r['return_date'];
-                                                $ldoc  = $r['_doc'] ?? null;
-                                                $lbt   = !empty($r['borrow_time']) ? date('g:i A', strtotime($r['borrow_time'])) : '';
-                                                $lrt   = !empty($r['return_time']) ? date('g:i A', strtotime($r['return_time'])) : '';
-                                                $lstart_lbl = date('M d, Y', strtotime($r['borrow_date'])) . ($lbt !== '' ? ' · ' . $lbt : '');
-                                                $ldue_lbl   = date('M d, Y', strtotime($r['return_date'])) . ($lrt !== '' ? ' · ' . $lrt : '');
-                                                $lstudent = (string)($r['submitted_as'] ?? '') === 'student' && trim((string)($r['submitted_by_name'] ?? '')) !== '';
-                                                // ── Section divider: emitted once when the first scheduled row follows
-                                                //    pending-review rows (or is the first row in the table).
-                                                if ($lst === 'scheduled' && $eq_prev_state !== 'scheduled'): ?>
-                                                    <tr class="eq-loan-section-divider" data-section-divider="scheduled">
-                                                        <td colspan="6">
-                                                            <div class="eq-loan-section-label">
-                                                                <span class="material-symbols-outlined" aria-hidden="true">event_upcoming</span>
-                                                                Scheduled bookings &mdash; approved, not yet started
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                <?php endif;
-                                                $eq_prev_state = $lst; ?>
-                                                <tr class="eq-loan-row is-<?php echo $lst; ?>"
-                                                    data-id="<?php echo (int)$r['id']; ?>"
-                                                    data-batch-id="<?php echo htmlspecialchars((string)($r['batch_id'] ?? ''), ENT_QUOTES); ?>"
-                                                    data-status="<?php echo $lst === 'scheduled' ? 'Scheduled' : htmlspecialchars($r['status']); ?>"
-                                                    data-loan-state="<?php echo $lst; ?>"
-                                                    data-submitted-ts="<?php echo !empty($r['request_date']) ? strtotime($r['request_date']) : 0; ?>"
-                                                    data-due-ts="<?php echo !empty($r['return_date']) ? strtotime($r['return_date']) : 0; ?>"
-                                                    data-start-label="<?php echo htmlspecialchars($lstart_lbl); ?>"
-                                                    data-due-label="<?php echo htmlspecialchars($ldue_lbl); ?>"
-                                                    data-days-overdue="<?php echo max(0, $ldays); ?>"
-                                                    data-condition="<?php echo htmlspecialchars($r['item_condition'] ?? 'Good'); ?>"
-                                                    data-borrower="<?php echo htmlspecialchars($r['faculty_name']); ?>"
-                                                    data-id-number="<?php echo htmlspecialchars(faculty_id_display($r['faculty_id'], 'Not set')); ?>"
-                                                    data-req-type="<?php echo htmlspecialchars($ltype); ?>"
-                                                    data-submitted-as="<?php echo htmlspecialchars((string)($r['submitted_as'] ?? '')); ?>"
-                                                    data-student-name="<?php echo $lstudent ? htmlspecialchars((string)$r['submitted_by_name']) : ''; ?>"
-                                                    data-student-id="<?php echo $lstudent ? htmlspecialchars((string)($r['submitted_by_id'] ?? '')) : ''; ?>"
-                                                    data-equipment="<?php echo htmlspecialchars($r['equipment_name']); ?>"
-                                                    data-qty="<?php echo $lqty; ?>"
-                                                    data-instructor="<?php echo htmlspecialchars($r['instructor']); ?>"
-                                                    data-room="<?php echo htmlspecialchars($r['room']); ?>"
-                                                    data-submitted="<?php echo date('M d, Y g:i A', strtotime($r['request_date'])); ?>"
-                                                    data-date-needed="<?php echo date('M d, Y', strtotime($r['borrow_date'])); ?>"
-                                                    data-return-date="<?php echo htmlspecialchars($r['return_date']); ?>"
-                                                    data-return-date-display="<?php echo date('M d, Y', strtotime($r['return_date'])); ?>"
-                                                    data-arb-rule="<?php echo htmlspecialchars($r['arbitration_rule'] ?? ''); ?>"
-                                                    data-note="<?php echo htmlspecialchars($r['reason'] ?? ''); ?>"
-                                                    data-doc-url="<?php echo $ldoc ? htmlspecialchars($ldoc['url']) : ''; ?>"
-                                                    data-doc-open-url="<?php echo $ldoc ? htmlspecialchars($ldoc['open_url']) : ''; ?>"
-                                                    data-doc-name="<?php echo $ldoc ? htmlspecialchars($ldoc['name']) : ''; ?>"
-                                                    data-doc-kind="<?php echo $ldoc ? $ldoc['kind'] : ''; ?>"
-                                                    data-returned-at-display="<?php echo !empty($r['returned_at']) ? date('M d, Y g:i A', strtotime($r['returned_at'])) : ''; ?>"
-                                                    data-handled-by="<?php echo htmlspecialchars($ldec['by'] ?? ''); ?>"
-                                                    data-notice-count="<?php echo isset($eq_notices[(int)$r['id']]) ? (int)$eq_notices[(int)$r['id']]['count'] : 0; ?>"
-                                                    data-notice-last="<?php echo isset($eq_notices[(int)$r['id']]) ? date('M j, Y g:i A', strtotime($eq_notices[(int)$r['id']]['last_at'])) : ''; ?>"
-                                                    data-admin-note="<?php echo htmlspecialchars($eq_arb_notes[(int)$r['id']] ?? '', ENT_QUOTES); ?>">
-                                                    <?php $lbundle = trim((string)($r['batch_id'] ?? '')); ?>
-                                                    <td data-col="borrower">
-                                                        <div class="eq-cell-name"><?php echo htmlspecialchars($lstudent ? (string)$r['submitted_by_name'] : $r['faculty_name']); ?></div>
-                                                        <div class="eq-cell-sub">
-                                                            <?php if ($lstudent): ?>Student<?php if (!empty($r['submitted_by_id'])): ?> &middot; <?php echo htmlspecialchars((string)$r['submitted_by_id']); ?><?php endif; ?> &middot; via <?php echo htmlspecialchars($r['faculty_name']); ?>
-                                                            <?php else: ?><?php echo htmlspecialchars(faculty_id_display($r['faculty_id'], 'Not set')); ?>
-                                                            <?php endif; ?>
-                                                        </div>
-                                                    </td>
-                                                    <td data-col="equipment">
-                                                        <div class="eq-cell-name"><?php echo htmlspecialchars($r['equipment_name']); ?><?php if ($lqty > 1): ?> <span class="ps-appr-qty">&times;<?php echo $lqty; ?></span><?php endif; ?></div>
-                                                        <button type="button" class="ps-appr-id" data-action="ps-open-modal" data-modal="ps-req-detail-modal">#<?php echo str_pad($r['id'], 4, '0', STR_PAD_LEFT); ?></button><?php if ($lbundle !== '' && ($eq_bundle_counts[$lbundle] ?? 0) > 1): ?><span class="eq-bundle-tag"><span class="material-symbols-outlined" aria-hidden="true">link</span><?php echo (int)$eq_bundle_counts[$lbundle]; ?></span><?php endif; ?>
-                                                    </td>
-                                                    <td data-col="col3">
-                                                        <?php if ($lst === 'waiting' || $lst === 'scheduled'): ?>
-                                                            <?php echo date('M d', strtotime($r['request_date'])); ?><div class="eq-cell-sub"><?php echo date('g:i A', strtotime($r['request_date'])); ?></div>
-                                                        <?php else: ?>
-                                                            <?php echo date('M d', strtotime($r['borrow_date'])); ?><?php if ($lbt !== ''): ?><div class="eq-cell-sub"><?php echo $lbt; ?></div><?php endif; ?>
+
+                        </form>
+                    </div><!-- /eq-card-body -->
+                </div><!-- /inv-form-card -->
+
+
+                <!-- ALL EQUIPMENT LIST -->
+                <div class="eq-card inv-list-card" id="inv-table-card">
+                    <div class="eq-card-header fac-list-head">
+                        <h2>
+                            <span class="material-symbols-outlined inv-head-icon">inventory_2</span>
+                            All Equipment
+                            <span class="fac-count-badge" id="inv-count-badge">(<?php echo (int)mysqli_num_rows($inventory_result); ?>)</span>
+                        </h2>
+                        <div class="fac-search">
+                            <span class="material-symbols-outlined">search</span>
+                            <input type="text" id="inventorySearch" class="form-control-custom"
+                                placeholder="Search name or category" autocomplete="off">
+                        </div>
+                    </div>
+                    <div class="tbl-wrap">
+                        <table class="admin-table fac-table inv-table" id="inv-list-table">
+                            <thead>
+                                <tr>
+                                    <th>Equipment</th>
+                                    <th>Category</th>
+                                    <th>Condition</th>
+                                    <th>Stock</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inventory-body">
+                                <?php
+                                mysqli_data_seek($inventory_result, 0);
+                                if (mysqli_num_rows($inventory_result) === 0): ?>
+                                    <tr id="inv-empty-row">
+                                        <td colspan="5" class="inv-empty-cell">
+                                            <span class="material-symbols-outlined">inventory_2</span>
+                                            No equipment yet. Add your first item using the form.
+                                        </td>
+                                    </tr>
+                                    <?php else:
+                                    while ($item = mysqli_fetch_assoc($inventory_result)):
+                                        $inv_qty        = (int)$item['quantity'];
+                                        $inv_cond       = $item['condition'] ?? 'Good';
+                                        $inv_condClass  = ($inv_cond === 'For Repair') ? 'repair' : (($inv_cond === 'Fair') ? 'fair' : 'good');
+                                        if ($inv_qty === 0) {
+                                            $inv_stockClass = 'none';
+                                            $inv_stockLabel = 'No stock';
+                                        } elseif ($inv_qty <= 2) {
+                                            $inv_stockClass = 'low';
+                                            $inv_stockLabel = 'Low stock';
+                                        } else {
+                                            $inv_stockClass = 'ok';
+                                            $inv_stockLabel = 'In stock';
+                                        }
+                                        $inv_addedTs    = !empty($item['created_at']) ? strtotime($item['created_at']) : false;
+                                    ?>
+                                        <tr class="inv-row-item"
+                                            data-item-id="<?php echo (int)$item['item_id']; ?>"
+                                            data-item-name="<?php echo htmlspecialchars($item['item_name'], ENT_QUOTES); ?>"
+                                            data-item-category="<?php echo htmlspecialchars($item['category'], ENT_QUOTES); ?>"
+                                            data-item-quantity="<?php echo $inv_qty; ?>"
+                                            data-item-condition="<?php echo htmlspecialchars($inv_cond, ENT_QUOTES); ?>"
+                                            data-item-image="<?php echo htmlspecialchars($item['image_path'], ENT_QUOTES); ?>"
+                                            data-item-image-full="<?php echo htmlspecialchars($root_url . $item['image_path'], ENT_QUOTES); ?>">
+                                            <td>
+                                                <div class="fac-person">
+                                                    <span class="inv-thumb">
+                                                        <img src="<?php echo $root_url . htmlspecialchars($item['image_path']); ?>"
+                                                            alt="<?php echo htmlspecialchars($item['item_name']); ?>"
+                                                            loading="lazy">
+                                                        <span class="material-symbols-outlined inv-thumb-ph">inventory_2</span>
+                                                    </span>
+                                                    <div class="fac-person-text">
+                                                        <div class="fac-person-name"><?php echo htmlspecialchars($item['item_name']); ?></div>
+                                                        <?php if ($inv_addedTs): ?>
+                                                            <div class="fac-person-sub">Added <?php echo date('M j, Y', $inv_addedTs); ?></div>
                                                         <?php endif; ?>
-                                                    </td>
-                                                    <td data-col="col4"<?php echo ($lst === 'overdue') ? ' style="color:var(--danger);font-weight:600"' : ''; ?>>
-                                                        <?php if ($lst === 'waiting'): ?>
-                                                            <?php echo date('M d', strtotime($r['borrow_date'])); ?><?php if ($lbt !== ''): ?><div class="eq-cell-sub"><?php echo $lbt; ?></div><?php endif; ?>
-                                                        <?php elseif ($lst === 'scheduled'): ?>
-                                                            <?php echo date('M d', strtotime($r['borrow_date'])); ?><div class="eq-cell-sub"><?php echo $ldays > 0 ? 'in '.$ldays.'d' : 'today'; ?></div>
-                                                        <?php elseif ($lst === 'returned'): ?>
-                                                            <?php echo date('M d', strtotime($lret)); ?><div class="eq-cell-sub"><?php echo date('g:i A', strtotime($lret)); ?></div>
-                                                        <?php elseif ($lst === 'overdue'): ?>
-                                                            <?php echo date('M d', strtotime($r['return_date'])); ?>
-                                                            <div class="eq-cell-sub" style="font-weight:400"><?php echo max(1,$ldays); ?>d overdue</div>
-                                                            <?php if (!empty($eq_notices[(int)$r['id']])): 
-                                                                $ninfo = $eq_notices[(int)$r['id']];
-                                                                $nSecs = max(0, time() - strtotime($ninfo['last_at']));
-                                                                $nAgo = $nSecs < 60 ? 'just now' : ($nSecs < 3600 ? floor($nSecs/60).'m ago' : ($nSecs < 86400 ? floor($nSecs/3600).'h ago' : ($nSecs < 172800 ? 'yesterday' : floor($nSecs/86400).'d ago')));
-                                                            ?>
-                                                                <div class="eq-cell-sub" style="color:#059669;font-weight:500;display:flex;align-items:center;gap:3px;margin-top:2px;" title="Notice sent: <?php echo date('M j, Y g:i A', strtotime($ninfo['last_at'])); ?>">
-                                                                    <span class="material-symbols-outlined" style="font-size:12px;">mark_email_read</span>
-                                                                    Notice sent (<?php echo $nAgo; ?>)
-                                                                </div>
-                                                            <?php endif; ?>
-                                                        <?php else: ?>
-                                                            <?php echo date('M d', strtotime($r['return_date'])); ?><?php if ($lrt !== ''): ?><div class="eq-cell-sub"><?php echo $lrt; ?></div><?php endif; ?><?php if ((int)($r['extension_count'] ?? 0) > 0): $lext=(int)$r['extension_count']; ?><div class="eq-cell-sub" title="Extended <?php echo $lext; ?> time<?php echo $lext===1?'':'s'; ?><?php echo !empty($r['original_return_date'])? ', was '.date('M d',strtotime($r['original_return_date'])):''; ?>">+<?php echo $lext; ?> ext</div><?php endif; ?>
-                                                        <?php endif; ?>
-                                                    </td>
-                                                    <td data-col="col5">
-                                                        <?php if ($lst === 'waiting'): ?>
-                                                            <?php if ($ldoc): ?><a class="ps-doc-chip ps-doc-chip--<?php echo $ldoc['kind']; ?>" href="<?php echo htmlspecialchars($ldoc['open_url']); ?>" target="_blank" rel="noopener noreferrer" title="<?php echo htmlspecialchars($ldoc['name']); ?>"><span class="material-symbols-outlined"><?php echo ps_doc_icon($ldoc['kind']); ?></span><span class="ps-doc-chip__name"><?php echo htmlspecialchars($ldoc['name']); ?></span><span class="material-symbols-outlined ps-doc-chip__open">open_in_new</span></a>
-                                                            <?php else: ?><span class="ps-doc-chip ps-doc-chip--none"><span class="material-symbols-outlined">block</span> None</span>
-                                                            <?php endif; ?>
-                                                        <?php elseif ($lst === 'scheduled'): ?>
-                                                            <span class="ps-badge ps-badge--scheduled">Scheduled</span>
-                                                        <?php elseif ($lst === 'pickup' || $lst === 'ok' || $lst === 'due' || $lst === 'overdue'): ?>
-                                                            <?php $lcond=$r['item_condition']??'Good'; $lcondCls=$lcond==='For Repair'?'repair':($lcond==='Fair'?'fair':'good'); ?><span class="inv-pill inv-pill--<?php echo $lcondCls; ?>"><?php echo htmlspecialchars($lcond); ?></span>
-                                                        <?php elseif ($lst === 'returned'): ?>
-                                                            <?php echo admin_decider_html($ldec); ?>
-                                                        <?php else: ?>
-                                                            <?php echo admin_decider_html($ldec); ?>
-                                                        <?php endif; ?>
-                                                    </td>
-                                                    <td data-col="actions">
-                                                        <div class="eq-act-wrap">
-                                                            <?php if ($lst === 'waiting'): ?>
-                                                                <button type="button" class="ps-btn ps-btn--success ps-btn--sm" data-action="ps-open-modal" data-modal="ps-approve-modal"><span class="material-symbols-outlined">check</span> Approve</button>
-                                                                <?php if ($lbundle !== '' && ($eq_wait_bundle_counts[$lbundle] ?? 0) > 1 && empty($eq_bundle_approve_shown[$lbundle])): $eq_bundle_approve_shown[$lbundle] = true; ?><button type="button" class="ps-btn ps-btn--outline ps-btn--sm" data-action="eq-open-bundle-approve" data-batch-id="<?php echo htmlspecialchars($lbundle, ENT_QUOTES); ?>"><span class="material-symbols-outlined">done_all</span> All</button><?php endif; ?>
-                                                                <button type="button" class="ps-btn ps-btn--danger ps-btn--sm" data-action="ps-open-modal" data-modal="ps-decline-modal"><span class="material-symbols-outlined">close</span> Decline</button>
-                                                            <?php elseif ($lst === 'scheduled'): ?>
-                                                                <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-action="eq-open-loan-detail">View</button>
-                                                                <button type="button" class="ps-btn ps-btn--danger ps-btn--sm" data-action="ps-open-modal" data-modal="ps-cancel-booking-modal"><span class="material-symbols-outlined">event_busy</span> Cancel</button>
-                                                            <?php elseif ($lst === 'pickup'): ?>
-                                                                <span class="eq-cell-sub">Awaiting Claim QR</span>
-                                                                <button type="button" class="ps-btn ps-btn--outline ps-btn--sm" data-action="ps-open-modal" data-modal="ps-manual-claim-modal"><span class="material-symbols-outlined">move_to_inbox</span> Manual</button>
-                                                            <?php elseif ($lst === 'returned'): ?>
-                                                                <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-action="eq-open-loan-detail">View</button>
-                                                            <?php else: ?>
-                                                                <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-action="ps-open-modal" data-modal="ps-return-modal">Return</button>
-                                                                <?php if ($lst === 'overdue'): 
-                                                                    $hasNotice = !empty($eq_notices[(int)$r['id']]);
-                                                                ?>
-                                                                    <button type="button" class="ps-btn <?php echo $hasNotice ? 'ps-btn--ghost' : 'ps-btn--outline'; ?> ps-btn--sm" data-action="ps-open-modal" data-modal="ps-notice-modal" title="<?php echo $hasNotice ? 'Notice already sent (' . $eq_notices[(int)$r['id']]['count'] . 'x). Click to send another.' : 'Send overdue notice'; ?>">
-                                                                        <span class="material-symbols-outlined" style="font-size:14px;"><?php echo $hasNotice ? 'mark_email_read' : 'mail'; ?></span>
-                                                                        <?php echo $hasNotice ? 'Notice (' . $eq_notices[(int)$r['id']]['count'] . ')' : 'Notice'; ?>
-                                                                    </button>
-                                                                <?php endif; ?>
-                                                            <?php endif; ?>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            <?php endforeach;
-                                        else: ?>
-                                            <tr class="eq-loan-empty">
-                                                <td colspan="6" class="eq-loan-empty-cell">
-                                                    <div class="ps-empty-state">
-                                                        <span class="material-symbols-outlined">inventory_2</span>
-                                                        <p>No loan records yet.</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td><span class="inv-pill inv-pill--cat"><?php echo htmlspecialchars($item['category']); ?></span></td>
+                                            <td><span class="inv-pill inv-pill--<?php echo $inv_condClass; ?>"><?php echo htmlspecialchars($inv_cond); ?></span></td>
+                                            <td>
+                                                <span class="inv-pill inv-pill--stock inv-pill--<?php echo $inv_stockClass; ?>"><strong><?php echo $inv_qty; ?></strong> <?php echo $inv_stockLabel; ?></span>
+                                            </td>
+                                            <td class="fac-actions">
+                                                <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm inv-edit-btn"
+                                                    data-action="eq-open-edit" aria-label="Edit equipment">
+                                                    <span class="material-symbols-outlined">edit</span>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    <?php endwhile; ?>
+                                    <tr id="inv-nomatch-row" class="inv-row-hidden">
+                                        <td colspan="5" class="inv-empty-cell">
+                                            <span class="material-symbols-outlined">search_off</span>
+                                            No equipment matches your search.
+                                        </td>
+                                    </tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination (10 per page, client-side; works together with the search box) -->
+                    <div class="inv-pager" id="inv-pager" hidden>
+                        <span class="inv-pager-info" id="inv-pager-info"></span>
+                        <div class="inv-pager-ctl" id="inv-pager-ctl">
+                            <button type="button" class="inv-pager-btn" id="inv-pg-prev" aria-label="Previous page">
+                                <span class="material-symbols-outlined">chevron_left</span>
+                            </button>
+                            <div class="inv-pager-nums" id="inv-pg-nums"></div>
+                            <button type="button" class="inv-pager-btn" id="inv-pg-next" aria-label="Next page">
+                                <span class="material-symbols-outlined">chevron_right</span>
+                            </button>
+                        </div>
+                    </div>
+                </div><!-- /inv-list-card -->
+
+            </div><!-- /faculty-layout inv-layout -->
+
+            <!-- Archived Items -->
+            <div class="inv-archived-wrap">
+                <div class="history-toggle-wrap inv-arch-toggle" id="registry-toggle-wrap">
+                    <button class="history-toggle-btn" data-history-tab="reg-archived">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round" width="14" height="14">
+                            <polyline points="21 8 21 21 3 21 3 8" />
+                            <rect x="1" y="3" width="22" height="5" />
+                            <line x1="10" y1="12" x2="14" y2="12" />
+                        </svg>
+                        Archived Items
+                    </button>
+                </div>
+                <div class="history-panel" id="history-reg-archived">
+                    <div class="eq-card">
+                        <div class="tbl-wrap">
+                            <table class="admin-table">
+                                <thead>
+                                    <tr>
+                                        <th>Image</th>
+                                        <th>Item Name</th>
+                                        <th>Category</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="inv-archive-body">
+                                    <?php if (mysqli_num_rows($archive_result) === 0): ?>
+                                        <tr>
+                                            <td colspan="4" class="text-muted"
+                                                style="text-align:center;padding:2.5rem;">
+                                                No archived items.
+                                            </td>
+                                        </tr>
+                                        <?php else: while ($item = mysqli_fetch_assoc($archive_result)): ?>
+                                            <tr>
+                                                <td>
+                                                    <img src="<?php echo $root_url . htmlspecialchars($item['image_path']); ?>"
+                                                        class="item-img"
+                                                        onerror="this.src='../uploads/default.png'">
+                                                </td>
+                                                <td class="fw-bold"><?php echo htmlspecialchars($item['item_name']); ?></td>
+                                                <td><?php echo htmlspecialchars($item['category']); ?></td>
+                                                <td class="action-cell">
+                                                    <div class="action-btns">
+                                                        <a href="admin-dashboard.php?restore_item=<?php echo $item['item_id']; ?>"
+                                                            class="btn-action btn-restore" title="Restore">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                                                fill="none" stroke="currentColor" stroke-width="2"
+                                                                stroke-linecap="round" stroke-linejoin="round"
+                                                                width="14" height="14">
+                                                                <polyline points="1 4 1 10 7 10" />
+                                                                <path d="M3.51 15a9 9 0 1 0 .49-3.51" />
+                                                            </svg>
+                                                        </a>
+                                                        <a href="admin-dashboard.php?force_delete=<?php echo $item['item_id']; ?>"
+                                                            class="btn-action btn-force-del" title="Delete permanently"
+                                                            onclick="return confirm('Permanently delete? This cannot be undone.')">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                                                fill="none" stroke="currentColor" stroke-width="2"
+                                                                stroke-linecap="round" stroke-linejoin="round"
+                                                                width="14" height="14">
+                                                                <polyline points="3 6 5 6 21 6" />
+                                                                <path d="M19 6l-1 14H6L5 6" />
+                                                                <path d="M10 11v6" />
+                                                                <path d="M14 11v6" />
+                                                                <path d="M9 6V4h6v2" />
+                                                            </svg>
+                                                        </a>
                                                     </div>
                                                 </td>
                                             </tr>
-                                        <?php endif; ?>
-                                        <tr class="eq-loan-nomatch" hidden>
-                                            <td colspan="6" class="eq-loan-nomatch-cell">
-                                                <div class="ps-empty-state">
-                                                    <span class="material-symbols-outlined">search_off</span>
-                                                    <p>No items match your filter.</p>
+                                    <?php endwhile;
+                                    endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div><!-- /history-reg-archived -->
+            </div><!-- /inv-archived-wrap -->
+
+        </div><!-- /eq-catalog -->
+
+        <!-- ── ON LOAN (equipment currently out: Approved + Overdue) ───────────── -->
+        <div class="eq-sub-panel" id="eq-onloan">
+            <!-- Overdue warning: no inline banner here any more. It pops up at the bottom-centre of the
+                             screen when this tab is opened (announceOverdue() in admin-dashboard.js). -->
+            <div class="ps-card">
+                <div class="ps-card-header eq-loan-head">
+                    <!-- Table title: text changes with the selected tab (see TITLES in admin-dashboard.js) -->
+                    <h2 class="eq-loan-title" id="eqLoanTitle">All Loans</h2>
+                    <div class="eq-loan-tools">
+                        <input class="ps-form-control" style="width:230px" placeholder="Search borrower or item..." id="eq-loan-search" autocomplete="off">
+                        <?php if ($is_super_admin): ?>
+                            <!-- Super Admin only: deletes the whole list after a password check (see the modal near the bottom of this file) -->
+                            <button type="button" class="ps-btn ps-btn--danger" id="eq-loan-wipe-btn"
+                                title="Permanently delete every record in this list" <?php echo $eq_view_total === 0 ? ' disabled' : ''; ?>>
+                                <span class="material-symbols-outlined">delete_forever</span> Delete All
+                            </button>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <!-- Status tabs + sort controls (mirrors the Reservations table layout) -->
+                <div class="eq-loan-status-bar">
+                    <div class="eq-loan-tabs" id="eqLoanFilter" role="tablist" aria-label="Filter loans by status">
+                        <button type="button" class="eq-loan-tab active" data-loan-filter="all" role="tab" aria-selected="true">All</button>
+                        <button type="button" class="eq-loan-tab" data-loan-filter="waiting" role="tab" aria-selected="false">Waiting <span class="eq-loan-tab-count<?php echo $eq_pend_total > 0 ? ' has' : ''; ?>"><?php echo (int)$eq_wait_total; ?></span></button>
+                        <button type="button" class="eq-loan-tab" data-loan-filter="pickup" role="tab" aria-selected="false">Pickup <span class="eq-loan-tab-count<?php echo $eq_loan_pickup > 0 ? ' has' : ''; ?>"><?php echo (int)$eq_loan_pickup; ?></span></button>
+                        <button type="button" class="eq-loan-tab" data-loan-filter="active" role="tab" aria-selected="false">Active <span class="eq-loan-tab-count"><?php echo (int)$eq_loan_active; ?></span></button>
+                        <button type="button" class="eq-loan-tab" data-loan-filter="overdue" role="tab" aria-selected="false">Overdue <span class="eq-loan-tab-count<?php echo $eq_loan_overdue > 0 ? ' has' : ''; ?>"><?php echo (int)$eq_loan_overdue; ?></span></button>
+                        <button type="button" class="eq-loan-tab" data-loan-filter="returned" role="tab" aria-selected="false">Returned</button>
+                    </div>
+                    <div class="eq-loan-sort">
+                        <select id="eqLoanSort" class="pr-filter-select" aria-label="Sort loans by">
+                            <option value="recent" selected>Recent requests</option>
+                            <option value="due">Due date</option>
+                        </select>
+                        <button type="button" class="eq-loan-sort-dir" id="eqLoanSortDir" data-dir="desc"
+                            title="Newest requests first (click to reverse)"
+                            aria-label="Sort direction: newest requests first. Click to reverse.">
+                            <span class="material-symbols-outlined" aria-hidden="true">arrow_downward</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="ps-table-wrap">
+                    <table class="ps-table" id="eq-loan-table">
+                        <!-- Per-tab headers: only one is visible at a time (toggled by JS) -->
+                        <thead data-loan-head="all">
+                            <tr>
+                                <th>Borrower</th>
+                                <th>Equipment</th>
+                                <th>Issued</th>
+                                <th>Due / Returned</th>
+                                <th>Info</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <thead data-loan-head="waiting" hidden>
+                            <tr>
+                                <th>Borrower</th>
+                                <th>Equipment</th>
+                                <th>Requested</th>
+                                <th>Needed By</th>
+                                <th>Document</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <thead data-loan-head="pickup" hidden>
+                            <tr>
+                                <th>Borrower</th>
+                                <th>Equipment</th>
+                                <th>Issued</th>
+                                <th>Due</th>
+                                <th>Condition</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <thead data-loan-head="active" hidden>
+                            <tr>
+                                <th>Borrower</th>
+                                <th>Equipment</th>
+                                <th>Issued</th>
+                                <th>Due</th>
+                                <th>Condition</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <thead data-loan-head="overdue" hidden>
+                            <tr>
+                                <th>Borrower</th>
+                                <th>Equipment</th>
+                                <th>Issued</th>
+                                <th>Overdue</th>
+                                <th>Condition</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <thead data-loan-head="returned" hidden>
+                            <tr>
+                                <th>Borrower</th>
+                                <th>Equipment</th>
+                                <th>Issued</th>
+                                <th>Returned</th>
+                                <th>Handled by</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if ($eq_view_total > 0):
+                                $eq_prev_state = null;
+                                foreach ($eq_view_rows as $r):
+                                    $lqty  = max(1, (int)($r['borrow_qty'] ?? 1));
+                                    $ltype = ps_submitted_as_label($r['submitted_as'] ?? '');
+                                    $ldays = (int)$r['_days'];
+                                    $lst   = $r['_state'];
+                                    $ldec  = $lst === 'returned'
+                                        ? ($eq_loan_dec[(int)$r['id']]['returned'] ?? null)
+                                        : ($eq_loan_dec[(int)$r['id']]['approved'] ?? null);
+                                    $lret  = !empty($r['returned_at']) ? $r['returned_at'] : $r['return_date'];
+                                    $ldoc  = $r['_doc'] ?? null;
+                                    $lbt   = !empty($r['borrow_time']) ? date('g:i A', strtotime($r['borrow_time'])) : '';
+                                    $lrt   = !empty($r['return_time']) ? date('g:i A', strtotime($r['return_time'])) : '';
+                                    $lstart_lbl = date('M d, Y', strtotime($r['borrow_date'])) . ($lbt !== '' ? ' · ' . $lbt : '');
+                                    $ldue_lbl   = date('M d, Y', strtotime($r['return_date'])) . ($lrt !== '' ? ' · ' . $lrt : '');
+                                    $lstudent = (string)($r['submitted_as'] ?? '') === 'student' && trim((string)($r['submitted_by_name'] ?? '')) !== '';
+                                    // ── Section divider: emitted once when the first scheduled row follows
+                                    //    pending-review rows (or is the first row in the table).
+                                    if ($lst === 'scheduled' && $eq_prev_state !== 'scheduled'): ?>
+                                        <tr class="eq-loan-section-divider" data-section-divider="scheduled">
+                                            <td colspan="6">
+                                                <div class="eq-loan-section-label">
+                                                    <span class="material-symbols-outlined" aria-hidden="true">event_upcoming</span>
+                                                    Scheduled bookings &mdash; approved, not yet started
                                                 </div>
                                             </td>
                                         </tr>
-                                    </tbody>
-                                </table>
-                            </div>
+                                    <?php endif;
+                                    $eq_prev_state = $lst; ?>
+                                    <tr class="eq-loan-row is-<?php echo $lst; ?>"
+                                        data-id="<?php echo (int)$r['id']; ?>"
+                                        data-batch-id="<?php echo htmlspecialchars((string)($r['batch_id'] ?? ''), ENT_QUOTES); ?>"
+                                        data-status="<?php echo $lst === 'scheduled' ? 'Scheduled' : htmlspecialchars($r['status']); ?>"
+                                        data-loan-state="<?php echo $lst; ?>"
+                                        data-submitted-ts="<?php echo !empty($r['request_date']) ? strtotime($r['request_date']) : 0; ?>"
+                                        data-due-ts="<?php echo !empty($r['return_date']) ? strtotime($r['return_date']) : 0; ?>"
+                                        data-start-label="<?php echo htmlspecialchars($lstart_lbl); ?>"
+                                        data-due-label="<?php echo htmlspecialchars($ldue_lbl); ?>"
+                                        data-days-overdue="<?php echo max(0, $ldays); ?>"
+                                        data-condition="<?php echo htmlspecialchars($r['item_condition'] ?? 'Good'); ?>"
+                                        data-borrower="<?php echo htmlspecialchars($r['faculty_name']); ?>"
+                                        data-id-number="<?php echo htmlspecialchars(faculty_id_display($r['faculty_id'], 'Not set')); ?>"
+                                        data-req-type="<?php echo htmlspecialchars($ltype); ?>"
+                                        data-submitted-as="<?php echo htmlspecialchars((string)($r['submitted_as'] ?? '')); ?>"
+                                        data-student-name="<?php echo $lstudent ? htmlspecialchars((string)$r['submitted_by_name']) : ''; ?>"
+                                        data-student-id="<?php echo $lstudent ? htmlspecialchars((string)($r['submitted_by_id'] ?? '')) : ''; ?>"
+                                        data-equipment="<?php echo htmlspecialchars($r['equipment_name']); ?>"
+                                        data-qty="<?php echo $lqty; ?>"
+                                        data-instructor="<?php echo htmlspecialchars($r['instructor']); ?>"
+                                        data-room="<?php echo htmlspecialchars($r['room']); ?>"
+                                        data-submitted="<?php echo date('M d, Y g:i A', strtotime($r['request_date'])); ?>"
+                                        data-date-needed="<?php echo date('M d, Y', strtotime($r['borrow_date'])); ?>"
+                                        data-return-date="<?php echo htmlspecialchars($r['return_date']); ?>"
+                                        data-return-date-display="<?php echo date('M d, Y', strtotime($r['return_date'])); ?>"
+                                        data-arb-rule="<?php echo htmlspecialchars($r['arbitration_rule'] ?? ''); ?>"
+                                        data-note="<?php echo htmlspecialchars($r['reason'] ?? ''); ?>"
+                                        data-doc-url="<?php echo $ldoc ? htmlspecialchars($ldoc['url']) : ''; ?>"
+                                        data-doc-open-url="<?php echo $ldoc ? htmlspecialchars($ldoc['open_url']) : ''; ?>"
+                                        data-doc-name="<?php echo $ldoc ? htmlspecialchars($ldoc['name']) : ''; ?>"
+                                        data-doc-kind="<?php echo $ldoc ? $ldoc['kind'] : ''; ?>"
+                                        data-returned-at-display="<?php echo !empty($r['returned_at']) ? date('M d, Y g:i A', strtotime($r['returned_at'])) : ''; ?>"
+                                        data-handled-by="<?php echo htmlspecialchars($ldec['by'] ?? ''); ?>"
+                                        data-notice-count="<?php echo isset($eq_notices[(int)$r['id']]) ? (int)$eq_notices[(int)$r['id']]['count'] : 0; ?>"
+                                        data-notice-last="<?php echo isset($eq_notices[(int)$r['id']]) ? date('M j, Y g:i A', strtotime($eq_notices[(int)$r['id']]['last_at'])) : ''; ?>"
+                                        data-faculty-key="<?php echo htmlspecialchars((string)($r['faculty_id'] ?? ''), ENT_QUOTES); ?>"
+                                        data-admin-note="<?php echo htmlspecialchars($eq_arb_notes[(int)$r['id']] ?? '', ENT_QUOTES); ?>">
+                                        <?php $lbundle = trim((string)($r['batch_id'] ?? '')); ?>
+                                        <td data-col="borrower">
+                                            <div class="eq-cell-name"><?php echo htmlspecialchars($lstudent ? (string)$r['submitted_by_name'] : $r['faculty_name']); ?></div>
+                                            <div class="eq-cell-sub">
+                                                <?php if ($lstudent): ?>Student<?php if (!empty($r['submitted_by_id'])): ?> &middot; <?php echo htmlspecialchars((string)$r['submitted_by_id']); ?><?php endif; ?> &middot; via <?php echo htmlspecialchars($r['faculty_name']); ?>
+                                                <?php else: ?><?php echo htmlspecialchars(faculty_id_display($r['faculty_id'], 'Not set')); ?>
+                                            <?php endif; ?>
+                                            </div>
+                                        </td>
+                                        <td data-col="equipment">
+                                            <div class="eq-cell-name"><?php echo htmlspecialchars($r['equipment_name']); ?><?php if ($lqty > 1): ?> <span class="ps-appr-qty">&times;<?php echo $lqty; ?></span><?php endif; ?></div>
+                                            <button type="button" class="ps-appr-id" data-action="ps-open-modal" data-modal="ps-req-detail-modal">#<?php echo str_pad($r['id'], 4, '0', STR_PAD_LEFT); ?></button><?php if ($lbundle !== '' && ($eq_bundle_counts[$lbundle] ?? 0) > 1): ?><span class="eq-bundle-tag"><span class="material-symbols-outlined" aria-hidden="true">link</span><?php echo (int)$eq_bundle_counts[$lbundle]; ?></span><?php endif; ?>
+                                        </td>
+                                        <td data-col="col3">
+                                            <?php if ($lst === 'waiting' || $lst === 'scheduled'): ?>
+                                                <?php echo date('M d', strtotime($r['request_date'])); ?><div class="eq-cell-sub"><?php echo date('g:i A', strtotime($r['request_date'])); ?></div>
+                                            <?php else: ?>
+                                                <?php echo date('M d', strtotime($r['borrow_date'])); ?><?php if ($lbt !== ''): ?><div class="eq-cell-sub"><?php echo $lbt; ?></div><?php endif; ?>
+                                        <?php endif; ?>
+                                        </td>
+                                        <td data-col="col4" <?php echo ($lst === 'overdue') ? ' style="color:var(--danger);font-weight:600"' : ''; ?>>
+                                            <?php if ($lst === 'waiting'): ?>
+                                                <?php echo date('M d', strtotime($r['borrow_date'])); ?><?php if ($lbt !== ''): ?><div class="eq-cell-sub"><?php echo $lbt; ?></div><?php endif; ?>
+                                        <?php elseif ($lst === 'scheduled'): ?>
+                                            <?php echo date('M d', strtotime($r['borrow_date'])); ?><div class="eq-cell-sub"><?php echo $ldays > 0 ? 'in ' . $ldays . 'd' : 'today'; ?></div>
+                                        <?php elseif ($lst === 'returned'): ?>
+                                            <?php echo date('M d', strtotime($lret)); ?><div class="eq-cell-sub"><?php echo date('g:i A', strtotime($lret)); ?></div>
+                                        <?php elseif ($lst === 'overdue'): ?>
+                                            <?php echo date('M d', strtotime($r['return_date'])); ?>
+                                            <div class="eq-cell-sub" style="font-weight:400"><?php echo max(1, $ldays); ?>d overdue</div>
+                                            <?php if (!empty($eq_notices[(int)$r['id']])):
+                                                    $ninfo = $eq_notices[(int)$r['id']];
+                                                    $nSecs = max(0, time() - strtotime($ninfo['last_at']));
+                                                    $nAgo = $nSecs < 60 ? 'just now' : ($nSecs < 3600 ? floor($nSecs / 60) . 'm ago' : ($nSecs < 86400 ? floor($nSecs / 3600) . 'h ago' : ($nSecs < 172800 ? 'yesterday' : floor($nSecs / 86400) . 'd ago')));
+                                            ?>
+                                                <div class="eq-cell-sub" style="color:#059669;font-weight:500;display:flex;align-items:center;gap:3px;margin-top:2px;" title="Notice sent: <?php echo date('M j, Y g:i A', strtotime($ninfo['last_at'])); ?>">
+                                                    <span class="material-symbols-outlined" style="font-size:12px;">mark_email_read</span>
+                                                    Notice sent (<?php echo $nAgo; ?>)
+                                                </div>
+                                            <?php endif; ?>
+                                        <?php else: ?>
+                                            <?php echo date('M d', strtotime($r['return_date'])); ?><?php if ($lrt !== ''): ?><div class="eq-cell-sub"><?php echo $lrt; ?></div><?php endif; ?><?php if ((int)($r['extension_count'] ?? 0) > 0): $lext = (int)$r['extension_count']; ?><div class="eq-cell-sub" title="Extended <?php echo $lext; ?> time<?php echo $lext === 1 ? '' : 's'; ?><?php echo !empty($r['original_return_date']) ? ', was ' . date('M d', strtotime($r['original_return_date'])) : ''; ?>">+<?php echo $lext; ?> ext</div><?php endif; ?>
+                                    <?php endif; ?>
+                                        </td>
+                                        <td data-col="col5">
+                                            <?php if ($lst === 'waiting'): ?>
+                                                <?php if ($ldoc): ?><a class="ps-doc-chip ps-doc-chip--<?php echo $ldoc['kind']; ?>" href="<?php echo htmlspecialchars($ldoc['open_url']); ?>" target="_blank" rel="noopener noreferrer" title="<?php echo htmlspecialchars($ldoc['name']); ?>"><span class="material-symbols-outlined"><?php echo ps_doc_icon($ldoc['kind']); ?></span><span class="ps-doc-chip__name"><?php echo htmlspecialchars($ldoc['name']); ?></span><span class="material-symbols-outlined ps-doc-chip__open">open_in_new</span></a>
+                                                <?php else: ?><span class="ps-doc-chip ps-doc-chip--none"><span class="material-symbols-outlined">block</span> None</span>
+                                                <?php endif; ?>
+                                            <?php elseif ($lst === 'scheduled'): ?>
+                                                <span class="ps-badge ps-badge--scheduled">Scheduled</span>
+                                            <?php elseif ($lst === 'pickup' || $lst === 'ok' || $lst === 'due' || $lst === 'overdue'): ?>
+                                                <?php $lcond = $r['item_condition'] ?? 'Good';
+                                                $lcondCls = $lcond === 'For Repair' ? 'repair' : ($lcond === 'Fair' ? 'fair' : 'good'); ?><span class="inv-pill inv-pill--<?php echo $lcondCls; ?>"><?php echo htmlspecialchars($lcond); ?></span>
+                                            <?php elseif ($lst === 'returned'): ?>
+                                                <?php echo admin_decider_html($ldec); ?>
+                                            <?php else: ?>
+                                                <?php echo admin_decider_html($ldec); ?>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td data-col="actions">
+                                            <div class="eq-act-wrap">
+                                                <?php if ($lst === 'waiting'): ?>
+                                                    <button type="button" class="ps-btn ps-btn--success ps-btn--sm" data-action="ps-open-modal" data-modal="ps-approve-modal"><span class="material-symbols-outlined">check</span> Approve</button>
+                                                    <?php if ($lbundle !== '' && ($eq_wait_bundle_counts[$lbundle] ?? 0) > 1 && empty($eq_bundle_approve_shown[$lbundle])): $eq_bundle_approve_shown[$lbundle] = true; ?><button type="button" class="ps-btn ps-btn--outline ps-btn--sm" data-action="eq-open-bundle-approve" data-batch-id="<?php echo htmlspecialchars($lbundle, ENT_QUOTES); ?>"><span class="material-symbols-outlined">done_all</span> All</button><?php endif; ?>
+                                                    <button type="button" class="ps-btn ps-btn--danger ps-btn--sm" data-action="ps-open-modal" data-modal="ps-decline-modal"><span class="material-symbols-outlined">close</span> Decline</button>
+                                                <?php elseif ($lst === 'scheduled'): ?>
+                                                    <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-action="eq-open-loan-detail">View</button>
+                                                    <button type="button" class="ps-btn ps-btn--danger ps-btn--sm" data-action="ps-open-modal" data-modal="ps-cancel-booking-modal"><span class="material-symbols-outlined">event_busy</span> Cancel</button>
+                                                <?php elseif ($lst === 'pickup'): ?>
+                                                    <span class="eq-cell-sub">Awaiting Claim QR</span>
+                                                    <button type="button" class="ps-btn ps-btn--outline ps-btn--sm" data-action="ps-open-modal" data-modal="ps-manual-claim-modal"><span class="material-symbols-outlined">move_to_inbox</span> Manual</button>
+                                                <?php elseif ($lst === 'returned'): ?>
+                                                    <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-action="eq-open-loan-detail">View</button>
+                                                <?php else: ?>
+                                                    <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-action="ps-open-modal" data-modal="ps-return-modal">Return</button>
+                                                    <?php if ($lst === 'overdue'):
+                                                        $hasNotice  = !empty($eq_notices[(int)$r['id']]);
+                                                        $noticeLock = isset($eq_noticed_today[(string)($r['faculty_id'] ?? '')]);
+                                                        $noticeTip  = $noticeLock
+                                                            ? 'A notice was already sent to this faculty today. You can send another one tomorrow.'
+                                                            : ($hasNotice ? 'Notice already sent (' . $eq_notices[(int)$r['id']]['count'] . 'x). Click to send another.' : 'Send overdue notice');
+                                                    ?>
+                                                        <button type="button" class="ps-btn <?php echo ($hasNotice || $noticeLock) ? 'ps-btn--ghost' : 'ps-btn--outline'; ?> ps-btn--sm" data-action="ps-open-modal" data-modal="ps-notice-modal" data-notice-btn="1" <?php echo $noticeLock ? ' disabled data-unlock-ts="' . (int)$eq_notice_unlock . '"' : ''; ?> title="<?php echo htmlspecialchars($noticeTip, ENT_QUOTES); ?>">
+                                                            <span class="material-symbols-outlined" style="font-size:14px;"><?php echo ($hasNotice || $noticeLock) ? 'mark_email_read' : 'mail'; ?></span>
+                                                            <?php echo $noticeLock ? 'Sent today' : ($hasNotice ? 'Notice (' . $eq_notices[(int)$r['id']]['count'] . ')' : 'Notice'); ?>
+                                                        </button>
+                                                    <?php endif; ?>
+                                                <?php endif; ?>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                <?php endforeach;
+                            else: ?>
+                                <tr class="eq-loan-empty">
+                                    <td colspan="6" class="eq-loan-empty-cell">
+                                        <div class="ps-empty-state">
+                                            <span class="material-symbols-outlined">inventory_2</span>
+                                            <p>No loan records yet.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endif; ?>
+                            <tr class="eq-loan-nomatch" hidden>
+                                <td colspan="6" class="eq-loan-nomatch-cell">
+                                    <div class="ps-empty-state">
+                                        <span class="material-symbols-outlined">search_off</span>
+                                        <p>No items match your filter.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
 
-                            <!-- Pagination (20 per page, client-side; works with the tabs and the search box) -->
-                            <div class="inv-pager" id="eq-loan-pager" hidden>
-                                <span class="inv-pager-info" id="eq-loan-pager-info"></span>
-                                <div class="inv-pager-ctl" id="eq-loan-pager-ctl">
-                                    <button type="button" class="inv-pager-btn" id="eq-loan-pg-prev" aria-label="Previous page">
-                                        <span class="material-symbols-outlined">chevron_left</span>
-                                    </button>
-                                    <div class="inv-pager-nums" id="eq-loan-pg-nums"></div>
-                                    <button type="button" class="inv-pager-btn" id="eq-loan-pg-next" aria-label="Next page">
-                                        <span class="material-symbols-outlined">chevron_right</span>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div><!-- /eq-onloan -->
+                <!-- Pagination (20 per page, client-side; works with the tabs and the search box) -->
+                <div class="inv-pager" id="eq-loan-pager" hidden>
+                    <span class="inv-pager-info" id="eq-loan-pager-info"></span>
+                    <div class="inv-pager-ctl" id="eq-loan-pager-ctl">
+                        <button type="button" class="inv-pager-btn" id="eq-loan-pg-prev" aria-label="Previous page">
+                            <span class="material-symbols-outlined">chevron_left</span>
+                        </button>
+                        <div class="inv-pager-nums" id="eq-loan-pg-nums"></div>
+                        <button type="button" class="inv-pager-btn" id="eq-loan-pg-next" aria-label="Next page">
+                            <span class="material-symbols-outlined">chevron_right</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div><!-- /eq-onloan -->
 
-                </div><!-- /lending-inventory -->
+    </div><!-- /lending-inventory -->
 
-            </div><!-- /panel-inventory -->
+</div><!-- /panel-inventory -->

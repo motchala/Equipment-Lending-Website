@@ -1,9 +1,12 @@
 <!-- ============================================================
      TAB: IMPORTS  (Super Admin only)  -  its own sidebar screen (was Settings -> Imports)
-     Equipment Inventory + Rooms Assigned (placeholders: those imports are not built yet) +
+     Equipment Inventory (linked Google Sheet: Sync now + categories) + Rooms Assigned +
      Faculty Registry imports behind ONE password unlock.
      The page only ever contains placeholders: real numbers, lists and
      files are fetched after unlock (settings/api/imports.php).
+     Rooms Assigned is its own import (settings/api/rooms-import.php): it never touches the Faculty Registry.
+     Equipment Inventory is not a file upload: its card is settings/views/admin-imports-equipment-card.php and it is
+     served by settings/api/equipment-import.php (the Google Sheets sync the Settings -> Equipment tab also drives).
      Script: settings/assets/js/admin-imports.js
      Styles: settings/assets/css/admin-imports.css
      Layout: page header (title + session pill) / [ import cards | sticky import guide ]
@@ -12,16 +15,12 @@
 <?php
 $imp_cards = [
     'equipment' => [
-        'pending' => true,   // clickable, but nothing is read, uploaded or imported (see initPlaceholderCard)
+        // Not a file upload: drawn by admin-imports-equipment-card.php (Google Sheets link, Sync now, categories)
         'title'   => 'Equipment Inventory',
         'icon'    => 'inventory_2',
-        'sub'     => 'Equipment lists with item names and stock counts',
-        'types'   => 'XLSX or CSV',
-        'accept'  => '.xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'stats'   => ['Items', 'Categories', 'Rows in file'],
-        'cols'    => ['#', 'Item name', 'Category', 'Quantity', 'Condition'],
-        'what'    => 'Items added to equipment inventory for loan.',
-        'replace' => 'Remove the current items first',
+        'sub'     => 'Equipment list synced from a Google Sheet',
+        'stats'   => ['Items', 'Categories', 'Archived'],
+        'what'    => 'Items added to equipment inventory for loan. They are read from the linked Google Sheet, and each tab of the sheet becomes a category.',
     ],
     'faculty' => [
         'title'  => 'Faculty Registry',
@@ -35,16 +34,15 @@ $imp_cards = [
         'replace' => 'Remove everyone listed first',
     ],
     'rooms' => [
-        'pending' => true,   // clickable, but nothing is read, uploaded or imported (see initPlaceholderCard)
         'title'   => 'Rooms Assigned',
         'icon'    => 'meeting_room',
         'sub'     => 'Rooms assigned to faculty and classes',
-        'types'   => 'XLSX or CSV',
-        'accept'  => '.xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'types'   => 'XLSX',
+        'accept'  => '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'stats'   => ['Rooms', 'Faculty', 'Rows in file'],
-        'cols'    => ['#', 'Room', 'Building', 'Floor', 'Assigned to'],
-        'what'    => 'Each room on this list is assigned to the faculty or class that uses it.',
-        'replace' => 'Remove the current assignments first',
+        'cols'    => ['#', 'Room', 'Building', 'Assigned to', 'Class', 'Day & time'],
+        'what'    => 'Each class in the file is saved with its room, day and time. Those rooms are blocked for reservations at those hours, every week. This list is separate from the Faculty Registry.',
+        'replace' => 'Remove every saved class first',
     ],
 ];
 ?>
@@ -74,7 +72,8 @@ $imp_cards = [
             <div class="imp-layout">
                 <!-- Left: one card per import -->
                 <div class="imp-main">
-                <?php foreach ($imp_cards as $kind => $c): $soon = !empty($c['pending']); ?>
+                <?php foreach ($imp_cards as $kind => $c): $soon = !empty($c['pending']);
+                    if ($kind === 'equipment') { require __DIR__ . '/admin-imports-equipment-card.php'; continue; } ?>
                     <section class="imp-card<?= $soon ? ' imp-card--soon' : '' ?>" data-kind="<?= $kind ?>">
                         <header class="imp-card-head">
                             <div class="imp-card-icon"><span class="material-symbols-outlined"><?= $c['icon'] ?></span></div>
@@ -168,7 +167,8 @@ $imp_cards = [
                 <?php
                 // ── Import guide: what each file has to look like, column by column ──
                 // Faculty Registry is the real, working import (rules below come from its parser).
-                // Equipment Inventory and Rooms Assigned are the planned layouts for when those imports are built.
+                // Rooms Assigned is the Faculty Rooms workbook (rules below come from room-reservation/core/class-schedule.php).
+                // Equipment Inventory is the Google Sheet layout (rules below come from equipment-booking/api/sync-inventory.php).
                 $gh = function ($s) {
                     return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
                 };
@@ -176,44 +176,54 @@ $imp_cards = [
                 $imp_guide = [
                     'equipment' => [
                         'label'   => 'Equipment Inventory',
-                        'planned' => true,
-                        'formats' => [['XLSX', 'Best choice', 'ok'], ['CSV', 'Works too', 'alt'], ['PDF', 'Not for this list', 'no']],
-                        'why'     => 'Excel keeps every value in its own cell, so quantities stay numbers and a comma in a description never shifts the columns. If you use CSV, save it as "CSV UTF-8" so special characters survive.',
+                        'planned' => false,
+                        'formats' => [['Google Sheets', 'Required', 'ok'], ['XLSX / CSV file', 'Not used here', 'no'], ['Private sheet', 'Will not sync', 'no']],
+                        'why'     => 'Nothing is uploaded. PUPSync reads the sheet straight from Google, so it has to be shared as "Anyone with the link can view". Press Sync now to bring it in; PUPSync also checks the sheet for changes by itself while an admin page is open.',
                         'cols'    => [
-                            ['Item name',   true,  'The name students see when they borrow it. One row for each kind of item.', 'HDMI Cable'],
-                            ['Category',    true,  'Pick one: Audio/Visual, Cables & Connectors, Computing, Lab Equipment, Networking, Power, Tools or Others.', 'Cables & Connectors'],
-                            ['Quantity',    true,  'Total units you own. A whole number, 0 or more.', '5'],
-                            ['Condition',   false, 'Good, Fair or For Repair. Leave it blank for Good.', 'Good'],
-                            ['Description', false, 'A short note, up to 500 characters.', '1.5 m, braided'],
+                            ['Name (or Description)', true,  'The item name people see when they borrow it. It is read from the column headed Name, or Description when there is no Name column. A row with no name, or only a number, is skipped.', 'HDMI Cable'],
+                            ['Status',                true,  'The working state. OK or Working counts as Good. NG, Not working or For repair counts as For Repair. Anything else counts as Fair.', 'OK'],
+                            ['Quantity',              false, 'Use it when one row stands for several identical units. A whole number, 0 or more. Leave the Control No. column out of a sheet that uses Quantity.', '5'],
+                            ['Control No.',           false, 'Use it instead of Quantity when each row is one physical unit. Units with the same name are counted for you, and only OK or Working units are counted as available.', 'CITE-0042'],
                         ],
-                        'rows'    => [['HDMI Cable', 'Cables & Connectors', '5', 'Good', '1.5 m, braided'], ['Projector', 'Audio/Visual', '2', 'Fair', 'Acer, HDMI + VGA']],
+                        'rows'    => [['HDMI Cable', 'OK', '5', ''], ['Extension Cord', 'NG', '2', '']],
                         'tips'    => [
-                            'Put the column names in row 1 and start your data in row 2. Nothing above the headers, no blank rows, no merged cells, no totals row.',
-                            'One row per kind of item. Put the total in Quantity instead of repeating the row for every unit.',
-                            'Spell each item the same way every time, because Merge will match items by name.',
-                            'Photos cannot come from the file. Add them afterwards on the Equipment page (JPG or PNG, up to 2 MB each).',
-                            'Keep each file under 5,000 rows and 10 MB, the same limits as the faculty import.',
+                            'Each tab of the sheet is one category, named after the tab. Tabs named Offices Inventory, Software List, Sports & Development Equipment, Ventilation and Fire Extinguisher are skipped.',
+                            'The header row has to contain Name (or Description) and Status. Rows above it can hold titles. Columns are found by their header names, so their order does not matter.',
+                            'To say which campus a tab belongs to, type Campus: in one cell and Canlalay (PUP CITE) or Zapote (PUP MAIN) in the cell next to it, above the header. With nothing there the tab is read as PUP CITE.',
+                            'Items are matched by name within a campus: existing ones are updated and new ones are added. Units that are out on loan right now are taken off the quantity, so a sync never wipes an active borrow.',
+                            'An item that is no longer in the sheet is archived, not deleted. It leaves the borrowing list but stays on record.',
+                            'Photos cannot come from the sheet. Add them afterwards on the Equipment page (JPG or PNG, up to 2 MB each).',
                         ],
                     ],
                     'rooms' => [
                         'label'   => 'Rooms Assigned',
-                        'planned' => true,
-                        'formats' => [['XLSX', 'Best choice', 'ok'], ['CSV', 'Works too', 'alt'], ['PDF', 'Not for this list', 'no']],
-                        'why'     => 'A spreadsheet keeps room names, floors and faculty names in separate cells, so nothing is guessed from a layout. If you use CSV, save it as "CSV UTF-8".',
+                        'planned' => false,
+                        'formats' => [['XLSX', 'Best choice', 'ok'], ['CSV', 'Not accepted', 'no'], ['PDF', 'Not for this list', 'no']],
+                        'why'     => 'Each class sits on its own row, with its room and meeting times in separate cells, so nothing is guessed from a layout. For a CSV, open it in Excel and save it as .xlsx first.',
                         'cols'    => [
-                            ['Room',            true,  'Exactly as it is named under Facilities.', 'Room 203'],
-                            ['Building',        true,  'Building A (Old), Building B (New) or Building C (CITE).', 'Building B (New)'],
-                            ['Floor',           true,  'The floor label, or just the floor number.', '2nd Floor'],
-                            ['Assigned to',     true,  'The faculty member, as written in the Faculty Registry (Faculty ID or full name).', 'Santos, Maria'],
-                            ['Section / class', false, 'The class or section that uses the room.', 'BSIT 3-1'],
+                            ['Faculty',         true,  'The instructor\'s full name. One class per row, so a faculty member appears on as many rows as they have classes.', 'Maria L. Santos'],
+                            ['Faculty ID',      false, 'Leave it blank or type Newly hired (no ID yet) if the person has no ID yet. Their classes attach to their account as soon as it is created.', 'FA0006BN2024'],
+                            ['Status',          false, 'Permanent, Part-Time and so on. For reference only.', 'Permanent'],
+                            ['Room',            true,  'The room code: building letter + room number (A402, B203, C101). A computer lab is CL + number (CL207). A room that is not under Facilities yet is added for you.', 'A402'],
+                            ['Subject Code',    false, 'The course code.', 'COMP 017'],
+                            ['Subject',         false, 'The course title.', 'Multimedia'],
+                            ['Section / Block', false, 'The class or section that uses the room.', 'BSIT 3-2'],
+                            ['Component',       false, 'Lecture or Laboratory. Blank counts as Lecture.', 'Laboratory'],
+                            ['Hours / week',    false, 'For reference only. The hours are worked out from the meeting times.', '3'],
+                            ['Meeting times',   true,  'Day, then start and end time, with a for AM and p for PM. Days are Mon to Sat. Two meetings in one cell are separated by a semicolon.', 'Tue 1:00p–4:00p; Fri 8:00a–11:00a'],
                         ],
-                        'rows'    => [['Room 203', 'Building B (New)', '2nd Floor', 'Santos, Maria', 'BSIT 3-1'], ['Audiovisual Room', 'Building C (CITE)', '1st Floor', 'Reyes, Jose', '']],
+                        'rows'    => [
+                            ['Maria L. Santos', 'FA0006BN2024', 'Permanent', 'C101', 'COMP 017', 'Multimedia', 'BSIT 3-2', 'Laboratory', '3', 'Wed 1:00p–4:00p'],
+                            ['Ana B. Cruz', 'Newly hired (no ID yet)', 'Part-Time', 'A203', 'BUMA 012', 'Strategic Management', 'BSBA-HRM 3-1', 'Lecture', '3', 'Sat 2:00p–5:00p'],
+                        ],
                         'tips'    => [
-                            'Room and building names must match Facilities exactly, spaces and spelling included ("Room 203", not "203"). A name that does not match cannot be linked to a room.',
-                            'Import the Faculty Registry first, so every name in "Assigned to" already exists.',
-                            'One assignment per row. If two faculty share a room, give each of them their own row.',
-                            'Put the column names in row 1 and start your data in row 2. No blank rows or merged cells.',
-                            'Keep each file under 5,000 rows and 10 MB.',
+                            'Put the column names in row 1 and start the classes in row 2. Only the first worksheet is read. No title rows, blank rows or merged cells.',
+                            'Faculty, Room and Meeting times are the columns the import needs. The other columns can be left out.',
+                            'Write each meeting as Day start–end, for example Mon 8:00a–11:00a. A group can follow in brackets, for example Fri 8:00a–11:00a (Grp A). Sunday is closed.',
+                            'Every class repeats each week until the next import replaces it. It blocks its room for reservations the same way an approved reservation does.',
+                            'Merge replaces the classes of the faculty listed in the file and leaves everyone else as they are. Replace removes every saved class first. Classes with no instructor yet are kept either way.',
+                            'This import does not change the Faculty Registry. A Room Timetables workbook (one grid per room) also works: it only adds the classes that have no instructor yet.',
+                            'Up to 20,000 rows and 10 MB per file.',
                         ],
                     ],
                     'faculty' => [

@@ -185,7 +185,8 @@
     /* Photo layered over a placeholder icon: if the file is missing the <img> removes itself
        (see the capture-phase error listener in init) and the placeholder shows through. */
     function photo(path, alt, ph) {
-        var src = safeImg(path);
+        /* An equipment item with no photo (e.g. imported from the sheet) shows the shared default picture */
+        var src = safeImg(path) || ((!ph || ph === 'inventory_2') ? safeImg('uploads/default.png') : '');
         return '<span class="st-ph">' + icon(ph || 'inventory_2') + '</span>' +
             (src ? '<img src="' + esc(src) + '" alt="' + esc(alt || '') + '" loading="lazy" data-fallback="1">' : '');
     }
