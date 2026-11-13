@@ -14047,6 +14047,22 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     }
 }
 
+@keyframes fac-gen-flash-anim {
+    0%   { background-color: var(--accent-light, #fce8ec); }
+    100% { background-color: transparent; }
+}
+
+/* Brief highlight on the generated password input after a regen */
+.fac-gen-input.fac-gen-flash {
+    animation: fac-gen-flash-anim 0.6s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fac-gen-input.fac-gen-flash {
+        animation: none;
+    }
+}
+
 .fac-gen-hint {
     display: block;
     margin-top: 6px;

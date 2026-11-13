@@ -205,6 +205,20 @@ function remember_me_restore(mysqli $conn): void
         return;
     }
 
+    // Regenerate the session ID first so the new session is established
+    // before we rotate the remember-me token in the DB.  On some shared
+    // hosts (e.g. InfinityFree) session_regenerate_id(true) can fail because
+    // the session save path is not writable or the old file cannot be
+    // deleted.  We fall back to a plain regenerate (no delete) in that case,
+    // and log a warning, rather than throwing — which would leave the DB
+    // token already rotated but no new cookie sent, permanently breaking
+    // remember-me for the user.
+    if (!@session_regenerate_id(true)) {
+        // Fallback: regenerate without deleting the old session file.
+        @session_regenerate_id(false);
+        error_log('[PUPSync] remember_me_restore: session_regenerate_id(true) failed; fell back to no-delete regeneration.');
+    }
+
     $newSelector = bin2hex(random_bytes(16));
     $newValidator = bin2hex(random_bytes(32));
     $newValidatorHash = hash('sha256', $newValidator);
@@ -230,18 +244,24 @@ function remember_me_restore(mysqli $conn): void
     }
 
     $expiresAt = strtotime((string)$token['expires_at'] . ' UTC');
-    if ($expiresAt === false || !setcookie(
-        REMEMBER_ME_COOKIE,
-        $newSelector . '.' . $newValidator,
-        remember_me_cookie_options($expiresAt)
-    )    ) {
-        remember_me_delete_selector($conn, $newSelector);
-        throw new RuntimeException('Could not refresh the remember-me cookie.');
-    }
-    $_COOKIE[REMEMBER_ME_COOKIE] = $newSelector . '.' . $newValidator;
-
-    if (!session_regenerate_id(true)) {
-        throw new RuntimeException('Could not renew the session for remember-me authentication.');
+    // setcookie() can silently return false on some shared hosts even when
+    // headers have not been sent yet.  Treat failure as non-fatal: the
+    // session variables are already set so this page-load succeeds; the
+    // next page-load will just re-issue from the now-rotated token stored in
+    // the DB (the old cookie value will fail the validator check, which is
+    // the normal theft-detection path, so a new remember_me_issue() will be
+    // needed on the next full login).
+    if ($expiresAt !== false) {
+        $cookieSent = setcookie(
+            REMEMBER_ME_COOKIE,
+            $newSelector . '.' . $newValidator,
+            remember_me_cookie_options($expiresAt)
+        );
+        if ($cookieSent) {
+            $_COOKIE[REMEMBER_ME_COOKIE] = $newSelector . '.' . $newValidator;
+        } else {
+            error_log('[PUPSync] remember_me_restore: setcookie() returned false during token rotation.');
+        }
     }
 
     if ($accountType === 'admin') {
