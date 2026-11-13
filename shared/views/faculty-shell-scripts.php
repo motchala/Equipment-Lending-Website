@@ -2,6 +2,7 @@
         window.REQUESTS_DATA = <?php echo $requests_json; ?>;
         window.BOOKING_META = <?php echo $bk_meta_json; ?>;
         window.FNOTIF_DATA = <?php echo $notif_json; ?>;
+        window.NOTIF_PREFS = <?php echo json_encode(notif_prefs_get($conn, 'faculty', (string)$_SESSION['faculty_id']), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
         window.USER_SLUG = '<?php echo $user_slug; ?>';
         window.OVERDUE_COUNT = <?php echo (int)$stat_overdue; ?>;
         window.SERVER_BASE_URL = '<?php
@@ -25,6 +26,7 @@
     <script src="shared/assets/js/logout-modal.js?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/js/logout-modal.js'); ?>"></script>
     <script src="shared/assets/js/letter-camera.js?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/js/letter-camera.js'); ?>"></script>
     <script src="dashboard/assets/js/faculty-dashboard.js?v=<?php echo @filemtime(PS_ROOT . '/dashboard/assets/js/faculty-dashboard.js'); ?>"></script>
+    <script src="notifications/assets/js/notif-prefs.js?v=<?php echo @filemtime(PS_ROOT . '/notifications/assets/js/notif-prefs.js'); ?>"></script>
     <script src="equipment-booking/assets/js/faculty-borrow-flow.js?v=<?php echo @filemtime(PS_ROOT . '/equipment-booking/assets/js/faculty-borrow-flow.js'); ?>"></script>
     <script src="room-reservation/assets/js/fcty-facilities.js"></script>
     <script src="room-reservation/assets/js/fcty-class-schedule.js?v=<?php echo @filemtime(PS_ROOT . '/room-reservation/assets/js/fcty-class-schedule.js'); ?>"></script>

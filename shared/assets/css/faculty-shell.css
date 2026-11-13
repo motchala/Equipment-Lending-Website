@@ -1237,6 +1237,19 @@
             grid-template-columns: minmax(0, 1fr);
         }
 
+        /* A card that takes the whole row (Notification Preferences, at the bottom of Settings) */
+        #settingsOverlay .acct-card--wide {
+            grid-column: 1 / -1;
+        }
+
+        /* Full width gives the notification labels room, so names like "Facility reservations"
+           stay on one line instead of wrapping inside the narrow 132px label column */
+        @media (min-width: 769px) {
+            #settingsOverlay #notifPrefsPanel .acct-row-label {
+                width: 200px;
+            }
+        }
+
         @media (max-width: 1024px) {
 
             #settingsOverlay .sx-grid,

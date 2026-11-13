@@ -214,7 +214,9 @@ $fac_mail_stmt2->execute();
 $fac_mail_row2 = $fac_mail_stmt2->get_result()->fetch_assoc();
 $fac_mail_stmt2->close();
 
-if ($fac_mail_row2 && !empty($fac_mail_row2['email'])) {
+require_once __DIR__ . '/../../notifications/core/preferences.php';
+// Respect the faculty's Notification Preferences (Equipment requests / master switch).
+if ($fac_mail_row2 && !empty($fac_mail_row2['email']) && notif_family_enabled($conn, 'faculty', (string)$faculty_id, 'equipment')) {
     require_once __DIR__ . '/../../shared/core/mailer.php';
     $email_subject2 = 'PUPSync: ' . $email_subject_word . ' — ' . $equipment;
     $email_body2 = '

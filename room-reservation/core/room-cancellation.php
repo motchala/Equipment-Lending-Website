@@ -13,6 +13,8 @@
  * Depth: 2  →  config prefix: __DIR__ . '/../../…'
  */
 
+require_once __DIR__ . '/../../notifications/core/preferences.php';
+
 class RoomCancellation
 {
   /**
@@ -152,6 +154,8 @@ class RoomCancellation
     $fac->close();
 
     if (!$facRow || empty($facRow['email'])) return;
+    // Respect the faculty's Notification Preferences (Facility reservations / master switch).
+    if (!notif_family_enabled($conn, 'faculty', (string)$row['faculty_id'], 'facilities')) return;
 
     require_once __DIR__ . '/../../shared/core/mailer.php';
 
@@ -239,7 +243,10 @@ class RoomCancellation
     $endDisplay   = date('g:i A',  strtotime('1970-01-01 ' . $endTime));
     $roomNameEsc  = htmlspecialchars($roomName);
 
+    $sent = 0;
     foreach ($entries as $entry) {
+      // Respect each waitlisted faculty's Notification Preferences (Facility reservations / master switch).
+      if (!notif_family_enabled($conn, 'faculty', (string)($entry['faculty_id'] ?? ''), 'facilities')) continue;
       $recipientName = htmlspecialchars($entry['faculty_name']);
       $subject       = 'PUPSync: ' . $roomName . ' is Now Available — ' . $dateDisplay;
       $bodyHtml      = '
@@ -276,7 +283,8 @@ class RoomCancellation
 </div>';
 
       sendPupSyncEmail($entry['faculty_email'], $entry['faculty_name'], $subject, $bodyHtml);
+      $sent++;
     }
-    return count($entries);
+    return $sent;
   }
 }

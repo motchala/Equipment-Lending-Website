@@ -87,14 +87,6 @@
     function isClass(s) { return !!s && s.kind === 'class'; }
     /* 'COMP 017 · DIT 3-1 (Lecture) — Jane Doe' -> 'COMP 017 · DIT 3-1 (Lecture)': what the class is, not who teaches it */
     function classTitle(s) { return decodeHtml(String(s.label || '')).split(' \u2014 ')[0] || 'a class'; }
-    /* '2 classes · 1 reservation' */
-    function dayCountLabel(list) {
-        var nc = list.filter(isClass).length, nr = list.length - nc, parts = [];
-        if (nc) parts.push(plural(nc, 'class', 'classes'));
-        if (nr) parts.push(plural(nr, 'reservation'));
-        return parts.length ? parts.join(' \u00b7 ') : 'Free all day';
-    }
-
     /* What is still OPEN in a day: the gaps (at least 30 min) between everything that blocks the room.
        list = the day's classes + reservations, from/to in minutes. Returns [[startMin, endMin], ...]. */
     function freeWindows(list, from, to) {
@@ -515,20 +507,6 @@
         $('fcty-modal-availability-text').textContent = text;
     }
 
-    function setScheduleTab(name) {
-        roomOverlay.querySelectorAll('.fcty-seg-btn').forEach(function (t) {
-            var on = t.dataset.scheduleTab === name;
-            t.classList.toggle('active', on);
-            t.setAttribute('aria-selected', on ? 'true' : 'false');
-        });
-        roomOverlay.querySelectorAll('.fcty-schedule-panel').forEach(function (p) {
-            p.classList.toggle('active', p.dataset.schedulePanel === name);
-        });
-        var dlg = roomOverlay.querySelector('.fcty-dialog');
-        if (dlg) dlg.classList.toggle('is-tt', name === 'weekly');   /* the timetable needs room to breathe */
-        if (name === 'daily') scrollTodayToNow();
-    }
-
     function note(text) {
         return '<div class="fcty-slot vacant is-note"><span class="fcty-slot-what">' + text + '</span></div>';
     }
@@ -537,7 +515,6 @@
        Reservation statuses come from the clock (reservationState). Records are only ever
        read here, never deleted, so history stays in the database when a day or week rolls over. */
     var schedule = null;       /* { monday, week, blocked } for the open room dialog */
-    var dayOpen = {};          /* 'scope|YYYY-MM-DD' → open?  (kept across re-renders) */
     var schedSig = '';
     var schedTimer = null;
 
@@ -558,52 +535,6 @@
 
     /* Positions are written as data-l / data-w here and applied through the DOM
        afterwards (positionTimeline), so no inline style="" attributes are emitted. */
-    function dayTimelineHTML(dateStr, list, now) {
-        var nowMin = now.getHours() * 60 + now.getMinutes();
-        var blocks = '', rows = '';
-        list.forEach(function (s) {
-            var st = reservationState(dateStr, s, now);
-            var cls = isClass(s);
-            if (cls && st.label === 'Ongoing') st = { cls: st.cls, label: 'In class' };
-            var a = tlPct(timeToMin(s.start)), b = tlPct(timeToMin(s.end));
-            var range = timeRange(s.start, s.end);
-            if (b > a) {
-                blocks += '<div class="fcty-dtl-block ' + st.cls + (cls ? ' is-class' : '') + '" data-l="' + a + '" data-w="' + (b - a) + '" title="' +
-                    esc(range + ' \u00b7 ' + decodeHtml(s.label) + ' \u00b7 ' + st.label) + '"></div>';
-            }
-            rows += '<li class="fcty-dtl-item ' + st.cls + (cls ? ' is-class' : '') + '"><div class="fcty-dtl-info"><time>' + range + '</time>' +
-                '<span class="fcty-dtl-what">' + (cls ? '<span class="fcty-dtl-tag">Class</span> ' : '') + s.label + '</span></div>' +
-                '<span class="fcty-dtl-state">' + st.label + '</span></li>';
-        });
-        var nowLine = (dateStr === ymd(now) && nowMin >= TL_START_MIN && nowMin <= TL_END_MIN)
-            ? '<div class="fcty-dtl-now" data-l="' + tlPct(nowMin) + '"></div>' : '';
-        var ticks = TL_TICKS.map(function (t) {
-            return '<span' + (t[2] ? ' class="is-minor"' : '') + ' data-l="' + tlPct(t[0] * 60) + '">' + t[1] + '</span>';
-        }).join('');
-        return '<div class="fcty-dtl">' +
-            '<div class="fcty-dtl-track" aria-hidden="true">' + blocks + nowLine + '</div>' +
-            '<div class="fcty-dtl-ticks" aria-hidden="true">' + ticks + '</div>' +
-            (rows ? '<ul class="fcty-dtl-list">' + rows + '</ul>' : '<p class="fcty-dtl-empty">No classes or reservations</p>') +
-            '</div>';
-    }
-
-    function dayDropdownHTML(scope, date, list, now) {
-        var dateStr = ymd(date), today = ymd(now);
-        var key = scope + '|' + dateStr;
-        var open = key in dayOpen ? dayOpen[key] : dateStr === today;   /* today starts open */
-        var id = 'fcty-day-' + scope + '-' + dateStr;
-        var n = list.length;
-        return '<div class="fcty-day' + (dateStr === today ? ' is-today' : '') + (dateStr < today ? ' is-past' : '') + (open ? ' is-open' : '') + '">' +
-            '<button type="button" class="fcty-day-head" data-day-key="' + key + '" aria-expanded="' + (open ? 'true' : 'false') + '" aria-controls="' + id + '">' +
-            '<span class="fcty-day-main"><span class="fcty-day-title">' + longDate(date) + '</span>' +
-            (dateStr === today ? '<span class="fcty-day-tag">Today</span>' : '') + '</span>' +
-            '<span class="fcty-day-count' + (n ? ' has' : '') + '">' + dayCountLabel(list) + '</span>' +
-            icon('expand_more') +
-            '</button>' +
-            '<div class="fcty-day-body" id="' + id + '"' + (open ? '' : ' hidden') + '>' + dayTimelineHTML(dateStr, list, now) + '</div>' +
-            '</div>';
-    }
-
     function positionTimeline(root) {
         root.querySelectorAll('[data-l]').forEach(function (el) {
             el.style.left = el.getAttribute('data-l') + '%';
@@ -658,7 +589,7 @@
                 var mins = timeToMin(s.end) - timeToMin(s.start);
                 var name = s.title || decodeHtml(String(s.label || '')), who = s.who || '';
                 return '<button type="button" class="fcty-tt-block ' + (cls ? 'is-class' : 'is-res') + ' ' + st.cls +
-                    (mins <= 60 ? ' is-short' : '') + (key === ttSel ? ' is-selected' : '') + '" data-t="' + a + '" data-h="' + Math.max(1, b - a) +
+                    (mins <= 60 ? ' is-short' : (mins <= 90 ? ' is-mid' : '')) + (key === ttSel ? ' is-selected' : '') + '" data-t="' + a + '" data-h="' + Math.max(1, b - a) +
                     '" data-key="' + esc(key) + '" title="' + esc(timeRange(s.start, s.end) + ' \u00b7 ' + name + (who ? ' \u00b7 ' + who : '')) + '">' +
                     '<span class="fcty-tt-time">' + rangeShort(s.start, s.end) + '</span>' +
                     '<span class="fcty-tt-name">' + esc(name) + '</span>' +
@@ -669,11 +600,11 @@
             cols += '<div class="fcty-tt-col' + (isToday ? ' is-today' : '') + '">' + blocks + nowLine + '</div>';
         });
         return '<div class="fcty-tt" role="group" aria-label="Weekly timetable">' +
-            '<p class="fcty-week-range">' + longDate(monday) + ' \u2013 ' + longDate(addDays(monday, 5)) + '</p>' +
+            '<div class="fcty-tt-bar"><p class="fcty-week-range">' + longDate(monday) + ' \u2013 ' + longDate(addDays(monday, 5)) + '</p>' +
+            '<div class="fcty-tt-legend" aria-hidden="true"><span><i class="is-class"></i>Class</span>' +
+            '<span><i class="is-res"></i>Reservation</span><span><i class="is-open"></i>Open</span></div></div>' +
             '<div class="fcty-tt-scroll"><div class="fcty-tt-grid">' + heads +
             '<div class="fcty-tt-hours" aria-hidden="true">' + hours + '</div>' + cols + '</div></div>' +
-            '<div class="fcty-tt-legend" aria-hidden="true"><span><i class="is-class"></i>Class</span>' +
-            '<span><i class="is-res"></i>Reservation</span><span><i class="is-open"></i>Open</span></div>' +
             '<div class="fcty-tt-detail" id="fcty-tt-detail" aria-live="polite">' + ttDetailHTML(ttSel) + '</div></div>';
     }
 
@@ -686,72 +617,7 @@
         if (d) d.innerHTML = ttDetailHTML(ttSel);
     }
 
-    /* "Open today": what is still free between now and closing */
-    function openTodayHTML(list, now) {
-        var nowMin = now.getHours() * 60 + now.getMinutes();
-        if (nowMin >= SCHOOL_END_MIN) return '';
-        var ws = freeWindows(list, Math.max(SCHOOL_START_MIN, Math.ceil(nowMin / 30) * 30), SCHOOL_END_MIN);
-        return '<div class="fcty-open"><span class="fcty-open-title">' + icon('event_available') + 'Open today</span>' +
-            (ws.length
-                ? '<div class="fcty-open-chips">' + ws.map(function (w) {
-                    return '<span class="fcty-open-chip">' + minToLabel(w[0]) + ' \u2013 ' + minToLabel(w[1]) + '</span>';
-                }).join('') + '</div>'
-                : '<p class="fcty-open-none">Nothing open for the rest of today.</p>') + '</div>';
-    }
-
-    /* ── Today: the same timetable, for one day ───────────────────────────────────────────────
-       One wide column (7 AM-8 PM) with every class / reservation written out in full, the gaps
-       that are still open marked as "Open" bands, and a line for the current time. */
-    var todayScrolled = false;   /* scroll to "now" once per opening, not on every refresh */
-
-    function todayTimetableHTML(list, now) {
-        var today = ymd(now), nowMin = now.getHours() * 60 + now.getMinutes();
-        var hours = '';
-        for (var h = SCHOOL_START_MIN / 60; h < SCHOOL_END_MIN / 60; h++) {
-            hours += '<span data-t="' + ttPct(h * 60) + '">' + hourLabel(h) + '</span>';
-        }
-        var blocks = list.map(function (s) {
-            var cls = isClass(s), st = reservationState(today, s, now);
-            var a = ttPct(timeToMin(s.start)), b = ttPct(timeToMin(s.end));
-            var mins = timeToMin(s.end) - timeToMin(s.start);
-            var name = s.title || decodeHtml(String(s.label || '')), who = s.who || '';
-            var live = st.label === 'Ongoing' ? (cls ? 'In class' : 'Ongoing') : '';
-            return '<div class="fcty-tt-block ' + (cls ? 'is-class' : 'is-res') + ' ' + st.cls +
-                (mins <= 30 ? ' is-xs' : (mins <= 60 ? ' is-short' : '')) + '" tabindex="0" data-t="' + a + '" data-h="' + Math.max(1, b - a) +
-                '" title="' + esc(timeRange(s.start, s.end) + ' \u00b7 ' + name + (who ? ' \u00b7 ' + who : '')) + '">' +
-                '<span class="fcty-tt-top"><span class="fcty-tt-time">' + timeRange(s.start, s.end) + '</span>' +
-                '<span class="fcty-tt-tag ' + (cls ? 'is-class' : 'is-res') + '">' + (cls ? 'Class' : 'Reservation') + '</span>' +
-                (live ? '<span class="fcty-tt-live">' + live + '</span>' : '') + '</span>' +
-                '<span class="fcty-tt-name">' + esc(name) + '</span>' +
-                (who ? '<span class="fcty-tt-who">' + esc(who) + '</span>' : '') + '</div>';
-        }).join('');
-        /* only the part of the day that is still ahead can be called open */
-        var bands = nowMin >= SCHOOL_END_MIN ? '' : freeWindows(list, Math.max(SCHOOL_START_MIN, Math.ceil(nowMin / 30) * 30), SCHOOL_END_MIN).map(function (w) {
-            return '<div class="fcty-tt-open" data-t="' + ttPct(w[0]) + '" data-h="' + (ttPct(w[1]) - ttPct(w[0])) + '"><span>Open \u00b7 ' +
-                minToLabel(w[0]) + ' \u2013 ' + minToLabel(w[1]) + '</span></div>';
-        }).join('');
-        var nowLine = nowMin >= SCHOOL_START_MIN && nowMin <= SCHOOL_END_MIN ? '<div class="fcty-tt-now" data-t="' + ttPct(nowMin) + '"></div>' : '';
-        return '<div class="fcty-tt fcty-tt-day" role="group" aria-label="Today\u2019s timetable">' +
-            '<div class="fcty-tt-daybar"><strong>' + esc(longDate(now)) + '</strong><span class="fcty-today-tag">Today</span>' +
-            '<span class="fcty-tt-daycount">' + dayCountLabel(list) + '</span></div>' +
-            '<div class="fcty-tt-scroll" id="fcty-tt-today-scroll"><div class="fcty-tt-grid">' +
-            '<div class="fcty-tt-hours" aria-hidden="true">' + hours + '</div>' +
-            '<div class="fcty-tt-col is-today">' + bands + blocks + nowLine + '</div></div></div>' +
-            '<div class="fcty-tt-legend" aria-hidden="true"><span><i class="is-class"></i>Class</span>' +
-            '<span><i class="is-res"></i>Reservation</span><span><i class="is-open"></i>Open</span></div></div>';
-    }
-
     /* open the Today timetable around "now" (or the first class of the day), once */
-    function scrollTodayToNow() {
-        var sc = $('fcty-tt-today-scroll');
-        if (todayScrolled || !sc || !sc.clientHeight) return;   /* hidden tab: try again when it is shown */
-        var col = sc.querySelector('.fcty-tt-col'), now = new Date();
-        var nowMin = now.getHours() * 60 + now.getMinutes();
-        var target = nowMin >= SCHOOL_START_MIN && nowMin <= SCHOOL_END_MIN ? nowMin - 60 : SCHOOL_START_MIN;   /* an hour before now */
-        sc.scrollTop = Math.max(0, col.offsetHeight * ttPct(Math.max(SCHOOL_START_MIN, target)) / 100);
-        todayScrolled = true;
-    }
-
     /* Everything that changes what the schedule looks like as time passes */
     function scheduleSig(now) {
         var m = now.getHours() * 60 + now.getMinutes();
@@ -777,24 +643,13 @@
         if (!schedule) return;
         var now = new Date();
         var week = schedule.week || {};
-        var held = document.activeElement && document.activeElement.getAttribute
-            ? document.activeElement.getAttribute('data-day-key') : null;
-
-        var todays = isClosedDay(now) ? [] : sortByStart(week[DAY_KEYS[now.getDay()]]);
-        $('fcty-modal-daily-list').innerHTML = isClosedDay(now)
-            ? note('Closed on Sundays \u2014 reservations resume ' + longDate(nextOpenDay(now)) + '.')
-            : todayTimetableHTML(todays, now);
+        var todays = isClosedDay(now) ? [] : sortByStart(week[DAY_KEYS[now.getDay()]]);   /* feeds the status pill ("Free until ...") */
 
         var monday = parseYmd(schedule.monday);
         $('fcty-modal-weekly-grid').innerHTML = weekTimetableHTML(monday, week, now);
 
         positionTimeline(roomOverlay);
-        scrollTodayToNow();
         if (!schedule.blocked) applyAvailabilityBadge(todays);
-        if (held) {   /* a re-render must not drop keyboard focus */
-            var again = roomOverlay.querySelector('[data-day-key="' + held + '"]');
-            if (again) again.focus();
-        }
     }
 
     function loadSchedule(room, blocked) {
@@ -808,7 +663,7 @@
             })
             .catch(function () {
                 if (!currentRoom || currentRoom.room !== room || schedule) return;
-                $('fcty-modal-daily-list').innerHTML = note('Couldn\u2019t load the schedule right now.');
+                $('fcty-modal-weekly-grid').innerHTML = note('Couldn\u2019t load the schedule right now.');
                 if (!blocked) setStatusBadge('', 'Available');
             });
     }
@@ -835,17 +690,6 @@
 
     function stopScheduleClock() {
         if (schedTimer) { clearInterval(schedTimer); schedTimer = null; }
-    }
-
-    function onDayToggle(e) {
-        var head = e.target.closest('.fcty-day-head');
-        if (!head) return;
-        var open = head.getAttribute('aria-expanded') !== 'true';
-        head.setAttribute('aria-expanded', open ? 'true' : 'false');
-        head.parentNode.classList.toggle('is-open', open);
-        var body = $(head.getAttribute('aria-controls'));
-        if (body) body.hidden = !open;
-        dayOpen[head.getAttribute('data-day-key')] = open;
     }
 
     /* "Free until 2:00 PM" / "In use until 10:30 AM" — shown in the status pill */
@@ -876,12 +720,8 @@
         else setStatusBadge('', 'Checking\u2026');
 
         schedule = null;
-        dayOpen = {};
         ttSel = '';
-        todayScrolled = false;
-        $('fcty-modal-daily-list').innerHTML = note('Loading schedule\u2026');
-        $('fcty-modal-weekly-grid').innerHTML = '';
-        setScheduleTab('daily');
+        $('fcty-modal-weekly-grid').innerHTML = note('Loading schedule\u2026');
 
         var reserve = $('fcty-modal-reserve');
         reserve.disabled = blocked;
@@ -1733,10 +1573,6 @@
 
         /* Room dialog */
         $('fcty-modal-close').addEventListener('click', function () { closeOverlay(roomOverlay); });
-        roomOverlay.querySelectorAll('.fcty-seg-btn').forEach(function (t) {
-            t.addEventListener('click', function () { setScheduleTab(this.dataset.scheduleTab); });
-        });
-        $('fcty-modal-daily-list').addEventListener('click', onDayToggle);
         $('fcty-modal-weekly-grid').addEventListener('click', onTimetableClick);
         $('fcty-modal-reserve').addEventListener('click', function () {
             if (!currentRoom || this.disabled) return;

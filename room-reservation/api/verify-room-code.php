@@ -96,7 +96,9 @@ $fac_stmt->execute();
 $fac_row = $fac_stmt->get_result()->fetch_assoc();
 $fac_stmt->close();
 
-if ($fac_row && !empty($fac_row['email'])) {
+require_once __DIR__ . '/../../notifications/core/preferences.php';
+// Respect the faculty's Notification Preferences (Facility reservations / master switch).
+if ($fac_row && !empty($fac_row['email']) && notif_family_enabled($conn, 'faculty', (string)$row['faculty_id'], 'facilities')) {
     require_once __DIR__ . '/../../shared/core/mailer.php';
     $subject = 'PUPSync: ' . $student_name . ' is about to reserve a room';
     $body_html = '

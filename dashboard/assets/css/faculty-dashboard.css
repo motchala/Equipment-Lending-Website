@@ -13655,3 +13655,21 @@ html.rx-mobile body #settingsOverlay .sov-pagehead::after {
     font-size: 13px;
     font-weight: 600;
 }
+
+/* ── Notification preferences: master switch + category rows ───────── */
+.acct-row--master .acct-row-label {
+    color: var(--color-on-surface, inherit);
+}
+
+.acct-row--child {
+    transition: opacity 0.2s;
+}
+
+.notif-prefs-off .acct-row--child {
+    opacity: 0.5;
+}
+
+.toggle-sw input:disabled+.toggle-track {
+    opacity: 0.55;
+    cursor: not-allowed;
+}

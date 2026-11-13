@@ -480,6 +480,7 @@ if ($action === 'check_faculty_id' || $action === 'set_faculty_id') {
         ['tbl_room_arbitration_log', 'borrower_id'],
         ['tbl_room_issues',          'reported_by_id'],
         ['tbl_faculty_notif_state',  'faculty_id'],
+        ['tbl_notif_prefs',          'user_key'],
         ['tbl_room_waitlist',        'faculty_id'],
     ];
 

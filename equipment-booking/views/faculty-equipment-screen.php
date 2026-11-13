@@ -1,6 +1,7 @@
             <!-- ============================================================
          TAB: EQUIPMENT (LENDING)
     ============================================================ -->
+            <?php require_once dirname(__DIR__, 2) . '/shared/core/equipment-image.php'; // no photo -> uploads/default.png ?>
             <div class="tab-panel" id="panel-lending">
 
 
@@ -112,16 +113,10 @@
                                                 <?= fbAddSlot($featured_hero, (bool)$has_overdue_block, $bk_items, 'hero') ?>
                                             </div>
                                         </div>
-                                        <?php if (!empty($featured_hero['image_path'])): ?>
-                                            <div class="feat-hero-img">
-                                                <img src="<?php echo $root_url . htmlspecialchars($featured_hero['image_path']); ?>"
-                                                    alt="<?php echo htmlspecialchars($featured_hero['item_name']); ?>">
-                                            </div>
-                                        <?php else: ?>
-                                            <div class="feat-hero-img-placeholder">
-                                                <span class="material-symbols-outlined">inventory_2</span>
-                                            </div>
-                                        <?php endif; ?>
+                                        <div class="feat-hero-img">
+                                            <img src="<?php echo $root_url . htmlspecialchars(equipment_image_path($featured_hero['image_path'] ?? '')); ?>"
+                                                alt="<?php echo htmlspecialchars($featured_hero['item_name']); ?>">
+                                        </div>
                                     </div>
                                 <?php endif; ?>
 
@@ -129,12 +124,8 @@
                                 <?php if ($featured_sec): ?>
                                     <div class="feat-secondary" data-campus="<?php echo (int)($featured_sec['campus_id'] ?? 1); ?>">
                                         <div class="feat-secondary-img" style="position:relative;">
-                                            <?php if (!empty($featured_sec['image_path'])): ?>
-                                                <img src="<?php echo $root_url . htmlspecialchars($featured_sec['image_path']); ?>"
-                                                    alt="<?php echo htmlspecialchars($featured_sec['item_name']); ?>">
-                                            <?php else: ?>
-                                                <span class="material-symbols-outlined">inventory_2</span>
-                                            <?php endif; ?>
+                                            <img src="<?php echo $root_url . htmlspecialchars(equipment_image_path($featured_sec['image_path'] ?? '')); ?>"
+                                                alt="<?php echo htmlspecialchars($featured_sec['item_name']); ?>">
                                             <span class="stock-badge stock-avail"
                                                 style="position:absolute;top:10px;left:10px;margin-bottom:0;z-index:2;background:rgba(209,250,229,.95);backdrop-filter:blur(4px);">
                                                 <span class="material-symbols-outlined" style="font-size:12px;">check_circle</span>
@@ -237,15 +228,10 @@
                                         data-campus="<?php echo (int)$item['campus_id']; ?>"
                                         data-item-id="<?php echo (int)$item['item_id']; ?>">
                                         <div class="eq-item-img-wrap">
-                                            <?php if (!empty($item['image_path'])): ?>
-                                                <img class="eq-item-img"
-                                                    src="<?php echo $root_url . htmlspecialchars($item['image_path']); ?>"
-                                                    alt="<?php echo htmlspecialchars($item['item_name']); ?>">
-                                            <?php else: ?>
-                                                <div class="eq-item-img-placeholder">
-                                                    <span class="material-symbols-outlined">inventory_2</span>
-                                                </div>
-                                            <?php endif; ?>
+                                            <img class="eq-item-img"
+                                                src="<?php echo $root_url . htmlspecialchars(equipment_image_path($item['image_path'] ?? '')); ?>"
+                                                alt="<?php echo htmlspecialchars($item['item_name']); ?>"
+                                                loading="lazy" decoding="async">
                                             <!-- Shown when the item is part of the current request -->
                                             <span class="bf-tick" aria-hidden="true"><span class="material-symbols-outlined">check</span></span>
 

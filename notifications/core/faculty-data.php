@@ -34,6 +34,8 @@
  *   $unread = fnotif_count_unread($list);
  */
 
+require_once __DIR__ . '/preferences.php';
+
 if (!function_exists('fnotif_ensure_table')) {
     /** Idempotent guard — creates tbl_faculty_notif_state on first use. */
     function fnotif_ensure_table(mysqli $conn): void
@@ -1003,6 +1005,12 @@ if (!function_exists('fnotif_build_list')) {
         } catch (Throwable $ex) {
             error_log('[PUPSync] fnotif static notices failed: ' . $ex->getMessage());
         }
+
+        // Notification Preferences (Settings > Notification Preferences): categories
+        // this faculty turned off, or everything when the master switch is off, are
+        // never part of the feed -- so they are not listed, counted or polled.
+        // This runs before the FEED_LIMIT slice so muted items never use up a slot.
+        $items = notif_prefs_filter_items($items, 'faculty', notif_prefs_get($conn, 'faculty', $facultyId));
 
         if (!$includeDeleted) {
             $items = array_values(array_filter($items, fn($i) => !$i['is_deleted']));

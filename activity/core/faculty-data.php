@@ -49,6 +49,7 @@ require_once __DIR__ . '/../../notifications/core/faculty-data.php';
 require_once __DIR__ . '/../../equipment-booking/core/borrow-extension.php';
 require_once __DIR__ . '/../../equipment-booking/core/borrow-cancellation.php';
 require_once __DIR__ . '/../../room-reservation/core/room-quota.php';
+require_once __DIR__ . '/../../shared/core/equipment-image.php';
 
 /** Same icon fallback the Home tab uses when an item has no catalogue photo. */
 if (!function_exists('actEquipIcon')) {
@@ -84,7 +85,10 @@ function fact_eq_housekeeping(mysqli $conn): void
     BookingSchedule::tick($conn);
 }
 
-/** Catalogue photo per item name (tbl_requests only stores the name as text). */
+/**
+ * Picture per item name (tbl_requests only stores the name as text). An item with no photo, or whose
+ * photo file is gone, gets the shared default picture (uploads/default.png) instead of an icon tile.
+ */
 function fact_eq_image_map(mysqli $conn): array
 {
     static $map = null;
@@ -94,10 +98,7 @@ function fact_eq_image_map(mysqli $conn): array
     $map = [];
     $res = $conn->query('SELECT item_name, image_path FROM tbl_inventory');
     while ($res && ($row = $res->fetch_assoc())) {
-        $path = (string)($row['image_path'] ?? '');
-        if ($path !== '' && $path !== 'uploads/default.png') {
-            $map[strtolower(trim((string)$row['item_name']))] = $path;
-        }
+        $map[strtolower(trim((string)$row['item_name']))] = equipment_image_path((string)($row['image_path'] ?? ''));
     }
     return $map;
 }
@@ -201,7 +202,7 @@ function fact_eq_load(mysqli $conn, string $faculty_id): array
                     'claim_token' => fact_s($row, 'claim_token'),
                     'student'     => fact_s($row, 'submitted_as') === 'student' ? trim(fact_s($row, 'submitted_by_name')) : '',
                     'student_id'  => fact_s($row, 'submitted_as') === 'student' ? trim(fact_s($row, 'submitted_by_id')) : '',
-                    'image'       => $images[strtolower(trim($name))] ?? '',
+                    'image'       => $images[strtolower(trim($name))] ?? EQUIPMENT_DEFAULT_IMAGE,
                     'icon'        => actEquipIcon($name),
                     'start_date'  => $start->format('Y-m-d'),
                     'start_time'  => $borrowTime,

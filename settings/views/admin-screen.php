@@ -235,37 +235,37 @@
                     <span class="material-symbols-outlined">notifications</span>
                     <h3>Notification Preferences</h3>
                 </div>
-                <div class="sett-card-body sett-card-body--notifs">
-                    <div class="sett-notif-row">
+                <?php
+                // Notification Preferences are saved per admin account on the server
+                // (notifications/api/notif-prefs.php) and applied there, so a muted
+                // category is never listed, counted, popped up or emailed.
+                require_once PS_ROOT . '/notifications/core/preferences.php';
+                $np_defs  = notif_pref_definitions('admin');
+                $np_state = notif_prefs_get($conn, 'admin', notif_prefs_current_key($conn, 'admin'));
+                ?>
+                <div class="sett-card-body sett-card-body--notifs<?php echo empty($np_state['all']) ? ' notif-prefs-off' : ''; ?>" id="notifPrefsPanel" data-notif-audience="admin">
+                    <div class="sett-notif-row sett-notif-row--master">
                         <label class="toggle-sw">
-                            <input type="checkbox" id="notifPrefRequestsToggle" checked>
+                            <input type="checkbox" data-notif-pref="all" data-notif-label="All notifications" aria-label="All notifications"<?php echo !empty($np_state['all']) ? ' checked' : ''; ?>>
                             <span class="toggle-track"></span>
                         </label>
                         <div>
-                            <div class="sett-notif-title">New Requests</div>
-                            <div class="sett-notif-sub">Alert when faculty submits a request</div>
+                            <div class="sett-notif-title">All notifications</div>
+                            <div class="sett-notif-sub">Turn this off to stop every alert, pop-up and email listed below</div>
                         </div>
                     </div>
-                    <div class="sett-notif-row">
+                    <?php foreach ($np_defs as $np_key => $np_def): ?>
+                    <div class="sett-notif-row sett-notif-row--child">
                         <label class="toggle-sw">
-                            <input type="checkbox" id="notifPrefOverdueToggle" checked>
+                            <input type="checkbox" data-notif-pref="<?php echo htmlspecialchars($np_key); ?>" data-notif-label="<?php echo htmlspecialchars($np_def['label']); ?>" aria-label="<?php echo htmlspecialchars($np_def['label']); ?>"<?php echo !empty($np_state[$np_key]) ? ' checked' : ''; ?><?php echo empty($np_state['all']) ? ' disabled' : ''; ?>>
                             <span class="toggle-track"></span>
                         </label>
                         <div>
-                            <div class="sett-notif-title">Overdue Alerts</div>
-                            <div class="sett-notif-sub">Alert when an item becomes overdue</div>
+                            <div class="sett-notif-title"><?php echo htmlspecialchars($np_def['label']); ?></div>
+                            <div class="sett-notif-sub"><?php echo htmlspecialchars($np_def['desc']); ?></div>
                         </div>
                     </div>
-                    <div class="sett-notif-row">
-                        <label class="toggle-sw">
-                            <input type="checkbox" id="notifPrefRoomToggle">
-                            <span class="toggle-track"></span>
-                        </label>
-                        <div>
-                            <div class="sett-notif-title">Facility Issues</div>
-                            <div class="sett-notif-sub">Alert when a facility issue is reported</div>
-                        </div>
-                    </div>
+                    <?php endforeach; ?>
                 </div>
             </div>
 
@@ -420,7 +420,7 @@
                                     <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
                                 </summary>
                                 <div class="hc-faq-a">
-                                    The <strong>Dashboard</strong> shows what needs attention right now. The <strong>Activity</strong> tab is the full timeline of decisions and changes, and who made them. You can filter it by type (Requests, Facilities, Equipment, System, Sign-ins), by person, and by date, and export it. The bell on the Dashboard opens your Notifications. Choose which alerts you get (new requests, overdue items, facility issues) in <strong>Settings → Preferences</strong>.
+                                    The <strong>Dashboard</strong> shows what needs attention right now. The <strong>Activity</strong> tab is the full timeline of decisions and changes, and who made them. You can filter it by type (Requests, Facilities, Equipment, System, Sign-ins), by person, and by date, and export it. The bell on the Dashboard opens your Notifications. Choose which alerts you get (new requests, overdue items, stock alerts, facility issues and security emails), or switch them all off, in <strong>Settings → Preferences</strong>.
                                 </div>
                             </details>
 

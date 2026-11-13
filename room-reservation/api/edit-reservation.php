@@ -186,7 +186,9 @@ try {
         $facRow = $fac->get_result()->fetch_assoc();
         $fac->close();
 
-        if ($facRow && !empty($facRow['email'])) {
+        require_once __DIR__ . '/../../notifications/core/preferences.php';
+        // Respect the faculty's Notification Preferences (Facility reservations / master switch).
+        if ($facRow && !empty($facRow['email']) && notif_family_enabled($conn, 'faculty', (string)$current['faculty_id'], 'facilities')) {
             require_once __DIR__ . '/../../shared/core/mailer.php';
             $facultyName = htmlspecialchars($current['faculty_name']);
             $subject     = 'PUPSync: Your Reservation Has Been Rescheduled — ' . $new_room_name;

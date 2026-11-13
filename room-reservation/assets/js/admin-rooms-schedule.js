@@ -548,14 +548,6 @@
                         document.addEventListener('click', function(e) {
                             const modal = $('roomScheduleModal');
                             if (!modal || modal.classList.contains('hidden')) return;
-                            if (e.target.closest('[data-action="room-schedule-today"]')) {
-                                _weekOff = 0;
-                                _mobDay = todayColumn(manilaNow());
-                                renderGrid({
-                                    scroll: true
-                                });
-                                return;
-                            }
                             const tab = e.target.closest('.rsm-daytab-btn');
                             if (tab) {
                                 _mobDay = +tab.dataset.day || 1;

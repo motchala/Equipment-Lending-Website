@@ -1759,6 +1759,25 @@ INSERT INTO `tbl_notif_state` (`id`, `notif_key`, `is_read`, `is_deleted`, `upda
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `tbl_notif_prefs`
+-- (Settings > Notification Preferences, admin + faculty. One row per account and toggle;
+--  a missing row means ON. Also created automatically on first use.)
+--
+
+CREATE TABLE IF NOT EXISTS `tbl_notif_prefs` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `audience` varchar(10) NOT NULL,
+  `user_key` varchar(64) NOT NULL,
+  `pref_key` varchar(32) NOT NULL,
+  `enabled` tinyint(1) NOT NULL DEFAULT 1,
+  `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_notif_pref` (`audience`,`user_key`,`pref_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_remember_tokens`
 --
 

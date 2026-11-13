@@ -17,6 +17,15 @@
         return meta ? (meta.getAttribute('content') || '') : '';
     }
 
+    /* Notification Preferences (Settings): true unless this faculty turned that category -- or
+       everything -- off. The server already leaves muted items out of the bell feed and the emails;
+       this keeps the pop-up toasts and coach marks raised here in line with it. */
+    function notifFamilyOn(family) {
+        if (window.PSNotifPrefs) return window.PSNotifPrefs.isOn(family);
+        const p = window.NOTIF_PREFS;
+        return !p || (p.all !== false && p[family] !== false);
+    }
+
     /* ══════════════════════════════════════════════════════════════════
        CRITICAL: Close all overlays on page load to prevent stuck modals
     ══════════════════════════════════════════════════════════════════ */
@@ -1202,6 +1211,10 @@
     // First paint from the server-embedded feed (badge, pills, counts)
     renderNotifPage();
 
+    // A Notification Preferences switch was flipped (Settings): re-pull the feed right away so the
+    // bell, its badge and the list match what the server will now send.
+    document.addEventListener('pupsync:notif-prefs-changed', function () { refreshNotifs(); });
+
     /* ── Settings: Theme ───────────────────────────────────────────────── */
     function applyTheme(theme) {
         _applyThemeDOM(theme);
@@ -2113,7 +2126,7 @@
         // while the tab is open) — not on every check. The very first call
         // just establishes the baseline; the initial-load toast (if any) is
         // handled server-side via the session-gated data-should-show flag.
-        if (_prevOverdueCount !== null && overdueCount > 0 && _prevOverdueCount === 0) {
+        if (_prevOverdueCount !== null && overdueCount > 0 && _prevOverdueCount === 0 && notifFamilyOn('overdue')) {
             showOverdueToast();
         }
         _prevOverdueCount = overdueCount;
@@ -3422,12 +3435,12 @@
                             // request simply wasn't in the initial snapshot (e.g. it was
                             // already in a terminal state on page load) — no toast needed.
                             if (prev !== undefined) {
-                                if (r.status === 'Returned') {
+                                if (r.status === 'Returned' && notifFamilyOn('equipment')) {
                                     showToast(r.equipment_name + ' has been marked as Returned.', 'success');
                                 }
                                 // Coach mark: first time a Waiting request becomes Approved,
                                 // point faculty to My Activity where the Claim QR lives.
-                                if (r.status === 'Approved' && prev === 'Waiting') {
+                                if (r.status === 'Approved' && prev === 'Waiting' && notifFamilyOn('equipment')) {
                                     const _claimKey = 'eq_claim_hint_shown_' + r.id;
                                     if (!localStorage.getItem(_claimKey)) {
                                         localStorage.setItem(_claimKey, '1');
@@ -3472,7 +3485,7 @@
                     if (!Array.isArray(rows)) return;
                     rows.forEach(function (rr) {
                         var prev = lastStatuses[rr.id];
-                        if (primed && prev !== undefined && prev !== rr.status && rr.status === 'Cancelled') {
+                        if (primed && prev !== undefined && prev !== rr.status && rr.status === 'Cancelled' && notifFamilyOn('facilities')) {
                             showToast('Your reservation for ' + rr.room_name + ' was cancelled by admin.', 'error');
                         }
                         lastStatuses[rr.id] = rr.status;

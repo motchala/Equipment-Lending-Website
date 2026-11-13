@@ -201,16 +201,9 @@
         const ac = LS.get('accentColor'), al = LS.get('accentLight');
         if (ac) _applyAccentDOM(ac, al || '#f3e5e6');
 
-        // Notification Preferences — checkboxes default to checked/unchecked
-        // in the markup itself, so only override when a stored value exists.
-        [['notifPrefRequestsToggle', 'notifPrefRequests'],
-        ['notifPrefOverdueToggle', 'notifPrefOverdue'],
-        ['notifPrefRoomToggle', 'notifPrefRoom']].forEach(([id, key]) => {
-            const el = document.getElementById(id);
-            if (!el) return;
-            const v = LS.get(key);
-            if (v !== null) el.checked = (v === 'true');
-        });
+        // Notification Preferences are saved on the server per admin account now
+        // (notifications/assets/js/notif-prefs.js + notifications/api/notif-prefs.php);
+        // this only clears what the old browser-only toggles left behind.
         _applyNotifPrefsDOM();
 
         // Notification read/unread state is no longer a client-side guess —
@@ -457,10 +450,9 @@
        Cards that are mid-removal, or in a category muted under Settings ->
        Notification Preferences, are not counted. */
     function _anMutedCats() {
-        const hidden = [];
-        if (LS.get('notifPrefRequests') === 'false') hidden.push('request');
-        if (LS.get('notifPrefOverdue') === 'false') hidden.push('overdue');
-        return hidden;
+        // Muted categories are filtered out on the server (they never reach the list),
+        // so there is nothing to hide here any more.
+        return [];
     }
 
     function _updateChipCounts() {
@@ -1085,35 +1077,21 @@
     /* ── Settings ────────────────────────────────────────────── */
     function applyTheme(theme) { _applyThemeDOM(theme); LS.set('theme', theme); showToast('Theme: ' + theme.charAt(0).toUpperCase() + theme.slice(1)); }
     function applyAccent(color, light) { _applyAccentDOM(color, light); LS.set('accentColor', color); LS.set('accentLight', light); showToast('Accent color updated!'); }
-    /* Notification Preferences (Preferences → Notification Preferences) —
-       mutes/unmutes categories of notification directly in the bell overlay,
-       via an injected stylesheet so it stays in effect regardless of which
-       overlay filter tab (All/Unread/etc.) is active. */
+    /* Notification Preferences used to be browser-only (localStorage + an injected
+       stylesheet that merely hid cards). They are now saved per admin on the server and
+       applied there, so this just removes the old stylesheet and stored keys, otherwise a
+       stale 'off' from the old toggles would keep hiding cards the server still sends. */
     function _applyNotifPrefsDOM() {
-        let s = document.getElementById('notifPrefStyle');
-        if (!s) { s = document.createElement('style'); s.id = 'notifPrefStyle'; document.head.appendChild(s); }
-        const hiddenCats = [];
-        if (LS.get('notifPrefRequests') === 'false') hiddenCats.push('request');
-        if (LS.get('notifPrefOverdue') === 'false') hiddenCats.push('overdue');
-        // "Room Issues" has no matching notif-item category yet — the
-        // preference is saved and ready for when that category is added.
-        s.textContent = hiddenCats.length
-            ? hiddenCats.map(c => '.notif-item[data-cat="' + c + '"]').join(',') + '{display:none !important;}'
-            : '';
-    }
-    function applyNotifPref(key, on) {
-        LS.set(key, on);
-        _applyNotifPrefsDOM();
-        showToast(on ? 'Notifications enabled.' : 'Notifications muted.');
+        const s = document.getElementById('notifPrefStyle');
+        if (s) s.remove();
+        ['notifPrefRequests', 'notifPrefOverdue', 'notifPrefRoom'].forEach(k => LS.del(k));
     }
 
     function resetAllSettings() {
         applyTheme('light');
 
-        const nReq = document.getElementById('notifPrefRequestsToggle'); if (nReq) nReq.checked = true;
-        const nOver = document.getElementById('notifPrefOverdueToggle'); if (nOver) nOver.checked = true;
-        const nRoom = document.getElementById('notifPrefRoomToggle'); if (nRoom) nRoom.checked = false;
-        LS.del('notifPrefRequests'); LS.del('notifPrefOverdue'); LS.del('notifPrefRoom');
+        // Notification preferences live on the server: put every switch back on there.
+        if (window.PSNotifPrefs) window.PSNotifPrefs.reset();
         _applyNotifPrefsDOM();
 
         LS.del('showAssetIds'); LS.del('verboseErrors');
@@ -3941,10 +3919,6 @@
         btn.addEventListener('click', function () { filterNotifs(this.dataset.notifFilter); });
     });
 
-    /* ── Settings toggles ────────────────────────────────────── */
-    const nReqT = document.getElementById('notifPrefRequestsToggle'); if (nReqT) nReqT.addEventListener('change', function () { applyNotifPref('notifPrefRequests', this.checked); });
-    const nOverT = document.getElementById('notifPrefOverdueToggle'); if (nOverT) nOverT.addEventListener('change', function () { applyNotifPref('notifPrefOverdue', this.checked); });
-    const nRoomT = document.getElementById('notifPrefRoomToggle'); if (nRoomT) nRoomT.addEventListener('change', function () { applyNotifPref('notifPrefRoom', this.checked); });
 
     /* ── Change Password Form Handler ───────────────────────── */
     const cpForm = document.getElementById('changePasswordForm');
@@ -4132,6 +4106,9 @@
         // Poll for new notifications (new requests, overdue items, room
         // issues, stock drops) every 25s without a full page reload.
         setInterval(_notifPoll, 25000);
+        // A Notification Preferences switch was flipped (Settings): pull the feed right away so
+        // the bell, its badge and the cards match what the server will now send.
+        document.addEventListener('pupsync:notif-prefs-changed', function () { _notifPoll(); });
         // Timers are throttled in background tabs, so also refresh the bell
         // the moment the admin comes back to this tab or window.
         // (Throttled: returning to a tab fires both events at once.)
@@ -6339,7 +6316,8 @@ function psSelectFmt(btn) {
            tab; it is now the bottom-centre pop-up alert and goes away on its own. */
         function announceOverdue() {
             var n = document.querySelectorAll('#eq-loan-table tbody tr.eq-loan-row[data-loan-state="overdue"]').length;
-            if (n > 0 && typeof window.showToast === 'function') {
+            // Skipped when this admin turned off Overdue equipment (or all) notifications.
+            if (n > 0 && typeof window.showToast === 'function' && (!window.PSNotifPrefs || window.PSNotifPrefs.isOn('overdue'))) {
                 window.showToast(n + ' item(s) are overdue. Contact the borrowers.', 'warning');
             }
         }

@@ -461,38 +461,6 @@
                                 <p class="sov-desc-small">Current theme: <strong id="currentThemeLabel">Light</strong></p>
                             </div>
 
-                            <!-- Notification Preferences -->
-                            <div class="acct-card">
-                                <div class="acct-card-head">
-                                    <span class="material-symbols-outlined">notifications</span>
-                                    <h3>Notification Preferences</h3>
-                                </div>
-                                <div class="acct-rows">
-                                    <div class="acct-row">
-                                        <span class="acct-row-label">Email Alerts</span>
-                                        <div class="acct-row-value">
-                                            <span class="acct-row-static acct-row-static-muted">Overdue reminders via email</span>
-                                        </div>
-                                        <label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
-                                    </div>
-                                    <div class="acct-row">
-                                        <span class="acct-row-label">Reservation Reminders</span>
-                                        <div class="acct-row-value">
-                                            <span class="acct-row-static acct-row-static-muted">24 hours before a booking</span>
-                                        </div>
-                                        <label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
-                                    </div>
-                                    <div class="acct-row">
-                                        <span class="acct-row-label">Account Activity</span>
-                                        <div class="acct-row-value">
-                                            <span class="acct-row-static acct-row-static-muted">Security &amp; login notifications</span>
-                                        </div>
-                                        <label class="toggle-sw"><input type="checkbox"><span class="toggle-track"></span></label>
-                                    </div>
-                                </div>
-                            </div>
-
-
                             <!-- Data Management -->
                             <div class="acct-card">
                                 <div class="acct-card-head">
@@ -509,6 +477,41 @@
                                     </div>
                                 </div>
                             </div>
+
+                            <!-- Notification Preferences: full-width row at the bottom (it is the tall one) -->
+                            <div class="acct-card acct-card--wide">
+                                <div class="acct-card-head">
+                                    <span class="material-symbols-outlined">notifications</span>
+                                    <h3>Notification Preferences</h3>
+                                </div>
+                                <?php
+                                // Saved per faculty account on the server (notifications/api/notif-prefs.php) and
+                                // applied there: a muted category is never listed, counted, popped up or emailed.
+                                require_once PS_ROOT . '/notifications/core/preferences.php';
+                                $np_defs  = notif_pref_definitions('faculty');
+                                $np_state = notif_prefs_get($conn, 'faculty', (string)$_SESSION['faculty_id']);
+                                ?>
+                                <div class="acct-rows<?php echo empty($np_state['all']) ? ' notif-prefs-off' : ''; ?>" id="notifPrefsPanel" data-notif-audience="faculty">
+                                    <div class="acct-row acct-row--master">
+                                        <span class="acct-row-label">All notifications</span>
+                                        <div class="acct-row-value">
+                                            <span class="acct-row-static acct-row-static-muted">Turn off to stop every alert, pop-up and email below</span>
+                                        </div>
+                                        <label class="toggle-sw"><input type="checkbox" data-notif-pref="all" data-notif-label="All notifications" aria-label="All notifications"<?php echo !empty($np_state['all']) ? ' checked' : ''; ?>><span class="toggle-track"></span></label>
+                                    </div>
+                                    <?php foreach ($np_defs as $np_key => $np_def): ?>
+                                    <div class="acct-row acct-row--child">
+                                        <span class="acct-row-label"><?php echo htmlspecialchars($np_def['label']); ?></span>
+                                        <div class="acct-row-value">
+                                            <span class="acct-row-static acct-row-static-muted"><?php echo htmlspecialchars($np_def['desc']); ?></span>
+                                        </div>
+                                        <label class="toggle-sw"><input type="checkbox" data-notif-pref="<?php echo htmlspecialchars($np_key); ?>" data-notif-label="<?php echo htmlspecialchars($np_def['label']); ?>" aria-label="<?php echo htmlspecialchars($np_def['label']); ?>"<?php echo !empty($np_state[$np_key]) ? ' checked' : ''; ?><?php echo empty($np_state['all']) ? ' disabled' : ''; ?>><span class="toggle-track"></span></label>
+                                    </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+
+
 
                         </div>
                     </section>

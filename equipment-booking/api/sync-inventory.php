@@ -240,13 +240,13 @@ foreach ($sheet_names as $sheet_idx => $sheet_name) {
                 $units_out   = (int)($out_row['units_out'] ?? 0);
                 $safe_qty    = max(0, $qty - $units_out);
 
-                $upd = $conn->prepare("UPDATE tbl_inventory SET quantity = ?, `condition` = ?, category = ?, synced_from_sheet = 1 WHERE item_id = ?");
+                $upd = $conn->prepare("UPDATE tbl_inventory SET quantity = ?, `condition` = ?, category = ?, synced_from_sheet = 1, image_path = COALESCE(NULLIF(image_path, ''), 'uploads/default.png') WHERE item_id = ?");
                 $upd->bind_param('issi', $safe_qty, $condition, $category, $existing['item_id']);
                 $upd->execute();
                 $upd->close();
                 $summary['updated']++;
             } else {
-                $ins = $conn->prepare("INSERT INTO tbl_inventory (campus_id, item_name, category, quantity, `condition`, synced_from_sheet) VALUES (?, ?, ?, ?, ?, 1)");
+                $ins = $conn->prepare("INSERT INTO tbl_inventory (campus_id, item_name, category, quantity, `condition`, synced_from_sheet, image_path) VALUES (?, ?, ?, ?, ?, 1, 'uploads/default.png')");
                 $ins->bind_param('issis', $campus_id, $item_name, $category, $qty, $condition);
                 $ins->execute();
                 $ins->close();
@@ -299,13 +299,13 @@ foreach ($sheet_names as $sheet_idx => $sheet_name) {
                 $units_out = (int)($out_row['units_out'] ?? 0);
                 $safe_qty  = max(0, $qty - $units_out);
 
-                $upd = $conn->prepare("UPDATE tbl_inventory SET quantity = ?, `condition` = ?, category = ?, synced_from_sheet = 1 WHERE item_id = ?");
+                $upd = $conn->prepare("UPDATE tbl_inventory SET quantity = ?, `condition` = ?, category = ?, synced_from_sheet = 1, image_path = COALESCE(NULLIF(image_path, ''), 'uploads/default.png') WHERE item_id = ?");
                 $upd->bind_param('issi', $safe_qty, $condition, $category, $existing['item_id']);
                 $upd->execute();
                 $upd->close();
                 $summary['updated']++;
             } else {
-                $ins = $conn->prepare("INSERT INTO tbl_inventory (campus_id, item_name, category, quantity, `condition`, synced_from_sheet) VALUES (?, ?, ?, ?, ?, 1)");
+                $ins = $conn->prepare("INSERT INTO tbl_inventory (campus_id, item_name, category, quantity, `condition`, synced_from_sheet, image_path) VALUES (?, ?, ?, ?, ?, 1, 'uploads/default.png')");
                 $ins->bind_param('issis', $campus_id, $item_name, $category, $qty, $condition);
                 $ins->execute();
                 $ins->close();

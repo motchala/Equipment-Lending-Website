@@ -76,7 +76,9 @@ $fac_mail_stmt->execute();
 $fac_mail_row = $fac_mail_stmt->get_result()->fetch_assoc();
 $fac_mail_stmt->close();
 
-if ($fac_mail_row && !empty($fac_mail_row['email'])) {
+require_once __DIR__ . '/../../notifications/core/preferences.php';
+// Respect the faculty's Notification Preferences (Equipment requests / master switch).
+if ($fac_mail_row && !empty($fac_mail_row['email']) && notif_family_enabled($conn, 'faculty', (string)$row['faculty_id'], 'equipment')) {
     require_once __DIR__ . '/../../shared/core/mailer.php';
     $email_subject = 'PUPSync: ' . $student_name . ' is about to borrow equipment';
     $email_body = '

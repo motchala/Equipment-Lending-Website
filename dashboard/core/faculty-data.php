@@ -24,6 +24,12 @@ $has_overdue_block = $stat_overdue > 0;
 // not on every page load/refresh. It reappears after logout+login, or once
 // the PHP session itself has expired (e.g. from being away too long).
 $show_overdue_toast = $has_overdue_block && empty($_SESSION['overdue_toast_shown']);
+// Notification Preferences: a faculty who turned off Overdue notices (or everything)
+// gets no pop-up. Borrowing is still blocked while the item is out -- only the toast goes.
+require_once __DIR__ . '/../../notifications/core/preferences.php';
+if ($show_overdue_toast && !notif_family_enabled($conn, 'faculty', (string)$_SESSION['faculty_id'], 'overdue')) {
+    $show_overdue_toast = false;
+}
 if ($has_overdue_block) {
     $_SESSION['overdue_toast_shown'] = true;
 } else {

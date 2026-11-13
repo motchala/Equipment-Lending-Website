@@ -269,6 +269,7 @@ try {
     // Unused student codes issued by this faculty (used ones stay as history).
     cleanup_optional($conn, 'DELETE FROM tbl_faculty_codes WHERE faculty_id = ? AND is_used = 0', $faculty_id);
     cleanup_optional($conn, 'DELETE FROM tbl_faculty_notif_state WHERE faculty_id = ?', $faculty_id);
+    cleanup_optional($conn, "DELETE FROM tbl_notif_prefs WHERE audience = 'faculty' AND user_key = ?", $faculty_id);
     cleanup_optional($conn, 'DELETE FROM tbl_room_waitlist WHERE faculty_id = ?', $faculty_id);
 
     $del = $conn->prepare('DELETE FROM tbl_users WHERE faculty_id = ?');

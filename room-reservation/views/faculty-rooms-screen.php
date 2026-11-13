@@ -141,18 +141,7 @@
 
             <h4 class="fcty-sched-title" id="fcty-sched-title">Who is using this room</h4>
 
-            <div class="fcty-seg" role="tablist" aria-label="Room schedule">
-                <button class="fcty-seg-btn active" type="button" data-schedule-tab="daily"
-                    role="tab" aria-selected="true">Today</button>
-                <button class="fcty-seg-btn" type="button" data-schedule-tab="weekly"
-                    role="tab" aria-selected="false">This week</button>
-            </div>
-
-            <div class="fcty-schedule-panel active" data-schedule-panel="daily">
-                <div class="fcty-schedule-list" id="fcty-modal-daily-list"></div>
-            </div>
-
-            <div class="fcty-schedule-panel" data-schedule-panel="weekly">
+            <div class="fcty-schedule-panel active" data-schedule-panel="weekly">
                 <div class="fcty-week-list" id="fcty-modal-weekly-grid"></div>
             </div>
 

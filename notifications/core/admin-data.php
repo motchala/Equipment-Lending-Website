@@ -20,6 +20,8 @@
  *   $unread        = notif_count_unread($notifications);
  */
 
+require_once __DIR__ . '/preferences.php';
+
 if (!function_exists('notif_ensure_table')) {
     /**
      * Idempotent guard — creates tbl_notif_state if this is the first run
@@ -379,6 +381,15 @@ if (!function_exists('notif_build_list')) {
                 ];
             }
         }
+
+        // Notification Preferences (Settings > Preferences): categories this admin
+        // turned off, or everything when the master switch is off, are never part of
+        // the feed -- so they are not listed, counted, polled or marked read either.
+        $items = notif_prefs_filter_items(
+            $items,
+            'admin',
+            notif_prefs_get($conn, 'admin', notif_prefs_current_key($conn, 'admin'))
+        );
 
         if (!$includeDeleted) {
             $items = array_values(array_filter($items, fn($i) => !$i['is_deleted']));
