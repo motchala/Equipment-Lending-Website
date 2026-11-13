@@ -1,11 +1,12 @@
 /**
  * settings/assets/js/admin-arbitration.js
  *
- * Settings → Arbitration tab (Super Admin only). UI BEHAVIOUR ONLY:
- * steppers, quick presets, the Priority faculty picker (max 10) and the
- * unsaved-changes bar. Nothing is sent to the server. Saving is a stub.
+ * Settings → Arbitration tab (Super Admin only).
  *
  * Every field in the panel carries data-arb-key="<setting key>".
+ * Fields inside a card marked data-arb-live are SAVED to settings/api/save-arbitration.php.
+ * The other cards are still UI only (steppers, presets and the Priority picker work on screen,
+ * but nothing is sent to the server for them).
  */
 (function () {
     'use strict';
@@ -17,9 +18,9 @@
        DEFAULTS is every setting at its standard value; each preset
        only overrides what it changes. */
     var DEFAULTS = {
-        rule_overdue_block_enabled: true, rule_missing_doc_block_enabled: false,
+        rule_overdue_block_enabled: false, rule_missing_doc_block_enabled: false,
         max_items_per_borrower: 3, max_borrow_days: 1, max_extensions: 2,
-        auto_approve_timeout_minutes: 1, low_stock_threshold: 2,
+        low_stock_threshold: 2,
 
         equip_day_start: '07:00', equip_day_end: '21:00', equip_max_advance_days: 14,
         equip_immediate_grace_min: 15, equip_cancel_cutoff_min: 60,
@@ -36,18 +37,18 @@
     };
 
     var PRESETS = {
-        standard: {},
+        standard: { rule_overdue_block_enabled: true },
         busy: {
             rule_overdue_block_enabled: true, rule_missing_doc_block_enabled: true,
             max_items_per_borrower: 2, max_borrow_days: 1, max_extensions: 1,
-            auto_approve_timeout_minutes: 5, low_stock_threshold: 3,
+            low_stock_threshold: 3,
             equip_max_advance_days: 7, equip_cancel_cutoff_min: 120,
             room_max_active: 1, room_max_advance_weeks: 2, room_cancel_cutoff_min: 120, room_letter_required: true
         },
         relaxed: {
             rule_overdue_block_enabled: false, rule_missing_doc_block_enabled: false,
             max_items_per_borrower: 5, max_borrow_days: 3, max_extensions: 3,
-            auto_approve_timeout_minutes: 1, low_stock_threshold: 1,
+            low_stock_threshold: 1,
             equip_max_advance_days: 21, equip_cancel_cutoff_min: 30,
             room_max_active: 3, room_max_advance_weeks: 4, room_cancel_cutoff_min: 30
         }
@@ -67,6 +68,25 @@
     function writeField(el, val) {
         if (el.type === 'checkbox') el.checked = !!val;
         else el.value = val;
+    }
+
+    /* Fields that are saved to the server (inside a data-arb-live card) */
+    function isLive(el) { return !!el.closest('[data-arb-live]'); }
+    function liveFields() {
+        return Array.prototype.filter.call(fields(), isLive);
+    }
+    function csrfToken() {
+        var el = document.querySelector('input[name="csrf_token"]');
+        return el ? el.value : '';
+    }
+    function clearErrors() {
+        root.querySelectorAll('.arb-row.has-error').forEach(function (r) { r.classList.remove('has-error'); });
+    }
+    function markError(key) {
+        var el = document.getElementById('arb-' + (key === 'equip_durations' ? 'equip_dur_1' : key));
+        var row = el ? el.closest('.arb-row') : null;
+        if (row) { row.classList.add('has-error'); }
+        return row;
     }
 
     /* Snapshot of what the page loaded with, so Discard can go back to it. */
@@ -259,6 +279,7 @@
     // Any edit marks the form as changed
     function onEdit(e) {
         if (applying || !e.target.matches('[data-arb-key]')) return;
+        clearErrors();
         setPresetActive(null);
         showBar();
     }
@@ -309,15 +330,90 @@
         });
     }
 
-    // Save: NOT connected yet. This is the one place to plug the request in later.
+    // Save: sends the fields of the connected cards (data-arb-live) to the server.
     var saveBtn = document.getElementById('arbSaveBtn');
+    var saveBtnHtml = saveBtn ? saveBtn.innerHTML : '';
+
+    function say(html, ms) {
+        if (!saveText) return;
+        resetBarText();
+        saveText.innerHTML = html;
+        if (ms) saveTimer = setTimeout(function () { resetBarText(); hideBar(); }, ms);
+    }
+
+    function collectLive() {
+        var settings = {}, durations = [];
+        liveFields().forEach(function (el) {
+            var k = el.dataset.arbKey;
+            if (k.indexOf('equip_dur_') === 0) {
+                if (el.checked) durations.push(parseInt(k.slice(10), 10));
+                return;
+            }
+            if (el.type === 'checkbox') settings[k] = el.checked;
+            else if (el.type === 'number') settings[k] = parseInt(el.value, 10);
+            else settings[k] = el.value;
+        });
+        settings.equip_durations = durations;
+        return settings;
+    }
+
+    function applySaved(values) {
+        // Show exactly what was stored (for example a value the server adjusted)
+        var map = {};
+        Object.keys(values).forEach(function (k) {
+            if (k === 'equip_durations') {
+                [1, 2, 3, 4, 5, 6].forEach(function (n) { map['equip_dur_' + n] = values.equip_durations.indexOf(n) !== -1; });
+            } else {
+                map[k] = values[k];
+            }
+        });
+        fill(map);
+        liveFields().forEach(function (el) { initial[el.dataset.arbKey] = readField(el); });
+    }
+
+    function nonLiveChanged() {
+        return Array.prototype.some.call(fields(), function (el) {
+            return !isLive(el) && readField(el) !== initial[el.dataset.arbKey];
+        });
+    }
+
     if (saveBtn) {
         saveBtn.addEventListener('click', function () {
-            // TODO: collect values from [data-arb-key] and POST them to the settings API.
-            if (!saveText) return;
-            resetBarText();
-            saveText.innerHTML = '<span class="material-symbols-outlined">info</span> Saving is not connected yet. This is a preview of the screen.';
-            saveTimer = setTimeout(resetBarText, 3500);
+            if (saveBtn.disabled) return;
+            clearErrors();
+            var otherEdits = nonLiveChanged() || prio.chosen.length !== prio.initial.length;
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = 'Saving\u2026';
+
+            fetch('settings/api/save-arbitration.php', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken() },
+                body: JSON.stringify({ settings: collectLive() })
+            }).then(function (r) {
+                return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, body: j }; });
+            }).then(function (res) {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = saveBtnHtml;
+                var j = res.body || {};
+                if (res.ok && j.status === 'success') {
+                    applySaved(j.values || {});
+                    var msg = '<span class="material-symbols-outlined">check_circle</span> ' +
+                        (j.changed && j.changed.length ? 'Saved. New requests use these rules now.' : 'Nothing changed.');
+                    if (otherEdits) msg += ' Room, role and priority edits are not connected yet, so they were not saved.';
+                    say(msg, otherEdits ? 7000 : 3500);
+                    return;
+                }
+                var errs = j.errors || {};
+                var firstRow = null;
+                Object.keys(errs).forEach(function (k) { var row = markError(k); if (row && !firstRow) firstRow = row; });
+                say('<span class="material-symbols-outlined">error</span> ' + (j.error || 'Could not save. Please try again.'), 0);
+                if (firstRow && firstRow.scrollIntoView) firstRow.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            }).catch(function () {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = saveBtnHtml;
+                say('<span class="material-symbols-outlined">error</span> Could not reach the server. Please try again.', 0);
+            });
         });
     }
 

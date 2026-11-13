@@ -578,6 +578,28 @@
     color: var(--text-light);
 }
 
+/* ── "Not connected yet" badge and field errors ───────────────── */
+#sett-arbitration .arb-badge {
+    margin-left: auto;
+    padding: 0.15rem 0.6rem;
+    border-radius: 999px;
+    border: 1px solid var(--khaki-border);
+    background: var(--secondary-cream);
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--text-light);
+    white-space: nowrap;
+}
+
+#sett-arbitration .arb-row.has-error {
+    box-shadow: inset 3px 0 0 #dc2626;
+    padding-left: 0.6rem;
+}
+
+#sett-arbitration .arb-row.has-error .arb-row__sub {
+    color: #dc2626;
+}
+
 /* ── Unsaved-changes bar ─────────────────────────────────────── */
 #sett-arbitration .arb-savebar {
     position: sticky;

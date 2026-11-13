@@ -73,8 +73,19 @@
         return {
             open: toMin(r.dayStart || '07:00'), lastStart: toMin(r.lastStart || '20:00'), close: toMin(r.dayEnd || '21:00'),
             step: +r.slot || 60, ahead: +r.maxAhead || 14,
-            hours: (r.durationHours && r.durationHours.length) ? r.durationHours : [1, 2, 3, 6]
+            hours: (r.durationHours && r.durationHours.length) ? r.durationHours : [1, 2, 3, 6],
+            maxDays: Math.max(1, +r.maxBorrowDays || 1), letterRequired: !!r.letterRequired
         };
+    }
+    /* Duration picker values: "3" = 3 hours, "d2" = 2 days (1 … the longest loan set in Settings → Arbitration). */
+    function durParse(v) { v = String(v == null ? '' : v); return v.charAt(0) === 'd' ? { unit: 'days', n: toInt(v.slice(1)) } : { unit: 'hours', n: toInt(v) }; }
+    /* the hours a start time must leave room for: a day loan only needs a bookable start */
+    function durHours(v) { var d = durParse(v); return d.unit === 'days' ? 1 : (d.n || 1); }
+    /* a day loan ends at closing time on its Nth OPEN day (Sundays are skipped), same as the server */
+    function dayLoanEnd(dateStr, n) {
+        var d = parseYmd(dateStr), left = Math.max(1, n) - 1;
+        while (left > 0) { d = addDays(d, 1); if (d.getDay() !== 0) left--; }
+        return ymd(d);
     }
     function stock(name) {
         var m = (meta().items || {})[name] || {};
@@ -335,18 +346,23 @@
             times.map(function (t) { return '<option value="' + t + '"' + (chosen === t ? ' selected' : '') + '>' + esc(clock(toMin(t))) + '</option>'; }).join('');
     }
     function durationOptions(dateStr, time, selected) {
-        var r = rules(), start = time ? toMin(time) : r.open;
-        return '<option value="" disabled' + (!selected ? ' selected' : '') + '>Choose duration</option>' +
-            r.hours.map(function (h) {
-                var off = !dateStr || start + h * 60 > r.close;
-                return '<option value="' + h + '"' + (selected === h ? ' selected' : '') + (off ? ' disabled' : '') + '>' + h + ' ' + (h === 1 ? 'hour' : 'hours') + '</option>';
-            }).join('');
+        var r = rules(), start = time ? toMin(time) : r.open, cur = String(selected == null ? '' : selected);
+        var html = '<option value="" disabled' + (!cur ? ' selected' : '') + '>Choose duration</option><optgroup label="Hours">';
+        r.hours.forEach(function (h) {
+            var off = !dateStr || start + h * 60 > r.close;
+            html += '<option value="' + h + '"' + (cur === String(h) ? ' selected' : '') + (off ? ' disabled' : '') + '>' + h + ' ' + (h === 1 ? 'hour' : 'hours') + '</option>';
+        });
+        html += '</optgroup><optgroup label="Days">';
+        for (var n = 1; n <= r.maxDays; n++) {
+            html += '<option value="d' + n + '"' + (cur === 'd' + n ? ' selected' : '') + (!dateStr ? ' disabled' : '') + '>' + n + ' ' + (n === 1 ? 'day' : 'days') + '</option>';
+        }
+        return html + '</optgroup>';
     }
     function refreshTimeAndDuration() {
         var date = $('bfDate'), time = $('bfTime'), dur = $('bfDuration');
         if (!date || !time || !dur) return;
-        var prevTime = time.value, prevDur = toInt(dur.value);
-        time.innerHTML = timeOptions(date.value, prevDur || 1, prevTime);
+        var prevTime = time.value, prevDur = dur.value;
+        time.innerHTML = timeOptions(date.value, durHours(prevDur), prevTime);
         dur.innerHTML = durationOptions(date.value, time.value, prevDur);
         if (dur.value === '' && dur.options.length > 1) {
             for (var i = 1; i < dur.options.length; i++) if (!dur.options[i].disabled) { dur.value = dur.options[i].value; break; }
@@ -368,7 +384,7 @@
             var info = $('bfTodayInfo');
             if (info) {
                 var msg = reason === 'sunday' ? 'Same-day borrowing is unavailable on Sundays. Choose a later date.'
-                    : 'Same-day borrowing is unavailable after 8:00 PM. Choose a later date.';
+                    : 'Same-day borrowing is unavailable after ' + clock(r.lastStart) + '. Choose a later date.';
                 info.hidden = !reason; info.title = reason ? msg : ''; info.setAttribute('aria-label', reason ? msg : '');
             }
         }
@@ -380,22 +396,30 @@
         if (!wrap) return;
         var later = !!date && !!date.value && date.value > todayStr();
         wrap.hidden = !later;
+        var req = rules().letterRequired, opt = wrap.querySelector('.bm-opt'), hint = wrap.querySelector('.bm-hint');
+        if (opt) opt.textContent = req ? 'Required' : 'Recommended';
+        if (hint) hint.textContent = req ? 'Required for bookings on a later date.' : 'Recommended for bookings on a later date. You can still submit without one.';
         if (!later && file && file.value) { file.value = ''; if (typeof window.syncBorrowDrops === 'function') window.syncBorrowDrops(); }
     }
 
     function windowOf() {
         var date = $('bfDate'), time = $('bfTime'), dur = $('bfDuration');
-        if (!date || !date.value || !time.value || !toInt(dur.value)) return null;
-        var d = toInt(dur.value), s = toMin(time.value);
-        return { date: date.value, time: time.value, dur: d, startMin: s, endMin: s + d * 60, mode: date.value === todayStr() ? 'today' : 'future' };
+        if (!date || !date.value || !time.value) return null;
+        var dv = durParse(dur.value);
+        if (!dv.n) return null;
+        var s = toMin(time.value), mode = date.value === todayStr() ? 'today' : 'future';
+        if (dv.unit === 'days') {
+            return { date: date.value, time: time.value, dur: dv.n, unit: 'days', startMin: s, endDate: dayLoanEnd(date.value, dv.n), endMin: rules().close, mode: mode };
+        }
+        return { date: date.value, time: time.value, dur: dv.n, unit: 'hours', startMin: s, endDate: date.value, endMin: s + dv.n * 60, mode: mode };
     }
     function windowQuery(w) {
         return 'mode=' + w.mode + '&date=' + encodeURIComponent(w.mode === 'future' ? w.date : '') +
-            '&time=' + encodeURIComponent(w.time) + '&duration=' + w.dur;
+            '&time=' + encodeURIComponent(w.time) + '&duration=' + w.dur + '&unit=' + w.unit;
     }
     function windowLabel(w) {
         return (w.mode === 'today' ? 'Today' : parseYmd(w.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })) +
-            ' · ' + clock(w.startMin) + ' → ' + clock(w.endMin);
+            ' · ' + clock(w.startMin) + ' → ' + (w.endDate !== w.date ? niceDate(w.endDate) + ' · ' : '') + clock(w.endMin);
     }
 
     /* ---- live check: item availability + which rooms are taken ---------- */
@@ -418,7 +442,7 @@
             return;
         }
         if (sum) {
-            sum.innerHTML = icon('schedule') + '<span><strong>' + esc(w.mode === 'today' ? 'Today' : niceDate(w.date)) + ' · ' + clock(w.startMin) + '</strong> → <strong>' + clock(w.endMin) + '</strong></span>';
+            sum.innerHTML = icon('schedule') + '<span><strong>' + esc(w.mode === 'today' ? 'Today' : niceDate(w.date)) + ' · ' + clock(w.startMin) + '</strong> → <strong>' + (w.endDate !== w.date ? esc(niceDate(w.endDate)) + ' · ' : '') + clock(w.endMin) + '</strong></span>';
             sum.classList.add('has');
         }
         clearTimeout(mstate.timer);
@@ -681,10 +705,10 @@
         if (!date) return 'Please select a borrow date.';
         var d = borrowDates().filter(function (e) { return e.value === date; })[0];
         if (!d) return 'Choose today or a non-Sunday date within the next ' + (r.ahead === 14 ? 'two weeks' : r.ahead + ' days') + '.';
-        if (!d.available) return isSunday(date) ? 'Same-day borrowing is unavailable on Sundays. Choose a later date.' : 'Same-day borrowing is unavailable after 8:00 PM. Choose a later date.';
+        if (!d.available) return isSunday(date) ? 'Same-day borrowing is unavailable on Sundays. Choose a later date.' : 'Same-day borrowing is unavailable after ' + clock(r.lastStart) + '. Choose a later date.';
         if (isSunday(date)) return 'Equipment borrowing is unavailable on Sundays.';
         if (!w) return 'Please choose a start time and a duration.';
-        if (startTimes(date, w.dur).indexOf(w.time) === -1) return 'Choose a start time that allows the selected borrowing duration.';
+        if (startTimes(date, w.unit === 'days' ? 1 : w.dur).indexOf(w.time) === -1) return 'Choose a start time that allows the selected borrowing duration.';
         if (!$('bfRoomId').value) return 'Please choose a building and room.';
         for (var i = 0; i < order.length; i++) {
             var name = order[i], s = stock(name), q = sel[name].qty;
@@ -699,6 +723,7 @@
         if (type === 'student' && !$('bfStudentName').value.trim()) return 'Please enter the student\u2019s name before submitting.';
         if (w.mode === 'future') {
             var f = $('request_document') && $('request_document').files && $('request_document').files[0];
+            if (!f && r.letterRequired) return 'A request letter is required for later-date requests. Please attach one.';
             if (f) {
                 if (!/\.(pdf|jpe?g|png|webp)$/i.test(f.name)) return 'The request letter must be a PDF, JPG, PNG or WEBP file.';
                 if (f.size > 5 * 1024 * 1024) return 'The request letter is too large. Maximum size is 5 MB.';
@@ -736,6 +761,7 @@
             borrow_date: w.date,
             time_slot: w.time,
             duration: w.dur,
+            duration_unit: w.unit,
             collector_type: type,
             collector_name: type === 'student' ? $('bfStudentName').value.trim() : ''
         };
@@ -862,13 +888,13 @@
         }
         if (inp.id === 'bfDate') { refreshTimeAndDuration(); onWindowChange(); return; }
         if (inp.id === 'bfTime') {
-            var dur = $('bfDuration'), d = toInt(dur.value);
+            var dur = $('bfDuration'), d = dur.value;
             dur.innerHTML = durationOptions($('bfDate').value, inp.value, d);
             onWindowChange(); return;
         }
         if (inp.id === 'bfDuration') {
             var time = $('bfTime'), prev = time.value;
-            time.innerHTML = timeOptions($('bfDate').value, toInt(inp.value) || 1, prev);
+            time.innerHTML = timeOptions($('bfDate').value, durHours(inp.value), prev);
             onWindowChange(); return;
         }
         if (inp.name === 'bf_collector_type') {

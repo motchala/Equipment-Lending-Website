@@ -147,14 +147,18 @@
         }).join('');
         D.body.appendChild(tabbar);
 
-        // Re-tapping the active tab: scroll to top, or leave a building view
+        // Re-tapping the active tab: leave a building view, otherwise refresh the screen in place
+        // (faculty-dashboard.js); either way scroll back to the top
         tabbar.addEventListener('click', function (e) {
             var b = e.target.closest('.rxm-tab');
             if (!b) return;
             if (b.getAttribute('aria-current') === 'page') {
                 e.stopPropagation();
-                if (b.dataset.rxmTab === 'rooms' && roomsViewOpen()) {
+                var leavingView = b.dataset.rxmTab === 'rooms' && roomsViewOpen();
+                if (leavingView) {
                     var back = $('#fcty-rooms-back-facilities'); if (back) back.click();
+                } else if (e.isTrusted && typeof window.psRefreshActiveTab === 'function') {
+                    window.psRefreshActiveTab(b.dataset.rxmTab);
                 }
                 var main = $('#appMain'); if (main) main.scrollTo({ top: 0, behavior: 'smooth' });
             }
