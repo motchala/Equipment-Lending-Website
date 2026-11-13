@@ -73,8 +73,11 @@ $dept_value  = trim((string)$acct['department']);
 $backup_value = trim((string)$acct['backup_email']);
 
 $h = static fn($v): string => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+// $rel is a path from the project root. This page lives one folder down (account-management/), so the URL
+// needs the leading ../ (without it the browser looks in account-management/account-management/ and the
+// page's CSS and JavaScript never load).
 $asset = static function (string $rel): string {
-    return $rel . '?v=' . (int)@filemtime(PS_ROOT . '/' . $rel);
+    return '../' . $rel . '?v=' . (int)@filemtime(PS_ROOT . '/' . $rel);
 };
 ?>
 <!DOCTYPE html>
