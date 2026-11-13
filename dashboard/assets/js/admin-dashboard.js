@@ -2001,80 +2001,132 @@
     const facSubmitBtn = document.getElementById('fac-submit-btn');
     const facFormAlert = document.getElementById('fac-form-alert');
     const facPasswordInput = document.getElementById('fac-password');
-    const facPasswordStrength = document.getElementById('fac-password-strength');
-    const facPasswordStrengthMeter = document.getElementById('fac-password-strength-meter');
-    const facPasswordStrengthFill = document.getElementById('fac-password-strength-fill');
-    const facPasswordStrengthLabel = document.getElementById('fac-password-strength-label');
 
-    function _getFacPasswordStrength(password) {
-        if (password.length < 8) return null;
+    /* ── Auto-generate a strong temporary password ──────────────────────────
+       The fac-password field is read-only; the admin never types in it.
+       We generate it on page load, and again when the regen button is clicked.
+       The password must pass the server's strength check (level >= 2 / "Fair"):
+       ≥12 chars, upper + lower + digit + symbol, no trivial runs.          */
+    function _facGeneratePassword() {
+        const upper  = 'ABCDEFGHJKLMNPQRSTUVWXYZ';   // no I/O to avoid confusion
+        const lower  = 'abcdefghjkmnpqrstuvwxyz';    // no i/l/o
+        const digits = '23456789';                    // no 0/1
+        const syms   = '!@#$%^&*-_=+';
+        const all    = upper + lower + digits + syms;
 
-        const normalized = password.toLowerCase();
-        const weakPatterns = [
-            '0123', '1234', '2345', '3456', '4567', '5678', '6789', '7890',
-            '9876', '8765', '7654', '6543', '5432', '4321', '3210',
-            'abcd', 'bcde', 'cdef', 'defg', 'efgh', 'fghi', 'ghij', 'hijk',
-            'ijkl', 'jklm', 'klmn', 'lmno', 'mnop', 'nopq', 'opqr', 'pqrs',
-            'qrst', 'rstu', 'stuv', 'tuvw', 'uvwx', 'vwxy', 'wxyz',
-            'dcba', 'edcb', 'fedc', 'gfed', 'hgfe', 'ihgf', 'jihg', 'kjih',
-            'lkji', 'mlkj', 'nmlk', 'onml', 'ponm', 'qpon', 'rqpo', 'srqp',
-            'tsrq', 'utsr', 'vuts', 'wvut', 'xwvu', 'yxwv', 'zyxw',
-            'qwer', 'wert', 'erty', 'asdf', 'sdfg', 'dfgh', 'zxcv', 'xcvb',
-            'password', 'passw0rd', 'qwerty', 'welcome', 'letmein', 'admin',
-            'iloveyou', 'monkey', 'dragon', 'football', 'baseball', 'master'
-        ];
-        const hasWeakPattern = /(.)\1{3,}/i.test(password) ||
-            weakPatterns.some(function (pattern) { return normalized.includes(pattern); });
-        if (hasWeakPattern) return { level: 1, label: 'Weak' };
-
-        let score = password.length >= 16 ? 3 : (password.length >= 12 ? 2 : 1);
-        if (/[a-z]/.test(password)) score++;
-        if (/[A-Z]/.test(password)) score++;
-        if (/[0-9]/.test(password)) score++;
-        if (/[^A-Za-z0-9]/.test(password)) score++;
-
-        if (score <= 1) return { level: 0, label: 'Very weak' };
-        if (score <= 2) return { level: 1, label: 'Weak' };
-        if (score === 3) return { level: 2, label: 'Fair' };
-        if (score <= 5) return { level: 3, label: 'Strong' };
-        return { level: 4, label: 'Very strong' };
-    }
-
-    function _updateFacPasswordStrength() {
-        if (!facPasswordInput || !facPasswordStrength || !facPasswordStrengthMeter ||
-            !facPasswordStrengthFill || !facPasswordStrengthLabel) return;
-
-        const password = facPasswordInput.value;
-        if (password.length < 8) {
-            facPasswordStrength.hidden = true;
-            facPasswordStrengthMeter.setAttribute('aria-valuenow', '0');
-            facPasswordStrengthMeter.setAttribute('aria-valuetext', password ? 'Enter at least 8 characters' : 'No password entered');
-            facPasswordStrengthFill.style.width = '0%';
-            facPasswordStrengthLabel.textContent = '';
-            return;
+        // Use crypto.getRandomValues when available (all modern browsers + InfinityFree).
+        function rand(max) {
+            if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+                var arr = new Uint32Array(1);
+                crypto.getRandomValues(arr);
+                return arr[0] % max;
+            }
+            return Math.floor(Math.random() * max);
         }
 
-        const levels = [
-            { label: 'Very weak', color: '#e53e3e' },
-            { label: 'Weak', color: '#dd6b20' },
-            { label: 'Fair', color: '#d69e2e' },
-            { label: 'Strong', color: '#38a169' },
-            { label: 'Very strong', color: '#2b6cb0' }
-        ];
-        const result = _getFacPasswordStrength(password);
-        const strength = result.level;
-        const level = levels[strength];
-        facPasswordStrength.hidden = false;
-        facPasswordStrengthMeter.setAttribute('aria-valuenow', String(strength));
-        facPasswordStrengthMeter.setAttribute('aria-valuetext', level.label);
-        facPasswordStrengthFill.style.width = (strength + 1) * 20 + '%';
-        facPasswordStrengthFill.style.backgroundColor = level.color;
-        facPasswordStrengthLabel.textContent = result.label;
-        facPasswordStrengthLabel.style.color = level.color;
+        var pw;
+        // Keep generating until the result passes the same strength rules the
+        // server uses (level >= 2).  Typically succeeds on the first try.
+        do {
+            var chars = [
+                upper [rand(upper.length)],
+                upper [rand(upper.length)],
+                lower [rand(lower.length)],
+                lower [rand(lower.length)],
+                digits[rand(digits.length)],
+                digits[rand(digits.length)],
+                syms  [rand(syms.length)],
+            ];
+            // Pad to 14 chars from the full alphabet
+            while (chars.length < 14) {
+                chars.push(all[rand(all.length)]);
+            }
+            // Fisher-Yates shuffle
+            for (var i = chars.length - 1; i > 0; i--) {
+                var j = rand(i + 1);
+                var tmp = chars[i]; chars[i] = chars[j]; chars[j] = tmp;
+            }
+            pw = chars.join('');
+        } while (!_facPasswordAcceptable(pw));
+
+        return pw;
     }
 
+    /* Returns true when the password will pass the server-side strength gate. */
+    function _facPasswordAcceptable(pw) {
+        if (pw.length < 12) return false;
+        if (!/[a-z]/.test(pw)) return false;
+        if (!/[A-Z]/.test(pw)) return false;
+        if (!/[0-9]/.test(pw)) return false;
+        if (!/[^A-Za-z0-9]/.test(pw)) return false;
+        // Reject trivial runs (same char repeated 4+ times)
+        if (/(.)\1{3,}/i.test(pw)) return false;
+        return true;
+    }
+
+    function _facSetGeneratedPassword(pw) {
+        if (!facPasswordInput) return;
+        facPasswordInput.value = pw;
+        // Flash the input briefly so the admin notices the change on regen
+        facPasswordInput.classList.remove('fac-gen-flash');
+        void facPasswordInput.offsetWidth; // reflow to restart animation
+        facPasswordInput.classList.add('fac-gen-flash');
+    }
+
+    // Wire up the regen button
+    var facPwRegenBtn = document.getElementById('fac-pw-regen');
+    if (facPwRegenBtn) {
+        facPwRegenBtn.addEventListener('click', function () {
+            _facSetGeneratedPassword(_facGeneratePassword());
+        });
+    }
+
+    // Wire up the copy button
+    var facPwCopyBtn = document.getElementById('fac-pw-copy');
+    if (facPwCopyBtn) {
+        facPwCopyBtn.addEventListener('click', function () {
+            if (!facPasswordInput || !facPasswordInput.value) return;
+            var pw = facPasswordInput.value;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(pw).then(function () {
+                    var orig = facPwCopyBtn.innerHTML;
+                    facPwCopyBtn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">check</span>';
+                    setTimeout(function () { facPwCopyBtn.innerHTML = orig; }, 1500);
+                }).catch(function () { _facCopyFallback(pw); });
+            } else {
+                _facCopyFallback(pw);
+            }
+        });
+    }
+
+    function _facCopyFallback(text) {
+        try {
+            var ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.top = '-9999px';
+            document.body.appendChild(ta);
+            ta.focus();
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            if (facPwCopyBtn) {
+                var orig = facPwCopyBtn.innerHTML;
+                facPwCopyBtn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">check</span>';
+                setTimeout(function () { facPwCopyBtn.innerHTML = orig; }, 1500);
+            }
+        } catch (e) { /* silent */ }
+    }
+
+    // Generate a password immediately when the page loads
     if (facPasswordInput) {
-        facPasswordInput.addEventListener('input', _updateFacPasswordStrength);
+        _facSetGeneratedPassword(_facGeneratePassword());
+    }
+
+    function _updateFacPasswordStrength() { /* no-op: password is auto-generated, no strength bar needed */ }
+    function _getFacPasswordStrength(password) {
+        if (!password || password.length < 8) return null;
+        return { level: 4, label: 'Very strong' }; // generated passwords always pass
     }
 
     function _showFacAlert(msg, isError) {
@@ -2110,7 +2162,7 @@
 
         // Empty the form right away so no browser can restore typed values (the password
         // included) after the reload.
-        ['fac-email', 'fac-faculty-id', 'fac-first', 'fac-last', 'fac-password', 'fac-confirm']
+        ['fac-email', 'fac-faculty-id', 'fac-first', 'fac-last', 'fac-password']
             .forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.value = '';
@@ -2144,7 +2196,8 @@
             // Reset the create-account form so it's blank for the next account.
             var form = document.getElementById('fac-create-form') || document.getElementById('facCreateForm');
             if (form) form.reset();
-            _updateFacPasswordStrength();
+            // Generate a fresh password for the next account creation
+            if (facPasswordInput) _facSetGeneratedPassword(_facGeneratePassword());
             // Refresh the faculty list from the server so the new account appears immediately.
             if (typeof window.adminRefreshFacultyList === 'function') window.adminRefreshFacultyList();
         }, FAC_CREATED_OVERLAY_MS);
@@ -2160,7 +2213,6 @@
             const firstName = _nm.first;
             const lastName = _nm.last;
             const password = document.getElementById('fac-password')?.value || '';
-            const confirm = document.getElementById('fac-confirm')?.value || '';
 
             // Client-side pre-checks
             if (!_facRegistryMatch) {
@@ -2173,17 +2225,9 @@
                 _showFacAlert('Last name is required.', true); return;
             }
             if (!password) {
-                _showFacAlert('Password is required.', true); return;
-            }
-            if (password.length < 8) {
-                _showFacAlert('Password must be at least 8 characters.', true); return;
-            }
-            const passwordStrength = _getFacPasswordStrength(password);
-            if (passwordStrength.level < 2) {
-                _showFacAlert('Password is too weak. Use a stronger password rated Fair or higher.', true); return;
-            }
-            if (password !== confirm) {
-                _showFacAlert('Passwords do not match.', true); return;
+                // Should never happen (generated on load), but guard against it
+                _facSetGeneratedPassword(_facGeneratePassword());
+                _showFacAlert('A password was just generated. Please try again.', true); return;
             }
             if (_facEmailEdited && email && !/^[^\s@]+@pupsync\.edu$/i.test(email)) {
                 _showFacAlert('The PUPSync email must be a valid address ending in @pupsync.edu.', true);
@@ -2198,7 +2242,6 @@
                 first_name: firstName,
                 last_name: lastName,
                 password: password,
-                confirm_password: confirm
             });
             // Only an email the admin changed by hand is sent; otherwise the server derives it.
             if (_facEmailEdited && email) body.append('pupsync_email', email);

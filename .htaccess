@@ -28,8 +28,12 @@ Options -Indexes
     Header always unset Access-Control-Allow-Origin
     Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
 
-    # Fix: Cookie No HttpOnly Flag (ZAP)
-    Header always edit Set-Cookie ^(.*)$ "$1; HttpOnly; SameSite=Strict"
+    # NOTE: Cookie HttpOnly/SameSite flags are set directly by PHP (session.php,
+    # remember-me.php) via ini_set and setcookie() options. The mod_headers
+    # "edit Set-Cookie" line was removed because it appended duplicate attributes
+    # (e.g. SameSite=Strict twice) which caused browsers on some hosting
+    # environments (InfinityFree) to reject or misparse the cookie entirely,
+    # breaking the Remember-Me persistent login.
 </IfModule>
 
 <IfModule mod_php.c>

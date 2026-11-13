@@ -54,7 +54,15 @@ require_once __DIR__ . '/../shared/core/faculty-id.php';
 
 if (!empty($_COOKIE[REMEMBER_ME_COOKIE]) && empty($_SESSION['admin']) && empty($_SESSION['faculty_id'])) {
     require_once __DIR__ . '/db.php';
-    remember_me_restore(getDB());
+    try {
+        remember_me_restore(getDB());
+    } catch (Throwable $e) {
+        // Restoration failed (e.g. DB unavailable, session write error on shared host).
+        // Log it and clear the broken cookie so the next page load falls back to the
+        // login form rather than looping through failed restore attempts.
+        error_log('[PUPSync] remember_me_restore failed: ' . $e->getMessage());
+        remember_me_clear_cookie();
+    }
 }
 
 admin_session_guard();
