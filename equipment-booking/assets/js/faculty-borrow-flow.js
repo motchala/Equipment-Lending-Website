@@ -13,7 +13,7 @@
 
    Role differences from the student flow (on purpose):
      - rooms another faculty has reserved for the chosen window are shown but locked
-     - "Outside" is offered, and the faculty's own room reservations are suggested
+     - "For Personal" is offered, and the faculty's own room reservations are suggested
      - a later date may ask for more than is on the shelf today (up to total stock),
        and an item that is out right now can be booked ahead
      - the request is filed under the faculty's own account; a student may collect it
@@ -602,9 +602,9 @@
             html += '<p class="bf-rp-label">Choose a building</p>';
             html += bs.length
                 ? '<div class="bf-panels">' + bs.map(function (x) { return panelHTML(x, 'rp-building'); }).join('') + '</div>'
-                : '<div class="bf-empty">' + icon('meeting_room') + '<strong>No rooms are open for equipment right now</strong><span>You can still choose Outside.</span></div>';
+                : '<div class="bf-empty">' + icon('meeting_room') + '<strong>No rooms are open for equipment right now</strong><span>You can still choose For Personal.</span></div>';
             html += '<div class="bf-quick-grid bf-quick-grid--one"><button type="button" class="bf-quick" data-bf="rp-room" data-id="outside">' + icon('park') +
-                '<span class="bf-quick-txt"><strong>Outside</strong><small>Off-campus / outdoors</small></span><span class="bf-quick-tag" data-bf-tag></span></button></div>';
+                '<span class="bf-quick-txt"><strong>For Personal</strong><small>Personal use / off-campus</small></span><span class="bf-quick-tag" data-bf-tag></span></button></div>';
             body.innerHTML = html;
             var sub = $('bfRpSub'), w = windowOf();
             if (sub) sub.textContent = w ? windowLabel(w) : 'Select a building, floor and room.';
@@ -693,7 +693,7 @@
     }
     function roomLabelHTML(value) {
         if (!value) return '<span class="bf-room-ph">Choose a building and room</span>';
-        if (value === 'outside') return '<strong>Outside</strong><span>Off-campus / outdoors</span>';
+        if (value === 'outside') return '<strong>For Personal</strong><span>Personal use / off-campus</span>';
         var r = rp.index && rp.index[value];
         if (!r) { buildBuildings(); r = rp.index[value]; }
         return r ? '<strong>' + esc(r.name) + '</strong><span>' + esc(r.building) + ' · ' + esc(r.floor) + '</span>' : '<span class="bf-room-ph">Choose a building and room</span>';
