@@ -77,7 +77,6 @@
             '<span class="rxm-logo" aria-hidden="true">' + icon('layers') + '</span>' +
             '<h1 class="rxm-title" id="rxmTitle">PUPSync</h1>' +
             '<div class="rxm-actions">' +
-            '<button type="button" class="rxm-iconbtn rxm-dl" id="rxmDl" aria-label="Download report" hidden>' + icon('download') + '</button>' +
             '<button type="button" class="rxm-iconbtn rxm-bell" id="rxmBell" aria-label="Notifications">' + icon('notifications') +
             '<b class="rxm-badge" id="rxmBadge" hidden></b></button>' +
             '<button type="button" class="rxm-avatar" id="rxmAvatar" aria-label="Account menu" aria-haspopup="dialog"></button>' +
@@ -86,10 +85,6 @@
         barBack = $('#rxmBack', bar); barTitle = $('#rxmTitle', bar); barBrand = $('.rxm-logo', bar);
         barBell = $('#rxmBell', bar); barBadge = $('#rxmBadge', bar); barAvatar = $('#rxmAvatar', bar);
 
-        $('#rxmDl', bar).addEventListener('click', function () {
-            var orig = $('#panel-activity [data-fact-print]');
-            if (orig) orig.click();
-        });
         barBell.addEventListener('click', function () {
             var orig = $('#dashNotifBtn') || $('[data-action="open-notif-modal"]');
             if (orig) orig.click();
@@ -117,7 +112,6 @@
             title = (b && b.textContent.trim()) || 'Building';
         }
         barTitle.textContent = title;
-        $('#rxmDl', bar).hidden = t !== 'activity';
         barBack.hidden = !inRoom;
         bar.classList.toggle('is-home', t === 'home' && !inRoom);
         bar.classList.toggle('has-back', inRoom);

@@ -18,9 +18,17 @@ BookingSchedule::tick($conn);
 $totals = BookingSchedule::totalStockMap($conn);
 
 $result = $conn->query("SELECT item_id, item_name, quantity FROM tbl_inventory WHERE is_archived = 0");
-$items = [];
+$rows = [];
+$shelfByName = [];
 while ($row = $result->fetch_assoc()) {
+    $rows[] = $row;
+    $shelfByName[$row['item_name']] = ($shelfByName[$row['item_name']] ?? 0) + (int)$row['quantity'];
+}
+$items = [];
+foreach ($rows as $row) {
     $row['total'] = $totals[$row['item_name']] ?? (int)$row['quantity'];
+    // quantity = this card's own row (its stock badge); shelf_by_name = the same item across every campus (what Add / Book ahead is decided on)
+    $row['shelf_by_name'] = $shelfByName[$row['item_name']];
     $items[] = $row;
 }
 

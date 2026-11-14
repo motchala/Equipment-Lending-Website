@@ -4,7 +4,9 @@ BookingSchedule::loadRules($conn);                      // Settings → Arbitrat
 $bk_rooms  = BookingSchedule::roomsTree($conn, true);   // Available rooms only (no Maintenance / Not Bookable)
 $bk_totals = BookingSchedule::totalStockMap($conn);
 $bk_items  = [];
-$bk_res    = $conn->query("SELECT item_name, quantity FROM tbl_inventory WHERE is_archived = 0");
+// One entry per item NAME: the same name can exist once per campus, so the shelf quantities are added up
+// (a plain "last row wins" made an item that is in stock on one campus look unavailable)
+$bk_res    = $conn->query("SELECT item_name, SUM(quantity) AS quantity FROM tbl_inventory WHERE is_archived = 0 GROUP BY item_name");
 while ($bk_res && ($bk_row = $bk_res->fetch_assoc())) {
     $bk_items[$bk_row['item_name']] = [
         'shelf' => (int)$bk_row['quantity'],

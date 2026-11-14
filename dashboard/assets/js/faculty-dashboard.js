@@ -3294,8 +3294,10 @@
                         if (!card) return;
                         const qty = parseInt(item.quantity, 10);
                         const total = parseInt(item.total, 10);
+                        const nameShelf = parseInt(item.shelf_by_name, 10);   // same item across every campus
                         if (window.BOOKING_META && window.BOOKING_META.items && item.item_name) {
-                            window.BOOKING_META.items[item.item_name] = { shelf: qty, total: isNaN(total) ? qty : total };
+                            const shelf = isNaN(nameShelf) ? qty : nameShelf;
+                            window.BOOKING_META.items[item.item_name] = { shelf: shelf, total: isNaN(total) ? shelf : total };
                         }
 
                         // Update availability badge
@@ -4520,7 +4522,6 @@
 
    1. History table   filter All / Equipment / Rooms, search, paging
    2. Cards           Equipment and Room reservations show 5 rows per page
-   3. Download Report prints the whole record (CSS un-pages it)
    4. Live refresh    Rooms:     room-reservation/api/poll-reservations.php?view=activity
                       Equipment: equipment-booking/api/poll-requests.php?view=activity
                       Each swaps its card, its rows in the history table and its own entries in
@@ -4779,10 +4780,6 @@
             paginateCard(card);
         });
 
-        /* ── 3. Download Report ──────────────────────────────────── */
-        panel.addEventListener('click', function (e) {
-            if (e.target.closest('[data-fact-print]')) window.print();
-        });
 
         /* ── 4. Live refresh (equipment + rooms) ─────────────────── */
         var inFlight = { rooms: false, equipment: false };

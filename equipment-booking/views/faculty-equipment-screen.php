@@ -48,7 +48,7 @@
                         function fbAddSlot(array $item, bool $blocked, array $bk_items, string $variant = ''): string
                         {
                             $name  = (string)$item['item_name'];
-                            $shelf = (int)$item['quantity'];
+                            $shelf = (int)($bk_items[$name]['shelf'] ?? $item['quantity']);   // per item name, all campuses
                             $total = (int)($bk_items[$name]['total'] ?? $shelf);
                             $ahead = ($shelf <= 0 && $total > 0);   // out now, but it exists: can be booked for later
                             $h     = fn(string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
@@ -69,7 +69,7 @@
                             }
                             return '<div class="' . $cls . '"' . $attrs . '><button type="button" class="' . $btn . ' bf-add' . ($ahead ? ' btn-borrow-ahead' : '') . '" data-bf="add">'
                                  . '<span class="material-symbols-outlined" aria-hidden="true">' . ($ahead ? 'event' : 'add') . '</span>'
-                                 . '<span class="btn-borrow-label">' . ($ahead ? 'Book ahead' : ($variant === 'hero' ? 'Add to request' : 'Add')) . '</span></button></div>';
+                                 . '<span class="btn-borrow-label">' . ($ahead ? 'Book ahead' : ($variant === 'hero' ? 'Add to request' : ($variant === 'block' ? 'Add Item' : 'Add'))) . '</span></button></div>';
                         }
                     }
 
