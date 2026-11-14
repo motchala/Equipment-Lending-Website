@@ -16,6 +16,7 @@ declare(strict_types=1);
  *   time      'HH:00' (booking times are on the hour)
  *   int_list  comma list such as '1,2,3,6', every number from the allowed set
  *   enum      one of the allowed words
+ *   date      'YYYY-MM-DD', or '' when not set
  *
  * A missing or invalid row falls back to the default, so a fresh database behaves exactly as
  * the system did before these settings existed.
@@ -47,6 +48,20 @@ final class ArbitrationConfig
         'room_same_day_auto'             => ['type' => 'bool', 'default' => true],
         'room_letter_required'           => ['type' => 'bool', 'default' => false],
         'room_expiry_mode'               => ['type' => 'enum', 'default' => 'day', 'allowed' => ['day', 'start', 'never']],
+
+        // ── Semester (shown as a small tag on every dashboard; the dates also anchor the service-survey
+        //    reporting windows). Never saved yet? all() falls back to the dates already in the survey settings. ──
+        'semester_name'                  => ['type' => 'enum', 'default' => 'none', 'allowed' => ['first', 'second', 'summer', 'none']],
+        'semester_start'                 => ['type' => 'date', 'default' => ''],
+        'semester_end'                   => ['type' => 'date', 'default' => ''],
+    ];
+
+    /** What each semester_name value is called on screen. */
+    public const SEMESTER_LABELS = [
+        'first'  => '1st Semester',
+        'second' => '2nd Semester',
+        'summer' => 'Summer',
+        'none'   => 'No active semester',
     ];
 
     /** @var array<string, mixed>|null typed values, per request */
@@ -101,6 +116,7 @@ final class ArbitrationConfig
         }
         // Keep the combination sane even if a row was edited by hand.
         $out = self::repairHours($out);
+        $out = self::legacySemester($conn, $raw, $out);
         return self::$cache = $out;
     }
 
@@ -182,6 +198,19 @@ final class ArbitrationConfig
                     $clean[$key] = $value;
                     break;
 
+                case 'date':
+                    if (!is_string($value)) {
+                        $errors[$key] = 'Choose a valid date.';
+                        break;
+                    }
+                    $value = trim($value);
+                    if ($value !== '' && !self::isDate($value)) {
+                        $errors[$key] = 'Choose a valid date.';
+                        break;
+                    }
+                    $clean[$key] = $value;   // '' = not set
+                    break;
+
                 case 'int_list':
                     if (!is_array($value)) {
                         $errors[$key] = 'Invalid list.';
@@ -234,6 +263,15 @@ final class ArbitrationConfig
             if ($end - $start < $shortest) {
                 $errors['equip_durations'] = 'The shortest booking length does not fit inside the booking hours.';
             }
+        }
+
+        // Semester dates: both or neither, and in order.
+        $semStart = (string)($merged['semester_start'] ?? '');
+        $semEnd   = (string)($merged['semester_end'] ?? '');
+        if (($semStart === '') !== ($semEnd === '')) {
+            $errors['semester_end'] = 'Enter both semester dates, or leave both blank.';
+        } elseif ($semStart !== '' && $semStart > $semEnd) {
+            $errors['semester_end'] = 'The semester must end on or after the day it starts.';
         }
         return $errors;
     }
@@ -322,6 +360,8 @@ final class ArbitrationConfig
                 return preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $raw) ? substr($raw, 0, 2) . ':00' : $def['default'];
             case 'enum':
                 return in_array($raw, $def['allowed'], true) ? $raw : $def['default'];
+            case 'date':
+                return self::isDate($raw) ? $raw : $def['default'];
             case 'int_list':
                 $nums = [];
                 foreach (explode(',', $raw) as $p) {
@@ -340,6 +380,57 @@ final class ArbitrationConfig
     private static function hour(string $hhmm): int
     {
         return (int)substr($hhmm, 0, 2);
+    }
+
+    /** True for a real calendar date written as YYYY-MM-DD. */
+    private static function isDate(string $value): bool
+    {
+        $d = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+        $e = \DateTimeImmutable::getLastErrors();
+        return $d !== false
+            && $d->format('Y-m-d') === $value
+            && ($e === false || ($e['warning_count'] === 0 && $e['error_count'] === 0));
+    }
+
+    /** Semester name for a start/end window, going by its middle month: Aug-Dec 1st · Jan-May 2nd · Jun-Jul Summer. */
+    private static function semesterFromWindow(string $start, string $end): string
+    {
+        $mid   = (int)((strtotime($start . ' 00:00:00') + strtotime($end . ' 00:00:00')) / 2);
+        $month = (int)date('n', $mid);
+        if ($month >= 8) {
+            return 'first';
+        }
+        return $month >= 6 ? 'summer' : 'second';
+    }
+
+    /**
+     * Until the Super Admin saves the Semester card here, the dates already set in the old survey settings
+     * (tbl_service_survey_config) keep working, and the semester name is worked out from them. After the first
+     * save here the rows exist and this does nothing.
+     */
+    private static function legacySemester(mysqli $conn, array $raw, array $out): array
+    {
+        if (array_key_exists('semester_start', $raw) || array_key_exists('semester_end', $raw) || array_key_exists('semester_name', $raw)) {
+            return $out;
+        }
+        try {
+            $res = $conn->query('SELECT semester_start, semester_end FROM tbl_service_survey_config WHERE id = 1 LIMIT 1');
+            $row = $res ? $res->fetch_assoc() : null;
+            if ($res) {
+                $res->free();
+            }
+        } catch (\Throwable $e) {
+            return $out;   // table not created yet
+        }
+        $start = (string)($row['semester_start'] ?? '');
+        $end   = (string)($row['semester_end'] ?? '');
+        if (!self::isDate($start) || !self::isDate($end) || $start > $end) {
+            return $out;
+        }
+        $out['semester_start'] = $start;
+        $out['semester_end']   = $end;
+        $out['semester_name']  = self::semesterFromWindow($start, $end);
+        return $out;
     }
 
     /** If hand-edited rows leave no usable window, fall back to the default hours. */

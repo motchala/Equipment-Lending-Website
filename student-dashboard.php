@@ -13,6 +13,8 @@ header("X-Frame-Options: DENY");
 
 require_once __DIR__ . '/config/session.php';      // needed to read the one-shot role-splash flag
 require_once __DIR__ . '/auth/core/role-splash.php';
+require_once __DIR__ . '/shared/core/semester-label.php';   // current semester name (no DB connection needed here)
+$st_semester = ps_semester_label();
 ?>
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
@@ -36,6 +38,7 @@ require_once __DIR__ . '/auth/core/role-splash.php';
     <!-- PUPSync Student Styles -->
     <link rel="stylesheet" href="dashboard/assets/css/student-dashboard.css">
     <link rel="stylesheet" href="shared/assets/css/letter-camera.css">
+    <link rel="stylesheet" href="shared/assets/css/semester-tag.css?v=<?php echo @filemtime(__DIR__ . '/shared/assets/css/semester-tag.css'); ?>">
     <?php role_splash_head(); ?>
 </head>
 
@@ -84,6 +87,7 @@ require_once __DIR__ . '/auth/core/role-splash.php';
             <div class="st-hero">
                 <h1 id="homeTitle" tabindex="-1">What do you need today?</h1>
                 <p>Choose a service. You don&rsquo;t need an account &mdash; just a code from your faculty.</p>
+                <p><span class="ps-semester-tag<?php echo $st_semester['active'] ? '' : ' is-none'; ?>" id="psSemesterTag"><?php echo htmlspecialchars($st_semester['label'], ENT_QUOTES, 'UTF-8'); ?></span></p>
             </div>
 
             <!-- Shown by JS when a borrow receipt was saved earlier in this browser session -->

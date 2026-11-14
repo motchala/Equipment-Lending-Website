@@ -119,6 +119,9 @@ if ($changed) {
         'room_same_day_auto'             => 'same-day room confirmation',
         'room_letter_required'           => 'room request letter requirement',
         'room_expiry_mode'               => 'undecided room requests',
+        'semester_name'                  => 'current semester',
+        'semester_start'                 => 'semester dates',
+        'semester_end'                   => 'semester dates',
     ];
     $names = [];
     foreach ($changed as $key) {

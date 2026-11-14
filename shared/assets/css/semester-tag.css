@@ -1,0 +1,41 @@
+/* semester-tag.css — the small "1st Semester" label on every portal's dashboard.
+   Theme-safe on purpose: it inherits the surrounding text colour and only adds a faint gold
+   tint, so it reads correctly in light, dark and high-contrast themes. */
+.ps-semester-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3em;
+    padding: 0.1em 0.65em;
+    border: 1px solid rgba(184, 145, 58, 0.45);
+    border-radius: 999px;
+    background: rgba(220, 184, 98, 0.16);
+    color: inherit;
+    font-size: 0.85em;
+    font-weight: 600;
+    line-height: 1.5;
+    white-space: nowrap;
+    vertical-align: baseline;
+}
+
+.ps-semester-tag .material-symbols-outlined {
+    font-size: 1.15em;
+    line-height: 1;
+}
+
+/* Faculty header: the date is a plain inline paragraph, so give the tag some air. */
+.dash-flat-sub .ps-semester-tag {
+    margin-left: 0.6em;
+}
+
+/* No semester is running (dates not set, or today is outside them): same tag, quieter. */
+.ps-semester-tag.is-none {
+    background: transparent;
+    border-color: rgba(128, 128, 128, 0.35);
+    font-weight: 500;
+    opacity: 0.75;
+}
+
+/* Student portal: lives in its own centred line under the hero text. */
+.st-hero .ps-semester-tag {
+    font-size: 0.8rem;
+}

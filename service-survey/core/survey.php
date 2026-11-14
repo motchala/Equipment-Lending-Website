@@ -9,6 +9,9 @@ const SS_QUESTION_MIN = 8;
 const SS_QUESTION_MAX = 160;
 const SS_COMMENT_MAX = 500;
 
+// The semester dates are managed in Settings → Arbitration (the survey only reads them).
+require_once __DIR__ . '/../../shared/core/arbitration-config.php';
+
 function ss_json(array $payload, int $code = 200): void
 {
     http_response_code($code);
@@ -219,11 +222,13 @@ function ss_config(mysqli $conn): array
     }
     $row = $result->fetch_assoc() ?: ['enabled' => 1, 'comment_enabled' => 1];
     $result->free();
+    // Semester dates come from Settings → Arbitration (falls back to the old survey-table dates until first saved there).
+    $semester = ArbitrationConfig::all($conn);
     return [
         'enabled' => (bool)$row['enabled'],
         'comment_enabled' => (bool)$row['comment_enabled'],
-        'semester_start' => !empty($row['semester_start']) ? (string)$row['semester_start'] : null,
-        'semester_end' => !empty($row['semester_end']) ? (string)$row['semester_end'] : null,
+        'semester_start' => $semester['semester_start'] !== '' ? (string)$semester['semester_start'] : null,
+        'semester_end' => $semester['semester_end'] !== '' ? (string)$semester['semester_end'] : null,
     ];
 }
 

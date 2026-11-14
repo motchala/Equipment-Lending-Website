@@ -92,24 +92,6 @@ $svr_super = !empty($is_super_admin);
         </div>
 
         <div class="svr-ed-body">
-            <div class="svr-semester-settings">
-                <div>
-                    <div class="svr-switch-title">Semester reporting dates</div>
-                    <div class="svr-switch-sub">Set both dates to start 14-day reporting windows anchored to the semester start. Leave both blank to use unperiodized totals.</div>
-                </div>
-                <div class="svr-date-fields">
-                    <label class="svr-date-field" for="svrSemesterStart">
-                        Semester starts
-                        <input type="date" id="svrSemesterStart">
-                    </label>
-                    <label class="svr-date-field" for="svrSemesterEnd">
-                        Semester ends
-                        <input type="date" id="svrSemesterEnd">
-                    </label>
-                </div>
-                <p class="svr-switch-sub">Ratings already collected before period reporting began remain in the legacy totals and cannot be assigned to exact two-week windows.</p>
-            </div>
-
             <div class="svr-switch-row">
                 <label class="toggle-sw">
                     <input type="checkbox" id="svrEnabled">

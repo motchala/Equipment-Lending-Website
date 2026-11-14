@@ -38,8 +38,6 @@
     var ed = document.getElementById('svrEditor');
     var edEnabled = document.getElementById('svrEnabled');
     var edCommentOn = document.getElementById('svrCommentOn');
-    var edSemesterStart = document.getElementById('svrSemesterStart');
-    var edSemesterEnd = document.getElementById('svrSemesterEnd');
     var edList = document.getElementById('svrEdList');
     var edCount = document.getElementById('svrEdCount');
     var btnAdd = document.getElementById('svrAdd');
@@ -181,7 +179,7 @@
 
         if (period.configured && !period.active) {
             clear(elOverall);
-            elOverall.appendChild(el('p', 'svr-muted svr-pad', 'There is no active two-week period today. Check the semester dates in Survey settings.'));
+            elOverall.appendChild(el('p', 'svr-muted svr-pad', 'There is no active two-week period today. Check the semester dates in Settings \u2192 Arbitration.'));
             return;
         }
         renderAggregate(elOverall, r);
@@ -191,7 +189,7 @@
         clear(elSemester);
         if (!summary || !summary.configured) {
             elSemesterRange.textContent = '';
-            elSemester.appendChild(el('p', 'svr-muted svr-pad', 'Set semester start and end dates in Survey settings to begin period reporting.'));
+            elSemester.appendChild(el('p', 'svr-muted svr-pad', 'Set the semester start and end dates in Settings \u2192 Arbitration to begin period reporting.'));
             return;
         }
         elSemesterRange.textContent = summary.start + ' – ' + summary.end;
@@ -287,8 +285,6 @@
         return JSON.stringify({
             enabled: e.enabled,
             commentOn: e.commentOn,
-            semesterStart: e.semesterStart,
-            semesterEnd: e.semesterEnd,
             items: e.items.map(function (i) { return [i.id, i.text]; })
         });
     }
@@ -298,15 +294,11 @@
         state.editor = {
             enabled: !!r.enabled,
             commentOn: !!r.comment_enabled,
-            semesterStart: r.semester && r.semester.start ? r.semester.start : '',
-            semesterEnd: r.semester && r.semester.end ? r.semester.end : '',
             items: (r.editor_questions || r.questions).map(function (q) { return { id: q.id, text: q.text, responses: q.responses || 0 }; })
         };
         state.snapshot = snapshotOf(state.editor);
         edEnabled.checked = state.editor.enabled;
         edCommentOn.checked = state.editor.commentOn;
-        edSemesterStart.value = state.editor.semesterStart;
-        edSemesterEnd.value = state.editor.semesterEnd;
         edConfirm.hidden = true;
         setMsg('');
         renderEditorList();
@@ -387,8 +379,6 @@
             csrf_token: CSRF,
             enabled: e.enabled,
             comment_enabled: e.commentOn,
-            semester_start: e.semesterStart,
-            semester_end: e.semesterEnd,
             confirm_reset: !!confirmReset,
             questions: e.items.map(function (i) { return { id: i.id === undefined ? null : i.id, text: i.text }; })
         };
@@ -396,12 +386,6 @@
 
     function validate() {
         var L = limits();
-        if ((state.editor.semesterStart === '') !== (state.editor.semesterEnd === '')) {
-            return 'Enter both semester dates, or leave both blank to disable period reporting.';
-        }
-        if (state.editor.semesterStart && state.editor.semesterStart > state.editor.semesterEnd) {
-            return 'The semester end date must be on or after the start date.';
-        }
         for (var i = 0; i < state.editor.items.length; i++) {
             var t = state.editor.items[i].text.replace(/\s+/g, ' ').trim();
             if (t.length < L.question_min) return 'Question ' + (i + 1) + ' is too short (at least ' + L.question_min + ' characters).';
@@ -467,8 +451,6 @@
 
         edEnabled.addEventListener('change', function () { state.editor.enabled = edEnabled.checked; refreshEditorButtons(); });
         edCommentOn.addEventListener('change', function () { state.editor.commentOn = edCommentOn.checked; refreshEditorButtons(); });
-        edSemesterStart.addEventListener('change', function () { state.editor.semesterStart = edSemesterStart.value; refreshEditorButtons(); });
-        edSemesterEnd.addEventListener('change', function () { state.editor.semesterEnd = edSemesterEnd.value; refreshEditorButtons(); });
 
         edList.addEventListener('input', function (ev) {
             var t = ev.target;
