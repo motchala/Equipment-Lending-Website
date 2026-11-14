@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Nov 12, 2026 at 09:50 AM
+-- Generation Time: Nov 14, 2026 at 12:04 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -38,17 +38,18 @@ CREATE TABLE `tbl_accounts` (
   `last_login` datetime DEFAULT NULL,
   `dormant_until` bigint(20) UNSIGNED DEFAULT NULL,
   `session_epoch` bigint(20) UNSIGNED NOT NULL DEFAULT 0,
-  `last_password_change` datetime DEFAULT NULL
+  `last_password_change` datetime DEFAULT NULL,
+  `backup_email` varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `tbl_accounts`
 --
 
-INSERT INTO `tbl_accounts` (`id`, `fullName`, `email`, `password`, `role`, `admin_no`, `created_at`, `last_login`, `dormant_until`, `session_epoch`, `last_password_change`) VALUES
-(1, 'Redg Abelida', 'main@admin.edu', '$2y$10$dLNCtd5IGqTMf7VUHFYyEOPI00YWyd9h9n4uj6dTptlcKwFNcw57e', 'Super Admin', 1, '2026-01-01 00:00:00', '2026-11-12 08:49:29', NULL, 0, NULL),
-(2, 'Chico Ramos', 'chico@admin.edu', '$2y$10$w.G7jIE6r6iSsVyn/T/G2OAhoqpyxgu4kkWKbHIhOky/CJk94xLGC', 'Admin', 2, '2026-10-02 11:05:03', '2026-11-09 23:25:05', NULL, 0, NULL),
-(3, 'Jell Alagon', 'jell@admin.edu', '$2y$10$Q2ZyDvxioT548b/LuPKdEe7XYwf3bh3t//5dN/mX2bNIKEQ3buhf6', 'Admin', 3, '2026-11-10 06:01:18', NULL, NULL, 0, NULL);
+INSERT INTO `tbl_accounts` (`id`, `fullName`, `email`, `password`, `role`, `admin_no`, `created_at`, `last_login`, `dormant_until`, `session_epoch`, `last_password_change`, `backup_email`) VALUES
+(1, 'Redg Abelida', 'main@admin.edu', '$2y$10$dLNCtd5IGqTMf7VUHFYyEOPI00YWyd9h9n4uj6dTptlcKwFNcw57e', 'Super Admin', 1, '2026-01-01 00:00:00', '2026-11-14 17:07:46', NULL, 0, NULL, ''),
+(2, 'Chico Ramos', 'chico@admin.edu', '$2y$10$w.G7jIE6r6iSsVyn/T/G2OAhoqpyxgu4kkWKbHIhOky/CJk94xLGC', 'Admin', 2, '2026-10-02 11:05:03', '2026-11-09 23:25:05', NULL, 0, NULL, NULL),
+(3, 'Jell Alagon', 'jell@admin.edu', '$2y$10$Q2ZyDvxioT548b/LuPKdEe7XYwf3bh3t//5dN/mX2bNIKEQ3buhf6', 'Admin', 3, '2026-11-10 06:01:18', NULL, NULL, 0, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -194,7 +195,31 @@ INSERT INTO `tbl_admin_activity` (`id`, `admin_id`, `admin_name`, `category`, `a
 (118, 1, 'Redg Abelida', 'settings', NULL, 'Unlocked the Imports tab', NULL, NULL, NULL, '2026-11-12 07:45:23'),
 (119, 1, 'Redg Abelida', 'rooms', NULL, 'Imported rooms assigned: 723 weekly class meetings for 91 faculty in 45 rooms (file: PUPSync-FullScheduleList.xlsx, replaced the previous file)', NULL, NULL, NULL, '2026-11-12 07:45:49'),
 (120, 1, 'Redg Abelida', 'login', NULL, 'Signed in', NULL, NULL, NULL, '2026-11-12 08:49:29'),
-(121, 1, 'Redg Abelida', 'settings', NULL, 'Unlocked the Imports tab', NULL, NULL, NULL, '2026-11-12 08:49:55');
+(121, 1, 'Redg Abelida', 'settings', NULL, 'Unlocked the Imports tab', NULL, NULL, NULL, '2026-11-12 08:49:55'),
+(122, 1, 'Redg Abelida', 'request', 'overdue_notice_sent', 'Sent overdue return notice for Active Speakers to Stephen Perez', 'request', 67, NULL, '2026-11-12 17:14:10'),
+(123, 1, 'Redg Abelida', 'request', 'request_returned', 'Recorded manual return: Router (Michael Anjelo Miguel)', 'request', 65, NULL, '2026-11-12 17:14:30'),
+(124, 1, 'Redg Abelida', 'request', 'overdue_notice_sent', 'Sent overdue return notice for Active Speakers to Stephen Perez', 'request', 66, NULL, '2026-11-12 17:14:47'),
+(125, 1, 'Redg Abelida', 'request', 'request_returned', 'Recorded manual return: Active Speakers (Michael Anjelo Miguel)', 'request', 63, NULL, '2026-11-12 17:14:52'),
+(126, 1, 'Redg Abelida', 'request', 'overdue_notice_sent', 'Sent overdue return notice for Unterrupted Power Supply to Michael Anjelo Miguel', 'request', 64, NULL, '2026-11-12 18:07:04'),
+(127, 1, 'Redg Abelida', 'request', 'request_returned', 'Recorded manual return: Unterrupted Power Supply (Michael Anjelo Miguel)', 'request', 64, NULL, '2026-11-12 18:27:39'),
+(128, 1, 'Redg Abelida', 'login', NULL, 'Signed in', NULL, NULL, NULL, '2026-11-12 23:29:53'),
+(129, 1, 'Redg Abelida', 'login', NULL, 'Signed in', NULL, NULL, NULL, '2026-11-13 04:03:07'),
+(130, 1, 'Redg Abelida', 'login', NULL, 'Signed in', NULL, NULL, NULL, '2026-11-13 05:13:37'),
+(131, 1, 'Redg Abelida', 'request', 'overdue_notice_sent', 'Sent overdue return notice for Active Speakers to Stephen Perez', 'request', 67, NULL, '2026-11-13 05:52:00'),
+(132, 1, 'Redg Abelida', 'request', 'request_returned', 'Recorded manual return: Active Speakers (Stephen Perez)', 'request', 67, NULL, '2026-11-13 05:52:37'),
+(133, 1, 'Redg Abelida', 'request', 'request_returned', 'Recorded manual return: Active Speakers (Stephen Perez)', 'request', 66, NULL, '2026-11-13 05:52:40'),
+(134, 1, 'Redg Abelida', 'request', 'request_claimed', 'Recorded manual claim: Active Speakers → Stephen Perez (1 unit(s))', 'request', 68, NULL, '2026-11-13 05:58:09'),
+(135, 1, 'Redg Abelida', 'request', 'request_returned', 'Recorded manual return: Active Speakers (Stephen Perez)', 'request', 68, NULL, '2026-11-13 06:03:36'),
+(136, 1, 'Redg Abelida', 'request', 'request_claimed', 'Recorded manual claim: Unterrupted Power Supply → Stephen Perez (3 unit(s))', 'request', 69, NULL, '2026-11-13 06:33:03'),
+(137, 1, 'Redg Abelida', 'request', 'request_returned', 'Recorded manual return: Unterrupted Power Supply (Stephen Perez)', 'request', 69, NULL, '2026-11-13 06:33:15'),
+(138, 1, 'Redg Abelida', 'request', 'request_claimed', 'Recorded manual claim: Unterrupted Power Supply → Stephen Perez (2 unit(s))', 'request', 70, NULL, '2026-11-13 06:35:23'),
+(139, 1, 'Redg Abelida', 'request', 'request_returned', 'Recorded manual return: Unterrupted Power Supply (Stephen Perez)', 'request', 70, NULL, '2026-11-13 06:35:32'),
+(140, 1, 'Redg Abelida', 'settings', NULL, 'Unlocked the Imports tab', NULL, NULL, NULL, '2026-11-13 07:44:08'),
+(141, 1, 'Redg Abelida', 'settings', NULL, 'Unlocked the Imports tab', NULL, NULL, NULL, '2026-11-14 01:53:02'),
+(142, 1, 'Redg Abelida', 'faculty', NULL, 'Created faculty account for Arvin Nuñez (8 weekly class meetings added to their schedule)', NULL, NULL, NULL, '2026-11-14 01:53:53'),
+(143, 1, 'Redg Abelida', 'login', NULL, 'Signed in', NULL, NULL, NULL, '2026-11-14 17:07:46'),
+(144, 1, 'Redg Abelida', 'faculty', NULL, 'Deleted faculty account of Arvin Nuñez', NULL, NULL, NULL, '2026-11-14 17:08:09'),
+(145, 1, 'Redg Abelida', 'faculty', NULL, 'Created faculty account for Arvin Nuñez (8 weekly class meetings added to their schedule)', NULL, NULL, NULL, '2026-11-14 17:08:53');
 
 -- --------------------------------------------------------
 
@@ -290,11 +315,14 @@ INSERT INTO `tbl_arbitration_log` (`id`, `request_id`, `borrower_id`, `borrower_
 (54, 60, 'FA0008BN2023', 'Edmundo Dela Cruz', 'Acer System Unit', 'Returned', 'manual_return', 'Equipment returned manually by an administrator.', 'Redg Abelida', 1, 'Condition: Good', NULL, '2026-11-11 16:10:35'),
 (55, 62, 'FA0008BN2023', 'Edmundo Dela Cruz', 'Active Speakers', 'Returned', 'manual_return', 'Equipment returned manually by an administrator.', 'Redg Abelida', 1, 'Condition: Good', NULL, '2026-11-11 16:10:13'),
 (56, 61, 'FA0008BN2023', 'Edmundo Dela Cruz', 'Adaptor', 'Returned', 'manual_return', 'Equipment returned manually by an administrator.', 'Redg Abelida', 1, 'Condition: Good', NULL, '2026-11-11 16:10:26'),
-(57, 63, 'FA0005BN2016', 'Michael Anjelo Miguel', 'Active Speakers', 'Approved', 'auto_approve_timeout', 'Auto-approved: no admin action within the buffer time.', NULL, NULL, NULL, NULL, '2026-11-10 00:46:02'),
-(58, 64, 'FA0005BN2016', 'Michael Anjelo Miguel', 'Unterrupted Power Supply', 'Approved', 'auto_approve_timeout', 'Auto-approved: no admin action within the buffer time.', NULL, NULL, NULL, NULL, '2026-11-10 02:18:06'),
-(59, 65, 'FA0005BN2016', 'Michael Anjelo Miguel', 'Router', 'Approved', 'auto_approve_timeout', 'Auto-approved: no admin action within the buffer time.', NULL, NULL, NULL, NULL, '2026-11-10 02:18:06'),
-(60, 66, 'FA0011BN2026', 'Stephen Perez', 'Active Speakers', 'Approved', 'auto_approve_timeout', 'Auto-approved: no admin action within the buffer time.', NULL, NULL, NULL, NULL, '2026-11-10 15:28:45'),
-(61, 67, 'FA0011BN2026', 'Stephen Perez', 'Active Speakers', 'Approved', 'auto_approve_timeout', 'Auto-approved: no admin action within the buffer time.', NULL, NULL, NULL, NULL, '2026-11-10 15:30:56');
+(57, 63, 'FA0005BN2016', 'Michael Anjelo Miguel', 'Active Speakers', 'Returned', 'manual_return', 'Equipment returned manually by an administrator.', 'Redg Abelida', 1, 'Condition: Good', NULL, '2026-11-12 17:14:52'),
+(58, 64, 'FA0005BN2016', 'Michael Anjelo Miguel', 'Unterrupted Power Supply', 'Returned', 'manual_return', 'Equipment returned manually by an administrator.', 'Redg Abelida', 1, 'Condition: Good', NULL, '2026-11-12 18:27:39'),
+(59, 65, 'FA0005BN2016', 'Michael Anjelo Miguel', 'Router', 'Returned', 'manual_return', 'Equipment returned manually by an administrator.', 'Redg Abelida', 1, 'Condition: Good', NULL, '2026-11-12 17:14:30'),
+(60, 66, 'FA0011BN2026', 'Stephen Perez', 'Active Speakers', 'Returned', 'manual_return', 'Equipment returned manually by an administrator.', 'Redg Abelida', 1, 'Condition: Good', NULL, '2026-11-13 05:52:40'),
+(61, 67, 'FA0011BN2026', 'Stephen Perez', 'Active Speakers', 'Returned', 'manual_return', 'Equipment returned manually by an administrator.', 'Redg Abelida', 1, 'Condition: Good', NULL, '2026-11-13 05:52:37'),
+(70, 68, 'FA0011BN2026', 'Stephen Perez', 'Active Speakers', 'Returned', 'manual_return', 'Equipment returned manually by an administrator.', 'Redg Abelida', 1, 'Condition: Good', NULL, '2026-11-13 06:03:35'),
+(73, 69, 'FA0011BN2026', 'Stephen Perez', 'Unterrupted Power Supply', 'Returned', 'manual_return', 'Equipment returned manually by an administrator.', 'Redg Abelida', 1, 'Condition: Good', NULL, '2026-11-13 06:33:15'),
+(76, 70, 'FA0011BN2026', 'Stephen Perez', 'Unterrupted Power Supply', 'Returned', 'manual_return', 'Equipment returned manually by an administrator.', 'Redg Abelida', 1, 'Condition: Good', NULL, '2026-11-13 06:35:32');
 
 -- --------------------------------------------------------
 
@@ -482,14 +510,14 @@ INSERT INTO `tbl_class_schedule` (`id`, `import_id`, `faculty_id`, `faculty_name
 (822, 2, NULL, 'Ariel S. Ponce', 'arielsponce', 'Part-Time', NULL, 89, 'C309', 'COMP 018', 'Database Administration', 'DIT 3-1', 'Lecture', NULL, 3, '09:00:00', '11:00:00', 0, NULL, '2026-11-12 07:45:48'),
 (823, 2, NULL, 'Ariel S. Ponce', 'arielsponce', 'Part-Time', NULL, 90, 'C310', 'COMP 018', 'Database Administration', 'DIT 3-2', 'Laboratory', NULL, 6, '16:00:00', '19:00:00', 0, NULL, '2026-11-12 07:45:48'),
 (824, 2, NULL, 'Ariel S. Ponce', 'arielsponce', 'Part-Time', NULL, 90, 'C310', 'COMP 018', 'Database Administration', 'DIT 3-2', 'Lecture', NULL, 1, '11:00:00', '13:00:00', 0, NULL, '2026-11-12 07:45:48'),
-(825, 2, 'FA0005BN2026', 'Arvin M. Nuñez', 'arvinmnuez', 'Part-Time', NULL, 14, 'A303', 'GEED 002', 'Readings in Philippine History/Mga Babasahin Hinggil sa Kasaysayan ng Pilipinas', 'BEED 1-2', 'Lecture', NULL, 6, '08:00:00', '11:00:00', 0, NULL, '2026-11-12 07:45:48'),
-(826, 2, 'FA0005BN2026', 'Arvin M. Nuñez', 'arvinmnuez', 'Part-Time', NULL, 114, 'A401', 'GEED 037', 'Life and Works of Rizal/Buhay at Mga Gawa ni Rizal', 'BSCPE 2-2', 'Lecture', NULL, 2, '16:00:00', '19:00:00', 0, NULL, '2026-11-12 07:45:48'),
-(827, 2, 'FA0005BN2026', 'Arvin M. Nuñez', 'arvinmnuez', 'Part-Time', NULL, 31, 'B204', 'GEED 003', 'The Contemporary World/Ang Kasalukuyang Daigdig', 'BSEDSS 1-2', 'Lecture', NULL, 1, '08:00:00', '11:00:00', 0, NULL, '2026-11-12 07:45:48'),
-(828, 2, 'FA0005BN2026', 'Arvin M. Nuñez', 'arvinmnuez', 'Part-Time', NULL, 31, 'B204', 'GEED 003', 'The Contemporary World/Ang Kasalukuyang Daigdig', 'BSPSY 2-2', 'Lecture', NULL, 5, '08:00:00', '11:00:00', 0, NULL, '2026-11-12 07:45:48'),
-(829, 2, 'FA0005BN2026', 'Arvin M. Nuñez', 'arvinmnuez', 'Part-Time', NULL, 32, 'B205', 'SOST 214', 'Socio-Cultural Anthropology', 'BSEDSS 2-1', 'Lecture', NULL, 2, '13:00:00', '16:00:00', 0, NULL, '2026-11-12 07:45:48'),
-(830, 2, 'FA0005BN2026', 'Arvin M. Nuñez', 'arvinmnuez', 'Part-Time', NULL, 32, 'B205', 'SOST 214', 'Socio-Cultural Anthropology', 'BSEDSS 2-2', 'Lecture', NULL, 3, '13:00:00', '16:00:00', 0, NULL, '2026-11-12 07:45:48'),
-(831, 2, 'FA0005BN2026', 'Arvin M. Nuñez', 'arvinmnuez', 'Part-Time', NULL, 38, 'B401', 'GEED 002', 'Readings in Philippine History/Mga Babasahin Hinggil sa Kasaysayan ng Pilipinas', 'BSIE 3-2', 'Lecture', NULL, 3, '16:00:00', '19:00:00', 0, NULL, '2026-11-12 07:45:48'),
-(832, 2, 'FA0005BN2026', 'Arvin M. Nuñez', 'arvinmnuez', 'Part-Time', NULL, 112, 'C107', 'GEED 037', 'Life and Works of Rizal/Buhay at Mga Gawa ni Rizal', 'BSPSY 2-2', 'Lecture', NULL, 1, '12:00:00', '15:00:00', 0, NULL, '2026-11-12 07:45:48'),
+(825, 2, 'FA0005BN2026', 'Arvin M. Nuñez', 'arvinmnuez', 'Part-Time', 'FA0005BN2026', 14, 'A303', 'GEED 002', 'Readings in Philippine History/Mga Babasahin Hinggil sa Kasaysayan ng Pilipinas', 'BEED 1-2', 'Lecture', NULL, 6, '08:00:00', '11:00:00', 0, NULL, '2026-11-12 07:45:48'),
+(826, 2, 'FA0005BN2026', 'Arvin M. Nuñez', 'arvinmnuez', 'Part-Time', 'FA0005BN2026', 114, 'A401', 'GEED 037', 'Life and Works of Rizal/Buhay at Mga Gawa ni Rizal', 'BSCPE 2-2', 'Lecture', NULL, 2, '16:00:00', '19:00:00', 0, NULL, '2026-11-12 07:45:48'),
+(827, 2, 'FA0005BN2026', 'Arvin M. Nuñez', 'arvinmnuez', 'Part-Time', 'FA0005BN2026', 31, 'B204', 'GEED 003', 'The Contemporary World/Ang Kasalukuyang Daigdig', 'BSEDSS 1-2', 'Lecture', NULL, 1, '08:00:00', '11:00:00', 0, NULL, '2026-11-12 07:45:48'),
+(828, 2, 'FA0005BN2026', 'Arvin M. Nuñez', 'arvinmnuez', 'Part-Time', 'FA0005BN2026', 31, 'B204', 'GEED 003', 'The Contemporary World/Ang Kasalukuyang Daigdig', 'BSPSY 2-2', 'Lecture', NULL, 5, '08:00:00', '11:00:00', 0, NULL, '2026-11-12 07:45:48'),
+(829, 2, 'FA0005BN2026', 'Arvin M. Nuñez', 'arvinmnuez', 'Part-Time', 'FA0005BN2026', 32, 'B205', 'SOST 214', 'Socio-Cultural Anthropology', 'BSEDSS 2-1', 'Lecture', NULL, 2, '13:00:00', '16:00:00', 0, NULL, '2026-11-12 07:45:48'),
+(830, 2, 'FA0005BN2026', 'Arvin M. Nuñez', 'arvinmnuez', 'Part-Time', 'FA0005BN2026', 32, 'B205', 'SOST 214', 'Socio-Cultural Anthropology', 'BSEDSS 2-2', 'Lecture', NULL, 3, '13:00:00', '16:00:00', 0, NULL, '2026-11-12 07:45:48'),
+(831, 2, 'FA0005BN2026', 'Arvin M. Nuñez', 'arvinmnuez', 'Part-Time', 'FA0005BN2026', 38, 'B401', 'GEED 002', 'Readings in Philippine History/Mga Babasahin Hinggil sa Kasaysayan ng Pilipinas', 'BSIE 3-2', 'Lecture', NULL, 3, '16:00:00', '19:00:00', 0, NULL, '2026-11-12 07:45:48'),
+(832, 2, 'FA0005BN2026', 'Arvin M. Nuñez', 'arvinmnuez', 'Part-Time', 'FA0005BN2026', 112, 'C107', 'GEED 037', 'Life and Works of Rizal/Buhay at Mga Gawa ni Rizal', 'BSPSY 2-2', 'Lecture', NULL, 1, '12:00:00', '15:00:00', 0, NULL, '2026-11-12 07:45:48'),
 (833, 2, 'FA0005SP2012', 'Benjamin A. Abarquez Jr.', 'benjaminaabarquezjr', 'Part-Time', NULL, 107, 'B403', 'ACCO 014', 'Principles of Accounting', 'BSIT 1-2', 'Lecture', NULL, 6, '11:00:00', '14:00:00', 0, NULL, '2026-11-12 07:45:48'),
 (834, 2, 'FA0005SP2012', 'Benjamin A. Abarquez Jr.', 'benjaminaabarquezjr', 'Part-Time', NULL, 107, 'B403', 'ACCO 014', 'Principles of Accounting', 'BSIT 1-3', 'Lecture', NULL, 1, '16:00:00', '19:00:00', 0, NULL, '2026-11-12 07:45:48'),
 (835, 2, 'FA0010BN2026', 'Benjamin Hernandez', 'benjaminhernandez', 'Part-Time', NULL, 7, 'A201', 'GEED 001', 'Understanding the Self/Pag-unawa sa Sarili', 'BEED 1-2', 'Lecture', NULL, 2, '07:00:00', '10:00:00', 0, NULL, '2026-11-12 07:45:48'),
@@ -589,9 +617,9 @@ INSERT INTO `tbl_class_schedule` (`id`, `import_id`, `faculty_id`, `faculty_name
 (929, 2, NULL, 'Francesca T. Chavenia', 'francescatchavenia', 'Part-Time', NULL, 14, 'A303', 'SEEN 317', 'Survey of English and American Literature', 'BSEDEN 3-1', 'Lecture', NULL, 2, '07:00:00', '10:00:00', 0, NULL, '2026-11-12 07:45:48'),
 (930, 2, NULL, 'Francesca T. Chavenia', 'francescatchavenia', 'Part-Time', NULL, 29, 'B202', 'SEEN 317', 'Survey of English and American Literature', 'BSEDEN 3-2', 'Lecture', NULL, 5, '13:00:00', '16:00:00', 0, NULL, '2026-11-12 07:45:48'),
 (931, 2, NULL, 'Francesca T. Chavenia', 'francescatchavenia', 'Part-Time', NULL, 33, 'B301', 'SEEN 311', 'Language Education Research', 'BSEDEN 3-2', 'Lecture', NULL, 4, '13:00:00', '16:00:00', 0, NULL, '2026-11-12 07:45:48'),
-(932, 2, NULL, 'Francesca T. Chavenia', 'francescatchavenia', 'Part-Time', NULL, 34, 'B302', 'SEEN 423', 'Remedial Instruction', 'BSEDEN 4-1', 'Lecture', NULL, 3, '14:00:00', '17:00:00', 0, NULL, '2026-11-12 07:45:48'),
-(933, 2, 'FA0009BN2023', 'Gatsby Aparejado Valdemoro', 'gatsbyaparejadovaldemoro', 'Part-Time', NULL, 8, 'A202', 'ELEC BEED-GEE1', 'Gen. Ed. Elective 1', 'BEED 2-1', 'Lecture', NULL, 6, '07:00:00', '10:00:00', 0, NULL, '2026-11-12 07:45:48');
+(932, 2, NULL, 'Francesca T. Chavenia', 'francescatchavenia', 'Part-Time', NULL, 34, 'B302', 'SEEN 423', 'Remedial Instruction', 'BSEDEN 4-1', 'Lecture', NULL, 3, '14:00:00', '17:00:00', 0, NULL, '2026-11-12 07:45:48');
 INSERT INTO `tbl_class_schedule` (`id`, `import_id`, `faculty_id`, `faculty_name`, `name_key`, `employment`, `account_faculty_id`, `room_id`, `room_code`, `subject_code`, `subject_name`, `section`, `component`, `group_label`, `day_of_week`, `start_time`, `end_time`, `is_tba`, `term_label`, `created_at`) VALUES
+(933, 2, 'FA0009BN2023', 'Gatsby Aparejado Valdemoro', 'gatsbyaparejadovaldemoro', 'Part-Time', NULL, 8, 'A202', 'ELEC BEED-GEE1', 'Gen. Ed. Elective 1', 'BEED 2-1', 'Lecture', NULL, 6, '07:00:00', '10:00:00', 0, NULL, '2026-11-12 07:45:48'),
 (934, 2, 'FA0009BN2023', 'Gatsby Aparejado Valdemoro', 'gatsbyaparejadovaldemoro', 'Part-Time', NULL, 8, 'A202', 'ELEC BEED-GEE2', 'Gen. Ed. Elective 2', 'BEED 2-1', 'Lecture', NULL, 3, '13:00:00', '16:00:00', 0, NULL, '2026-11-12 07:45:48'),
 (935, 2, 'FA0009BN2023', 'Gatsby Aparejado Valdemoro', 'gatsbyaparejadovaldemoro', 'Part-Time', NULL, 11, 'A205', 'GEED 003', 'The Contemporary World/Ang Kasalukuyang Daigdig', 'BSBA-HRM 1-2', 'Lecture', NULL, 3, '08:00:00', '11:00:00', 0, NULL, '2026-11-12 07:45:48'),
 (936, 2, 'FA0009BN2023', 'Gatsby Aparejado Valdemoro', 'gatsbyaparejadovaldemoro', 'Part-Time', NULL, 14, 'A303', 'GEED 020', 'Politics, Governance and Citizenship', 'BSCPE 2-1', 'Lecture', NULL, 5, '08:00:00', '11:00:00', 0, NULL, '2026-11-12 07:45:48'),
@@ -796,9 +824,9 @@ INSERT INTO `tbl_class_schedule` (`id`, `import_id`, `faculty_id`, `faculty_name
 (1135, 2, 'FA0007BN2026', 'Kurt Kurt Leinard D. Balbuena', 'kurtkurtleinarddbalbuena', 'Part-Time', NULL, 77, 'C212', 'CMPE 102', 'Programming Logic and Design', 'DCPET 1-2', 'Laboratory', NULL, 4, '16:00:00', '19:00:00', 0, NULL, '2026-11-12 07:45:48'),
 (1136, 2, 'FA0001BN2024', 'Lawrence Lucis Bucayu', 'lawrencelucisbucayu', 'Part-Time', NULL, 106, 'A405', 'GEED 017', 'Philippine Indigenous Communities', 'BSEDEN 1-2', 'Lecture', NULL, 3, '09:00:00', '12:00:00', 0, NULL, '2026-11-12 07:45:48'),
 (1137, 2, 'FA0001BN2024', 'Lawrence Lucis Bucayu', 'lawrencelucisbucayu', 'Part-Time', NULL, 29, 'B202', 'SOST 205', 'Geography 2: Human Geography', 'BSEDSS 2-1', 'Lecture', NULL, 4, '08:00:00', '11:00:00', 0, NULL, '2026-11-12 07:45:48'),
-(1138, 2, 'FA0001BN2024', 'Lawrence Lucis Bucayu', 'lawrencelucisbucayu', 'Part-Time', NULL, 31, 'B204', 'ELEC SS-GE1', 'Gen. Ed. Elective 1', 'BSEDSS 1-2', 'Lecture', NULL, 5, '13:00:00', '16:00:00', 0, NULL, '2026-11-12 07:45:48'),
-(1139, 2, 'FA0001BN2024', 'Lawrence Lucis Bucayu', 'lawrencelucisbucayu', 'Part-Time', NULL, 32, 'B205', 'SOST 209', 'World History 1', 'BSEDSS 2-1', 'Lecture', NULL, 5, '08:00:00', '11:00:00', 0, NULL, '2026-11-12 07:45:48');
+(1138, 2, 'FA0001BN2024', 'Lawrence Lucis Bucayu', 'lawrencelucisbucayu', 'Part-Time', NULL, 31, 'B204', 'ELEC SS-GE1', 'Gen. Ed. Elective 1', 'BSEDSS 1-2', 'Lecture', NULL, 5, '13:00:00', '16:00:00', 0, NULL, '2026-11-12 07:45:48');
 INSERT INTO `tbl_class_schedule` (`id`, `import_id`, `faculty_id`, `faculty_name`, `name_key`, `employment`, `account_faculty_id`, `room_id`, `room_code`, `subject_code`, `subject_name`, `section`, `component`, `group_label`, `day_of_week`, `start_time`, `end_time`, `is_tba`, `term_label`, `created_at`) VALUES
+(1139, 2, 'FA0001BN2024', 'Lawrence Lucis Bucayu', 'lawrencelucisbucayu', 'Part-Time', NULL, 32, 'B205', 'SOST 209', 'World History 1', 'BSEDSS 2-1', 'Lecture', NULL, 5, '08:00:00', '11:00:00', 0, NULL, '2026-11-12 07:45:48'),
 (1140, 2, 'FA0001BN2024', 'Lawrence Lucis Bucayu', 'lawrencelucisbucayu', 'Part-Time', NULL, 32, 'B205', 'SOST 205', 'Geography 2: Human Geography', 'BSEDSS 2-2', 'Lecture', NULL, 2, '08:00:00', '11:00:00', 0, NULL, '2026-11-12 07:45:48'),
 (1141, 2, 'FA0001BN2024', 'Lawrence Lucis Bucayu', 'lawrencelucisbucayu', 'Part-Time', NULL, 32, 'B205', 'SOST 209', 'World History 1', 'BSEDSS 2-2', 'Lecture', NULL, 1, '14:00:00', '17:00:00', 0, NULL, '2026-11-12 07:45:48'),
 (1142, 2, 'FA0001BN2024', 'Lawrence Lucis Bucayu', 'lawrencelucisbucayu', 'Part-Time', NULL, 33, 'B301', 'SOST 318', 'Teaching Approaches in Secondary School - Social Studies', 'BSEDSS 3-1', 'Lecture', NULL, 6, '08:00:00', '11:00:00', 0, NULL, '2026-11-12 07:45:48'),
@@ -1006,9 +1034,9 @@ INSERT INTO `tbl_class_schedule` (`id`, `import_id`, `faculty_id`, `faculty_name
 (1344, 2, 'FA0001BN2011', 'Noemi Apostol', 'noemiapostol', 'Permanent', NULL, 31, 'B204', 'PATHFIT 3', 'Physical Activity Towards Health and Fitness 3', 'BSIE 2-2', 'Lecture', NULL, 3, '10:00:00', '12:00:00', 0, NULL, '2026-11-12 07:45:48'),
 (1345, 2, 'FA0001BN2011', 'Noemi Apostol', 'noemiapostol', 'Permanent', NULL, 36, 'B304', 'PATHFIT 1', 'Physical Activity Towards Health and Fitness 1', 'BSIE 1-2', 'Lecture', NULL, 6, '09:00:00', '11:00:00', 0, NULL, '2026-11-12 07:45:48'),
 (1346, 2, 'FA0001BN2011', 'Noemi Apostol', 'noemiapostol', 'Permanent', NULL, 36, 'B304', 'PATHFIT 3', 'Physical Activity Towards Health and Fitness 3', 'BSIE 2-1', 'Lecture', NULL, 4, '13:00:00', '15:00:00', 0, NULL, '2026-11-12 07:45:48'),
-(1347, 2, 'FA0001BN2011', 'Noemi Apostol', 'noemiapostol', 'Permanent', NULL, 107, 'B403', 'PATHFIT 1', 'Physical Activity Towards Health and Fitness 1', 'BSIT 1-2', 'Lecture', NULL, 5, '13:00:00', '15:00:00', 0, NULL, '2026-11-12 07:45:48'),
-(1348, 2, 'FA0001BN2011', 'Noemi Apostol', 'noemiapostol', 'Permanent', NULL, 107, 'B403', 'PATHFIT 1', 'Physical Activity Towards Health and Fitness 1', 'BSIT 1-3', 'Lecture', NULL, 2, '07:00:00', '09:00:00', 0, NULL, '2026-11-12 07:45:48');
+(1347, 2, 'FA0001BN2011', 'Noemi Apostol', 'noemiapostol', 'Permanent', NULL, 107, 'B403', 'PATHFIT 1', 'Physical Activity Towards Health and Fitness 1', 'BSIT 1-2', 'Lecture', NULL, 5, '13:00:00', '15:00:00', 0, NULL, '2026-11-12 07:45:48');
 INSERT INTO `tbl_class_schedule` (`id`, `import_id`, `faculty_id`, `faculty_name`, `name_key`, `employment`, `account_faculty_id`, `room_id`, `room_code`, `subject_code`, `subject_name`, `section`, `component`, `group_label`, `day_of_week`, `start_time`, `end_time`, `is_tba`, `term_label`, `created_at`) VALUES
+(1348, 2, 'FA0001BN2011', 'Noemi Apostol', 'noemiapostol', 'Permanent', NULL, 107, 'B403', 'PATHFIT 1', 'Physical Activity Towards Health and Fitness 1', 'BSIT 1-3', 'Lecture', NULL, 2, '07:00:00', '09:00:00', 0, NULL, '2026-11-12 07:45:48'),
 (1349, 2, 'FA0001BN2011', 'Noemi Apostol', 'noemiapostol', 'Permanent', NULL, 110, 'B404', 'PATHFIT 3', 'Physical Activity Towards Health and Fitness 3', 'BSIT 2-1', 'Lecture', NULL, 6, '13:00:00', '15:00:00', 0, NULL, '2026-11-12 07:45:48'),
 (1350, 2, 'FA0001BN2011', 'Noemi Apostol', 'noemiapostol', 'Permanent', NULL, 60, 'C105', 'PATHFIT 1', 'Physical Activity Towards Health and Fitness 1', 'BSPSY 1-2', 'Lecture', NULL, 2, '14:00:00', '16:00:00', 0, NULL, '2026-11-12 07:45:48'),
 (1351, 2, 'FA0001BN2011', 'Noemi Apostol', 'noemiapostol', 'Permanent', NULL, 112, 'C107', 'PATHFIT 3', 'Physical Activity Towards Health and Fitness 3', 'BSPSY 2-1', 'Lecture', NULL, 6, '07:00:00', '09:00:00', 0, NULL, '2026-11-12 07:45:48'),
@@ -1167,7 +1195,11 @@ CREATE TABLE `tbl_faculty_admin_notice` (
 --
 
 INSERT INTO `tbl_faculty_admin_notice` (`id`, `faculty_id`, `request_id`, `admin_id`, `admin_name`, `title`, `message`, `created_at`) VALUES
-(1, 'NOTSET-275A970376E5', 25, 0, 'PUPSync System', 'Item Code Used: Double A Batter', 'sandy (2023-00004bn-0) borrowed 1 unit of Double A Batter using your item code today. Return expected by 19:30. Room/Location: 308.', '2026-10-24 17:31:00');
+(1, 'NOTSET-275A970376E5', 25, 0, 'PUPSync System', 'Item Code Used: Double A Batter', 'sandy (2023-00004bn-0) borrowed 1 unit of Double A Batter using your item code today. Return expected by 19:30. Room/Location: 308.', '2026-10-24 17:31:00'),
+(2, 'FA0011BN2026', 67, 1, 'Redg Abelida', 'Immediate Return Required: Active Speakers', 'This is an official overdue-return notice from PUPSync Admin. Active Speakers was due on November 10, 2026 and is now 2 days overdue. Please return this equipment to the Admin Office immediately. Your borrowing access remains blocked until the return is recorded.', '2026-11-12 17:14:10'),
+(3, 'FA0011BN2026', 66, 1, 'Redg Abelida', 'Immediate Return Required: Active Speakers', 'This is an official overdue-return notice from PUPSync Admin. Active Speakers was due on November 11, 2026 and is now 1 day overdue. Please return this equipment to the Admin Office immediately. Your borrowing access remains blocked until the return is recorded.', '2026-11-12 17:14:47'),
+(4, 'FA0005BN2016', 64, 1, 'Redg Abelida', 'Immediate Return Required: Unterrupted Power Supply', 'This is an official overdue-return notice from PUPSync Admin. Unterrupted Power Supply was due on November 10, 2026 and is now 2 days overdue. Please return this equipment to the Admin Office immediately. Your borrowing access remains blocked until the return is recorded.', '2026-11-12 18:07:04'),
+(5, 'FA0011BN2026', 67, 1, 'Redg Abelida', 'Immediate Return Required: Active Speakers', 'This is an official overdue-return notice from PUPSync Admin. Active Speakers was due on November 10, 2026 and is now 3 days overdue. Please return this equipment to the Admin Office immediately. Your borrowing access remains blocked until the return is recorded.', '2026-11-13 05:52:00');
 
 -- --------------------------------------------------------
 
@@ -1246,7 +1278,9 @@ CREATE TABLE `tbl_faculty_notif_state` (
 --
 
 INSERT INTO `tbl_faculty_notif_state` (`id`, `faculty_id`, `notif_key`, `is_read`, `is_deleted`, `updated_at`) VALUES
-(8, 'FA0011BN2026', 'reqpending-67', 1, 0, '2026-11-10 15:30:16');
+(8, 'FA0011BN2026', 'reqpending-67', 1, 0, '2026-11-10 15:30:16'),
+(9, 'FA0011BN2026', 'adminnotice-3', 1, 0, '2026-11-13 05:51:29'),
+(10, 'FA0011BN2026', 'adminnotice-5', 1, 0, '2026-11-13 05:52:10');
 
 -- --------------------------------------------------------
 
@@ -1425,228 +1459,228 @@ INSERT INTO `tbl_inventory` (`item_id`, `campus_id`, `synced_from_sheet`, `item_
 (30, 1, 0, 'Table', 'Others', 4, 'Good', NULL, 'uploads/1790901156_item_table2.jpg', '2026-10-02 08:32:36', 0, 0),
 (31, 1, 0, 'Projector', 'Audio/Visual', 3, 'Good', NULL, 'uploads/1790901270_images.jpg', '2026-10-02 08:34:30', 0, 0),
 (32, 1, 0, 'Double A Batter', 'Power', 16, 'Fair', NULL, 'uploads/1790910199_batteryAA.jpg', '2026-10-02 11:03:19', 0, 0),
-(33, 2, 1, 'Unterrupted Power Supply', 'Computer Laboratories', 30, 'Good', NULL, NULL, '2026-11-08 16:22:55', 0, 0),
-(34, 2, 1, 'Automatic Voltage Regulator', 'Computer Laboratories', 30, 'Good', NULL, NULL, '2026-11-08 16:22:55', 0, 0),
-(35, 2, 1, 'Data Comm Cabinet', 'Computer Laboratories', 1, 'Good', NULL, NULL, '2026-11-08 16:22:55', 0, 0),
-(36, 2, 1, 'D-Link Switch/Hub', 'Computer Laboratories', 1, 'Good', NULL, NULL, '2026-11-08 16:22:55', 0, 0),
-(37, 2, 1, 'Network Switch', 'Computer Laboratories', 2, 'Good', NULL, NULL, '2026-11-08 16:22:55', 0, 0),
-(38, 2, 1, 'Router', 'Computer Laboratories', 1, 'Good', NULL, NULL, '2026-11-08 16:22:55', 0, 0),
-(39, 2, 1, 'System Unit', 'Dispensing Room', 5, 'Good', NULL, NULL, '2026-11-08 16:22:55', 0, 0),
-(40, 2, 1, 'Keyboard', 'Computer Laboratories', 30, 'Good', NULL, NULL, '2026-11-08 16:22:55', 0, 0),
-(41, 2, 1, 'Optical Mouse', 'Computer Laboratories', 30, 'Good', NULL, NULL, '2026-11-08 16:22:55', 0, 0),
-(42, 2, 1, 'PC Monitor', 'Computer Laboratories', 30, 'Good', NULL, NULL, '2026-11-08 16:22:55', 0, 0),
-(43, 2, 1, 'Printer', 'Computer Laboratories', 1, 'For Repair', NULL, NULL, '2026-11-08 16:22:55', 0, 0),
-(44, 2, 1, 'Globe Ammeter (-500 to 500 uA)', 'Dispensing Room', 2, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(45, 2, 1, 'Ammeter (100/500 mA)', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(46, 2, 1, 'Globe Ammeter (1/5 A)', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(47, 2, 1, 'Ammeter (5A)', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(48, 2, 1, 'Camsco Ammeter (5A)', 'Dispensing Room', 2, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(49, 2, 1, 'Ammeter (15A)', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(50, 2, 1, 'Ammeter (20A)', 'Dispensing Room', 2, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(51, 2, 1, 'Ammeter (30A)', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(52, 2, 1, 'Nikko Denki Ammeter (30A)', 'Dispensing Room', 20, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(53, 2, 1, 'EDM Voltmeter (3V)', 'Dispensing Room', 2, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(54, 2, 1, 'Voltmeter (10V)', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(55, 2, 1, 'Voltmeter (15V)', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(56, 2, 1, 'Unix Voltmeter (15V)', 'Dispensing Room', 0, 'For Repair', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(57, 2, 1, 'Voltmeter (3/15V)', 'Dispensing Room', 2, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(58, 2, 1, 'Nikko Denki Voltmeter (30V)', 'Dispensing Room', 9, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(59, 2, 1, 'CAmsco Voltmeter (150V)', 'Dispensing Room', 2, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(60, 2, 1, 'COS Power Factor Meter (5V)', 'Dispensing Room', 4, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(61, 2, 1, 'Risesun COS Power Factor Meter (5V)', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(62, 2, 1, 'Nikko Denki COS Power Factor Meter (5V)', 'Dispensing Room', 5, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(63, 2, 1, 'Transformer DC Moving Coil', 'Dispensing Room', 8, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(64, 2, 1, 'Transformer Module 03', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(65, 2, 1, 'Transformer Module 07', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(66, 2, 1, 'Transformer Current', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(67, 2, 1, 'Black Potentiometer', 'Dispensing Room', 5, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(68, 2, 1, 'White Potentiometer', 'Dispensing Room', 4, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(69, 2, 1, 'Regulating Transformer 250', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(70, 2, 1, 'Nice-Power DC Power Supply', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(71, 2, 1, 'Lodestar - DC Power Supply', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(72, 2, 1, 'Wattmeter (500w)', 'Dispensing Room', 2, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(73, 2, 1, 'Magnetic Contractor', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(74, 2, 1, 'Resistance Box', 'Dispensing Room', 5, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(75, 2, 1, 'Uni-T Digital Multimeter', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(76, 2, 1, 'Sanwa Multitester', 'Dispensing Room', 5, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(77, 2, 1, 'Lenovo System Unit', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(78, 2, 1, 'Novus System Unit', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(79, 2, 1, 'Acer System Unit', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(80, 2, 1, 'NewTech System Unit', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(81, 2, 1, 'Lenovo Monitor', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(82, 2, 1, 'BenQ Monitor', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(83, 2, 1, 'Sassin Power Supply', 'Dispensing Room', 9, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(84, 2, 1, 'Harrys Power Supply', 'Dispensing Room', 10, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(85, 2, 1, 'Wheeler Power Supply', 'Dispensing Room', 5, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(86, 2, 1, 'Air Compressor', 'Dispensing Room', 2, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(87, 2, 1, 'D-Link Dongle', 'Dispensing Room', 2, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(88, 2, 1, 'Dummy Dome Camera', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(89, 2, 1, 'Wheeler Digital Traing System', 'Dispensing Room', 4, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(90, 2, 1, 'Coaxial Cable Stripper', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(91, 2, 1, 'Wire Stripper', 'Dispensing Room', 6, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(92, 2, 1, 'Crimping Tool', 'Dispensing Room', 5, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(93, 2, 1, 'Pack of Crystal Heads', 'Dispensing Room', 2, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(94, 2, 1, 'Roll of Lan Cable', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(95, 2, 1, 'D-Link 24-Port Switch', 'Dispensing Room', 2, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(96, 2, 1, 'D-Link 16-Port Switch', 'Dispensing Room', 2, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(97, 2, 1, 'D-Link 8-Port Switch', 'Dispensing Room', 2, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(98, 2, 1, 'Network Cable Tester', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(99, 2, 1, 'Amron Prpgrammable Controller', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(100, 2, 1, 'Atwood Machine', 'Dispensing Room', 12, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(101, 2, 1, 'Wheeler 20MHz Oscilloscope', 'Dispensing Room', 0, 'For Repair', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(102, 2, 1, 'Instek 100MHz Oscilloscope', 'Dispensing Room', 0, 'For Repair', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(103, 2, 1, 'Raffles 100MHz Oscilloscope', 'Dispensing Room', 0, 'For Repair', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(104, 2, 1, 'Leader 40MHz Oscilloscope', 'Dispensing Room', 0, 'For Repair', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(105, 2, 1, 'Wheeler Signal Generator', 'Dispensing Room', 0, 'For Repair', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(106, 2, 1, 'Function Generator', 'Dispensing Room', 0, 'For Repair', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(107, 2, 1, 'Incline Plane', 'Dispensing Room', 9, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(108, 2, 1, 'Frictionless Dynamic Cart', 'Dispensing Room', 6, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(109, 2, 1, 'Friction Board with Pully', 'Dispensing Room', 9, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(110, 2, 1, 'Freefall Apparatus', 'Dispensing Room', 5, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(111, 2, 1, 'Centripetal Force Apparatus', 'Dispensing Room', 4, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(112, 2, 1, 'Dynamic Cart', 'Dispensing Room', 5, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(113, 2, 1, 'Friction Block', 'Dispensing Room', 6, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(114, 2, 1, 'Winch Roller Fairlead', 'Dispensing Room', 11, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(115, 2, 1, 'Ballistic Pendulums', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(116, 2, 1, 'Demonstration Balance', 'Dispensing Room', 5, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(117, 2, 1, 'Force Table', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(118, 2, 1, 'Slinky Coil 3x4', 'Dispensing Room', 4, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(119, 2, 1, 'Cage Style Slotted Mass Hanger', 'Dispensing Room', 11, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(120, 2, 1, 'Graduated Cylinder (100ml)', 'Chem Lab', 10, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(121, 2, 1, 'Beaker (100ml)', 'Chem Lab', 4, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(122, 2, 1, 'Resistor Assortment Kit', 'Dispensing Room', 15, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(123, 2, 1, 'Freefall Apparatus Accessories', 'Dispensing Room', 5, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(124, 2, 1, 'Electric Calorimeter', 'Dispensing Room', 5, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(125, 2, 1, 'Esal Barometer', 'Dispensing Room', 2, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(126, 2, 1, 'Box of Syringe with Needle', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(127, 2, 1, 'Hook Style Slotted Mass Hanger', 'Dispensing Room', 13, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(128, 2, 1, 'Field Mapping Set', 'Dispensing Room', 5, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(129, 2, 1, 'Double Meam Balance', 'Dispensing Room', 5, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(130, 2, 1, 'Triple Beam Balance', 'Chem Lab', 4, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(131, 2, 1, 'Spalding Stopwatch', 'Dispensing Room', 10, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(132, 2, 1, 'Kadio Stopwatch', 'Dispensing Room', 9, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(133, 2, 1, 'Glass Plate for Friction Board', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(134, 2, 1, 'Soldering Iron', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(135, 2, 1, 'Desoldering Pump', 'Dispensing Room', 2, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(136, 2, 1, 'Erlenmeyer Flask (250ml)', 'Chem Lab', 12, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(137, 2, 1, 'Erlenmeyer Flask (500ml)', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(138, 2, 1, 'Erlenmeyer Flask (1000ml)', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(139, 2, 1, 'Red Fire Extinguisher', 'Dispensing Room', 2, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(140, 2, 1, 'Retort Stand', 'Dispensing Room', 6, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(141, 2, 1, 'Physical Optics Experiment Set', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(142, 2, 1, 'Artec Robo Creator Set DX', 'Dispensing Room', 2, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(143, 2, 1, 'Wadfow Bench Vice', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(144, 2, 1, 'Adaptor', 'Dispensing Room', 2, 'Good', NULL, NULL, '2026-11-08 16:22:56', 0, 0),
-(145, 2, 1, 'Raspberry Pi Camera', 'Dispensing Room', 2, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(146, 2, 1, 'Digital Scale', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(147, 2, 1, 'Test Line ad Alligator Clip Set', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(148, 2, 1, 'Box of Potentiometer', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(149, 2, 1, 'Ohms Law Apparatus', 'Dispensing Room', 2, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(150, 2, 1, 'Metal File Set', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(151, 2, 1, 'Digital Level', 'Dispensing Room', 2, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(152, 2, 1, 'Tatnad Soldering Iron', 'Dispensing Room', 4, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(153, 2, 1, 'Spring Balancer', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(154, 2, 1, 'Needle File', 'Dispensing Room', 4, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(155, 2, 1, 'White Hard Hat', 'Dispensing Room', 10, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(156, 2, 1, 'Microscope', 'Dispensing Room', 4, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(157, 2, 1, 'Kuaiqu DC Power Supply', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(158, 2, 1, 'Portable Monitor', 'Dispensing Room', 2, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(159, 2, 1, 'Wadfow Claw Hammer', 'Dispensing Room', 5, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(160, 2, 1, 'Wadfow Ball Pein Hammer', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(161, 2, 1, 'Beaker (250ml)', 'Chem Lab', 8, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(162, 2, 1, 'Beaker (500ml)', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(163, 2, 1, 'Beaker (1000ml)', 'Chem Lab', 10, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(164, 2, 1, 'Glass Funnel (50mm)', 'Chem Lab', 10, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(165, 2, 1, 'Glass Funnel (60mm)', 'Dispensing Room', 2, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(166, 2, 1, 'Glass Funnel (75mm)', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(167, 2, 1, 'Glass Funnel (100mm)', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(168, 2, 1, 'Burette', 'Dispensing Room', 1, 'Fair', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(169, 2, 1, 'Optical Bench', 'Dispensing Room', 2, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(170, 2, 1, 'Galvanometer', 'Dispensing Room', 5, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(171, 2, 1, 'Magnifying Glass', 'Dispensing Room', 5, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(172, 2, 1, 'Compass', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(173, 2, 1, 'Combination Wrench', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(174, 2, 1, 'Crucible (50ml)', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(175, 2, 1, 'Crucible (30ml)', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(176, 2, 1, 'Indicator Paper', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(177, 2, 1, 'Horse Shoe Magnet', 'Dispensing Room', 5, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(178, 2, 1, 'Voltmeter (0-500v)', 'Dispensing Room', 5, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(179, 2, 1, 'Squeeze Bottle (250ml)', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(180, 2, 1, 'Squeeze Bottle (500ml)', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(181, 2, 1, 'Wadfow Machinist Hammer', 'Dispensing Room', 5, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(182, 2, 1, 'Crimper Plier', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(183, 2, 1, 'VE terminals', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(184, 2, 1, 'Tap and Die Set', 'Dispensing Room', 2, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(185, 2, 1, 'Prism', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(186, 2, 1, 'Ammeter (0-100mA)', 'Dispensing Room', 4, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(187, 2, 1, 'Test Tube Rack', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(188, 2, 1, 'L-Square', 'Dispensing Room', 5, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(189, 2, 1, 'Saw', 'Dispensing Room', 2, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(190, 2, 1, 'Metal Saw', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(191, 2, 1, 'Ammeter (0-5A)', 'Dispensing Room', 5, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(192, 2, 1, 'Gas Burner', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(193, 2, 1, 'Voltmeter (0-20v)', 'Dispensing Room', 5, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(194, 2, 1, 'Convex Lens', 'Dispensing Room', 12, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(195, 2, 1, 'Meter Stick', 'Dispensing Room', 5, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(196, 2, 1, 'Multimeter', 'Dispensing Room', 7, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(197, 2, 1, 'Safety Goggles', 'Dispensing Room', 15, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(198, 2, 1, 'Face Shield', 'Dispensing Room', 5, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(199, 2, 1, 'Dropper Pipette (10ml)', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(200, 2, 1, 'Raspi Camera', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(201, 2, 1, 'Thermometer', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(202, 2, 1, 'Inculating Loops', 'Dispensing Room', 5, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(203, 2, 1, 'Watch Glass (Large)', 'Dispensing Room', 5, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(204, 2, 1, 'Watch Glass (Medium)', 'Dispensing Room', 5, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(205, 2, 1, 'Watch Glass (Small)', 'Dispensing Room', 5, 'Good', NULL, NULL, '2026-11-08 16:22:57', 0, 0),
-(206, 2, 1, 'Test Tube Holder', 'Dispensing Room', 10, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(207, 2, 1, 'Test Tube Brush', 'Dispensing Room', 5, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(208, 2, 1, 'Crucible Tong', 'Dispensing Room', 5, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(209, 2, 1, 'Tuning Fork', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(210, 2, 1, 'ESP32', 'Dispensing Room', 4, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(211, 2, 1, 'Multi-Function Meter', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(212, 2, 1, 'Relay (8in)', 'Dispensing Room', 5, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(213, 2, 1, 'Vernier Caliper', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(214, 2, 1, 'Mini Guage', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(215, 2, 1, 'Precision Screwdriver', 'Dispensing Room', 2, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(216, 2, 1, 'Wrench (150x19)', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(217, 2, 1, 'Wrench (200x24)', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(218, 2, 1, 'Wrench (250x30)', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(219, 2, 1, 'Wrench (300x36)', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(220, 2, 1, 'Long Nose', 'Dispensing Room', 2, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(221, 2, 1, 'Pliers', 'Dispensing Room', 2, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(222, 2, 1, 'Cutting Pliers', 'Dispensing Room', 3, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(223, 2, 1, 'Graduated Cylinder (10ml)', 'Chem Lab', 4, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(224, 2, 1, 'Graduated Cylinder (25ml)', 'Chem Lab', 1, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(225, 2, 1, 'Graduated Cylinder (50ml)', 'Chem Lab', 8, 'Fair', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(226, 2, 1, 'Erlenmeyer Flask (100ml)', 'Chem Lab', 1, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(227, 2, 1, 'Erlenmeyer Flask (125ml)', 'Chem Lab', 11, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(228, 2, 1, 'Filtering Flask', 'Chem Lab', 5, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(229, 2, 1, 'Separatory Funnel (100ml)', 'Chem Lab', 1, 'Fair', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(230, 2, 1, 'Separatory Funnel (250ml)', 'Chem Lab', 2, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(231, 2, 1, 'Separatory Funnel (500ml)', 'Chem Lab', 1, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(232, 2, 1, 'Florence Flask (250ml)', 'Chem Lab', 3, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(233, 2, 1, 'Florence Flask (500ml)', 'Chem Lab', 1, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(234, 2, 1, 'Beaker (50ml)', 'Chem Lab', 5, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(235, 2, 1, 'Beaker (150ml)', 'Chem Lab', 2, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(236, 2, 1, 'Beaker (400ml)', 'Chem Lab', 7, 'Fair', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(237, 1, 1, 'Alcohol Lamp', 'Audio/Visual', 2, 'For Repair', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
-(238, 2, 1, 'Pipette', 'Chem Lab', 10, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(239, 2, 1, 'Hydrometer', 'Chem Lab', 2, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(240, 2, 1, 'Watch Glass', 'Chem Lab', 9, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(241, 2, 1, 'Glass Thermometer', 'Chem Lab', 10, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(242, 2, 1, 'Delivery Tube', 'Chem Lab', 3, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(243, 2, 1, 'Reagent Bottle', 'Chem Lab', 2, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(244, 2, 1, 'Petri Dish (100mm)', 'Chem Lab', 10, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(245, 2, 1, 'Double Beam Balance', 'Chem Lab', 7, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(246, 2, 1, 'Fume Hood', 'Chem Lab', 1, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(247, 2, 1, 'Smart TV', 'Audio-Visual Equipment', 17, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(248, 2, 1, 'Smart TV (Touch Screen)', 'Audio-Visual Equipment', 1, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(249, 2, 1, 'LCD Projector', 'Audio-Visual Equipment', 6, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(250, 2, 1, 'Analog Audio Mixer', 'Audio-Visual Equipment', 1, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(251, 2, 1, 'Active Speakers', 'Audio-Visual Equipment', 1, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(252, 2, 1, 'Passive Speakers with Power Amplifier', 'Audio-Visual Equipment', 2, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(253, 2, 1, 'Power Amplifier', 'Audio-Visual Equipment', 1, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
-(254, 2, 1, 'Wireless Microphone', 'Audio-Visual Equipment', 2, 'Good', NULL, NULL, '2026-11-08 16:22:58', 0, 0),
+(33, 2, 1, 'Unterrupted Power Supply', 'Computer Laboratories', 30, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:55', 0, 0),
+(34, 2, 1, 'Automatic Voltage Regulator', 'Computer Laboratories', 30, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:55', 0, 0),
+(35, 2, 1, 'Data Comm Cabinet', 'Computer Laboratories', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:55', 0, 0),
+(36, 2, 1, 'D-Link Switch/Hub', 'Computer Laboratories', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:55', 0, 0),
+(37, 2, 1, 'Network Switch', 'Computer Laboratories', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:55', 0, 0),
+(38, 2, 1, 'Router', 'Computer Laboratories', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:55', 0, 0),
+(39, 2, 1, 'System Unit', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:55', 0, 0),
+(40, 2, 1, 'Keyboard', 'Computer Laboratories', 30, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:55', 0, 0),
+(41, 2, 1, 'Optical Mouse', 'Computer Laboratories', 30, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:55', 0, 0),
+(42, 2, 1, 'PC Monitor', 'Computer Laboratories', 30, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:55', 0, 0),
+(43, 2, 1, 'Printer', 'Computer Laboratories', 1, 'For Repair', NULL, 'uploads/default.png', '2026-11-08 16:22:55', 0, 0),
+(44, 2, 1, 'Globe Ammeter (-500 to 500 uA)', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(45, 2, 1, 'Ammeter (100/500 mA)', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(46, 2, 1, 'Globe Ammeter (1/5 A)', 'Dispensing Room', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(47, 2, 1, 'Ammeter (5A)', 'Dispensing Room', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(48, 2, 1, 'Camsco Ammeter (5A)', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(49, 2, 1, 'Ammeter (15A)', 'Dispensing Room', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(50, 2, 1, 'Ammeter (20A)', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(51, 2, 1, 'Ammeter (30A)', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(52, 2, 1, 'Nikko Denki Ammeter (30A)', 'Dispensing Room', 20, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(53, 2, 1, 'EDM Voltmeter (3V)', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(54, 2, 1, 'Voltmeter (10V)', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(55, 2, 1, 'Voltmeter (15V)', 'Dispensing Room', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(56, 2, 1, 'Unix Voltmeter (15V)', 'Dispensing Room', 0, 'For Repair', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(57, 2, 1, 'Voltmeter (3/15V)', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(58, 2, 1, 'Nikko Denki Voltmeter (30V)', 'Dispensing Room', 9, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(59, 2, 1, 'CAmsco Voltmeter (150V)', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(60, 2, 1, 'COS Power Factor Meter (5V)', 'Dispensing Room', 4, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(61, 2, 1, 'Risesun COS Power Factor Meter (5V)', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(62, 2, 1, 'Nikko Denki COS Power Factor Meter (5V)', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(63, 2, 1, 'Transformer DC Moving Coil', 'Dispensing Room', 8, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(64, 2, 1, 'Transformer Module 03', 'Dispensing Room', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(65, 2, 1, 'Transformer Module 07', 'Dispensing Room', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(66, 2, 1, 'Transformer Current', 'Dispensing Room', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(67, 2, 1, 'Black Potentiometer', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(68, 2, 1, 'White Potentiometer', 'Dispensing Room', 4, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(69, 2, 1, 'Regulating Transformer 250', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(70, 2, 1, 'Nice-Power DC Power Supply', 'Dispensing Room', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(71, 2, 1, 'Lodestar - DC Power Supply', 'Dispensing Room', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(72, 2, 1, 'Wattmeter (500w)', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(73, 2, 1, 'Magnetic Contractor', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(74, 2, 1, 'Resistance Box', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(75, 2, 1, 'Uni-T Digital Multimeter', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(76, 2, 1, 'Sanwa Multitester', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(77, 2, 1, 'Lenovo System Unit', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(78, 2, 1, 'Novus System Unit', 'Dispensing Room', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(79, 2, 1, 'Acer System Unit', 'Dispensing Room', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(80, 2, 1, 'NewTech System Unit', 'Dispensing Room', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(81, 2, 1, 'Lenovo Monitor', 'Dispensing Room', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(82, 2, 1, 'BenQ Monitor', 'Dispensing Room', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(83, 2, 1, 'Sassin Power Supply', 'Dispensing Room', 9, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(84, 2, 1, 'Harrys Power Supply', 'Dispensing Room', 10, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(85, 2, 1, 'Wheeler Power Supply', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(86, 2, 1, 'Air Compressor', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(87, 2, 1, 'D-Link Dongle', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(88, 2, 1, 'Dummy Dome Camera', 'Dispensing Room', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(89, 2, 1, 'Wheeler Digital Traing System', 'Dispensing Room', 4, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(90, 2, 1, 'Coaxial Cable Stripper', 'Dispensing Room', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(91, 2, 1, 'Wire Stripper', 'Dispensing Room', 6, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(92, 2, 1, 'Crimping Tool', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(93, 2, 1, 'Pack of Crystal Heads', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(94, 2, 1, 'Roll of Lan Cable', 'Dispensing Room', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(95, 2, 1, 'D-Link 24-Port Switch', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(96, 2, 1, 'D-Link 16-Port Switch', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(97, 2, 1, 'D-Link 8-Port Switch', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(98, 2, 1, 'Network Cable Tester', 'Dispensing Room', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(99, 2, 1, 'Amron Prpgrammable Controller', 'Dispensing Room', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(100, 2, 1, 'Atwood Machine', 'Dispensing Room', 12, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(101, 2, 1, 'Wheeler 20MHz Oscilloscope', 'Dispensing Room', 0, 'For Repair', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(102, 2, 1, 'Instek 100MHz Oscilloscope', 'Dispensing Room', 0, 'For Repair', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(103, 2, 1, 'Raffles 100MHz Oscilloscope', 'Dispensing Room', 0, 'For Repair', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(104, 2, 1, 'Leader 40MHz Oscilloscope', 'Dispensing Room', 0, 'For Repair', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(105, 2, 1, 'Wheeler Signal Generator', 'Dispensing Room', 0, 'For Repair', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(106, 2, 1, 'Function Generator', 'Dispensing Room', 0, 'For Repair', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(107, 2, 1, 'Incline Plane', 'Dispensing Room', 9, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(108, 2, 1, 'Frictionless Dynamic Cart', 'Dispensing Room', 6, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(109, 2, 1, 'Friction Board with Pully', 'Dispensing Room', 9, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(110, 2, 1, 'Freefall Apparatus', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(111, 2, 1, 'Centripetal Force Apparatus', 'Dispensing Room', 4, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(112, 2, 1, 'Dynamic Cart', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(113, 2, 1, 'Friction Block', 'Dispensing Room', 6, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(114, 2, 1, 'Winch Roller Fairlead', 'Dispensing Room', 11, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(115, 2, 1, 'Ballistic Pendulums', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(116, 2, 1, 'Demonstration Balance', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(117, 2, 1, 'Force Table', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(118, 2, 1, 'Slinky Coil 3x4', 'Dispensing Room', 4, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(119, 2, 1, 'Cage Style Slotted Mass Hanger', 'Dispensing Room', 11, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(120, 2, 1, 'Graduated Cylinder (100ml)', 'Chem Lab', 10, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(121, 2, 1, 'Beaker (100ml)', 'Chem Lab', 4, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(122, 2, 1, 'Resistor Assortment Kit', 'Dispensing Room', 15, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(123, 2, 1, 'Freefall Apparatus Accessories', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(124, 2, 1, 'Electric Calorimeter', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(125, 2, 1, 'Esal Barometer', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(126, 2, 1, 'Box of Syringe with Needle', 'Dispensing Room', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(127, 2, 1, 'Hook Style Slotted Mass Hanger', 'Dispensing Room', 13, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(128, 2, 1, 'Field Mapping Set', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(129, 2, 1, 'Double Meam Balance', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(130, 2, 1, 'Triple Beam Balance', 'Chem Lab', 4, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(131, 2, 1, 'Spalding Stopwatch', 'Dispensing Room', 10, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(132, 2, 1, 'Kadio Stopwatch', 'Dispensing Room', 9, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(133, 2, 1, 'Glass Plate for Friction Board', 'Dispensing Room', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(134, 2, 1, 'Soldering Iron', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(135, 2, 1, 'Desoldering Pump', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(136, 2, 1, 'Erlenmeyer Flask (250ml)', 'Chem Lab', 12, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(137, 2, 1, 'Erlenmeyer Flask (500ml)', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(138, 2, 1, 'Erlenmeyer Flask (1000ml)', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(139, 2, 1, 'Red Fire Extinguisher', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(140, 2, 1, 'Retort Stand', 'Dispensing Room', 6, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(141, 2, 1, 'Physical Optics Experiment Set', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(142, 2, 1, 'Artec Robo Creator Set DX', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(143, 2, 1, 'Wadfow Bench Vice', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(144, 2, 1, 'Adaptor', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(145, 2, 1, 'Raspberry Pi Camera', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(146, 2, 1, 'Digital Scale', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(147, 2, 1, 'Test Line ad Alligator Clip Set', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(148, 2, 1, 'Box of Potentiometer', 'Dispensing Room', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(149, 2, 1, 'Ohms Law Apparatus', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(150, 2, 1, 'Metal File Set', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(151, 2, 1, 'Digital Level', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(152, 2, 1, 'Tatnad Soldering Iron', 'Dispensing Room', 4, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(153, 2, 1, 'Spring Balancer', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(154, 2, 1, 'Needle File', 'Dispensing Room', 4, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(155, 2, 1, 'White Hard Hat', 'Dispensing Room', 10, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(156, 2, 1, 'Microscope', 'Dispensing Room', 4, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(157, 2, 1, 'Kuaiqu DC Power Supply', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(158, 2, 1, 'Portable Monitor', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(159, 2, 1, 'Wadfow Claw Hammer', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(160, 2, 1, 'Wadfow Ball Pein Hammer', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(161, 2, 1, 'Beaker (250ml)', 'Chem Lab', 8, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(162, 2, 1, 'Beaker (500ml)', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(163, 2, 1, 'Beaker (1000ml)', 'Chem Lab', 10, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(164, 2, 1, 'Glass Funnel (50mm)', 'Chem Lab', 10, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(165, 2, 1, 'Glass Funnel (60mm)', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(166, 2, 1, 'Glass Funnel (75mm)', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(167, 2, 1, 'Glass Funnel (100mm)', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(168, 2, 1, 'Burette', 'Dispensing Room', 1, 'Fair', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(169, 2, 1, 'Optical Bench', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(170, 2, 1, 'Galvanometer', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(171, 2, 1, 'Magnifying Glass', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(172, 2, 1, 'Compass', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(173, 2, 1, 'Combination Wrench', 'Dispensing Room', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(174, 2, 1, 'Crucible (50ml)', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(175, 2, 1, 'Crucible (30ml)', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(176, 2, 1, 'Indicator Paper', 'Dispensing Room', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(177, 2, 1, 'Horse Shoe Magnet', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(178, 2, 1, 'Voltmeter (0-500v)', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(179, 2, 1, 'Squeeze Bottle (250ml)', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(180, 2, 1, 'Squeeze Bottle (500ml)', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(181, 2, 1, 'Wadfow Machinist Hammer', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(182, 2, 1, 'Crimper Plier', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(183, 2, 1, 'VE terminals', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(184, 2, 1, 'Tap and Die Set', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(185, 2, 1, 'Prism', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(186, 2, 1, 'Ammeter (0-100mA)', 'Dispensing Room', 4, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(187, 2, 1, 'Test Tube Rack', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(188, 2, 1, 'L-Square', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(189, 2, 1, 'Saw', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(190, 2, 1, 'Metal Saw', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(191, 2, 1, 'Ammeter (0-5A)', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(192, 2, 1, 'Gas Burner', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(193, 2, 1, 'Voltmeter (0-20v)', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(194, 2, 1, 'Convex Lens', 'Dispensing Room', 12, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(195, 2, 1, 'Meter Stick', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(196, 2, 1, 'Multimeter', 'Dispensing Room', 7, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(197, 2, 1, 'Safety Goggles', 'Dispensing Room', 15, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(198, 2, 1, 'Face Shield', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(199, 2, 1, 'Dropper Pipette (10ml)', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(200, 2, 1, 'Raspi Camera', 'Dispensing Room', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(201, 2, 1, 'Thermometer', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(202, 2, 1, 'Inculating Loops', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(203, 2, 1, 'Watch Glass (Large)', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(204, 2, 1, 'Watch Glass (Medium)', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(205, 2, 1, 'Watch Glass (Small)', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(206, 2, 1, 'Test Tube Holder', 'Dispensing Room', 10, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(207, 2, 1, 'Test Tube Brush', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(208, 2, 1, 'Crucible Tong', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(209, 2, 1, 'Tuning Fork', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(210, 2, 1, 'ESP32', 'Dispensing Room', 4, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(211, 2, 1, 'Multi-Function Meter', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(212, 2, 1, 'Relay (8in)', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(213, 2, 1, 'Vernier Caliper', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(214, 2, 1, 'Mini Guage', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(215, 2, 1, 'Precision Screwdriver', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(216, 2, 1, 'Wrench (150x19)', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(217, 2, 1, 'Wrench (200x24)', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(218, 2, 1, 'Wrench (250x30)', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(219, 2, 1, 'Wrench (300x36)', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(220, 2, 1, 'Long Nose', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(221, 2, 1, 'Pliers', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(222, 2, 1, 'Cutting Pliers', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(223, 2, 1, 'Graduated Cylinder (10ml)', 'Chem Lab', 4, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(224, 2, 1, 'Graduated Cylinder (25ml)', 'Chem Lab', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(225, 2, 1, 'Graduated Cylinder (50ml)', 'Chem Lab', 8, 'Fair', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(226, 2, 1, 'Erlenmeyer Flask (100ml)', 'Chem Lab', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(227, 2, 1, 'Erlenmeyer Flask (125ml)', 'Chem Lab', 11, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(228, 2, 1, 'Filtering Flask', 'Chem Lab', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(229, 2, 1, 'Separatory Funnel (100ml)', 'Chem Lab', 1, 'Fair', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(230, 2, 1, 'Separatory Funnel (250ml)', 'Chem Lab', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(231, 2, 1, 'Separatory Funnel (500ml)', 'Chem Lab', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(232, 2, 1, 'Florence Flask (250ml)', 'Chem Lab', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(233, 2, 1, 'Florence Flask (500ml)', 'Chem Lab', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(234, 2, 1, 'Beaker (50ml)', 'Chem Lab', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(235, 2, 1, 'Beaker (150ml)', 'Chem Lab', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(236, 2, 1, 'Beaker (400ml)', 'Chem Lab', 7, 'Fair', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(237, 1, 1, 'Alcohol Lamp', 'Audio/Visual', 2, 'For Repair', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 1, 0),
+(238, 2, 1, 'Pipette', 'Chem Lab', 10, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(239, 2, 1, 'Hydrometer', 'Chem Lab', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(240, 2, 1, 'Watch Glass', 'Chem Lab', 9, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(241, 2, 1, 'Glass Thermometer', 'Chem Lab', 10, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(242, 2, 1, 'Delivery Tube', 'Chem Lab', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(243, 2, 1, 'Reagent Bottle', 'Chem Lab', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(244, 2, 1, 'Petri Dish (100mm)', 'Chem Lab', 10, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(245, 2, 1, 'Double Beam Balance', 'Chem Lab', 7, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(246, 2, 1, 'Fume Hood', 'Chem Lab', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(247, 2, 1, 'Smart TV', 'Audio-Visual Equipment', 17, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(248, 2, 1, 'Smart TV (Touch Screen)', 'Audio-Visual Equipment', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(249, 2, 1, 'LCD Projector', 'Audio-Visual Equipment', 6, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(250, 2, 1, 'Analog Audio Mixer', 'Audio-Visual Equipment', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(251, 2, 1, 'Active Speakers', 'Audio-Visual Equipment', 4, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(252, 2, 1, 'Passive Speakers with Power Amplifier', 'Audio-Visual Equipment', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(253, 2, 1, 'Power Amplifier', 'Audio-Visual Equipment', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(254, 2, 1, 'Wireless Microphone', 'Audio-Visual Equipment', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
 (255, 2, 0, 'Test Raspberry Pi Kit', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-08 16:31:32', 1, 0),
 (256, 2, 0, 'Helloo', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-08 16:41:05', 1, 0),
 (257, 2, 0, 'Ostin', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-08 16:44:58', 1, 0),
@@ -1664,7 +1698,8 @@ INSERT INTO `tbl_inventory` (`item_id`, `campus_id`, `synced_from_sheet`, `item_
 (269, 2, 1, 'HOTDOG', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-09 09:52:52', 1, 0),
 (270, 2, 1, 'pizza', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-09 09:52:52', 1, 0),
 (271, 2, 1, 'hotdog', 'Dispensing Room', 0, 'For Repair', NULL, NULL, '2026-11-09 12:58:29', 1, 0),
-(272, 2, 1, 'hotdog', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-09 13:04:40', 1, 0);
+(272, 2, 1, 'hotdog', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-09 13:04:40', 1, 0),
+(273, 2, 1, 'Alcohol Lamp', 'Chem Lab', 0, 'For Repair', NULL, 'uploads/default.png', '2026-11-14 18:42:13', 0, 0);
 
 -- --------------------------------------------------------
 
@@ -1685,7 +1720,7 @@ CREATE TABLE `tbl_ip_login_attempts` (
 --
 
 INSERT INTO `tbl_ip_login_attempts` (`id`, `ip_address`, `fail_count`, `window_start`, `locked_until`) VALUES
-(1, '::1', 0, '2026-11-12 08:49:14', NULL),
+(1, '::1', 2, '2026-11-14 17:07:39', NULL),
 (19, '127.0.0.1', 1, '2026-11-09 15:36:32', NULL);
 
 -- --------------------------------------------------------
@@ -1731,7 +1766,30 @@ INSERT INTO `tbl_login_attempts` (`id`, `identifier`, `ip_address`, `attempt_cou
 (25, 'edmundo.delacruz@pupsync.edu', '127.0.0.1', 0, 0, NULL, '2026-11-09 10:24:15', 1),
 (26, 'edmundo.delacruz@gmail.com', '127.0.0.1', 1, 0, NULL, '2026-11-09 15:36:32', 0),
 (27, 'main@admin.edu', '::1', 0, 0, NULL, '2026-11-10 02:18:05', 1),
-(28, 'michael.miguel@pupsync.edu', '::1', 0, 0, NULL, '2026-11-12 07:43:26', 1);
+(28, 'michael.miguel@pupsync.edu', '::1', 0, 0, NULL, '2026-11-12 07:43:26', 1),
+(29, 'arvin.nuez@pupsync.edu', '::1', 2, 0, NULL, '2026-11-14 17:08:29', 0);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tbl_notif_prefs`
+--
+
+CREATE TABLE `tbl_notif_prefs` (
+  `id` int(11) NOT NULL,
+  `audience` varchar(10) NOT NULL,
+  `user_key` varchar(64) NOT NULL,
+  `pref_key` varchar(32) NOT NULL,
+  `enabled` tinyint(1) NOT NULL DEFAULT 1,
+  `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `tbl_notif_prefs`
+--
+
+INSERT INTO `tbl_notif_prefs` (`id`, `audience`, `user_key`, `pref_key`, `enabled`, `updated_at`) VALUES
+(1, 'faculty', 'FA0011BN2026', 'all', 1, '2026-11-13 08:56:16');
 
 -- --------------------------------------------------------
 
@@ -1754,25 +1812,6 @@ CREATE TABLE `tbl_notif_state` (
 INSERT INTO `tbl_notif_state` (`id`, `notif_key`, `is_read`, `is_deleted`, `updated_at`) VALUES
 (1, 'overdue-21', 1, 0, '2026-10-03 11:48:37'),
 (2, 'overdue-13', 1, 0, '2026-10-03 11:48:39');
-
--- --------------------------------------------------------
-
---
--- Table structure for table `tbl_notif_prefs`
--- (Settings > Notification Preferences, admin + faculty. One row per account and toggle;
---  a missing row means ON. Also created automatically on first use.)
---
-
-CREATE TABLE IF NOT EXISTS `tbl_notif_prefs` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `audience` varchar(10) NOT NULL,
-  `user_key` varchar(64) NOT NULL,
-  `pref_key` varchar(32) NOT NULL,
-  `enabled` tinyint(1) NOT NULL DEFAULT 1,
-  `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_notif_pref` (`audience`,`user_key`,`pref_key`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -1848,11 +1887,14 @@ INSERT INTO `tbl_requests` (`id`, `faculty_name`, `faculty_id`, `equipment_name`
 (60, 'Edmundo Dela Cruz', 'FA0008BN2023', 'Acer System Unit', 'Edmundo Dela Cruz', 'Room 210Building C (CITE) · 2nd Floor', '2026-11-09', '2026-11-09', NULL, NULL, '2026-11-11 16:10:35', NULL, 'Returned', '2026-11-09 19:08:21', 'Auto-approved: no admin action within the buffer time.', NULL, 'auto_approve_timeout', '', '', 'personal', 'f46b09c1-cc5d-48ee-a6dd-dd85865092fc', '53a4512b54a2477f43f49dafd6af1cb689e8a9eff81d66cab707eba1bafa7448', '19:10:00', '20:10:00', 1, 76, '0', 0, 0, NULL, NULL, 0, NULL),
 (61, 'Edmundo Dela Cruz', 'FA0008BN2023', 'Adaptor', 'Edmundo Dela Cruz', 'Room 210Building C (CITE) · 2nd Floor', '2026-11-09', '2026-11-09', NULL, NULL, '2026-11-11 16:10:26', NULL, 'Returned', '2026-11-09 19:08:22', 'Auto-approved: no admin action within the buffer time.', NULL, 'auto_approve_timeout', '', '', 'personal', 'f46b09c1-cc5d-48ee-a6dd-dd85865092fc', '53a4512b54a2477f43f49dafd6af1cb689e8a9eff81d66cab707eba1bafa7448', '19:10:00', '20:10:00', 2, 76, '0', 0, 0, NULL, NULL, 0, NULL),
 (62, 'Edmundo Dela Cruz', 'FA0008BN2023', 'Active Speakers', 'Edmundo Dela Cruz', 'Room 210Building C (CITE) · 2nd Floor', '2026-11-09', '2026-11-09', NULL, NULL, '2026-11-11 16:10:13', NULL, 'Returned', '2026-11-09 19:08:22', 'Auto-approved: no admin action within the buffer time.', NULL, 'auto_approve_timeout', '', '', 'personal', 'f46b09c1-cc5d-48ee-a6dd-dd85865092fc', '53a4512b54a2477f43f49dafd6af1cb689e8a9eff81d66cab707eba1bafa7448', '19:10:00', '20:10:00', 2, 76, '0', 0, 0, NULL, NULL, 0, NULL),
-(63, 'Michael Anjelo Miguel', 'FA0005BN2016', 'Active Speakers', 'Michael Anjelo Miguel', 'Room 205 · Building A (Old) · 2nd Floor', '2026-11-11', '2026-11-11', '8043b0d033c74221b69e2c31b0ea0502a3e4bef17c69f7bf38db97e6041db7ae', 'b150c281e41c1e07f6bc499dc59df089d36748a131b196afdd8012890822b60a', NULL, NULL, 'Overdue', '2026-11-10 00:36:01', 'Auto-approved: no admin action within the buffer time.', NULL, 'auto_approve_timeout', 'Napiza, Sandy', '', 'personal', NULL, NULL, '07:00:00', '09:00:00', 1, 11, 'future', 1, 0, NULL, NULL, 0, NULL),
-(64, 'Michael Anjelo Miguel', 'FA0005BN2016', 'Unterrupted Power Supply', 'Michael Anjelo Miguel', 'Room 203', '2026-11-10', '2026-11-10', 'b078dec71381969ab290019cba3221e7a44ec5dad3e7f470b4ddbf38b201d41f', '27a1178a554ef46246a325a44d28bf61c4ec0824bce89a2e057c84e799d98445', NULL, NULL, 'Overdue', '2026-11-10 02:01:36', 'Auto-approved: no admin action within the buffer time.', NULL, 'auto_approve_timeout', 'Frederick Rosales', '', 'student', NULL, NULL, '07:00:00', '08:00:00', 1, 30, 'today', 0, 0, NULL, NULL, 0, NULL),
-(65, 'Michael Anjelo Miguel', 'FA0005BN2016', 'Router', 'Michael Anjelo Miguel', 'Room 203', '2026-11-10', '2026-11-10', 'de9145bb7885e104a52bce60c7bdef26ac2c04d3211d2561b470c525d90eaa78', '92dce4fbd4bda5a060f63161ec8ad1d9ad64bf4bcd6e7685f97d5f3407ecc3f1', NULL, NULL, 'Overdue', '2026-11-10 02:01:39', 'Auto-approved: no admin action within the buffer time.', NULL, 'auto_approve_timeout', 'Frederick Rosales', '', 'student', NULL, NULL, '07:00:00', '08:00:00', 1, 30, 'today', 0, 0, NULL, NULL, 0, NULL),
-(66, 'Stephen Perez', 'FA0011BN2026', 'Active Speakers', 'Stephen Perez', 'Audio Visual Room 2 · Building A (Old) · 1st Floor', '2026-11-11', '2026-11-11', 'cd74710f2018757c8b2793459f15c46fb1e51f8d57e1bae215400aa98d3b6023', '341a723fe4194caa6f47847514e8689a6213abcf40ef0d5e6360a49feae1b722', NULL, NULL, 'Overdue', '2026-11-10 15:27:09', 'Auto-approved: no admin action within the buffer time.', NULL, 'auto_approve_timeout', '', '', 'personal', NULL, NULL, '16:00:00', '19:00:00', 2, 99, 'future', 1, 0, NULL, NULL, 0, NULL),
-(67, 'Stephen Perez', 'FA0011BN2026', 'Active Speakers', 'Stephen Perez', 'Room 203Building A (Old) · 2nd Floor', '2026-11-10', '2026-11-10', '2ede68fd9ac3d6f95ddc8852ffacc1fc8e5b0213c72abb9e1ceeadb4f9475343', NULL, NULL, NULL, 'Overdue', '2026-11-10 15:29:13', 'Auto-approved: no admin action within the buffer time.', NULL, 'auto_approve_timeout', '', '', 'personal', '9c3fa87e-ba96-4960-aaf8-d3fc071d6372', '5a193f9913356a6330038f68408348967bf7e92ae106d2fe779017325e7bec9a', '16:00:00', '19:00:00', 1, 9, '0', 0, 0, NULL, NULL, 0, NULL);
+(63, 'Michael Anjelo Miguel', 'FA0005BN2016', 'Active Speakers', 'Michael Anjelo Miguel', 'Room 205 · Building A (Old) · 2nd Floor', '2026-11-11', '2026-11-11', NULL, 'b150c281e41c1e07f6bc499dc59df089d36748a131b196afdd8012890822b60a', '2026-11-12 17:14:52', NULL, 'Returned', '2026-11-10 00:36:01', 'Auto-approved: no admin action within the buffer time.', NULL, 'auto_approve_timeout', 'Napiza, Sandy', '', 'personal', NULL, NULL, '07:00:00', '09:00:00', 1, 11, 'future', 1, 0, NULL, NULL, 0, NULL),
+(64, 'Michael Anjelo Miguel', 'FA0005BN2016', 'Unterrupted Power Supply', 'Michael Anjelo Miguel', 'Room 203', '2026-11-10', '2026-11-10', NULL, '27a1178a554ef46246a325a44d28bf61c4ec0824bce89a2e057c84e799d98445', '2026-11-12 18:27:39', NULL, 'Returned', '2026-11-10 02:01:36', 'Auto-approved: no admin action within the buffer time.', NULL, 'auto_approve_timeout', 'Frederick Rosales', '', 'student', NULL, NULL, '07:00:00', '08:00:00', 1, 30, 'today', 0, 0, NULL, NULL, 0, NULL),
+(65, 'Michael Anjelo Miguel', 'FA0005BN2016', 'Router', 'Michael Anjelo Miguel', 'Room 203', '2026-11-10', '2026-11-10', NULL, '92dce4fbd4bda5a060f63161ec8ad1d9ad64bf4bcd6e7685f97d5f3407ecc3f1', '2026-11-12 17:14:30', NULL, 'Returned', '2026-11-10 02:01:39', 'Auto-approved: no admin action within the buffer time.', NULL, 'auto_approve_timeout', 'Frederick Rosales', '', 'student', NULL, NULL, '07:00:00', '08:00:00', 1, 30, 'today', 0, 0, NULL, NULL, 0, NULL),
+(66, 'Stephen Perez', 'FA0011BN2026', 'Active Speakers', 'Stephen Perez', 'Audio Visual Room 2 · Building A (Old) · 1st Floor', '2026-11-11', '2026-11-11', NULL, '341a723fe4194caa6f47847514e8689a6213abcf40ef0d5e6360a49feae1b722', '2026-11-13 05:52:40', NULL, 'Returned', '2026-11-10 15:27:09', 'Auto-approved: no admin action within the buffer time.', NULL, 'auto_approve_timeout', '', '', 'personal', NULL, NULL, '16:00:00', '19:00:00', 2, 99, 'future', 1, 0, NULL, NULL, 0, NULL),
+(67, 'Stephen Perez', 'FA0011BN2026', 'Active Speakers', 'Stephen Perez', 'Room 203Building A (Old) · 2nd Floor', '2026-11-10', '2026-11-10', NULL, NULL, '2026-11-13 05:52:37', NULL, 'Returned', '2026-11-10 15:29:13', 'Auto-approved: no admin action within the buffer time.', NULL, 'auto_approve_timeout', '', '', 'personal', '9c3fa87e-ba96-4960-aaf8-d3fc071d6372', '5a193f9913356a6330038f68408348967bf7e92ae106d2fe779017325e7bec9a', '16:00:00', '19:00:00', 1, 9, '0', 0, 0, NULL, NULL, 0, NULL),
+(68, 'Stephen Perez', 'FA0011BN2026', 'Active Speakers', 'Stephen Perez', 'Outside', '2026-11-13', '2026-11-13', NULL, NULL, '2026-11-13 06:03:35', '2026-11-13 05:58:09', 'Returned', '2026-11-13 05:53:58', 'Approved: the equipment is free for the requested schedule.', NULL, 'rule_1_fifo', '', '', 'personal', NULL, NULL, '07:00:00', '09:00:00', 1, NULL, 'today', 1, 0, NULL, NULL, 0, NULL),
+(69, 'Stephen Perez', 'FA0011BN2026', 'Unterrupted Power Supply', 'Stephen Perez', 'Room 203 · Building B (New) · 2nd Floor', '2026-11-13', '2026-11-13', NULL, NULL, '2026-11-13 06:33:15', '2026-11-13 06:33:03', 'Returned', '2026-11-13 06:32:31', 'Approved: the equipment is free for the requested schedule.', NULL, 'rule_1_fifo', '', '', 'personal', NULL, NULL, '07:00:00', '08:00:00', 3, 30, 'today', 1, 0, NULL, NULL, 0, NULL),
+(70, 'Stephen Perez', 'FA0011BN2026', 'Unterrupted Power Supply', 'Stephen Perez', 'Audio Visual Room 2 · Building A (Old) · 1st Floor', '2026-11-13', '2026-11-13', NULL, NULL, '2026-11-13 06:35:32', '2026-11-13 06:35:23', 'Returned', '2026-11-13 06:34:52', 'Approved: the equipment is free for the requested schedule.', NULL, 'rule_1_fifo', '', '', 'personal', NULL, NULL, '07:00:00', '08:00:00', 2, 99, 'today', 1, 0, NULL, NULL, 0, NULL);
 
 -- --------------------------------------------------------
 
@@ -2172,6 +2214,160 @@ CREATE TABLE `tbl_room_waitlist` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `tbl_service_survey_comments`
+--
+
+CREATE TABLE `tbl_service_survey_comments` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `comment_text` varchar(500) NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `period_id` bigint(20) UNSIGNED DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `tbl_service_survey_comments`
+--
+
+INSERT INTO `tbl_service_survey_comments` (`id`, `comment_text`, `created_at`, `period_id`) VALUES
+(1, 'oks lang', '2026-11-13 06:23:23', NULL),
+(2, 'oksoks lang', '2026-11-13 06:30:33', NULL);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tbl_service_survey_completions`
+--
+
+CREATE TABLE `tbl_service_survey_completions` (
+  `source_type` varchar(16) NOT NULL,
+  `transaction_key` varchar(64) NOT NULL,
+  `answered` tinyint(1) NOT NULL DEFAULT 0,
+  `consumed_at` datetime NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `tbl_service_survey_completions`
+--
+
+INSERT INTO `tbl_service_survey_completions` (`source_type`, `transaction_key`, `answered`, `consumed_at`) VALUES
+('equipment', 'batch:9c3fa87e-ba96-4960-aaf8-d3fc071d6372', 1, '2026-11-13 06:30:18'),
+('equipment', 'request:66', 1, '2026-11-13 06:23:58'),
+('equipment', 'request:68', 1, '2026-11-13 06:23:23'),
+('equipment', 'request:69', 1, '2026-11-13 06:33:22'),
+('equipment', 'request:70', 1, '2026-11-13 06:35:53'),
+('room', '15', 0, '2026-11-13 06:30:49');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tbl_service_survey_config`
+--
+
+CREATE TABLE `tbl_service_survey_config` (
+  `id` tinyint(3) UNSIGNED NOT NULL,
+  `enabled` tinyint(1) NOT NULL DEFAULT 1,
+  `comment_enabled` tinyint(1) NOT NULL DEFAULT 1,
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `semester_start` date DEFAULT NULL,
+  `semester_end` date DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `tbl_service_survey_config`
+--
+
+INSERT INTO `tbl_service_survey_config` (`id`, `enabled`, `comment_enabled`, `updated_at`, `semester_start`, `semester_end`) VALUES
+(1, 1, 1, '2026-11-13 07:10:45', '2026-09-01', '2027-01-08');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tbl_service_survey_periods`
+--
+
+CREATE TABLE `tbl_service_survey_periods` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `semester_start` date NOT NULL,
+  `semester_end` date NOT NULL,
+  `period_start` date NOT NULL,
+  `period_end` date NOT NULL,
+  `response_count` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `rating_count` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `total_score` bigint(20) UNSIGNED NOT NULL DEFAULT 0,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `tbl_service_survey_periods`
+--
+
+INSERT INTO `tbl_service_survey_periods` (`id`, `semester_start`, `semester_end`, `period_start`, `period_end`, `response_count`, `rating_count`, `total_score`, `created_at`) VALUES
+(1, '2026-09-01', '2027-01-08', '2026-09-01', '2026-09-14', 0, 0, 0, '2026-11-13 07:10:45'),
+(2, '2026-09-01', '2027-01-08', '2026-09-15', '2026-09-28', 0, 0, 0, '2026-11-13 07:10:45'),
+(3, '2026-09-01', '2027-01-08', '2026-09-29', '2026-10-12', 0, 0, 0, '2026-11-13 07:10:45'),
+(4, '2026-09-01', '2027-01-08', '2026-10-13', '2026-10-26', 0, 0, 0, '2026-11-13 07:10:45'),
+(5, '2026-09-01', '2027-01-08', '2026-10-27', '2026-11-09', 0, 0, 0, '2026-11-13 07:10:45'),
+(6, '2026-09-01', '2027-01-08', '2026-11-10', '2026-11-23', 0, 0, 0, '2026-11-13 07:10:45'),
+(7, '2026-09-01', '2027-01-08', '2026-11-24', '2026-12-07', 0, 0, 0, '2026-11-13 07:10:45'),
+(8, '2026-09-01', '2027-01-08', '2026-12-08', '2026-12-21', 0, 0, 0, '2026-11-13 07:10:45'),
+(9, '2026-09-01', '2027-01-08', '2026-12-22', '2027-01-04', 0, 0, 0, '2026-11-13 07:10:45'),
+(10, '2026-09-01', '2027-01-08', '2027-01-05', '2027-01-08', 0, 0, 0, '2026-11-13 07:10:45');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tbl_service_survey_period_questions`
+--
+
+CREATE TABLE `tbl_service_survey_period_questions` (
+  `period_id` bigint(20) UNSIGNED NOT NULL,
+  `question_id` int(10) UNSIGNED NOT NULL,
+  `question_version` char(64) NOT NULL,
+  `question_text` varchar(160) NOT NULL,
+  `sort_order` tinyint(3) UNSIGNED NOT NULL DEFAULT 0,
+  `responses` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `total_score` bigint(20) UNSIGNED NOT NULL DEFAULT 0,
+  `rating_1` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `rating_2` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `rating_3` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `rating_4` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `rating_5` int(10) UNSIGNED NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tbl_service_survey_questions`
+--
+
+CREATE TABLE `tbl_service_survey_questions` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `question_text` varchar(160) NOT NULL,
+  `sort_order` tinyint(3) UNSIGNED NOT NULL DEFAULT 0,
+  `active` tinyint(1) NOT NULL DEFAULT 1,
+  `responses` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `total_score` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `rating_1` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `rating_2` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `rating_3` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `rating_4` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `rating_5` int(10) UNSIGNED NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `tbl_service_survey_questions`
+--
+
+INSERT INTO `tbl_service_survey_questions` (`id`, `question_text`, `sort_order`, `active`, `responses`, `total_score`, `rating_1`, `rating_2`, `rating_3`, `rating_4`, `rating_5`) VALUES
+(1, 'How satisfied are you with the service you received?', 1, 1, 5, 18, 1, 1, 0, 0, 3),
+(2, 'How helpful and respectful was the staff who assisted you?', 2, 0, 0, 0, 0, 0, 0, 0, 0),
+(3, 'How clear was the information about your transaction?', 2, 1, 5, 19, 0, 0, 1, 4, 0),
+(4, 'How satisfied are you with the time it took to complete your transaction?', 4, 0, 0, 0, 0, 0, 0, 0, 0),
+(5, 'How likely are you to use this service again?', 3, 1, 5, 20, 0, 0, 2, 1, 2);
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_sync_config`
 --
 
@@ -2187,7 +2383,7 @@ CREATE TABLE `tbl_sync_config` (
 
 INSERT INTO `tbl_sync_config` (`config_key`, `value`, `updated_at`) VALUES
 ('gsheet_last_modified', '2026-11-09T05:10:03.032Z', '2026-11-09 13:10:08'),
-('gsheet_last_sync', '2026-11-11 08:50:58', '2026-11-11 15:50:58'),
+('gsheet_last_sync', '2026-11-14 12:04:12', '2026-11-14 19:04:12'),
 ('gsheet_sync_enabled', '0', '2026-11-08 16:09:50'),
 ('gsheet_url', 'https://docs.google.com/spreadsheets/d/1Dw6HiLwXKIS8hZI0VVFOh4awDzPi4KEy/edit?gid=1579991349#gid=1579991349', '2026-11-11 15:48:41');
 
@@ -2215,6 +2411,7 @@ CREATE TABLE `tbl_users` (
   `fullname` varchar(255) NOT NULL,
   `faculty_id` varchar(255) NOT NULL,
   `email` varchar(255) NOT NULL,
+  `backup_email` varchar(255) DEFAULT NULL,
   `password` varchar(255) NOT NULL,
   `last_password_change` datetime DEFAULT NULL,
   `profile_picture` varchar(255) DEFAULT NULL,
@@ -2227,13 +2424,14 @@ CREATE TABLE `tbl_users` (
 -- Dumping data for table `tbl_users`
 --
 
-INSERT INTO `tbl_users` (`fullname`, `faculty_id`, `email`, `password`, `last_password_change`, `profile_picture`, `department`, `role`, `must_change_password`) VALUES
-('Indaleen Quinsayas', 'FA0002BN2016', 'indaleen.quinsayas@pupsync.edu', '$2y$10$oUbLCC9dtNYPFxcvkvcbtOrmsdae1iiw1IGenLcfrWZo5CSyvlf1C', NULL, NULL, NULL, 'Regular Faculty', 0),
-('Michael Anjelo Miguel', 'FA0005BN2016', 'michael.miguel@pupsync.edu', '$2y$10$cDg6QolF.l2mGo3v43go3e/fpglvD0WfWTxv3ifoAJ95wtEH4FGpC', NULL, NULL, NULL, 'Regular Faculty', 0),
-('Aaron Atienza', 'FA0006BN2024', 'aaron.atienza@pupsync.edu', '$2y$10$jhe4/CMvTgDYHbnB1XKaC.6NVO.di7gcuIk8cyQ8osmDIV.9uNs1.', NULL, NULL, NULL, 'Regular Faculty', 0),
-('Edmundo Dela Cruz', 'FA0008BN2023', 'edmundo.delacruz@pupsync.edu', '$2y$10$XdcZ7CBLZ6CvgSQtQ.oh0.S9VH91QWzR08IJLQexx4SMvgR5Bzl3S', NULL, NULL, NULL, 'Regular Faculty', 0),
-('Stephen Perez', 'FA0011BN2026', 'stephen.perez@pupsync.edu', '$2y$10$YjDFkqM4Ap0nQguCXFhcAOcUmLbEiEVLxE18CItSQEiBolMyVTunK', NULL, NULL, NULL, 'Regular Faculty', 0),
-('Archie Arevalo', 'FA0143MN2016', 'archie.arevalo@pupsync.edu', '$2y$10$uvhw5DCm0BaZaRQkO9nR2ezH.IsY7uXqGUqcWALfSpDf3eSobffcq', '2026-11-10 22:25:09', NULL, 'Department of General Education & Social Sciences', 'Regular Faculty', 0);
+INSERT INTO `tbl_users` (`fullname`, `faculty_id`, `email`, `backup_email`, `password`, `last_password_change`, `profile_picture`, `department`, `role`, `must_change_password`) VALUES
+('Indaleen Quinsayas', 'FA0002BN2016', 'indaleen.quinsayas@pupsync.edu', NULL, '$2y$10$oUbLCC9dtNYPFxcvkvcbtOrmsdae1iiw1IGenLcfrWZo5CSyvlf1C', NULL, NULL, NULL, 'Regular Faculty', 0),
+('Michael Anjelo Miguel', 'FA0005BN2016', 'michael.miguel@pupsync.edu', NULL, '$2y$10$cDg6QolF.l2mGo3v43go3e/fpglvD0WfWTxv3ifoAJ95wtEH4FGpC', NULL, NULL, NULL, 'Regular Faculty', 0),
+('Arvin Nuñez', 'FA0005BN2026', 'arvin.nunez@pupsync.edu', NULL, '$2y$10$sU.v4llfJcWRZcx8QvFSYuOx3lJJH51TrkJ1TLNB/ID0IXCZaPmPO', '2026-11-14 17:09:34', NULL, 'Department of Information Technology/Computing', 'Regular Faculty', 0),
+('Aaron Atienza', 'FA0006BN2024', 'aaron.atienza@pupsync.edu', NULL, '$2y$10$jhe4/CMvTgDYHbnB1XKaC.6NVO.di7gcuIk8cyQ8osmDIV.9uNs1.', NULL, NULL, NULL, 'Regular Faculty', 0),
+('Edmundo Dela Cruz', 'FA0008BN2023', 'edmundo.delacruz@pupsync.edu', NULL, '$2y$10$XdcZ7CBLZ6CvgSQtQ.oh0.S9VH91QWzR08IJLQexx4SMvgR5Bzl3S', NULL, NULL, NULL, 'Regular Faculty', 0),
+('Stephen Perez', 'FA0011BN2026', 'stephen.perez@pupsync.edu', NULL, '$2y$10$YjDFkqM4Ap0nQguCXFhcAOcUmLbEiEVLxE18CItSQEiBolMyVTunK', NULL, NULL, NULL, 'Regular Faculty', 0),
+('Archie Arevalo', 'FA0143MN2016', 'archie.arevalo@pupsync.edu', 'archiearevalo@gmail.com', '$2y$10$uvhw5DCm0BaZaRQkO9nR2ezH.IsY7uXqGUqcWALfSpDf3eSobffcq', '2026-11-10 22:25:09', NULL, 'Department of General Education & Social Sciences', 'Regular Faculty', 0);
 
 --
 -- Indexes for dumped tables
@@ -2389,6 +2587,13 @@ ALTER TABLE `tbl_login_attempts`
   ADD KEY `idx_last_attempt` (`last_attempt`);
 
 --
+-- Indexes for table `tbl_notif_prefs`
+--
+ALTER TABLE `tbl_notif_prefs`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_notif_pref` (`audience`,`user_key`,`pref_key`);
+
+--
 -- Indexes for table `tbl_notif_state`
 --
 ALTER TABLE `tbl_notif_state`
@@ -2470,6 +2675,48 @@ ALTER TABLE `tbl_room_waitlist`
   ADD KEY `idx_waitlist_slot` (`room_id`,`reservation_date`,`start_time`,`end_time`);
 
 --
+-- Indexes for table `tbl_service_survey_comments`
+--
+ALTER TABLE `tbl_service_survey_comments`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_service_survey_comment_date` (`created_at`),
+  ADD KEY `idx_service_survey_comment_period` (`period_id`);
+
+--
+-- Indexes for table `tbl_service_survey_completions`
+--
+ALTER TABLE `tbl_service_survey_completions`
+  ADD PRIMARY KEY (`source_type`,`transaction_key`),
+  ADD KEY `idx_service_survey_answered` (`answered`);
+
+--
+-- Indexes for table `tbl_service_survey_config`
+--
+ALTER TABLE `tbl_service_survey_config`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `tbl_service_survey_periods`
+--
+ALTER TABLE `tbl_service_survey_periods`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_service_survey_period` (`semester_start`,`semester_end`,`period_start`),
+  ADD KEY `idx_service_survey_semester` (`semester_start`,`semester_end`);
+
+--
+-- Indexes for table `tbl_service_survey_period_questions`
+--
+ALTER TABLE `tbl_service_survey_period_questions`
+  ADD PRIMARY KEY (`period_id`,`question_id`,`question_version`),
+  ADD KEY `idx_service_survey_period_question` (`question_id`);
+
+--
+-- Indexes for table `tbl_service_survey_questions`
+--
+ALTER TABLE `tbl_service_survey_questions`
+  ADD PRIMARY KEY (`id`);
+
+--
 -- Indexes for table `tbl_sync_config`
 --
 ALTER TABLE `tbl_sync_config`
@@ -2503,7 +2750,7 @@ ALTER TABLE `tbl_accounts`
 -- AUTO_INCREMENT for table `tbl_admin_activity`
 --
 ALTER TABLE `tbl_admin_activity`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=122;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=146;
 
 --
 -- AUTO_INCREMENT for table `tbl_ai_chat_log`
@@ -2521,7 +2768,7 @@ ALTER TABLE `tbl_arbitration_config`
 -- AUTO_INCREMENT for table `tbl_arbitration_log`
 --
 ALTER TABLE `tbl_arbitration_log`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=65;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=79;
 
 --
 -- AUTO_INCREMENT for table `tbl_buildings`
@@ -2545,13 +2792,13 @@ ALTER TABLE `tbl_class_schedule`
 -- AUTO_INCREMENT for table `tbl_equipment_categories`
 --
 ALTER TABLE `tbl_equipment_categories`
-  MODIFY `category_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=810;
+  MODIFY `category_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=942;
 
 --
 -- AUTO_INCREMENT for table `tbl_faculty_admin_notice`
 --
 ALTER TABLE `tbl_faculty_admin_notice`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `tbl_faculty_codes`
@@ -2569,7 +2816,7 @@ ALTER TABLE `tbl_faculty_item_codes`
 -- AUTO_INCREMENT for table `tbl_faculty_notif_state`
 --
 ALTER TABLE `tbl_faculty_notif_state`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- AUTO_INCREMENT for table `tbl_faculty_registry`
@@ -2587,13 +2834,13 @@ ALTER TABLE `tbl_faculty_registry_files`
 -- AUTO_INCREMENT for table `tbl_inventory`
 --
 ALTER TABLE `tbl_inventory`
-  MODIFY `item_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=273;
+  MODIFY `item_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=274;
 
 --
 -- AUTO_INCREMENT for table `tbl_ip_login_attempts`
 --
 ALTER TABLE `tbl_ip_login_attempts`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=21;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=23;
 
 --
 -- AUTO_INCREMENT for table `tbl_item_code_attempts`
@@ -2605,7 +2852,13 @@ ALTER TABLE `tbl_item_code_attempts`
 -- AUTO_INCREMENT for table `tbl_login_attempts`
 --
 ALTER TABLE `tbl_login_attempts`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=29;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=31;
+
+--
+-- AUTO_INCREMENT for table `tbl_notif_prefs`
+--
+ALTER TABLE `tbl_notif_prefs`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT for table `tbl_notif_state`
@@ -2617,7 +2870,7 @@ ALTER TABLE `tbl_notif_state`
 -- AUTO_INCREMENT for table `tbl_requests`
 --
 ALTER TABLE `tbl_requests`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=68;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=71;
 
 --
 -- AUTO_INCREMENT for table `tbl_request_events`
@@ -2660,6 +2913,24 @@ ALTER TABLE `tbl_room_reservations`
 --
 ALTER TABLE `tbl_room_waitlist`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT for table `tbl_service_survey_comments`
+--
+ALTER TABLE `tbl_service_survey_comments`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+
+--
+-- AUTO_INCREMENT for table `tbl_service_survey_periods`
+--
+ALTER TABLE `tbl_service_survey_periods`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=31;
+
+--
+-- AUTO_INCREMENT for table `tbl_service_survey_questions`
+--
+ALTER TABLE `tbl_service_survey_questions`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `tbl_sync_pending_deletions`
