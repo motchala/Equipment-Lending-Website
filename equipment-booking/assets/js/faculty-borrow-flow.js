@@ -67,7 +67,19 @@
     }
 
     /* ── rules + stock (from the server, kept fresh by the inventory poll) ── */
-    function meta() { return window.BOOKING_META || {}; }
+    function meta() {
+        if (window.BOOKING_META) return window.BOOKING_META;
+
+        var data = $('bookingMetaData');
+        if (!data) return {};
+        try {
+            window.BOOKING_META = JSON.parse(data.textContent || '{}');
+        } catch (error) {
+            console.error('Unable to parse faculty booking metadata.', error);
+            return {};
+        }
+        return window.BOOKING_META;
+    }
     function rules() {
         var r = meta().rules || {};
         return {
