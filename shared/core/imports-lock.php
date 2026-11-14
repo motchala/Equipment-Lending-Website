@@ -5,60 +5,42 @@ declare(strict_types=1);
 /**
  * imports-lock.php  (shared helpers)
  *
- * The "Imports" tab (Settings -> Imports, Super Admin only) is locked until the
- * Super Admin re-enters their own password. The unlock lives in the SERVER session
- * - never in the browser alone - and every endpoint that imports, lists or opens
- * an imported file calls imports_require_unlocked() first, so the lock cannot be
- * bypassed by calling an endpoint directly.
+ * The Imports screen (Super Admin only) used to be locked behind a password step. That lock was
+ * removed: Imports is simply open to the Super Admin. The helpers below are kept, always "open", so
+ * every import endpoint that calls them keeps working without edits.
  *
- *   imports.php (action=unlock | lock | status)   opens / closes the unlock
- *   everything else                               imports_require_unlocked()
- *
- * The unlock is sliding: it lasts IMPORTS_UNLOCK_TTL seconds from the last gated
- * request (or from the page's keep-alive ping while the tab is being used).
+ * Who may use Imports is still enforced on the server by each endpoint (signed-in Super Admin +
+ * CSRF token); nothing here changes that.
  */
 
-const IMPORTS_UNLOCK_TTL = 600;   // 10 minutes
+const IMPORTS_UNLOCK_TTL = 600;   // kept only so older callers still find the constant
 
 function imports_is_unlocked(): bool
 {
-    return (int)($_SESSION['imports_unlocked_until'] ?? 0) > time();
+    return true;
 }
 
 function imports_remaining(): int
 {
-    return max(0, (int)($_SESSION['imports_unlocked_until'] ?? 0) - time());
+    return IMPORTS_UNLOCK_TTL;
 }
 
 function imports_unlock(): void
 {
-    $_SESSION['imports_unlocked_until'] = time() + IMPORTS_UNLOCK_TTL;
+    // nothing to do: Imports is always open
 }
 
-/** Extends an unlock that is still valid (never opens a closed one). */
 function imports_touch(): void
 {
-    if (imports_is_unlocked()) {
-        imports_unlock();
-    }
+    // nothing to do: there is no timer any more
 }
 
 function imports_lock(): void
 {
-    unset($_SESSION['imports_unlocked_until']);
+    // nothing to do: there is no lock any more
 }
 
-/** Endpoint guard: stops the request with a JSON 403 unless the tab is unlocked. */
+/** Endpoint guard: kept so existing endpoints need no change; it never blocks. */
 function imports_require_unlocked(): void
 {
-    if (!imports_is_unlocked()) {
-        http_response_code(403);
-        echo json_encode([
-            'status' => 'error',
-            'code'   => 'locked',
-            'error'  => 'Imports are locked. Unlock them with your password first.',
-        ]);
-        exit;
-    }
-    imports_touch();
 }
