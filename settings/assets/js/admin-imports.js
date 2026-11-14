@@ -2,12 +2,9 @@
    admin-imports.js
    Settings -> Imports (Super Admin only).
 
-   - The tab is locked (blurred, inert) until the Super Admin enters their
-     password. The unlock lives in the SERVER session (imports.php); this file
-     only mirrors it. Every request is also checked on the server, so hiding the
-     UI is never the only protection.
-   - While locked the page holds placeholders only. Counts, lists and files are
-     fetched after unlock and dropped again when the tab locks.
+   - There is no password lock: the screen is open to the Super Admin. Every request is still
+     checked on the server (signed-in Super Admin + CSRF token), so hiding the UI is never the
+     only protection. Counts, lists and files are fetched when the screen opens.
    - Equipment Inventory: not a file upload. The list is read from a linked Google Sheet by
      settings/api/equipment-import.php (Google Sheets link, Sync now, categories; see initEquipmentCard).
      Rooms Assigned: a Faculty Rooms workbook (XLSX), read and saved by settings/api/rooms-import.php
@@ -184,119 +181,26 @@
         if (!shell) return;                       // not a Super Admin
 
         var content = $('imp-content');
-        var lockBtn = $('imp-lock-btn');
-        var lockNow = $('imp-lock-now');
-        var sessionText = $('imp-session-text');
-        var lockMsg = $('imp-lock-msg');
         var cards = Array.prototype.slice.call(shell.querySelectorAll('.imp-card'));
 
-        var unlocked = false;
-        var expiresAt = 0;
-        var clock = null;
-        var lastPing = 0;
+var unlocked = true;      // no password lock any more: the screen is always open
 
-        /* ── Lock state ───────────────────────────────────────────── */
-        function setExpiry(remaining) { if (typeof remaining === 'number') expiresAt = Date.now() + remaining * 1000; }
+        /* ── Always open ──────────────────────────────────────────── */
+        // These small helpers stay so the cards below can keep calling them unchanged.
+        function setExpiry() { }
+        function relock() { }
+        function guard() { return false; }
+        function sync() { }
 
-        function tick() {
-            var left = Math.round((expiresAt - Date.now()) / 1000);
-            if (left <= 0) { relock('Locked after 10 minutes without use.'); post('lock').catch(function () { }); return; }
-            sessionText.textContent = 'Unlocked \u00b7 auto-locks in ' + fmtClock(left);
+        function openScreen() {
+            unlocked = true;
+            shell.classList.remove('is-locked');
+            shell.classList.add('is-unlocked');
+            content.removeAttribute('inert');
+            content.setAttribute('aria-hidden', 'false');
         }
+        openScreen();
 
-        function setLocked(locked, message) {
-            unlocked = !locked;
-            shell.classList.toggle('is-locked', locked);
-            shell.classList.toggle('is-unlocked', !locked);
-            content.toggleAttribute('inert', locked);
-            content.setAttribute('aria-hidden', locked ? 'true' : 'false');
-            var sessionPill = $('imp-session');
-            if (sessionPill) sessionPill.hidden = locked;
-            if (lockMsg) {
-                lockMsg.textContent = message || '';
-                lockMsg.classList.toggle('hidden', !(locked && message));
-            }
-            if (locked) {
-                if (clock) { clearInterval(clock); clock = null; }
-                resetAll();
-                closeModal('imp-list-modal'); closeModal('imp-files-modal');
-                listRows = []; fileRows = [];
-                $('imp-list-tbody').textContent = ''; $('imp-files-list').textContent = '';
-            } else {
-                tick();
-                if (!clock) clock = setInterval(tick, 1000);
-            }
-        }
-        function relock(message) { if (unlocked || message) setLocked(true, message); }
-
-        // Any gated call that comes back "locked" means the server session is no longer unlocked
-        function guard(d) {
-            if (d && d.code === 'locked') { relock('Imports were locked. Unlock them again to continue.'); return true; }
-            return false;
-        }
-        function sync(d) { if (d && typeof d.remaining === 'number') setExpiry(d.remaining); }
-
-        // Keep an open unlock alive while the tab is actually being used
-        function keepAlive() {
-            if (!unlocked || Date.now() - lastPing < KEEPALIVE_MS) return;
-            lastPing = Date.now();
-            postJson('status', { touch: 1 }).then(function (d) {
-                if (!d) return;
-                if (d.unlocked === false) relock('Imports were locked. Unlock them again to continue.');
-                else sync(d);
-            });
-        }
-        document.addEventListener('pointerdown', keepAlive, true);
-        document.addEventListener('keydown', keepAlive, true);
-
-        lockNow.addEventListener('click', function () {
-            post('lock').catch(function () { }).then(function () { setLocked(true, ''); });
-        });
-
-        /* ── Password step ────────────────────────────────────────── */
-        var pwInput = $('imp-auth-password');
-        var pwError = $('imp-auth-error');
-        var pwOk = $('imp-auth-confirm');
-        var pwOkHtml = pwOk.innerHTML;
-
-        function showPwError(msg) { pwError.textContent = msg; pwError.classList.remove('hidden'); }
-        function openAuth() {
-            pwInput.value = '';
-            pwInput.type = 'password';
-            pwError.classList.add('hidden');
-            pwOk.disabled = false; pwOk.innerHTML = pwOkHtml;
-            openModal('imp-auth-modal');
-            setTimeout(function () { pwInput.focus(); }, 60);
-        }
-        lockBtn.addEventListener('click', openAuth);
-        $('imp-auth-close').addEventListener('click', function () { closeModal('imp-auth-modal'); });
-        $('imp-auth-cancel').addEventListener('click', function () { closeModal('imp-auth-modal'); });
-        pwInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); pwOk.click(); } });
-
-        pwOk.addEventListener('click', function () {
-            var pw = pwInput.value;
-            if (!pw) { showPwError('Enter your password to continue.'); return; }
-            pwError.classList.add('hidden');
-            pwOk.disabled = true;
-            pwOk.innerHTML = '<span class="material-symbols-outlined imp-spin">progress_activity</span> Checking\u2026';
-            postJson('unlock', { current_password: pw }).then(function (d) {
-                pwInput.value = '';
-                if (d && d.status === 'success') {
-                    closeModal('imp-auth-modal');
-                    setExpiry(d.remaining);
-                    setLocked(false);
-                    loadOverview();
-                    if (controllers.equipment) controllers.equipment.load();
-                    return;
-                }
-                showPwError((d && d.error) || 'Could not unlock. Please try again.');
-                pwOk.disabled = false; pwOk.innerHTML = pwOkHtml;
-                pwInput.focus();
-            }).catch(function () {
-                showPwError('Network error. Please try again.');
-                pwOk.disabled = false; pwOk.innerHTML = pwOkHtml;
-            });
-        });
 
         /* ── Overview (numbers on the cards) ──────────────────────── */
         function cardOf(kind) { return shell.querySelector('.imp-card[data-kind="' + kind + '"]'); }
@@ -1289,7 +1193,7 @@
         /* Esc closes the top-most Imports dialog */
         document.addEventListener('keydown', function (e) {
             if (e.key !== 'Escape') return;
-            ['imp-auth-modal', 'imp-files-modal', 'imp-list-modal'].some(function (id) {
+            ['imp-files-modal', 'imp-list-modal'].some(function (id) {
                 var m = $(id);
                 if (m && m.classList.contains('ps-modal-open')) {
                     if (id === 'imp-list-modal') closeList(); else if (id === 'imp-files-modal') closeFiles(); else closeModal(id);
@@ -1299,25 +1203,12 @@
             });
         });
 
-        function restoreUnlock() {
-            postJson('status', { touch: 1 }).then(function (d) {
-                if (!d || d.status !== 'success') return;
-                if (!d.unlocked) {
-                    if (unlocked) relock('Imports were locked. Unlock them again to continue.');
-                    return;
-                }
-                setExpiry(d.remaining);
-                if (!unlocked) {
-                    setLocked(false);
-                    loadOverview();
-                }
-            }).catch(function () { /* keep the current state if the status check fails */ });
-        }
-
-        /* Re-check the server session on reload and whenever Imports is revisited. */
-        restoreUnlock();
+/* The screen is always open: read the numbers (and the equipment sheet) straight away, and
+           refresh the numbers whenever Imports is revisited. */
+        loadOverview();
+        if (controllers.equipment) controllers.equipment.load();
         var importsNav = document.querySelector('.nav-item[data-tab="imports"]');
-        if (importsNav) importsNav.addEventListener('click', restoreUnlock);
+        if (importsNav) importsNav.addEventListener('click', function () { loadOverview(); });
     }
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

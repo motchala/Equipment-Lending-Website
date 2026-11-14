@@ -1,9 +1,9 @@
 <!-- ============================================================
      TAB: IMPORTS  (Super Admin only)  -  its own sidebar screen (was Settings -> Imports)
      Equipment Inventory (linked Google Sheet: Sync now + categories) + Rooms Assigned +
-     Faculty Registry imports behind ONE password unlock.
-     The page only ever contains placeholders: real numbers, lists and
-     files are fetched after unlock (settings/api/imports.php).
+     Faculty Registry imports (no password lock: the screen is open to the Super Admin).
+     The page holds placeholders: real numbers, lists and
+     files are fetched when it opens (settings/api/imports.php).
      Rooms Assigned is its own import (settings/api/rooms-import.php): it never touches the Faculty Registry.
      Equipment Inventory is not a file upload: its card is settings/views/admin-imports-equipment-card.php and it is
      served by settings/api/equipment-import.php (the Google Sheets sync the Settings -> Equipment tab also drives).
@@ -49,24 +49,17 @@ $imp_cards = [
 
 <div class="tab-panel" id="panel-imports">
 
-    <!-- Page header: same pattern as every other screen. The session pill only shows while unlocked. -->
+    <!-- Page header: same pattern as every other screen. -->
     <div class="imp-page-head admin-screen-header">
         <div class="imp-page-head-text">
             <h1 class="sett-page-title">Imports</h1>
             <p class="sett-page-sub">Bring in the equipment inventory, the room assignments and the official faculty list. The original file of the latest import is kept on record.</p>
         </div>
-        <div class="imp-session" id="imp-session" hidden>
-            <span class="imp-session-dot"></span>
-            <span class="imp-session-text" id="imp-session-text">Unlocked</span>
-            <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" id="imp-lock-now">
-                <span class="material-symbols-outlined">lock</span> Lock
-            </button>
-        </div>
     </div>
 
-    <div class="imp-shell is-locked" id="imp-shell">
+    <div class="imp-shell is-unlocked" id="imp-shell">
 
-        <div class="imp-content" id="imp-content" inert aria-hidden="true">
+        <div class="imp-content" id="imp-content">
             <?= csrf_field() ?>
 
             <div class="imp-layout">
@@ -341,18 +334,6 @@ $imp_cards = [
                 </aside>
             </div><!-- /imp-layout -->
         </div><!-- /imp-content -->
-
-        <div class="imp-lock" id="imp-lock">
-            <div class="imp-lock-inner">
-                <button type="button" class="imp-lock-btn" id="imp-lock-btn" aria-label="Unlock Imports">
-                    <span class="material-symbols-outlined">lock</span>
-                </button>
-                <h4>Imports are locked</h4>
-                <p>Click the lock and enter your password to view or make imports, or to open the files that were imported.</p>
-                <p class="imp-lock-msg hidden" id="imp-lock-msg"></p>
-                <span class="imp-lock-note"><span class="material-symbols-outlined">lock</span> Password required to unlock</span>
-            </div>
-        </div>
 
     </div><!-- /imp-shell -->
 </div><!-- /panel-imports -->

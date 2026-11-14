@@ -5,7 +5,7 @@ declare(strict_types=1);
 /**
  * imports.php
  *
- * Everything the Settings -> Imports tab reads, behind ONE password unlock.
+ * Everything the Imports screen reads. Open to the signed-in Super Admin (the password lock was removed).
  * POST only (form-encoded), always: logged-in Super Admin + CSRF token.
  *
  *   action=status    { unlocked, remaining }                 (touch=1 refreshes an open unlock)
@@ -104,10 +104,7 @@ switch ($action) {
         ]);
 
     case 'unlock':
-        frf_verify_password($conn, (string)($_POST['current_password'] ?? ''));   // 5 wrong tries -> 5 min cool-down
-        imports_unlock();
-        require_once __DIR__ . '/../../shared/core/activity-logger.php';
-        admin_log_activity($conn, 'settings', 'Unlocked the Imports tab');
+        // The password lock was removed: kept as a harmless no-op so an older cached page still works.
         frf_respond(200, [
             'status'    => 'success',
             'unlocked'  => true,
