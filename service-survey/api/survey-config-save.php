@@ -36,8 +36,6 @@ if (!admin_is_super_admin($conn)) {
 if (
     !isset($body['enabled'], $body['comment_enabled'])
     || !is_array($body['questions'])
-    || !array_key_exists('semester_start', $body)
-    || !array_key_exists('semester_end', $body)
 ) {
     ss_fail(400, 'The survey settings are incomplete.');
 }
@@ -56,27 +54,7 @@ if ($enabled === null || $commentEnabled === null) {
     ss_fail(422, 'Survey switches must be on or off.');
 }
 
-$semesterStartValue = $body['semester_start'];
-$semesterEndValue = $body['semester_end'];
-if (!is_string($semesterStartValue) || !is_string($semesterEndValue)) {
-    ss_fail(422, 'Semester dates must be valid dates.');
-}
-$semesterStartValue = trim($semesterStartValue);
-$semesterEndValue = trim($semesterEndValue);
-if (($semesterStartValue === '') !== ($semesterEndValue === '')) {
-    ss_fail(422, 'Enter both semester dates, or leave both blank to disable period reporting.');
-}
-$semesterStart = null;
-$semesterEnd = null;
-if ($semesterStartValue !== '') {
-    $startDate = ss_parse_date($semesterStartValue);
-    $endDate = ss_parse_date($semesterEndValue);
-    if (!$startDate || !$endDate || $startDate > $endDate) {
-        ss_fail(422, 'Semester start and end dates are invalid or out of order.');
-    }
-    $semesterStart = $startDate->format('Y-m-d');
-    $semesterEnd = $endDate->format('Y-m-d');
-}
+// The semester dates are no longer part of the survey settings: they are set in Settings → Arbitration.
 
 $submitted = $body['questions'];
 if (count($submitted) < SS_MIN_QUESTIONS || count($submitted) > SS_MAX_QUESTIONS) {
@@ -153,13 +131,13 @@ try {
     }
     $configUpdate = $conn->prepare(
         'UPDATE tbl_service_survey_config
-         SET enabled = ?, comment_enabled = ?, semester_start = ?, semester_end = ?
+         SET enabled = ?, comment_enabled = ?
          WHERE id = 1'
     );
     if (!$configUpdate) {
         throw new RuntimeException('Could not prepare survey settings update: ' . $conn->error);
     }
-    $configUpdate->bind_param('iiss', $enabled, $commentEnabled, $semesterStart, $semesterEnd);
+    $configUpdate->bind_param('ii', $enabled, $commentEnabled);
     if (!$configUpdate->execute()) {
         $configUpdate->close();
         throw new RuntimeException('Could not save survey settings: ' . $configUpdate->error);

@@ -9,6 +9,9 @@
                      admin-dashboard.js. -->
 
                 <?php
+                // Current semester (set by the Super Admin in the survey settings) -> small tag under the date. Name only, no dates.
+                require_once __DIR__ . '/../../shared/core/semester-label.php';
+                $dash_semester = ps_semester_label($conn);
                 // dash_collect() / dash_render() are defined at the top of this file; the same markup is
                 // returned by admin-dashboard.php?fragment=dashboard for the live refresh.
                 $dash_data = dash_collect($conn);
@@ -25,7 +28,9 @@
                                         $hour = (int)date('H');
                                         echo $hour < 12 ? 'morning' : ($hour < 18 ? 'afternoon' : 'evening');
                                         ?>, <span id="greetName"><?php echo htmlspecialchars(explode(' ', $admin_name)[0]); ?></span>.</h1>
-                            <p><?php echo date('l, F j, Y'); ?></p>
+                            <p><?php echo date('l, F j, Y'); ?>
+                                <span class="ps-semester-tag<?php echo $dash_semester['active'] ? '' : ' is-none'; ?>" id="psSemesterTag"><?php echo htmlspecialchars($dash_semester['label'], ENT_QUOTES, 'UTF-8'); ?></span>
+                            </p>
                         </div>
                         <div class="dash-head-tools">
                             <!-- One quick action left on purpose: confirming a return by QR code has no other entry point

@@ -6,7 +6,7 @@
  * Included from settings/views/admin-screen.php as a direct child of #panel-settings,
  * so the existing Settings sub-tab switcher can show and hide it.
  *
- * LIVE cards (marked data-arb-live): "Borrowing rules" and "Booking window". They load their
+ * LIVE cards (marked data-arb-live): "Current semester", "Borrowing rules" and "Booking window". They load their
  * values through ArbitrationConfig and save through settings/api/save-arbitration.php.
  * The other cards (room rules, room schedule, role weights, priority faculty) are still UI only
  * and carry a "Not connected yet" badge.
@@ -108,6 +108,28 @@ $arb_chips = static function (string $prefix, string $title, string $sub, array 
     }
     echo '</div></div>';
 };
+
+/** Row with a drop-down. $options = [value => label]. */
+$arb_select = static function (string $key, string $title, string $sub, array $options, string $current) use ($arb_e): void {
+    echo '<div class="arb-row">';
+    echo '<div class="arb-row__text"><div class="arb-row__title">' . $arb_e($title) . '</div>';
+    echo '<div class="arb-row__sub">' . $arb_e($sub) . '</div></div>';
+    echo '<div class="arb-row__ctl"><select class="form-control-custom arb-select" id="arb-' . $arb_e($key) . '" data-arb-key="' . $arb_e($key) . '" aria-label="' . $arb_e($title) . '">';
+    foreach ($options as $value => $label) {
+        echo '<option value="' . $arb_e((string)$value) . '"' . ((string)$value === $current ? ' selected' : '') . '>' . $arb_e((string)$label) . '</option>';
+    }
+    echo '</select></div>';
+    echo '</div>';
+};
+
+/** Row with a date picker ($value is YYYY-MM-DD, or '' when not set). */
+$arb_date = static function (string $key, string $title, string $sub, string $value) use ($arb_e): void {
+    echo '<div class="arb-row">';
+    echo '<div class="arb-row__text"><div class="arb-row__title">' . $arb_e($title) . '</div>';
+    echo '<div class="arb-row__sub">' . $arb_e($sub) . '</div></div>';
+    echo '<div class="arb-row__ctl"><input type="date" class="form-control-custom arb-select" id="arb-' . $arb_e($key) . '" data-arb-key="' . $arb_e($key) . '" value="' . $arb_e($value) . '" aria-label="' . $arb_e($title) . '"></div>';
+    echo '</div>';
+};
 ?>
 
 <!-- ── ARBITRATION (Super Admin only) ─────────────────────────────────
@@ -131,6 +153,33 @@ $arb_chips = static function (string $prefix, string $title, string $sub, array 
     <div class="arb-note">
         <span class="material-symbols-outlined">info</span>
         <span>Changes apply to <strong>new requests only</strong>. Requests that are already decided or waiting are not re-evaluated.</span>
+    </div>
+
+    <!-- ═══ SEMESTER ════════════════════════════════════════════════ -->
+    <div class="arb-section">
+        <h3 class="arb-section__title"><span class="material-symbols-outlined">calendar_month</span> Semester</h3>
+        <p class="arb-section__sub">Which semester is running. It shows as a small tag on every dashboard.</p>
+    </div>
+
+    <div class="arb-grid">
+        <div class="sett-card arb-card" data-arb-live>
+            <div class="sett-card-head">
+                <span class="material-symbols-outlined">event</span>
+                <h3>Current semester</h3>
+            </div>
+            <div class="sett-card-body">
+                <?php
+                $arb_select('semester_name', 'We are currently in', 'Shown on the student, faculty and admin dashboards (the name only, never the dates). Choose None between semesters.', [
+                    'first'  => ArbitrationConfig::SEMESTER_LABELS['first'],
+                    'second' => ArbitrationConfig::SEMESTER_LABELS['second'],
+                    'summer' => ArbitrationConfig::SEMESTER_LABELS['summer'],
+                    'none'   => 'None (semester break)',
+                ], (string)$arb_live['semester_name']);
+                $arb_date('semester_start', 'Semester starts', 'First day of the semester. The service survey\'s 14-day rating windows start counting from here.', (string)$arb_live['semester_start']);
+                $arb_date('semester_end', 'Semester ends', 'Last day of the semester. Leave both dates blank to switch the survey\'s period reporting off.', (string)$arb_live['semester_end']);
+                ?>
+            </div>
+        </div>
     </div>
 
     <!-- Quick presets -->

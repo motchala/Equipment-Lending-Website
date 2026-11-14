@@ -7,6 +7,9 @@
                 // Built from this faculty member's own loans ($requests_js), room reservations
                 // ($room_reservations) and notification count, all already loaded by this page.
                 $fdb_h        = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+                // Current semester (set by the Super Admin) -> small tag next to the date. Name only, no dates.
+                require_once __DIR__ . '/../../shared/core/semester-label.php';
+                $fdb_semester = ps_semester_label($conn);
                 $fdb_pl       = fn(int $n, string $w) => $n . ' ' . $w . ($n === 1 ? '' : 's');
                 $fdb_today    = date('Y-m-d');
                 $fdb_now_hms  = date('H:i:s');
@@ -226,7 +229,9 @@
                                                                 $fdb_v_h = (int)date('H');
                                                                 echo $fdb_v_h < 12 ? 'morning' : ($fdb_v_h < 17 ? 'afternoon' : 'evening');
                                                                 ?>, <span data-first-name><?php echo htmlspecialchars($firstname); ?></span>.</h1>
-                            <p class="dash-flat-sub"><?php echo date('l, F j, Y'); ?></p>
+                            <p class="dash-flat-sub"><?php echo date('l, F j, Y'); ?>
+                                <span class="ps-semester-tag<?php echo $fdb_semester['active'] ? '' : ' is-none'; ?>" id="psSemesterTag"><?php echo $fdb_h($fdb_semester['label']); ?></span>
+                            </p>
                         </div>
                         <div class="fdb-head-tools">
                             <div class="fdb-actions">
