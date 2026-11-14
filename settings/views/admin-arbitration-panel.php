@@ -6,9 +6,9 @@
  * Included from settings/views/admin-screen.php as a direct child of #panel-settings,
  * so the existing Settings sub-tab switcher can show and hide it.
  *
- * LIVE cards (marked data-arb-live): "Current semester", "Borrowing rules" and "Booking window". They load their
+ * LIVE cards (marked data-arb-live): "Current semester", "Borrowing rules", "Booking window" and "Reservation rules". They load their
  * values through ArbitrationConfig and save through settings/api/save-arbitration.php.
- * The other cards (room rules, room schedule, role weights, priority faculty) are still UI only
+ * The other cards (room schedule, role weights, priority faculty) are still UI only
  * and carry a "Not connected yet" badge.
  *
  * Styles : settings/assets/css/admin-arbitration.css  (all classes are arb-*)
@@ -255,33 +255,24 @@ $arb_date = static function (string $key, string $title, string $sub, string $va
     </div>
 
     <div class="arb-grid">
-        <div class="sett-card arb-card">
+        <div class="sett-card arb-card" data-arb-live>
             <div class="sett-card-head">
                 <span class="material-symbols-outlined">rule</span>
                 <h3>Reservation rules</h3>
-                <span class="arb-badge">Not connected yet</span>
             </div>
             <div class="sett-card-body">
                 <?php
-                $arb_stepper('room_max_active', 'Active reservations per faculty', 'Reservations a faculty account can hold at the same time.', $arb_num('room_max_active', 2), 1, 10, 1, 'rooms');
-                $arb_stepper('room_max_advance_weeks', 'Book ahead up to', 'How far in advance a room can be reserved.', $arb_num('room_max_advance_weeks', 3), 1, 8, 1, 'weeks');
-                $arb_stepper('room_cancel_cutoff_min', 'Cancellation cutoff', 'Faculty can cancel until this long before the start time.', $arb_num('room_cancel_cutoff_min', 60), 0, 240, 15, 'min');
-                $arb_toggle('room_same_day_auto', 'Confirm same-day reservations automatically', 'When the slot is free, nothing waits for an admin.', $arb_bool('room_same_day_auto', true));
-                $arb_toggle('room_letter_required', 'Require a request letter for later dates', 'Later-date reservations without a letter cannot be submitted.', $arb_bool('room_letter_required', false));
+                $arb_stepper('room_max_active', 'Active reservations per faculty', 'Reservations a faculty account can hold at the same time.', (int)$arb_live['room_max_active'], 1, 10, 1, 'rooms');
+                $arb_stepper('room_max_advance_weeks', 'Book ahead up to', 'How far in advance a room can be reserved, on every reservation form.', (int)$arb_live['room_max_advance_weeks'], 1, 8, 1, 'weeks');
+                $arb_stepper('room_cancel_cutoff_min', 'Cancellation cutoff', 'Faculty can cancel an approved reservation until this long before it starts. 0 allows it until the start.', (int)$arb_live['room_cancel_cutoff_min'], 0, 240, 15, 'min');
+                $arb_toggle('room_same_day_auto', 'Confirm same-day reservations automatically', 'When off, a same-day reservation waits for an admin like a later-date one.', (bool)$arb_live['room_same_day_auto']);
+                $arb_toggle('room_letter_required', 'Require a request letter for later dates', 'A faculty member\'s own later-date reservation needs a letter. Same-day and student reservations never do.', (bool)$arb_live['room_letter_required']);
+                $arb_select('room_expiry_mode', 'Undecided requests', 'What happens to a waiting reservation that nobody has decided.', [
+                    'day'   => 'Decline at 12:01 AM on the date',
+                    'start' => 'Decline at the start time',
+                    'never' => 'Keep waiting for an admin',
+                ], (string)$arb_live['room_expiry_mode']);
                 ?>
-                <div class="arb-row">
-                    <div class="arb-row__text">
-                        <div class="arb-row__title">Undecided later-date requests</div>
-                        <div class="arb-row__sub">What happens when nobody reviews a request in time.</div>
-                    </div>
-                    <div class="arb-row__ctl">
-                        <select class="form-control-custom arb-select" id="arb-room_expiry_mode" data-arb-key="room_expiry_mode" aria-label="Undecided later-date requests">
-                            <option value="day" selected>Decline at 12:01 AM on the date</option>
-                            <option value="start">Decline at the start time</option>
-                            <option value="never">Keep waiting for an admin</option>
-                        </select>
-                    </div>
-                </div>
             </div>
         </div>
 
