@@ -13,6 +13,12 @@ require __DIR__ . '/activity/core/faculty-reservations-data.php';
 // room issues and account activity — see faculty-notif-functions.php.
 // Read/deleted state lives in tbl_faculty_notif_state; the modal is rendered
 // client-side from this JSON and kept in sync via api/faculty-notif.php.
+//
+// Set Manila timezone before building the feed so that time() / strtotime()
+// / date() inside fnotif_build_list() all anchor to PH time, not the server
+// default (UTC on InfinityFree).  The polling endpoint (faculty-notif.php)
+// already does this at the top of that file.
+date_default_timezone_set('Asia/Manila');
 require_once __DIR__ . '/notifications/core/faculty-data.php';
 $notifications = fnotif_build_list($conn, $_SESSION['faculty_id']);
 $notif_count   = fnotif_count_unread($notifications);

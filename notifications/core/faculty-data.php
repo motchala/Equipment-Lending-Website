@@ -35,6 +35,7 @@
  */
 
 require_once __DIR__ . '/preferences.php';
+require_once __DIR__ . '/datetime.php';
 
 if (!function_exists('fnotif_ensure_table')) {
     /** Idempotent guard — creates tbl_faculty_notif_state on first use. */
@@ -235,11 +236,46 @@ if (!function_exists('fnotif_time_label')) {
     /** Short label for the card's top-right corner: "9:42 AM" / "Yesterday" / "Jun 12". */
     function fnotif_time_label(int $ts): string
     {
-        $today = strtotime('today');
+        $today = (new DateTimeImmutable('today', new DateTimeZone('Asia/Manila')))->getTimestamp();
         if ($ts >= $today)                 return date('g:i A', $ts);
         if ($ts >= $today - 86400)         return 'Yesterday';
         if (date('Y', $ts) === date('Y'))  return date('M j', $ts);
         return date('M j, Y', $ts);
+    }
+}
+
+if (!function_exists('fnotif_db_timestamp')) {
+    function fnotif_db_timestamp(mysqli $conn, ?string $datetime, int $fallback): int
+    {
+        $datetime = trim((string)$datetime);
+        return $datetime !== '' ? notif_datetime($conn, $datetime)->getTimestamp() : $fallback;
+    }
+}
+
+if (!function_exists('fnotif_date_ts')) {
+    /**
+     * Unix timestamp for a user-entered DATE (+ optional TIME) column such as
+     * borrow_date/borrow_time, return_date/return_time or reservation_date/
+     * start_time. These hold the wall-clock Manila values the person picked in
+     * the booking form; the database never converted them, so they must be read
+     * as Asia/Manila. Do NOT route them through notif_datetime(): that applies
+     * the database server's clock offset, which is only meant for columns the
+     * database stamped itself (CURRENT_TIMESTAMP / NOW()) and would shift these
+     * by +8h whenever the DB runs on UTC.
+     */
+    function fnotif_date_ts(mysqli $conn, ?string $date, ?string $time = '00:00:00'): int
+    {
+        static $manila = null;
+        $date = trim((string)$date);
+        if ($date === '') return 0;
+        $time = trim((string)$time);
+        if ($time === '') $time = '00:00:00';
+        $manila = $manila ?? new DateTimeZone('Asia/Manila');
+        try {
+            return (new DateTimeImmutable($date . ' ' . $time, $manila))->getTimestamp();
+        } catch (Exception $ex) {
+            return 0;
+        }
     }
 }
 
@@ -319,6 +355,8 @@ if (!function_exists('fnotif_build_list')) {
      */
     function fnotif_build_list(mysqli $conn, string $facultyId, bool $includeDeleted = false): array
     {
+        date_default_timezone_set('Asia/Manila');
+
         $HISTORY_DAYS = 30;     // one-off events (approved/declined/returned/...) age out after this
         $FEED_LIMIT   = 200;
 
@@ -379,11 +417,11 @@ if (!function_exists('fnotif_build_list')) {
                 $id      = (int)$r['id'];
                 $status  = trim((string)$r['status']);
                 $equip   = (string)$r['equipment_name'];
-                $reqTs   = strtotime($r['request_date']) ?: $now;
+                $reqTs   = fnotif_db_timestamp($conn, $r['request_date'] ?? null, $now);
                 $decidedTs = (!empty($r['log_at']) && in_array($r['log_decision'] ?? '', ['Approved', 'Declined'], true))
-                    ? (strtotime($r['log_at']) ?: $reqTs) : $reqTs;
-                $borrowStr = date('M j, Y', strtotime($r['borrow_date']));
-                $returnStr = date('M j, Y', strtotime($r['return_date']));
+                    ? fnotif_db_timestamp($conn, $r['log_at'], $reqTs) : $reqTs;
+                $borrowStr = date('M j, Y', fnotif_date_ts($conn, $r['borrow_date']));
+                $returnStr = date('M j, Y', fnotif_date_ts($conn, $r['return_date']));
                 $override  = !empty($r['log_override_by']);
                 $common = [
                     $d('Equipment', $equip),
@@ -416,8 +454,8 @@ if (!function_exists('fnotif_build_list')) {
                             'icon_class' => 'ni-success',
                             'title' => 'Borrow Request Approved: ' . $equip,
                             'body'  => 'Your request for <strong>' . $e($equip) . '</strong> was approved. Borrow on <strong>'
-                                . $e(date('M j', strtotime($r['borrow_date']))) . '</strong>, return by <strong>'
-                                . $e(date('M j', strtotime($r['return_date']))) . '</strong>.',
+                                . $e(date('M j', fnotif_date_ts($conn, $r['borrow_date']))) . '</strong>, return by <strong>'
+                                . $e(date('M j', fnotif_date_ts($conn, $r['return_date']))) . '</strong>.',
                             'ts'    => $decidedTs,
                             'detail' => array_merge([$d('Status', 'Approved')], $common, [
                                 $d('Decision Rule', fnotif_rule_label($r['log_rule'] ?? $r['arbitration_rule'] ?? null)),
@@ -429,7 +467,7 @@ if (!function_exists('fnotif_build_list')) {
                         ]);
 
                         // Return reminder: due today / tomorrow / in 2 days
-                        $daysLeft = (int)round((strtotime($r['return_date']) - $todayTs) / 86400);
+                        $daysLeft = (int)round((fnotif_date_ts($conn, $r['return_date']) - $todayTs) / 86400);
                         if ($daysLeft >= 0 && $daysLeft <= 2) {
                             $when = $daysLeft === 0 ? 'today' : ($daysLeft === 1 ? 'tomorrow' : 'in 2 days');
                             $add([
@@ -438,10 +476,10 @@ if (!function_exists('fnotif_build_list')) {
                                 'icon' => 'alarm',
                                 'icon_class' => 'ni-warn',
                                 'title' => 'Return Reminder: ' . $equip,
-                                'body'  => '<strong>' . $e($equip) . '</strong> is due <strong>' . $when . '</strong> (' . $e(date('M j', strtotime($r['return_date'])))
+                                'body'  => '<strong>' . $e($equip) . '</strong> is due <strong>' . $when . '</strong> (' . $e(date('M j', fnotif_date_ts($conn, $r['return_date'])))
                                     . '). Please return it on time to avoid penalties.',
                                 'ts'    => $todayTs,
-                                'time_label' => $daysLeft === 0 ? 'Due today' : ($daysLeft === 1 ? 'Due tomorrow' : 'Due ' . date('M j', strtotime($r['return_date']))),
+                                'time_label' => $daysLeft === 0 ? 'Due today' : ($daysLeft === 1 ? 'Due tomorrow' : 'Due ' . date('M j', fnotif_date_ts($conn, $r['return_date']))),
                                 'detail' => [
                                     $d('Equipment', $equip),
                                     $d('Due Date', $returnStr, $daysLeft === 0),
@@ -464,10 +502,10 @@ if (!function_exists('fnotif_build_list')) {
                             $cQty    = max(1, (int)($r['borrow_qty'] ?? 1));
                             $cReason = trim((string)($r['log_override_reason'] ?? ''));
                             if ($cReason === '') $cReason = trim((string)($r['log_reason'] ?? ''));
-                            $cStartTs = strtotime($r['borrow_date'] . ' ' . (!empty($r['borrow_time']) ? $r['borrow_time'] : '00:00:00'));
+                            $cStartTs = fnotif_date_ts($conn, $r['borrow_date'], !empty($r['borrow_time']) ? $r['borrow_time'] : '00:00:00');
                             $cStart   = !empty($r['borrow_time']) ? date('M j, Y g:i A', $cStartTs) : $borrowStr;
                             $cDue     = !empty($r['return_time'])
-                                ? date('M j, Y g:i A', strtotime($r['return_date'] . ' ' . $r['return_time'])) : $returnStr;
+                                ? date('M j, Y g:i A', fnotif_date_ts($conn, $r['return_date'], $r['return_time'])) : $returnStr;
                             $add([
                                 'key' => 'reqcancelled-' . $id,
                                 'cat' => 'borrow',
@@ -519,10 +557,10 @@ if (!function_exists('fnotif_build_list')) {
                         // The faculty member cancelled this request themselves (core/borrow-cancellation.php).
                         // A short record in the feed, aging out like the other one-off events.
                         $cancelTs = (!empty($r['log_at']) && ($r['log_decision'] ?? '') === 'Cancelled')
-                            ? (strtotime($r['log_at']) ?: $reqTs) : $reqTs;
+                            ? fnotif_db_timestamp($conn, $r['log_at'], $reqTs) : $reqTs;
                         if ($cancelTs < $windowTs) break;
                         $kQty   = max(1, (int)($r['borrow_qty'] ?? 1));
-                        $kStart = strtotime($r['borrow_date'] . ' ' . (!empty($r['borrow_time']) ? $r['borrow_time'] : '00:00:00'));
+                        $kStart = fnotif_date_ts($conn, $r['borrow_date'], !empty($r['borrow_time']) ? $r['borrow_time'] : '00:00:00');
                         $add([
                             'key' => 'reqselfcancelled-' . $id,
                             'cat' => 'borrow',
@@ -538,7 +576,7 @@ if (!function_exists('fnotif_build_list')) {
                                 $d('Quantity', $kQty > 1 ? (string)$kQty : ''),
                                 $d('Was Scheduled For', !empty($r['borrow_time']) ? date('M j, Y g:i A', $kStart) : $borrowStr),
                                 $d('Return By', !empty($r['return_time'])
-                                    ? date('M j, Y g:i A', strtotime($r['return_date'] . ' ' . $r['return_time'])) : $returnStr),
+                                    ? date('M j, Y g:i A', fnotif_date_ts($conn, $r['return_date'], $r['return_time'])) : $returnStr),
                                 $d('Cancelled On', date('M j, Y g:i A', $cancelTs)),
                                 $d('Requested On', date('M j, Y g:i A', $reqTs)),
                             ],
@@ -547,7 +585,7 @@ if (!function_exists('fnotif_build_list')) {
                         break;
 
                     case 'Overdue':
-                        $dueTs    = strtotime($r['return_date']);
+                        $dueTs    = fnotif_date_ts($conn, $r['return_date']);
                         $daysLate = max(0, (int)floor(($now - $dueTs) / 86400));
                         $lateStr  = $daysLate . ' day' . ($daysLate !== 1 ? 's' : '');
                         $add([
@@ -573,14 +611,17 @@ if (!function_exists('fnotif_build_list')) {
                         break;
 
                     case 'Returned':
-                        $retTs = !empty($r['returned_at']) ? strtotime($r['returned_at'])
-                            : (!empty($r['log_at']) ? strtotime($r['log_at']) : strtotime($r['return_date']));
+                        $retTs = !empty($r['returned_at'])
+                            ? fnotif_db_timestamp($conn, $r['returned_at'], $now)
+                            : (!empty($r['log_at'])
+                                ? fnotif_db_timestamp($conn, $r['log_at'], $now)
+                                : fnotif_date_ts($conn, $r['return_date']));
                         if ($retTs < $windowTs) break;
                         // Judged against when it was ORIGINALLY due: an extension never makes a late return look on time
                         $hasOrig   = !empty($r['original_return_date']);
                         $dueDateOn = $hasOrig ? $r['original_return_date'] : $r['return_date'];
                         $dueTimeOn = $hasOrig ? ($r['original_return_time'] ?? '') : '';
-                        $onTime = $retTs <= strtotime($dueDateOn . ' ' . ($dueTimeOn !== '' && $dueTimeOn !== null ? $dueTimeOn : '23:59:59'));
+                        $onTime = $retTs <= fnotif_date_ts($conn, $dueDateOn, ($dueTimeOn !== '' && $dueTimeOn !== null) ? $dueTimeOn : '23:59:59');
                         $extN   = (int)($r['extension_count'] ?? 0);
                         $add([
                             'key' => 'returned-' . $id,
@@ -593,7 +634,7 @@ if (!function_exists('fnotif_build_list')) {
                             'detail' => [
                                 $d('Equipment', $equip),
                                 $d('Borrow Date', $borrowStr),
-                                $d('Due Date', $hasOrig ? date('M j, Y', strtotime($dueDateOn)) . ' (original)' : $returnStr),
+                                $d('Due Date', $hasOrig ? date('M j, Y', fnotif_date_ts($conn, $dueDateOn)) . ' (original)' : $returnStr),
                                 $d('Extensions', $extN > 0 ? ($extN === 1 ? 'Extended once, until ' : 'Extended ' . $extN . ' times, until ') . $returnStr : ''),
                                 $d('Returned On', date('M j, Y g:i A', $retTs)),
                                 $d('Timeliness', $onTime ? 'Returned on time' : 'Returned after the due date', !$onTime),
@@ -640,12 +681,12 @@ if (!function_exists('fnotif_build_list')) {
                     $id     = (int)$r['id'];
                     $status = trim((string)$r['status']);
                     $room   = (string)$r['room_name'];
-                    $reqTs  = strtotime($r['request_date']) ?: $now;
-                    $startTs = strtotime($r['reservation_date'] . ' ' . $r['start_time']);
-                    $endTs   = strtotime($r['reservation_date'] . ' ' . $r['end_time']);
-                    $dateStr = date('M j, Y', strtotime($r['reservation_date']));
+                    $reqTs  = fnotif_db_timestamp($conn, $r['request_date'] ?? null, $now);
+                    $startTs = fnotif_date_ts($conn, $r['reservation_date'], $r['start_time']);
+                    $endTs   = fnotif_date_ts($conn, $r['reservation_date'], $r['end_time']);
+                    $dateStr = date('M j, Y', fnotif_date_ts($conn, $r['reservation_date']));
                     $timeStr = date('g:i A', $startTs) . ' – ' . date('g:i A', $endTs);
-                    $slot    = date('M j', strtotime($r['reservation_date'])) . ', ' . $timeStr;
+                    $slot    = date('M j', fnotif_date_ts($conn, $r['reservation_date'])) . ', ' . $timeStr;
                     $common = [
                         $d('Room', $room),
                         $d('Location', $r['floor_label'] . ', ' . $r['building_name']),
@@ -674,7 +715,7 @@ if (!function_exists('fnotif_build_list')) {
                             ]);
                         }
                         // Reminder: today (not yet over) or tomorrow
-                        $dayDiff = (int)round((strtotime($r['reservation_date']) - $todayTs) / 86400);
+                        $dayDiff = (int)round((fnotif_date_ts($conn, $r['reservation_date']) - $todayTs) / 86400);
                         if (($dayDiff === 0 && $endTs >= $now) || $dayDiff === 1) {
                             $isToday = $dayDiff === 0;
                             $add([
@@ -711,7 +752,9 @@ if (!function_exists('fnotif_build_list')) {
                             'link' => $resvLink,
                         ]);
                     } elseif ($status === 'Cancelled') {
-                        $cTs = !empty($r['cancelled_at']) ? (strtotime($r['cancelled_at']) ?: $reqTs) : $reqTs;
+                        $cTs = !empty($r['cancelled_at'])
+                            ? fnotif_db_timestamp($conn, $r['cancelled_at'], $reqTs)
+                            : $reqTs;
                         if ($cTs < $windowTs) continue;
                         $add([
                             'key' => 'roomcancelled-' . $id,
@@ -766,13 +809,13 @@ if (!function_exists('fnotif_build_list')) {
                 while ($r = $res->fetch_assoc()) {
                     $id      = (int)$r['id'];
                     $room    = (string)$r['room_name'];
-                    $joinTs  = strtotime($r['created_at']) ?: $now;
+                    $joinTs  = fnotif_db_timestamp($conn, $r['created_at'] ?? null, $now);
                     $timeStr = date('g:i A', strtotime($r['start_time'])) . ' – ' . date('g:i A', strtotime($r['end_time']));
-                    $slot    = date('M j', strtotime($r['reservation_date'])) . ', ' . $timeStr;
+                    $slot    = date('M j', fnotif_date_ts($conn, $r['reservation_date'])) . ', ' . $timeStr;
                     $common = [
                         $d('Room', $room),
                         $d('Location', $r['floor_label'] . ', ' . $r['building_name']),
-                        $d('Date', date('M j, Y', strtotime($r['reservation_date']))),
+                        $d('Date', date('M j, Y', fnotif_date_ts($conn, $r['reservation_date']))),
                         $d('Time', $timeStr),
                         $d('Joined Waitlist', date('M j, Y g:i A', $joinTs)),
                     ];
@@ -834,7 +877,7 @@ if (!function_exists('fnotif_build_list')) {
                     $id     = (int)$r['id'];
                     $status = trim((string)$r['status']);
                     $room   = (string)$r['room_name'];
-                    $crTs   = strtotime($r['created_at']) ?: $now;
+                    $crTs   = fnotif_db_timestamp($conn, $r['created_at'] ?? null, $now);
                     $snip   = fnotif_clip((string)$r['description'], 90);
                     $common = [
                         $d('Room', $room),
@@ -855,7 +898,9 @@ if (!function_exists('fnotif_build_list')) {
                             'link'   => $roomsLink,
                         ]);
                     } elseif ($status === 'Resolved' || $status === 'Dismissed') {
-                        $doneTs = !empty($r['resolved_at']) ? (strtotime($r['resolved_at']) ?: $crTs) : $crTs;
+                        $doneTs = !empty($r['resolved_at'])
+                            ? fnotif_db_timestamp($conn, $r['resolved_at'], $crTs)
+                            : $crTs;
                         if ($doneTs < $windowTs) continue;
                         $isRes = $status === 'Resolved';
                         $note  = trim((string)($r['admin_notes'] ?? ''));
@@ -892,7 +937,7 @@ if (!function_exists('fnotif_build_list')) {
 
             if ($u) {
                 if (!empty($u['last_password_change'])) {
-                    $pwTs = strtotime($u['last_password_change']);
+                    $pwTs = fnotif_db_timestamp($conn, $u['last_password_change'], $now);
                     if ($pwTs && $pwTs >= $now - 14 * 86400) {
                         $add([
                             'key' => 'passchange-' . $pwTs,
@@ -908,21 +953,24 @@ if (!function_exists('fnotif_build_list')) {
                 }
 
                 if (!empty($u['email']) && fnotif_table_exists($conn, 'tbl_login_attempts')) {
-                    $since = date('Y-m-d H:i:s', $now - 7 * 86400);
                     $stmt = $conn->prepare(
                         "SELECT COALESCE(SUM(attempt_count), 0) AS attempts, MAX(last_attempt) AS last_at, MAX(locked_until) AS locked_until
                            FROM tbl_login_attempts
-                          WHERE identifier = ? AND login_ok = 0 AND attempt_count > 0 AND last_attempt >= ?"
+                          WHERE identifier = ? AND login_ok = 0 AND attempt_count > 0
+                            AND last_attempt >= DATE_SUB(NOW(), INTERVAL 7 DAY)"
                     );
-                    $stmt->bind_param('ss', $u['email'], $since);
+                    $stmt->bind_param('s', $u['email']);
                     $stmt->execute();
                     $la = $stmt->get_result()->fetch_assoc();
                     $stmt->close();
 
                     if ($la && (int)$la['attempts'] > 0 && !empty($la['last_at'])) {
                         $n      = (int)$la['attempts'];
-                        $lastTs = strtotime($la['last_at']);
-                        $locked = !empty($la['locked_until']) && strtotime($la['locked_until']) > $now;
+                        $lastTs = fnotif_db_timestamp($conn, $la['last_at'], $now);
+                        $lockedUntilTs = !empty($la['locked_until'])
+                            ? fnotif_db_timestamp($conn, $la['locked_until'], $now)
+                            : null;
+                        $locked = $lockedUntilTs !== null && $lockedUntilTs > $now;
                         $add([
                             'key' => 'failedlogin-' . $lastTs,
                             'cat' => 'system',
@@ -936,7 +984,7 @@ if (!function_exists('fnotif_build_list')) {
                             'detail' => [
                                 $d('Failed Attempts', $n, $n >= 5),
                                 $d('Most Recent', date('M j, Y g:i A', $lastTs)),
-                                $d('Account Lockout', $locked ? 'Temporarily locked until ' . date('g:i A', strtotime($la['locked_until'])) : ''),
+                                $d('Account Lockout', $locked ? 'Temporarily locked until ' . date('g:i A', $lockedUntilTs) : ''),
                             ],
                         ]);
                     }
@@ -961,7 +1009,7 @@ if (!function_exists('fnotif_build_list')) {
                 $stmt->execute();
                 $res = $stmt->get_result();
                 while ($notice = $res->fetch_assoc()) {
-                    $sentTs = strtotime((string)$notice['created_at']) ?: $now;
+                    $sentTs = fnotif_db_timestamp($conn, $notice['created_at'] ?? null, $now);
                     $add([
                         'key'        => 'adminnotice-' . (int)$notice['id'],
                         'cat'        => 'overdue',
