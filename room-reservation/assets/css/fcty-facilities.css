@@ -3800,3 +3800,45 @@ button.fcty-open-chip {
 .fcty-doc[open] > summary {
     margin-bottom: 8px;
 }
+
+/* Duration dropdown + gear: the gear swaps Duration for an End time list (whole hours only) */
+.fcty-dur-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.fcty-dur-row .fcty-input {
+    flex: 1;
+    min-width: 0;
+}
+
+.fcty-gear-btn {
+    display: inline-grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--fcty-line);
+    border-radius: 10px;
+    background: var(--fcty-card);
+    color: var(--fcty-muted);
+    cursor: pointer;
+    transition: border-color .18s, background .18s, color .18s;
+}
+
+.fcty-gear-btn .material-symbols-outlined {
+    font-size: 20px;
+}
+
+.fcty-gear-btn:hover,
+.fcty-gear-btn:focus-visible {
+    border-color: var(--fcty-brand);
+    color: var(--color-primary, #800000);
+}
+
+.fcty-gear-btn.is-on {
+    border-color: var(--fcty-brand);
+    background: color-mix(in srgb, var(--fcty-brand) 8%, var(--fcty-card));
+    color: var(--color-primary, #800000);
+}

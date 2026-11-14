@@ -60,18 +60,21 @@
                     <!-- Request letter: only for a later date, recommended, never required -->
                     <div class="form-group bm-letter" id="bfLetter" hidden>
                         <span class="form-label">Request letter <span class="bm-opt">Recommended</span></span>
-                        <label class="bm-drop" for="request_document">
-                            <span class="material-symbols-outlined bm-drop-icon" aria-hidden="true">upload_file</span>
-                            <span class="bm-drop-text">
-                                <strong data-bm-drop-title>Choose a file or drag it here</strong>
-                                <small>PDF, JPG, PNG or WEBP &middot; max 5 MB</small>
-                            </span>
-                            <input type="file" id="request_document" name="request_document"
-                                accept=".pdf,.jpg,.jpeg,.png,.webp">
-                        </label>
-                        <button type="button" class="pslc-trigger" data-letter-camera="request_document">
-                            <span class="material-symbols-outlined" aria-hidden="true">photo_camera</span> Take a photo of the letter
-                        </button>
+                        <div class="pslc-pair">
+                            <label class="bm-drop" for="request_document">
+                                <span class="material-symbols-outlined bm-drop-icon" aria-hidden="true">upload_file</span>
+                                <span class="bm-drop-text">
+                                    <strong data-bm-drop-title>Upload a file</strong>
+                                    <small>PDF, JPG, PNG or WEBP &middot; max 5 MB</small>
+                                </span>
+                                <input type="file" id="request_document" name="request_document"
+                                    accept=".pdf,.jpg,.jpeg,.png,.webp">
+                            </label>
+                            <button type="button" class="pslc-trigger" data-letter-camera="request_document">
+                                <span class="material-symbols-outlined" aria-hidden="true">photo_camera</span>
+                                <span class="pslc-trigger-text"><strong>Take a photo</strong><small>Use your camera</small></span>
+                            </button>
+                        </div>
                         <p class="bm-hint">Recommended for bookings on a later date. You can still submit without one.</p>
                     </div>
 
