@@ -3,7 +3,7 @@ require_once __DIR__ . '/../../config/security-headers.php';
 
 /**
  * update-profile.php
- * AJAX endpoint — handles account updates (name, department), password changes, backup email,
+ * AJAX endpoint — handles account updates (name, department), password changes,
  * faculty ID and profile pictures.
  * Place this file inside: includes/update-profile.php
  */
@@ -383,41 +383,6 @@ if ($action === 'change_password') {
     exit;
 }
 
-/* ══════════════════════════════════════════════════════════════════
-   ACTION: update_backup_email
-   Adds, changes or clears the backup email (it is never locked)
-══════════════════════════════════════════════════════════════════ */
-if ($action === 'update_backup_email') {
-    $backup_email = trim($_POST['backup_email'] ?? '');
-
-    // Leaving it empty removes the backup email; anything else must be a valid address.
-    if ($backup_email !== '') {
-        if (strlen($backup_email) > 254 || !filter_var($backup_email, FILTER_VALIDATE_EMAIL)) {
-            echo json_encode(['success' => false, 'msg' => 'Invalid email format.']);
-            exit;
-        }
-        $own = mysqli_fetch_assoc(mysqli_query($conn, "SELECT email FROM tbl_users WHERE faculty_id='$uid' LIMIT 1"));
-        if ($own && strtolower($backup_email) === strtolower((string)$own['email'])) {
-            echo json_encode(['success' => false, 'msg' => 'Your backup email must be different from your PUPSync email.']);
-            exit;
-        }
-    }
-
-    $backup_esc = mysqli_real_escape_string($conn, $backup_email);
-    $backup_sql = $backup_email === '' ? 'NULL' : "'$backup_esc'";
-
-    if (mysqli_query($conn, "UPDATE tbl_users SET backup_email=$backup_sql WHERE faculty_id='$uid'")) {
-        echo json_encode([
-            'success' => true,
-            'msg' => $backup_email === '' ? 'Backup email removed.' : 'Backup email saved.',
-            'backup_email' => $backup_email
-        ]);
-    } else {
-        echo json_encode(['success' => false, 'msg' => 'Failed to update backup email.']);
-    }
-    exit;
-}
-
 /* ------------------------------------------------------------------
    ACTION: check_faculty_id / set_faculty_id
    A faculty member sets their own Faculty ID ONCE. Admins cannot edit it and
@@ -651,11 +616,11 @@ if ($action === 'remove_profile_picture') {
 if ($action === 'get_completion_status') {
     $user = mysqli_fetch_assoc(mysqli_query(
         $conn,
-        "SELECT fullname, email, backup_email, department, profile_picture
+        "SELECT fullname, email, department, profile_picture
          FROM tbl_users WHERE faculty_id='$uid' LIMIT 1"
     )) ?: [];
 
-    $fields = ['fullname', 'email', 'backup_email', 'department', 'profile_picture'];
+    $fields = ['fullname', 'email', 'department', 'profile_picture'];
     $total_fields = count($fields);
     $completed_fields = 0;
     foreach ($fields as $field) {

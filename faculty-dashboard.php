@@ -26,8 +26,6 @@ require __DIR__ . '/settings/core/faculty-data.php';
 require __DIR__ . '/equipment-booking/core/faculty-equipment-data.php';
 
 $masked_email       = maskEmail($db_email);
-$masked_backup      = maskEmail($db_backup_email);
-$backup_locked      = !empty($db_backup_email);
 $department_locked  = !empty($db_department);
 $profile_pic_file = basename(str_replace('\\', '/', trim($db_profile_pic)));
 $profile_pic_path = __DIR__ . '/uploads/profile_pictures/' . $profile_pic_file;

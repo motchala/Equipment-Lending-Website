@@ -21,12 +21,19 @@
  * 12:01 AM of its own reservation day has no "before the day" left, so its deadline is
  * its start time.
  *
+ * The Super Admin can change this (Settings → Arbitration → Reservation rules):
+ *   day   (default) the rule above
+ *   start           the deadline is always the start time the requester asked for
+ *   never           nothing is declined automatically; an admin has to decide every request
+ *
  * There is no cron job in this project, so this runs lazily - at the top of every
  * read that depends on it (admin Reservations list, the review endpoint, the faculty
  * My Activity feed, the room limit check). It is cheap (one indexed-ish SELECT), safe
  * to call any number of times and race-safe (each row is only declined if it is still
  * Waiting at that instant).
  */
+
+require_once __DIR__ . '/room-rules.php';   // Settings → Arbitration → "Undecided later-date requests"
 
 if (!defined('PS_ROOM_EXPIRY_RULE')) {
     // Stored in tbl_room_arbitration_log.rule_applied so the admin Activity feed and the
@@ -48,6 +55,12 @@ if (!defined('PS_ROOM_EXPIRY_REASON_START')) {
  */
 function ps_room_expire_unreviewed(mysqli $conn, ?DateTimeInterface $now = null): int
 {
+    RoomRules::load($conn);
+    $mode = RoomRules::expiryMode();
+    if ($mode === 'never') {
+        return 0;   // the Super Admin turned automatic declining off
+    }
+
     $tz  = new DateTimeZone('Asia/Manila');
     $now = $now ?: new DateTimeImmutable('now', $tz);
     $now_s = $now->format('Y-m-d H:i:s');
@@ -56,6 +69,14 @@ function ps_room_expire_unreviewed(mysqli $conn, ?DateTimeInterface $now = null)
     try {
         // request_date is compared with the deadline on the DB side so both values live
         // in the same clock; "now" is the Manila wall clock the rest of the app uses.
+        $deadline_sql = $mode === 'start'
+            ? "(? >= TIMESTAMP(rr.reservation_date, rr.start_time))"
+            : "(
+                      (COALESCE(rr.request_date, '1970-01-01 00:00:00') <  TIMESTAMP(rr.reservation_date, '00:01:00')
+                        AND ? >= TIMESTAMP(rr.reservation_date, '00:01:00'))
+                   OR (COALESCE(rr.request_date, '1970-01-01 00:00:00') >= TIMESTAMP(rr.reservation_date, '00:01:00')
+                        AND ? >= TIMESTAMP(rr.reservation_date, rr.start_time))
+                )";
         $sel = $conn->prepare(
             "SELECT rr.id, rr.room_id, rr.faculty_id, rr.faculty_name, r.room_name,
                     (COALESCE(rr.request_date, '1970-01-01 00:00:00')
@@ -63,23 +84,22 @@ function ps_room_expire_unreviewed(mysqli $conn, ?DateTimeInterface $now = null)
                FROM tbl_room_reservations rr
                JOIN tbl_rooms r ON r.room_id = rr.room_id
               WHERE rr.status = 'Waiting'
-                AND (
-                      (COALESCE(rr.request_date, '1970-01-01 00:00:00') <  TIMESTAMP(rr.reservation_date, '00:01:00')
-                        AND ? >= TIMESTAMP(rr.reservation_date, '00:01:00'))
-                   OR (COALESCE(rr.request_date, '1970-01-01 00:00:00') >= TIMESTAMP(rr.reservation_date, '00:01:00')
-                        AND ? >= TIMESTAMP(rr.reservation_date, rr.start_time))
-                )"
+                AND " . $deadline_sql
         );
         if (!$sel) {
             return 0;
         }
-        $sel->bind_param('ss', $now_s, $now_s);
+        if ($mode === 'start') {
+            $sel->bind_param('s', $now_s);
+        } else {
+            $sel->bind_param('ss', $now_s, $now_s);
+        }
         $sel->execute();
         $rows = $sel->get_result()->fetch_all(MYSQLI_ASSOC);
         $sel->close();
 
         foreach ($rows as $row) {
-            $reason = ((int)$row['submitted_on_the_day'] === 1) ? PS_ROOM_EXPIRY_REASON_START : PS_ROOM_EXPIRY_REASON_DAY;
+            $reason = ($mode === 'start' || (int)$row['submitted_on_the_day'] === 1) ? PS_ROOM_EXPIRY_REASON_START : PS_ROOM_EXPIRY_REASON_DAY;
 
             $upd = $conn->prepare("UPDATE tbl_room_reservations SET status = 'Declined', reason = ? WHERE id = ? AND status = 'Waiting'");
             if (!$upd) {

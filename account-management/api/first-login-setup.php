@@ -7,12 +7,12 @@ ini_set('display_errors', '0');
  * Saves the one-time setup a NEW faculty account must finish before it can be used
  * (screen: faculty-setup.php). In ONE statement it:
  *   - replaces the generated password with the person's own,
- *   - saves the essential details (department, mobile number, optional backup email),
+ *   - saves the essential details (department),
  *   - clears tbl_users.must_change_password, which unlocks the account for good.
  * Doing it all at once means there is never a half-finished state to resume from, and the
  * WHERE must_change_password = 1 makes a double click (or a replayed request) harmless.
  *
- * POST: csrf_token, new_password, confirm_password, department, backup_email (optional)
+ * POST: csrf_token, new_password, confirm_password, department
  * JSON: { success, msg, field?, redirect? }
  */
 
@@ -58,7 +58,7 @@ $faculty_id = (string)$_SESSION['faculty_id'];
 // ── Current account ─────────────────────────────────────────────────────────
 $cur = null;
 try {
-    $sel = $conn->prepare('SELECT email, password, must_change_password, department, backup_email FROM tbl_users WHERE faculty_id = ? LIMIT 1');
+    $sel = $conn->prepare('SELECT email, password, must_change_password, department FROM tbl_users WHERE faculty_id = ? LIMIT 1');
     if ($sel) {
         $sel->bind_param('s', $faculty_id);
         $sel->execute();
@@ -119,19 +119,6 @@ if ($cur_dept !== '') {
     }
 }
 
-// Backup email: optional and never locked (it can be changed any time in Settings).
-$backup_in = strtolower(trim((string)($_POST['backup_email'] ?? '')));
-$backup    = null;
-if ($backup_in !== '') {
-    if (strlen($backup_in) > 254 || !filter_var($backup_in, FILTER_VALIDATE_EMAIL)) {
-        $fail('Enter a valid backup email address, or leave it empty.', 'backup_email');
-    }
-    if ($backup_in === strtolower((string)$cur['email'])) {
-        $fail('Your backup email must be different from your PUPSync email.', 'backup_email');
-    }
-    $backup = $backup_in;
-}
-
 // ── Save everything at once ──────────────────────────────────────────────────
 $hash = password_hash($new_pw, PASSWORD_DEFAULT);
 $now  = date('Y-m-d H:i:s');
@@ -139,13 +126,13 @@ try {
     $upd = $conn->prepare(
         'UPDATE tbl_users
             SET password = ?, last_password_change = ?, must_change_password = 0,
-                department = ?, backup_email = ?
+                department = ?
           WHERE faculty_id = ? AND must_change_password = 1'
     );
     if (!$upd) {
         throw new RuntimeException('prepare failed: ' . $conn->error);
     }
-    $upd->bind_param('sssss', $hash, $now, $department, $backup, $faculty_id);
+    $upd->bind_param('ssss', $hash, $now, $department, $faculty_id);
     $upd->execute();
     $changed = $upd->affected_rows;
     $upd->close();

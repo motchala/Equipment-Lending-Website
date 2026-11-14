@@ -113,6 +113,12 @@ if ($changed) {
         'equip_immediate_grace_min'      => 'same-day grace',
         'equip_cancel_cutoff_min'        => 'cancellation cutoff',
         'equip_durations'                => 'booking lengths',
+        'room_max_active'                => 'room reservations per faculty',
+        'room_max_advance_weeks'         => 'room booking-ahead limit',
+        'room_cancel_cutoff_min'         => 'room cancellation cutoff',
+        'room_same_day_auto'             => 'same-day room confirmation',
+        'room_letter_required'           => 'room request letter requirement',
+        'room_expiry_mode'               => 'undecided room requests',
     ];
     $names = [];
     foreach ($changed as $key) {

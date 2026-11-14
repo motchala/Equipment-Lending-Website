@@ -8,7 +8,7 @@ if (($_GET['fragment'] ?? '') === 'faculty-tbody') {
 
     $fac_rows = [];
     $fac_result = $conn->query(
-        "SELECT u.fullname, u.email, u.backup_email, u.faculty_id"
+        "SELECT u.fullname, u.email, u.faculty_id"
             . " FROM tbl_users u"
             . " ORDER BY u.fullname ASC"
     );
@@ -32,7 +32,6 @@ if (($_GET['fragment'] ?? '') === 'faculty-tbody') {
             <tr
                 data-fullname="<?= htmlspecialchars($frow['fullname']) ?>"
                 data-email="<?= htmlspecialchars($frow['email']) ?>"
-                data-backup-email="<?= htmlspecialchars($frow['backup_email'] ?? '') ?>"
                 data-faculty-id="<?= htmlspecialchars($frow['faculty_id']) ?>"
                 data-init="<?= htmlspecialchars($initFac) ?>">
                 <td>

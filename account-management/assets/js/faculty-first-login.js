@@ -25,7 +25,6 @@
         newPw: $('fsNewPassword'),
         confirmPw: $('fsConfirmPassword'),
         dept: $('fsDepartment'),
-        backup: $('fsBackupEmail'),
         meter: $('fsMeter'),
         meterLabel: $('fsMeterLabel'),
         rules: $('fsPwHelp'),
@@ -215,18 +214,12 @@
     }
 
     function validateStep2() {
-        ['department', 'backup_email'].forEach(clearFieldError);
+        clearFieldError('department');
 
         if (el.dept && el.dept.tagName === 'SELECT' && !el.dept.value) {
             return fail('department', 'Select your department.');
         }
 
-        if (el.backup && el.backup.name === 'backup_email') {
-            var be = el.backup.value.trim();
-            if (be && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(be)) {
-                return fail('backup_email', 'Enter a valid backup email address, or leave it empty.');
-            }
-        }
         return true;
     }
 
@@ -322,7 +315,6 @@
         clearFieldError('confirm_password');
     });
     if (el.dept) el.dept.addEventListener('change', function () { clearFieldError('department'); });
-    if (el.backup) el.backup.addEventListener('input', function () { clearFieldError('backup_email'); });
 
     // show / hide password
     Array.prototype.forEach.call(document.querySelectorAll('[data-eye-for]'), function (btn) {

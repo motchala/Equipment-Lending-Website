@@ -103,11 +103,7 @@ $today = new DateTimeImmutable('today', new DateTimeZone('Asia/Manila'));
 if ($date_obj < $today) {
     slot_respond(400, ['error' => 'date cannot be in the past.']);
 }
-// Max 21 days ahead
-$max_date = $today->modify('+21 days');
-if ($date_obj > $max_date) {
-    slot_respond(400, ['error' => 'date cannot be more than 21 days in the future.']);
-}
+// How far ahead is checked below, once the Arbitration settings can be read
 
 // ── Validate start_time ───────────────────────────────────────────────────────
 $start_time = trim((string)($body['start_time'] ?? ''));
@@ -134,6 +130,14 @@ if ($end_time > '20:00') {
 require_once __DIR__ . '/../../config/db.php';
 $conn = getDB();
 $conn->set_charset('utf8mb4');
+
+// ── How far ahead a room can be reserved (Settings → Arbitration → Reservation rules) ──
+require_once __DIR__ . '/../core/room-rules.php';
+RoomRules::load($conn);
+$advance_err = RoomRules::advanceError($date_obj->format('Y-m-d'));
+if ($advance_err !== null) {
+    slot_respond(400, ['error' => $advance_err]);
+}
 
 // ── Get all bookable rooms for this campus ────────────────────────────────────
 $rooms_stmt = $conn->prepare(

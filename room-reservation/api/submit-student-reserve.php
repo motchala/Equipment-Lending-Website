@@ -77,6 +77,14 @@ if ($start_time < '07:00' || $end_time > '20:00') {
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../core/room-quota.php';
 $conn = getDB();
+RoomRules::load($conn);   // Settings → Arbitration → Reservation rules
+
+// ── How far ahead a room can be reserved ────────────────────────────────────
+$advance_err = RoomRules::advanceError($res_date);
+if ($advance_err !== null) {
+    echo json_encode(['error' => $advance_err]);
+    exit();
+}
 
 // ── Re-verify code still unused (race-condition guard) ────────────────────
 $chk = $conn->prepare("SELECT id FROM tbl_faculty_codes WHERE id = ? AND is_used = 0 LIMIT 1");
@@ -110,14 +118,14 @@ $room_name = $room_row['room_name'];
 // Student-authorized reservations use the same faculty account limit and lock as faculty submissions.
 fcty_quota_lock($conn, $faculty_id);
 $active_now = fcty_active_room_reservations($conn, $faculty_id);
-if (count($active_now) >= FCTY_MAX_ACTIVE_ROOM_RESERVATIONS) {
+if (count($active_now) >= RoomRules::maxActive()) {
     fcty_quota_unlock($conn, $faculty_id);
     echo json_encode([
         'error' => 'The authorizing faculty account has reached its limit of '
-            . FCTY_MAX_ACTIVE_ROOM_RESERVATIONS . ' active room reservations. Please ask the faculty member to cancel one or wait until one ends.',
+            . RoomRules::maxActive() . ' active room reservations. Please ask the faculty member to cancel one or wait until one ends.',
         'limit_reached' => true,
         'active' => count($active_now),
-        'max' => FCTY_MAX_ACTIVE_ROOM_RESERVATIONS,
+        'max' => RoomRules::maxActive(),
     ]);
     exit();
 }
@@ -125,9 +133,10 @@ if (count($active_now) >= FCTY_MAX_ACTIVE_ROOM_RESERVATIONS) {
 // ── Insert reservation ────────────────────────────────────────────────────
 // Same-day: Approved at once (the engine may flip it to Declined). A LATER DATE waits for an admin.
 require_once __DIR__ . '/../core/room-expiry.php';
-$is_future_day  = ps_room_is_future_date($res_date);
-$initial_status = $is_future_day ? 'Waiting' : 'Approved';
-if ($is_future_day) {
+$is_future_day   = ps_room_is_future_date($res_date);
+$hold_for_review = RoomRules::holdsForReview($res_date);   // later date, or same-day when auto-confirm is off
+$initial_status  = $hold_for_review ? 'Waiting' : 'Approved';
+if ($hold_for_review) {
     ps_room_ensure_waiting_status($conn);
 }
 $notes_val = $notes !== '' ? $notes : null;
@@ -193,7 +202,7 @@ if ($letter_path !== null) {
 
 // ── Run Arbitration Engine ────────────────────────────────────────────────
 require_once __DIR__ . '/../../equipment-booking/core/arbitration-engine.php';
-ArbitrationEngine::processRoomReservation($conn, $reservation_id, $is_future_day);
+ArbitrationEngine::processRoomReservation($conn, $reservation_id, $hold_for_review);
 
 // ── A declined reservation is never kept: tell the student on the spot ────
 // (the code is NOT marked used, so they can pick another slot with the same code)

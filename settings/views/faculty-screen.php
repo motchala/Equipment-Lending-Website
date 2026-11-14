@@ -108,18 +108,10 @@
                         <h3>Login &amp; Security</h3>
                     </div>
                     <div class="info-row">
-                        <span class="info-lbl">Primary Email</span>
+                        <span class="info-lbl">Email Address</span>
                         <span class="info-val <?php echo $masked_email ? '' : 'empty'; ?>">
                             <?php echo $masked_email ?: '— Not provided'; ?>
                         </span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-lbl">Backup Email</span>
-                        <span class="info-val <?php echo $masked_backup ? '' : 'empty'; ?>"
-                            data-field="backup_email">
-                            <?php echo $masked_backup ?: '— Not provided'; ?>
-                        </span>
-                        <button class="btn-inline-action" data-action="open-backup-email-modal"><?php echo $backup_locked ? 'Edit' : 'Add'; ?></button>
                     </div>
                     <div class="info-row">
                         <span class="info-lbl">Password</span>
@@ -367,20 +359,6 @@
                                                 <?php echo $sov_pw_untracked ? '— Not tracked' : htmlspecialchars(date('M d, Y · g:i A', $sov_pw_changed_ts)); ?>
                                             </span>
                                         </div>
-                                    </div>
-                                    <div class="acct-row">
-                                        <span class="acct-row-label">Backup Email</span>
-                                        <div class="acct-row-value">
-                                            <span class="acct-row-static <?php echo $masked_backup ? '' : 'acct-row-static-muted acct-row-not-provided'; ?>">
-                                                <?php echo $masked_backup ? htmlspecialchars($masked_backup) : '— Not provided'; ?>
-                                            </span>
-                                        </div>
-                                        <span class="sov-gated-action-slot">
-                                            <button type="button" class="sov-btn-outline"
-                                                data-action="open-backup-email-modal" data-sov-edit-gated hidden>
-                                                <?php echo $backup_locked ? 'Edit' : 'Add'; ?>
-                                            </button>
-                                        </span>
                                     </div>
                                     <?php
                                     $sov_dev      = faculty_device_info($_SERVER['HTTP_USER_AGENT'] ?? '');
@@ -672,7 +650,7 @@
                                     <span class="material-symbols-outlined help-item-chevron">expand_more</span>
                                 </summary>
                                 <div class="help-item-a">
-                                    Open <strong>Settings</strong> from the sidebar. Click <strong>Edit Profile</strong> to change your name, department and mobile number. Your department can only be chosen once, your Faculty ID is permanent, and your email is managed by the administrator. You can also add a backup email and change your profile photo.<br><br>To change your password, click <strong>Change</strong> under Password &amp; Security. You will need your current password, the new one must be at least 6 characters, and it can be changed once every 7 days. Settings also lets you choose a Light or Dark theme, pick your email alerts, and <strong>Export Data</strong>. If you cannot sign in, contact the administrator.
+                                    Open <strong>Settings</strong> from the sidebar. Click <strong>Edit Profile</strong> to change your name, department and mobile number. Your department can only be chosen once, your Faculty ID is permanent, and your email is managed by the administrator. You can also change your profile photo.<br><br>To change your password, click <strong>Change</strong> under Password &amp; Security. You will need your current password, the new one must be at least 6 characters, and it can be changed once every 7 days. Settings also lets you choose a Light or Dark theme, pick your email alerts, and <strong>Export Data</strong>. If you cannot sign in, contact the administrator.
                                 </div>
                             </details>
 

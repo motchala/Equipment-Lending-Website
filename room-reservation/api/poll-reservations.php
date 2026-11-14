@@ -38,6 +38,8 @@ header('Content-Type: application/json');
 
 require_once __DIR__ . '/../../config/db.php';
 $conn = getDB();
+require_once __DIR__ . '/../core/room-rules.php';
+RoomRules::load($conn);   // Settings → Arbitration: cancellation cutoff
 
 $faculty_id = $_SESSION['faculty_id'];
 
@@ -88,7 +90,7 @@ $now = new DateTime('now', new DateTimeZone('Asia/Manila'));
 $rows = [];
 while ($row = $result->fetch_assoc()) {
     // Compute whether the Cancel button should be shown:
-    // only Approved reservations where start is > 1 hour away.
+    // only Approved reservations that start further away than the cancellation cutoff.
     $canCancel = false;
     if ($row['status'] === 'Approved') {
         $resStart = DateTime::createFromFormat(
@@ -96,7 +98,7 @@ while ($row = $result->fetch_assoc()) {
             $row['reservation_date'] . ' ' . $row['start_time'],
             new DateTimeZone('Asia/Manila')
         );
-        if ($resStart && ($resStart->getTimestamp() - $now->getTimestamp()) > 3600) {
+        if ($resStart && ($resStart->getTimestamp() - $now->getTimestamp()) > RoomRules::cancelCutoffSeconds()) {
             $canCancel = true;
         }
     }

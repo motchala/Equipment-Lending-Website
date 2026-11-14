@@ -53,9 +53,6 @@ function admin_accounts_ensure_schema(mysqli $conn): void
     if (!in_array('session_epoch', $cols, true)) {
         @$conn->query('ALTER TABLE tbl_accounts ADD COLUMN `session_epoch` BIGINT UNSIGNED NOT NULL DEFAULT 0');
     }
-    if (!in_array('backup_email', $cols, true)) {
-        @$conn->query('ALTER TABLE tbl_accounts ADD COLUMN `backup_email` VARCHAR(255) NULL DEFAULT NULL');
-    }
 }
 
 /** True when a dormant_until value is still in the future. */

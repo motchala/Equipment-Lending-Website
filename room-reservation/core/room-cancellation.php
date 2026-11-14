@@ -14,6 +14,7 @@
  */
 
 require_once __DIR__ . '/../../notifications/core/preferences.php';
+require_once __DIR__ . '/room-rules.php';
 
 class RoomCancellation
 {
@@ -28,6 +29,7 @@ class RoomCancellation
   public static function cancel(mysqli $conn, int $reservationId, string $actor): array
   {
     date_default_timezone_set('Asia/Manila');
+    RoomRules::load($conn);
 
     // ── Fetch the reservation ────────────────────────────────────────
     $stmt = $conn->prepare(
@@ -55,7 +57,7 @@ class RoomCancellation
       return ['success' => false, 'error' => 'Only Approved or Waiting reservations can be cancelled.'];
     }
 
-    // ── 1-hour cutoff enforcement (faculty only; admins can cancel anytime before end) ──
+    // ── Cancellation cutoff (Settings → Arbitration; faculty only, admins can cancel anytime before end) ──
     $resStart = new DateTime(
       $row['reservation_date'] . ' ' . $row['start_time'],
       new DateTimeZone('Asia/Manila')
@@ -63,10 +65,10 @@ class RoomCancellation
     $now      = new DateTime('now', new DateTimeZone('Asia/Manila'));
     $diffSecs = $resStart->getTimestamp() - $now->getTimestamp();
 
-    if ($actor !== 'admin' && !$isWaiting && $diffSecs <= 3600) {
+    if ($actor !== 'admin' && !$isWaiting && RoomRules::cancelCutoffSeconds() > 0 && $diffSecs <= RoomRules::cancelCutoffSeconds()) {
       return [
         'success' => false,
-        'error'   => 'Cancellations are not allowed within 1 hour of the reservation start time.',
+        'error'   => 'Cancellations are not allowed within ' . RoomRules::cancelCutoffLabel() . ' of the reservation start time.',
       ];
     }
 

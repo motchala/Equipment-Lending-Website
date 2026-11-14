@@ -168,7 +168,6 @@ function fr_load_profile(mysqli $conn, string $faculty_id, ?string $employment):
         ['Full Name',             $g('fullname')],
         ['Faculty ID',            faculty_id_display($faculty_id, 'Not set yet')],
         ['Email Address',         $g('email')],
-        ['Backup Email',          $g('backup_email')],
         ['Department',            $g('department')],
         ['Employment Status',     (string)$employment],
         ['Account Role',          $g('role')],

@@ -15,6 +15,7 @@ declare(strict_types=1);
  *   int       whole number inside [min, max]
  *   time      'HH:00' (booking times are on the hour)
  *   int_list  comma list such as '1,2,3,6', every number from the allowed set
+ *   enum      one of the allowed words
  *
  * A missing or invalid row falls back to the default, so a fresh database behaves exactly as
  * the system did before these settings existed.
@@ -38,6 +39,14 @@ final class ArbitrationConfig
         'equip_immediate_grace_min'      => ['type' => 'int', 'default' => 15, 'min' => 0, 'max' => 60, 'step' => 5],
         'equip_cancel_cutoff_min'        => ['type' => 'int', 'default' => 60, 'min' => 0, 'max' => 240, 'step' => 15],
         'equip_durations'                => ['type' => 'int_list', 'default' => [1, 2, 3, 6], 'allowed' => [1, 2, 3, 4, 5, 6]],
+
+        // ── Rooms: reservation rules (read through RoomRules) ───────────────
+        'room_max_active'                => ['type' => 'int', 'default' => 2,  'min' => 1, 'max' => 10],
+        'room_max_advance_weeks'         => ['type' => 'int', 'default' => 3,  'min' => 1, 'max' => 8],
+        'room_cancel_cutoff_min'         => ['type' => 'int', 'default' => 60, 'min' => 0, 'max' => 240, 'step' => 15],
+        'room_same_day_auto'             => ['type' => 'bool', 'default' => true],
+        'room_letter_required'           => ['type' => 'bool', 'default' => false],
+        'room_expiry_mode'               => ['type' => 'enum', 'default' => 'day', 'allowed' => ['day', 'start', 'never']],
     ];
 
     /** @var array<string, mixed>|null typed values, per request */
@@ -160,6 +169,14 @@ final class ArbitrationConfig
                 case 'time':
                     if (!is_string($value) || !preg_match('/^([01]\d|2[0-3]):00$/', $value)) {
                         $errors[$key] = 'Choose a time on the hour.';
+                        break;
+                    }
+                    $clean[$key] = $value;
+                    break;
+
+                case 'enum':
+                    if (!is_string($value) || !in_array($value, $def['allowed'], true)) {
+                        $errors[$key] = 'Choose one of the listed options.';
                         break;
                     }
                     $clean[$key] = $value;
@@ -303,6 +320,8 @@ final class ArbitrationConfig
                 return max((int)$def['min'], min((int)$def['max'], (int)$raw));
             case 'time':
                 return preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $raw) ? substr($raw, 0, 2) . ':00' : $def['default'];
+            case 'enum':
+                return in_array($raw, $def['allowed'], true) ? $raw : $def['default'];
             case 'int_list':
                 $nums = [];
                 foreach (explode(',', $raw) as $p) {

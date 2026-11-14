@@ -91,6 +91,8 @@ if (mb_strlen($raw_message) > 500) {
 // ── 10. Database connection ───────────────────────────────────────────────────
 require_once __DIR__ . '/../../config/db.php';
 $conn = getDB();
+require_once __DIR__ . '/../core/room-rules.php';
+RoomRules::load($conn);   // Settings → Arbitration → Reservation rules (the assistant quotes these)
 $conn->set_charset('utf8mb4');
 
 // ── 11. Rate limit (20 messages per rolling hour) ─────────────────────────────
@@ -200,7 +202,9 @@ $wl_rows = $wl_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $wl_stmt->close();
 
 $quota_used = count($res_rows);
-$quota_max  = 2;
+$quota_max  = RoomRules::maxActive();
+$rule_advance_days = RoomRules::maxAdvanceDays();
+$rule_cutoff       = RoomRules::cancelCutoffLabel();
 
 $ctx_reservations = $quota_used === 0
     ? 'None — no active or upcoming reservations.'
@@ -432,9 +436,9 @@ You are PUPSync Room Assistant, an AI assistant for the Polytechnic University o
 
 ## SYSTEM RULES
 - Operating hours: 7:00 AM to 8:00 PM.
-- Maximum advance booking: 21 days from today ({$today_date}).
-- Maximum active reservations per faculty: 2 at the same time.
-- Cancellation: only allowed more than 1 hour before the start time.
+- Maximum advance booking: {$rule_advance_days} days from today ({$today_date}).
+- Maximum active reservations per faculty: {$quota_max} at the same time.
+- Cancellation: only allowed more than {$rule_cutoff} before the start time.
 - A request letter (PDF, JPG, PNG, max 5 MB) is recommended for reservations on a later date. It cannot be attached in this chat — tell the faculty to attach it in the Reserve form instead. Same-day reservations do not need a letter.
 - Student-submitted reservations via faculty code count toward the faculty's quota and appear in the faculty's activity.
 
@@ -468,7 +472,7 @@ The reservation IDs are shown as [ID:12] in the FACULTY CONTEXT above — use th
 
 Follow these rules in order:
 1. No active reservations → tell them there is nothing to cancel. No signal needed.
-2. Reservation starts within 1 hour of now → tell them cancellation is blocked by the 1-hour cutoff rule. No signal.
+2. Reservation starts within {$rule_cutoff} of now → tell them cancellation is blocked by the {$rule_cutoff} cutoff rule. No signal.
 3. "cancel my reservation" or "cancel all" with exactly 1 reservation → ask to confirm, then ADD the exact text: INTENT:cancel_confirm:{id}
 4. "cancel all" with 2 reservations → ask to confirm cancelling both, then ADD: INTENT:cancel_confirm_multi:{id1},{id2}
 5. "cancel my reservation" with 2 reservations and no room specified → ask which one, then ADD: INTENT:cancel_pick
