@@ -1,28 +1,18 @@
     <script nonce="<?php echo $csp_nonce; ?>">
-        /* Activate the restored panel before revealing the content area.
-           The new state is committed while the page is still hidden AND transitions are off
-           (html.admin-tab-pending), then the page is revealed. Otherwise the sidebar highlight would
-           visibly fade from the Dashboard to the real tab, and the screen would slide in again. */
+        /* Reveal the restored screen (after a refresh).
+           1. Put the restored screen in place now, while the page is still hidden (html.admin-tab-pending).
+           2. Reveal only AFTER the page's own start-up has run (admin-dashboard.js init: theme, accent colour,
+              open sub-tabs...). That start-up waits for the deferred scripts, which on a slow host can take seconds;
+              revealing before it showed the Dashboard / a default sub-tab / the wrong theme for a moment. */
         (function() {
             var root = document.documentElement;
-            var tab = window._preJumpTab;
-            if (tab) {
-                var target = document.getElementById('panel-' + tab);
-                if (target) {
-                    var current = document.querySelector('.tab-panel.active');
-                    if (current) current.classList.remove('active');
-                    target.classList.add('active');
-
-                    document.querySelectorAll('.nav-item[data-tab]').forEach(function(item) {
-                        item.classList.toggle('active', item.dataset.tab === tab);
-                    });
-                    var accountToggle = document.getElementById('navAccountToggle');
-                    if (accountToggle) accountToggle.classList.toggle('active', tab === 'settings');
-
-                    root.classList.add('ps-restored');   // the restored screen shows in place, no slide-in
-                    void document.body.offsetWidth;      // commit the new state now, while transitions are still off
-                }
+            if (typeof window.psActivateRestoredScreen === 'function') window.psActivateRestoredScreen();
+            var reveal = function() { root.classList.remove('admin-tab-pending'); };
+            if (window._preJumpTab && document.readyState === 'loading') {
+                // Registered after admin-dashboard.js's own DOMContentLoaded handlers, so it runs after them.
+                document.addEventListener('DOMContentLoaded', reveal);
+            } else {
+                reveal();
             }
-            root.classList.remove('admin-tab-pending');
         })();
     </script>

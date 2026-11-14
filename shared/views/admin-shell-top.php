@@ -23,6 +23,14 @@
     <link rel="stylesheet" href="shared/assets/css/logout-modal.css?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/css/logout-modal.css'); ?>">
     <link rel="stylesheet" href="shared/assets/css/semester-tag.css?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/css/semester-tag.css'); ?>">
     <?php role_splash_head(); ?>
+    <!-- Critical anti-flash rules, inline on purpose: they must be in effect on the very first paint, even if
+         admin-shell.css is slow to arrive or comes from the cache (same rules as the top of that file). -->
+    <style>
+        html.admin-tab-pending #panel-dashboard { display: none !important; }
+        html.admin-tab-pending .app-body { visibility: hidden; }
+        html.admin-tab-pending *, html.admin-tab-pending *::before, html.admin-tab-pending *::after { transition: none !important; }
+        html.ps-restored .tab-panel.active { animation: none !important; }
+    </style>
     <script nonce="<?php echo $csp_nonce; ?>">
         /* Refresh behaviour (admin interface)
            - Soft refresh (F5 / reload button): stay on the screen you are on; an open edit form is dropped.
@@ -35,6 +43,25 @@
             var nav = (window.performance && performance.getEntriesByType) ? performance.getEntriesByType('navigation')[0] : null;
             var isReload = nav ? nav.type === 'reload' : !!(performance.navigation && performance.navigation.type === 1);
             window._adminIsReload = isReload;
+
+            // Puts the restored screen (and its sidebar highlight) in place. Used by the reveal script at the end of the
+            // page and by the safety timers below, so even a late reveal never shows the Dashboard first.
+            window.psActivateRestoredScreen = function() {
+                var tab = window._preJumpTab;
+                if (!tab) return false;
+                var target = document.getElementById('panel-' + tab);
+                if (!target) return false;
+                document.querySelectorAll('.tab-panel.active').forEach(function(p) { if (p !== target) p.classList.remove('active'); });
+                target.classList.add('active');
+                document.querySelectorAll('.nav-item[data-tab]').forEach(function(item) {
+                    item.classList.toggle('active', item.dataset.tab === tab);
+                });
+                var accountToggle = document.getElementById('navAccountToggle');
+                if (accountToggle) accountToggle.classList.toggle('active', tab === 'settings');
+                document.documentElement.classList.add('ps-restored');   // shows in place, no slide-in
+                if (document.body) void document.body.offsetWidth;       // commit now, while transitions are still off
+                return true;
+            };
 
             // Remember a hard-refresh shortcut so the page that loads next knows about it.
             window.addEventListener('keydown', function(e) {
@@ -91,7 +118,7 @@
                 window._adminLeaving = true;
                 // Keep the Dashboard (and its sidebar highlight) from showing while the page reloads once more.
                 document.documentElement.classList.add('admin-tab-pending');
-                setTimeout(function() { document.documentElement.classList.remove('admin-tab-pending'); }, 5000);
+                setTimeout(function() { document.documentElement.classList.remove('admin-tab-pending'); }, 30000);
                 loc.replace(loc.pathname + (qs ? '?' + qs : '') + hash);
                 return;
             }
@@ -118,7 +145,10 @@
             // Safety net: never leave the page hidden if the reveal script below fails to run.
             // It waits for the page to finish loading (a slow connection can take longer than any fixed
             // timeout, and lifting early would flash the Dashboard), then lifts after a short grace.
-            var lift = function() { document.documentElement.classList.remove('admin-tab-pending'); };
+            var lift = function() {
+                window.psActivateRestoredScreen();   // never reveal the Dashboard by accident
+                document.documentElement.classList.remove('admin-tab-pending');
+            };
             window.addEventListener('load', function() { setTimeout(lift, 1500); });
             setTimeout(lift, 20000);
         })();

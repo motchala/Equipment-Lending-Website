@@ -6095,34 +6095,31 @@ function psSelectFmt(btn) {
             var tab = go.getAttribute('data-dash-go');
             var nav = document.querySelector('.nav-item[data-tab="' + tab + '"]');
             if (nav) {
-                nav.click();
-                // Defer sub-panel navigation until the tab panel has activated (next tick).
                 var loanFilter = go.getAttribute('data-dash-loan-filter');
                 var roomsTab = go.getAttribute('data-dash-rooms-tab');
                 var roomsFilter = go.getAttribute('data-dash-rooms-filter');
-                if (loanFilter || roomsTab) {
+                // Facilities cards: choose the target sub-screen (and its filter chip) BEFORE the tab opens,
+                // while #panel-rooms is still hidden, so the tab appears already on Reservations (or wherever
+                // the card points). Doing this after nav.click() flashed the default sub-tab first.
+                if (roomsTab) {
+                    var roomsSubBtn = document.querySelector('#panel-rooms [data-rooms-tab="' + roomsTab + '"]');
+                    if (typeof window.switchRoomsTab === 'function') window.switchRoomsTab(roomsTab);
+                    else if (roomsSubBtn) roomsSubBtn.click();
+                    if (roomsFilter) {
+                        var tabBtn = document.querySelector('#rrTabs [data-rr-tab="' + roomsFilter + '"]');
+                        if (tabBtn) tabBtn.click();
+                    }
+                }
+                nav.click();
+                if (loanFilter) {
+                    // Equipment cards: wait for the tab panel to activate (next tick), then open Loans and apply the filter chip.
                     setTimeout(function () {
-                        if (loanFilter) {
-                            // Navigate to Equipment > Loans tab, then apply the filter chip.
-                            var loanPanel = document.querySelector('#eqTabs .rq-filter-chip[data-eq-panel="eq-onloan"]');
-                            if (loanPanel) loanPanel.click();
-                            setTimeout(function () {
-                                var loanTab = document.querySelector('#eqLoanFilter [data-loan-filter="' + loanFilter + '"]');
-                                if (loanTab) loanTab.click();
-                            }, 80);
-                        }
-                        if (roomsTab) {
-                            // Navigate to the correct Rooms sub-panel (e.g. Reservations).
-                            var roomsSubBtn = document.querySelector('#panel-rooms [data-rooms-tab="' + roomsTab + '"]');
-                            if (typeof window.switchRoomsTab === 'function') window.switchRoomsTab(roomsTab);
-                            else if (roomsSubBtn) roomsSubBtn.click();
-                            if (roomsFilter) {
-                                setTimeout(function () {
-                                    var tabBtn = document.querySelector('#rrTabs [data-rr-tab="' + roomsFilter + '"]');
-                                    if (tabBtn) tabBtn.click();
-                                }, 80);
-                            }
-                        }
+                        var loanPanel = document.querySelector('#eqTabs .rq-filter-chip[data-eq-panel="eq-onloan"]');
+                        if (loanPanel) loanPanel.click();
+                        setTimeout(function () {
+                            var loanTab = document.querySelector('#eqLoanFilter [data-loan-filter="' + loanFilter + '"]');
+                            if (loanTab) loanTab.click();
+                        }, 80);
                     }, 80);
                 }
             }
