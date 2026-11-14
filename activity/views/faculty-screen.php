@@ -22,7 +22,7 @@
                                         (filters and search in the header, page navigation in the footer)
 
                    Where every button lives (so a button is only ever in one place):
-                     page header, top right        Download Report
+                     page header                   title only (no buttons)
                      row action bar (Equipment     only the buttons the row really has, packed left to right:
                        and Room rows)                Claim QR · Return QR · Extend, then the way out
                                                      (Cancel / Withdraw / Leave waitlist) at the far right
@@ -51,9 +51,6 @@
                         <h2 class="myact-title">My Activity</h2>
                         <p class="fact-sub">Your equipment loans and room reservations, all in one place.</p>
                     </div>
-                    <button type="button" class="fact-btn fact-btn-ghost" data-fact-print>
-                        <span class="material-symbols-outlined" aria-hidden="true">download</span>Download Report
-                    </button>
                 </header>
 
                 <!-- ── Next steps: what needs you right now (replaces the summary cards) ── -->

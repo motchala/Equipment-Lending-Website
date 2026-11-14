@@ -639,7 +639,7 @@
                                     <span class="material-symbols-outlined help-item-chevron">expand_more</span>
                                 </summary>
                                 <div class="help-item-a">
-                                    <strong>My Activity</strong> shows your loans and room reservations: ready for pickup, active, overdue, pending, and a searchable history (use <strong>Download Report</strong> to save it). Your <strong>Dashboard</strong> shows what needs your attention and your schedule today. The bell on the Dashboard opens your Notifications.
+                                    <strong>My Activity</strong> shows your loans and room reservations: ready for pickup, active, overdue, pending, and a searchable history. Your <strong>Dashboard</strong> shows what needs your attention and your schedule today. The bell on the Dashboard opens your Notifications.
                                 </div>
                             </details>
 

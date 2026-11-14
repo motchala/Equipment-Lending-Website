@@ -11073,7 +11073,7 @@ body .side-nav .side-nav-user .side-nav-user-name {
    5 rows per page; the page navigation is in the card footer, like every other paginated table.
 
    Where every button lives (a button only ever appears in its own place):
-     page header, top right        Download Report
+     page header                   title only (no buttons)
      header of a card / table      filters and search
      action bar of a row           the buttons the row has, packed left: Claim QR, Return QR, Extend; then
                                    Cancel, Withdraw or Leave waitlist alone at the far right.
@@ -13384,11 +13384,11 @@ html:not(.rx-mobile) #panel-lending .eq-ic-panel {
    (e.g. the default one) made the card grow, and the second card stretched to match it. Now both
    cards share one fixed height, the picture is clipped to its slot (object-fit: cover, drawn
    absolutely so its own proportions cannot push anything), and long text is clamped.
-   Desktop height follows the screen width a little (270-310px); tablets get 320px because the
+   Desktop height follows the screen width a little (300-340px); tablets get 350px because the
    text column is narrower. Phones (<=600px) keep their own compact rows. */
 @media (min-width: 601px) {
     html:not(.rx-mobile) #panel-lending #featuredSection {
-        --feat-h: clamp(270px, 20vw, 310px);
+        --feat-h: clamp(300px, 22vw, 340px);
     }
 
     html:not(.rx-mobile) #panel-lending #featuredSection .featured-grid {
@@ -13457,8 +13457,8 @@ html:not(.rx-mobile) #panel-lending .eq-ic-panel {
 
     /* second card: fixed picture band on top, the rest is its text and button */
     html:not(.rx-mobile) #panel-lending #featuredSection .feat-secondary-img {
-        flex: 0 0 140px;
-        height: 140px;
+        flex: 0 0 160px;
+        height: 160px;
     }
 
     html:not(.rx-mobile) #panel-lending #featuredSection .feat-secondary-body {
@@ -13472,6 +13472,16 @@ html:not(.rx-mobile) #panel-lending .eq-ic-panel {
         -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
         overflow: hidden;
+    }
+
+    /* the right card's Add button: the same height as every other Add button (42px), full width, never stretched */
+    html:not(.rx-mobile) #panel-lending #featuredSection .feat-secondary .bf-slot {
+        flex: none;
+    }
+
+    html:not(.rx-mobile) #panel-lending #featuredSection .feat-secondary .btn-borrow {
+        height: 42px;
+        min-height: 42px;
     }
 
     /* the hero's Add button: big enough for the card it sits on */
@@ -13493,7 +13503,7 @@ html:not(.rx-mobile) #panel-lending .eq-ic-panel {
 
 @media (min-width: 601px) and (max-width: 1100px) {
     html:not(.rx-mobile) #panel-lending #featuredSection {
-        --feat-h: 320px;
+        --feat-h: 350px;
     }
 }
 

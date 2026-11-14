@@ -196,10 +196,6 @@ html.rx-mobile .rxm-bar.is-scrolled {
     display: none;
 }
 
-.rxm-dl[hidden] {
-    display: none;
-}
-
 .rxm-badge {
     position: absolute;
     top: 3px;

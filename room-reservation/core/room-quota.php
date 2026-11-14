@@ -435,7 +435,7 @@ function fact_render_group(string $label, array $itemsHtml): string
 
 /*
  * ── Where every button on My Activity lives ────────────────────────────────
- *   Page header, top right        Download Report                        (nothing else)
+ *   Page header                   title only (no buttons)
  *   Next steps list               no action buttons: each entry only points at the row below
  *                                 where the real button is (it scrolls to it and flashes it)
  *   Card / table header           filters and search                     (nothing else)

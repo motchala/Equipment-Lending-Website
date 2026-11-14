@@ -87,6 +87,7 @@
         while (left > 0) { d = addDays(d, 1); if (d.getDay() !== 0) left--; }
         return ymd(d);
     }
+    function hasStock(name) { return !!(meta().items || {})[name]; }
     function stock(name) {
         var m = (meta().items || {})[name] || {};
         var shelf = Math.max(0, toInt(m.shelf)), total = Math.max(0, toInt(m.total, shelf));
@@ -119,7 +120,7 @@
         }
         if (!item) {
             return '<button type="button" class="' + btn + ' bf-add' + (ahead ? ' btn-borrow-ahead' : '') + '" data-bf="add">' +
-                icon(ahead ? 'event' : 'add') + '<span class="btn-borrow-label">' + (ahead ? 'Book ahead' : (hero ? 'Add to request' : 'Add')) + '</span></button>';
+                icon(ahead ? 'event' : 'add') + '<span class="btn-borrow-label">' + (ahead ? 'Book ahead' : (hero ? 'Add to request' : (slot.classList.contains('bf-slot--block') ? 'Add Item' : 'Add'))) + '</span></button>';
         }
         return stepperHTML(name, item.qty, cardCap(name));
     }
@@ -146,6 +147,9 @@
             card.classList.toggle(card.classList.contains('item-node') ? 'eq-item-card--in-cart' : 'is-picked', on);
         }
         if (slot.getAttribute('data-blocked') === '1') return;   /* overdue: stays as the server drew it */
+        /* no stock figures for this item (the page data did not include it): leave the button as the
+           server drew it instead of guessing "Unavailable" */
+        if (!hasStock(name) && !on) return;
         var sig = slotSig(name);
         if (slot.getAttribute('data-sig') === sig && slot.firstElementChild) return;
         slot.setAttribute('data-sig', sig);

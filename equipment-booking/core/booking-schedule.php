@@ -632,26 +632,35 @@ final class BookingSchedule
     // Stock & schedule
     // ═════════════════════════════════════════════════════════════════════════
 
-    /** @return array<string,int> item_name => total stock (shelf + out on loan) */
+    /**
+     * @return array<string,int> item_name => total stock (shelf + out on loan)
+     *
+     * One figure per item NAME: the booking system is name-based (a request stores only the equipment
+     * name), and the same name can exist once per campus (the sheet sync keeps one row per
+     * name + campus). The shelf quantities of those rows are added up, and the units that are out are
+     * counted once, so a second campus's row can no longer overwrite the first one's figures.
+     */
     public static function totalStockMap(mysqli $conn): array
     {
         $map = [];
         if (self::ensureSchema($conn)) {
-            $sql = "SELECT i.item_name, i.quantity + COALESCE(x.out_qty, 0) AS total
+            $sql = "SELECT i.item_name, SUM(i.quantity) + COALESCE(MAX(x.out_qty), 0) AS total
                       FROM tbl_inventory i
                       LEFT JOIN (SELECT equipment_name, SUM(borrow_qty) AS out_qty
                                    FROM tbl_requests
                                   WHERE status IN ('Approved','On Loan','Overdue') AND stock_applied = 1
                                   GROUP BY equipment_name) x ON x.equipment_name = i.item_name
-                     WHERE i.is_archived = 0";
+                     WHERE i.is_archived = 0
+                     GROUP BY i.item_name";
         } else {
-            $sql = "SELECT i.item_name, i.quantity + COALESCE(x.out_qty, 0) AS total
+            $sql = "SELECT i.item_name, SUM(i.quantity) + COALESCE(MAX(x.out_qty), 0) AS total
                       FROM tbl_inventory i
                       LEFT JOIN (SELECT equipment_name, COUNT(*) AS out_qty
                                    FROM tbl_requests
                                   WHERE status IN ('Approved','On Loan','Overdue')
                                   GROUP BY equipment_name) x ON x.equipment_name = i.item_name
-                     WHERE i.is_archived = 0";
+                     WHERE i.is_archived = 0
+                     GROUP BY i.item_name";
         }
         $res = $conn->query($sql);
         while ($res && ($row = $res->fetch_assoc())) {
