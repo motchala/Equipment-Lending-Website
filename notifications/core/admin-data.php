@@ -184,10 +184,51 @@ if (!function_exists('notif_mark_all_read')) {
     }
 }
 
-if (!function_exists('notif_time_ago')) {
-    function notif_time_ago(string $datetime): string
+if (!function_exists('notif_database_timezone')) {
+    function notif_database_timezone(mysqli $conn): DateTimeZone
     {
-        $diff = time() - strtotime($datetime);
+        static $timezone = null;
+        if ($timezone instanceof DateTimeZone) {
+            return $timezone;
+        }
+
+        $result = $conn->query('SELECT TIMESTAMPDIFF(MINUTE, UTC_TIMESTAMP(), NOW()) AS offset_minutes');
+        $row = $result ? $result->fetch_assoc() : null;
+        if (!$row || !is_numeric($row['offset_minutes'] ?? null)) {
+            error_log('[PUPSync] Unable to determine the database timezone for admin notifications: ' . $conn->error);
+            $timezone = new DateTimeZone(date_default_timezone_get());
+            return $timezone;
+        }
+
+        $offset = (int)$row['offset_minutes'];
+        $absoluteOffset = abs($offset);
+        $timezone = new DateTimeZone(sprintf(
+            '%s%02d:%02d',
+            $offset < 0 ? '-' : '+',
+            intdiv($absoluteOffset, 60),
+            $absoluteOffset % 60
+        ));
+        return $timezone;
+    }
+}
+
+if (!function_exists('notif_datetime')) {
+    function notif_datetime(mysqli $conn, string $datetime): DateTimeImmutable
+    {
+        static $manilaTimezone = null;
+        if ($manilaTimezone === null) {
+            $manilaTimezone = new DateTimeZone('Asia/Manila');
+        }
+
+        $databaseDateTime = new DateTimeImmutable($datetime, notif_database_timezone($conn));
+        return $databaseDateTime->setTimezone($manilaTimezone);
+    }
+}
+
+if (!function_exists('notif_time_ago')) {
+    function notif_time_ago(DateTimeImmutable $datetime): string
+    {
+        $diff = time() - $datetime->getTimestamp();
         if ($diff < 60) return 'Just now';
         if ($diff < 3600) {
             $m = floor($diff / 60);
@@ -197,8 +238,8 @@ if (!function_exists('notif_time_ago')) {
             $h = floor($diff / 3600);
             return $h . ' hour' . ($h != 1 ? 's' : '') . ' ago';
         }
-        if ($diff < 172800) return 'Yesterday, ' . date('g:i A', strtotime($datetime));
-        return date('M d, g:i A', strtotime($datetime));
+        if ($diff < 172800) return 'Yesterday, ' . $datetime->format('g:i A');
+        return $datetime->format('M d, g:i A');
     }
 }
 
@@ -258,6 +299,7 @@ if (!function_exists('notif_build_list')) {
         if ($res) {
             while ($r = $res->fetch_assoc()) {
                 $key = 'request-' . $r['id'];
+                $requestedAt = notif_datetime($conn, (string)$r['request_date']);
                 $items[] = [
                     'key'          => $key,
                     'cat'          => 'request',
@@ -270,14 +312,14 @@ if (!function_exists('notif_build_list')) {
                     'title'        => 'New Borrow Request',
                     'body'         => '<strong>' . htmlspecialchars($r['faculty_name']) . '</strong> requested <strong>'
                         . htmlspecialchars($r['equipment_name']) . '</strong> — awaiting approval.',
-                    'time_label'   => notif_time_ago($r['request_date']),
-                    'sort_ts'      => strtotime($r['request_date']),
+                    'time_label'   => notif_time_ago($requestedAt),
+                    'sort_ts'      => $requestedAt->getTimestamp(),
                     'detail' => [
                         ['label' => 'Borrower', 'value' => $r['faculty_name'] . ' (' . $r['faculty_id'] . ')'],
                         ['label' => 'Equipment', 'value' => $r['equipment_name']],
                         ['label' => 'Borrow Date', 'value' => date('M d, Y', strtotime($r['borrow_date']))],
                         ['label' => 'Return Date', 'value' => date('M d, Y', strtotime($r['return_date']))],
-                        ['label' => 'Requested On', 'value' => date('M d, Y g:i A', strtotime($r['request_date']))],
+                        ['label' => 'Requested On', 'value' => $requestedAt->format('M d, Y g:i A')],
                         ['label' => 'Facility / Instructor', 'value' => ($r['room'] ?? '—') . ' / ' . ($r['instructor'] ?? '—')],
                     ],
                     'view_label' => 'View in Loans',
@@ -308,6 +350,7 @@ if (!function_exists('notif_build_list')) {
             if ($res) {
                 while ($r = $res->fetch_assoc()) {
                     $key = 'roomissue-' . $r['id'];
+                    $reportedAt = notif_datetime($conn, (string)$r['created_at']);
                     $items[] = [
                         'key'          => $key,
                         'cat'          => 'room',
@@ -320,14 +363,14 @@ if (!function_exists('notif_build_list')) {
                         'title'        => 'Issue Reported: ' . $r['room_name'],
                         'body'         => '<strong>' . htmlspecialchars($r['reported_by_name']) . '</strong> reported an issue — '
                             . htmlspecialchars(mb_substr($r['description'], 0, 80)) . (mb_strlen($r['description']) > 80 ? '…' : ''),
-                        'time_label'   => notif_time_ago($r['created_at']),
-                        'sort_ts'      => strtotime($r['created_at']),
+                        'time_label'   => notif_time_ago($reportedAt),
+                        'sort_ts'      => $reportedAt->getTimestamp(),
                         'detail' => [
                             ['label' => 'Facility', 'value' => $r['room_name']],
                             ['label' => 'Location', 'value' => $r['floor_label'] . ', ' . $r['building_name']],
                             ['label' => 'Reported By', 'value' => $r['reported_by_name']],
                             ['label' => 'Description', 'value' => $r['description']],
-                            ['label' => 'Reported At', 'value' => date('M d, Y g:i A', strtotime($r['created_at']))],
+                            ['label' => 'Reported At', 'value' => $reportedAt->format('M d, Y g:i A')],
                         ],
                         'view_label' => 'Review Issue',
                         'link'       => ['tab' => 'rooms', 'sub' => 'rooms-issues', 'issue_id' => (int)$r['id']],
