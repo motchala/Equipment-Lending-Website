@@ -26,9 +26,6 @@
                     <span class="material-symbols-outlined svy-head-ic" aria-hidden="true">star_rate</span>
                     How was our service?
                 </h3>
-                <button type="button" class="modal-close-btn" id="svyClose" aria-label="Close survey">
-                    <span class="material-symbols-outlined">close</span>
-                </button>
             </div>
 
             <div class="modal-body svy-body">
@@ -57,7 +54,6 @@
             </div>
 
             <div class="modal-footer svy-foot">
-                <button type="button" class="btn-cancel-acc" id="svySkip">Skip</button>
                 <button type="button" class="btn-save-acc" id="svySubmit" disabled>
                     <span class="material-symbols-outlined" aria-hidden="true">send</span>
                     Submit

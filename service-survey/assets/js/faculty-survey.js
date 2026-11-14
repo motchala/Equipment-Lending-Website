@@ -7,10 +7,11 @@
  *     service-survey/api/survey-status.php whether a completed transaction is waiting to be rated.
  *  2. Before opening, it claims that transaction through survey-present.php so refreshes cannot show it again.
  *  3. If claimed, it builds one star row per question (1–5, 5 = most satisfied) plus the optional comment box.
- *  4. Submit / Skip go to service-survey/api/survey-submit.php. Nothing identifying is ever added to the answer.
+ *  4. Submit goes to service-survey/api/survey-submit.php. Nothing identifying is ever added to the answer.
+ *     The pop-up has no Skip button and no X button; it is closed by answering (Esc or a click outside still closes it).
  *
  * It stays out of the way: it never opens over another dialog, never while the tab is hidden, and after any
- * answer / skip / close it waits COOLDOWN_MS before checking for another transaction.
+ * answer / close it waits COOLDOWN_MS before checking for another transaction.
  *
  * All text is inserted with textContent (never innerHTML).
  */
@@ -34,8 +35,6 @@
     var elCount = document.getElementById('svyCount');
     var elError = document.getElementById('svyError');
     var btnSubmit = document.getElementById('svySubmit');
-    var btnSkip = document.getElementById('svySkip');
-    var btnClose = document.getElementById('svyClose');
 
     var state = {
         open: false,
@@ -223,7 +222,6 @@
         showError('');
         state.busy = false;
         refreshSubmit();
-        btnSkip.disabled = false;
 
         state.lastFocus = document.activeElement;
         backdrop.hidden = false;
@@ -259,7 +257,6 @@
 
     function setBusy(b) {
         state.busy = b;
-        btnSkip.disabled = b;
         refreshSubmit();
     }
 
@@ -298,22 +295,8 @@
         });
     }
 
-    function skip() {
-        if (state.busy || !state.pending) return;
-        setBusy(true);
-        send({ key: state.pending.key, skipped: true }).then(function () {
-            setBusy(false);
-            closeSurvey(false);
-        }).catch(function () {
-            setBusy(false);
-            closeSurvey(true);
-        });
-    }
-
     /* ── events ──────────────────────────────────────────────── */
     btnSubmit.addEventListener('click', submit);
-    btnSkip.addEventListener('click', skip);
-    btnClose.addEventListener('click', function () { if (!state.busy) closeSurvey(true); });
 
     elComment.addEventListener('input', function () {
         elCount.textContent = elComment.value.length + '/' + elComment.maxLength;

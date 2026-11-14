@@ -27,6 +27,7 @@
     var STEP_MIN = 60;
     var BORROW_HOURS = [1, 2, 3, 6];
     var BORROW_ADVANCE_DAYS = 14;
+    var ROOM_ADVANCE_DAYS = 21;       /* how far ahead a room can be reserved (Settings → Arbitration; loadBorrowRules() updates it) */
     var BORROW_CLOSE_MIN = 21 * 60;   /* borrowing closes (equipment only; rooms use CLOSE_MIN) */
     /* The six values above are only defaults: loadBorrowRules() replaces them with the booking
        window from Settings → Arbitration, so the pickers match what the server accepts. */
@@ -93,7 +94,14 @@
             BORROW_CLOSE_MIN = hhmmToMin(r.dayEnd);
             if (r.durationHours && r.durationHours.length) BORROW_HOURS = r.durationHours.map(Number);
             if (r.maxAhead) BORROW_ADVANCE_DAYS = +r.maxAhead;
+            if (r.roomMaxAdvanceDays) ROOM_ADVANCE_DAYS = +r.roomMaxAdvanceDays;
         }).catch(function () { /* keep the defaults */ });
+    }
+    /* Latest date a room can be reserved (Settings → Arbitration → Book ahead) */
+    function roomMaxDate() { var d = new Date(); d.setDate(d.getDate() + ROOM_ADVANCE_DAYS); return ymd(d); }
+    function roomAdvanceMsg() {
+        var w = Math.round(ROOM_ADVANCE_DAYS / 7);
+        return 'Rooms can only be reserved up to ' + w + (w === 1 ? ' week' : ' weeks') + ' ahead.';
     }
     function borrowDates() {
         var dates = [];
@@ -1147,7 +1155,7 @@
             '<button type="button" class="st-btn st-btn-ghost st-btn-sm" data-action="back-rooms">Change</button></div>' +
             '<div class="st-alert is-error" id="flowError" role="alert" hidden></div>' +
             '<div class="st-field"><label for="reserveDate">Date <span class="st-star">*</span></label>' +
-            '<input type="date" class="st-input" id="reserveDate" min="' + t0 + '" value="' + t0 + '"></div>' +
+            '<input type="date" class="st-input" id="reserveDate" min="' + t0 + '" max="' + roomMaxDate() + '" value="' + t0 + '"></div>' +
             '<div class="st-row">' +
             '<div class="st-field"><label for="reserveStart">Start time <span class="st-star">*</span></label>' +
             '<select class="st-input" id="reserveStart">' + startOptions(t0) + '</select></div>' +
@@ -1172,6 +1180,8 @@
 
     function onReserveFieldChange(target) {
         if (target.id === 'reserveDate') {
+            var tooFar = !!target.value && target.value > roomMaxDate();
+            if (tooFar) target.value = roomMaxDate();
             var cur = $('reserveStart').value, curEnd = $('reserveEnd').value;
             $('reserveStart').innerHTML = startOptions(target.value);
             var keep = cur && $('reserveStart').querySelector('option[value="' + cur + '"]:not([disabled])');
@@ -1181,7 +1191,8 @@
             $('reserveEnd').innerHTML = endOptions(startNow, endOk ? curEnd : '');
             syncLetter('reserveLetter', target.value);
             var d = target.value ? parseYmd(target.value) : null;
-            if (d && d.getDay() === 0) showAlert('flowError', 'Reservations are not available on Sundays. Please choose another day.');
+            if (tooFar) showAlert('flowError', roomAdvanceMsg() + ' We moved you to ' + target.value + '.');
+            else if (d && d.getDay() === 0) showAlert('flowError', 'Reservations are not available on Sundays. Please choose another day.');
             else hideAlert('flowError');
         } else if (target.id === 'reserveStart') {
             var prevEnd = $('reserveEnd').value;

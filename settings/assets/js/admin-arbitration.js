@@ -400,7 +400,7 @@
                     applySaved(j.values || {});
                     var msg = '<span class="material-symbols-outlined">check_circle</span> ' +
                         (j.changed && j.changed.length ? 'Saved. New requests use these rules now.' : 'Nothing changed.');
-                    if (otherEdits) msg += ' Room, role and priority edits are not connected yet, so they were not saved.';
+                    if (otherEdits) msg += ' Room schedule, role and priority edits are not connected yet, so they were not saved.';
                     say(msg, otherEdits ? 7000 : 3500);
                     return;
                 }

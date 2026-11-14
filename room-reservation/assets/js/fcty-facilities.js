@@ -977,8 +977,26 @@
         function loadQuota() {
             return fetch(apiBase() + 'room-reservation/api/get-room-quota.php', { credentials: 'same-origin' })
                 .then(function (r) { return r.ok ? r.json() : null; })
-                .then(function (q) { if (q && !q.error) { quota = q; renderQuota(); } })
+                .then(function (q) { if (q && !q.error) { quota = q; renderQuota(); applyRules(); } })
                 .catch(function () { /* informational only — the server enforces the limit */ });
+        }
+
+        /* Reservation rules from Settings → Arbitration (sent with the quota): how far ahead the date can be,
+           and whether a request letter is required for a later date. The server enforces them too. */
+        function applyRules() {
+            var r = quota && quota.rules;
+            if (!r) return;
+            elDate.max = ymd(addDays(now, r.maxAdvanceDays));
+            DOC_HINT = r.letterRequired
+                ? 'Required for reservations on a later date.'
+                : 'Recommended for reservations on a later date. You can still submit without one.';
+            var tag = $('fcty-doc-block') && $('fcty-doc-block').querySelector('summary small');
+            if (tag) tag.textContent = r.letterRequired ? '(required)' : '(recommended)';
+            docMessage('');
+        }
+        function advanceLabel() {
+            var w = Math.round(((quota && quota.rules && quota.rules.maxAdvanceDays) || 21) / 7);
+            return w + (w === 1 ? ' week' : ' weeks');
         }
 
         /* ── Request letter: recommended for a LATER date, never needed for same-day ── */
@@ -1234,11 +1252,14 @@
         elDate.addEventListener('change', function () {
             if (!elDate.value) return;
             var picked = elDate.value < firstOpenStr ? firstOpenStr : elDate.value;
+            var tooFar = !!elDate.max && picked > elDate.max;
+            if (tooFar) picked = elDate.max;
             var closed = isClosedDay(parseYmd(picked));
             st.date = closed ? ymd(nextOpenDay(parseYmd(picked))) : picked;   /* Sunday → next open day */
             elDate.value = st.date;
             changed(true);
-            if (closed) setAlert(elMsg, 'warn', 'event_busy', 'Reservations are not available on Sundays. We moved you to ' + longDate(parseYmd(st.date)) + '.');
+            if (tooFar) setAlert(elMsg, 'warn', 'event_busy', 'Rooms can only be reserved up to ' + advanceLabel() + ' ahead. We moved you to ' + longDate(parseYmd(st.date)) + '.');
+            else if (closed) setAlert(elMsg, 'warn', 'event_busy', 'Reservations are not available on Sundays. We moved you to ' + longDate(parseYmd(st.date)) + '.');
         });
         elStart.addEventListener('change', function () {
             var keep = st.end - st.start;
@@ -1281,6 +1302,8 @@
             if (st.end <= st.start) return fail('End time must be after the start time.');
             if (isClosedDay(parseYmd(st.date))) return fail('Reservations are not available on Sundays. Please choose another day.');
             if (weekData && clashes().length) return fail('That time is already taken. Pick one of the open times.');
+            if (elDate.max && st.date > elDate.max) return fail('Rooms can only be reserved up to ' + advanceLabel() + ' ahead. Please pick an earlier date.');
+            if (quota && quota.rules && quota.rules.letterRequired && isLaterDate() && !docFile) return fail('A request letter is required for later-date reservations. Please attach one.');
 
             btnSubmit.disabled = true;
             btnSubmit.textContent = 'Submitting\u2026';
