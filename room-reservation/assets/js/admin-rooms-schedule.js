@@ -2,9 +2,20 @@
                     (function() {
                         'use strict';
 
-                        /* — Data injected from PHP — */
-                        const PS_ROOMS = window.PS_ROOMS_SCHEDULE_BOOT.rooms;
-                        const PS_RSVP = window.PS_ROOMS_SCHEDULE_BOOT.reservations;
+                        /* — Data injected from PHP —
+                           Read from the inert JSON block (#psRoomsScheduleBootData). This must NEVER throw:
+                           every click handler below (open schedule, Edit) is registered after it, so a
+                           failure here used to leave the whole Facilities tab unclickable. */
+                        let PS_ROOMS = [];
+                        let PS_RSVP = [];
+                        try {
+                            const bootEl = document.getElementById('psRoomsScheduleBootData');
+                            const boot = bootEl ? JSON.parse(bootEl.textContent || '{}') : (window.PS_ROOMS_SCHEDULE_BOOT || {});
+                            PS_ROOMS = Array.isArray(boot.rooms) ? boot.rooms : [];
+                            PS_RSVP = Array.isArray(boot.reservations) ? boot.reservations : [];
+                        } catch (err) {
+                            console.warn('Room schedule data could not be read; the schedule will load it live instead.', err);
+                        }
 
                         /* — Grid geometry —
                            Reservations run 7 AM – 8 PM, Monday to Saturday (Sunday is closed; see
