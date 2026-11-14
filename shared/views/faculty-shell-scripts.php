@@ -1,3 +1,4 @@
+    <script type="application/json" id="bookingMetaData"><?php echo $bk_meta_json; ?></script>
     <script nonce="<?php echo $csp_nonce; ?>">
         window.REQUESTS_DATA = <?php echo $requests_json; ?>;
         window.BOOKING_META = <?php echo $bk_meta_json; ?>;
