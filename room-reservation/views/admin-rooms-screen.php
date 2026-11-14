@@ -599,12 +599,22 @@
                     }
                 ));
                 ?>
-                <script nonce="<?php echo $csp_nonce; ?>">
-    window.PS_ROOMS_SCHEDULE_BOOT = {
-        rooms: <?php echo json_encode(array_values($ps_rooms_json)); ?>,
-        reservations: <?php echo json_encode($ps_rsvp_json); ?>
-    };
-</script>
+                <?php
+                // Schedule data goes out as an inert JSON block (never executed, so CSP has nothing to block)
+                // and is encoded defensively: one stray non-UTF-8 character in a purpose / name on the live
+                // database used to make json_encode() return false, which printed nothing and left a
+                // JavaScript syntax error that killed every click handler on this tab.
+                $ps_boot_flags = JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP
+                    | JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR;
+                $ps_boot_json = json_encode([
+                    'rooms'        => array_values($ps_rooms_json),
+                    'reservations' => array_values($ps_rsvp_json),
+                ], $ps_boot_flags);
+                if (!is_string($ps_boot_json) || $ps_boot_json === '') {
+                    $ps_boot_json = '{"rooms":[],"reservations":[]}';
+                }
+                ?>
+                <script type="application/json" id="psRoomsScheduleBootData"><?php echo $ps_boot_json; ?></script>
 <script src="room-reservation/assets/js/admin-rooms-schedule.js?v=<?php echo @filemtime(PS_ROOT . '/room-reservation/assets/js/admin-rooms-schedule.js'); ?>"></script>
 
             </div><!-- /panel-rooms -->
