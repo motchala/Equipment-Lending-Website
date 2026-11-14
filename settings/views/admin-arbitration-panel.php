@@ -224,7 +224,7 @@ $arb_date = static function (string $key, string $title, string $sub, string $va
                 $arb_toggle('rule_overdue_block_enabled', 'Decline if the borrower has an overdue item', 'A faculty member with equipment past its return time cannot borrow more or generate student codes.', (bool)$arb_live['rule_overdue_block_enabled']);
                 $arb_toggle('rule_missing_doc_block_enabled', 'Require a request letter', 'Faculty must attach a request letter when booking for a later date. Same-day requests never need one.', (bool)$arb_live['rule_missing_doc_block_enabled']);
                 $arb_stepper('max_items_per_borrower', 'Items per borrower', 'Most items a borrower can hold or have requested at the same time.', (int)$arb_live['max_items_per_borrower'], 1, 20, 1, 'items');
-                $arb_stepper('max_borrow_days', 'Longest loan', 'The most days a faculty member can pick in the Borrow form.', (int)$arb_live['max_borrow_days'], 1, 14, 1, 'days');
+                $arb_stepper('max_borrow_days', 'Longest loan', 'The most days a faculty member can pick in the Borrow form.', (int)$arb_live['max_borrow_days'], 1, 3, 1, 'days');
                 $arb_stepper('max_extensions', 'Extensions per loan', 'How many times a borrower can extend. 0 turns extensions off.', (int)$arb_live['max_extensions'], 0, 5, 1, 'times');
                 $arb_stepper('low_stock_threshold', 'Low-stock warning', 'Shows in Stock watch when an item has this many units or fewer.', (int)$arb_live['low_stock_threshold'], 0, 20, 1, 'units');
                 ?>

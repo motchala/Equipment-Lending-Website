@@ -273,7 +273,7 @@ INSERT INTO `tbl_arbitration_config` (`id`, `config_key`, `config_value`, `updat
 (6, 'rule_overdue_block_enabled', '0', '2026-11-09 10:20:53'),
 (7, 'rule_duplicate_block_enabled', '0', '2026-11-09 10:20:53'),
 (8, 'rule_missing_doc_block_enabled', '0', '2026-11-09 10:20:53'),
-(10, 'max_borrow_days', '1', '2026-11-09 10:20:53'),
+(10, 'max_borrow_days', '3', '2026-11-09 10:20:53'),
 (11, 'max_items_per_borrower', '3', '2026-11-09 10:20:53'),
 (12, 'low_stock_threshold', '2', '2026-11-09 10:20:53'),
 (13, 'auto_approve_timeout_minutes', '1', '2026-11-09 10:20:53');

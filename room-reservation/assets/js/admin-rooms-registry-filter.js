@@ -1,11 +1,30 @@
                             /* ── PUPSync Room Registry filter module ─────────────────
                                Search + Building/Floor/Status dropdowns. Depends on
-                               PHP-emitted floor data, so it lives inline (same pattern
-                               as the Room Schedule module below). */
+                               the CSP-safe JSON data block emitted by the PHP view. */
                             (function() {
                                 'use strict';
-                                let FLOORS_BY_BUILDING = window.PS_ROOMS_REGISTRY_BOOT.floorsByBuilding;
-                                const DEFAULT_BUILDING = String(window.PS_ROOMS_REGISTRY_BOOT.defaultBuilding);
+
+                                var boot = window.PS_ROOMS_REGISTRY_BOOT;
+                                if (!boot) {
+                                    var bootData = document.getElementById('psRoomsRegistryBootData');
+                                    if (!bootData) {
+                                        console.error('Room registry filter data is missing.');
+                                        return;
+                                    }
+                                    try {
+                                        boot = JSON.parse(bootData.textContent || '{}');
+                                    } catch (error) {
+                                        console.error('Unable to parse room registry filter data.', error);
+                                        return;
+                                    }
+                                    window.PS_ROOMS_REGISTRY_BOOT = boot;
+                                }
+                                if (!boot.floorsByBuilding) {
+                                    console.error('Room registry filter data has no floor mapping.');
+                                    return;
+                                }
+                                let FLOORS_BY_BUILDING = boot.floorsByBuilding;
+                                const DEFAULT_BUILDING = String(boot.defaultBuilding);
 
                                 const table = document.getElementById('roomsRegistryTable');
                                 const bldSel = document.getElementById('roomBuildingSelect');

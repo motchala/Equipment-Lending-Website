@@ -336,6 +336,19 @@
     margin-bottom: 0;
 }
 
+.bf-when .form-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 1.25rem;
+}
+
+.bf-when .bm-mode-info {
+    flex: 0 0 auto;
+    font-size: 16px;
+    line-height: 1;
+}
+
 @media (max-width: 560px) {
     .bf-when {
         grid-template-columns: 1fr;

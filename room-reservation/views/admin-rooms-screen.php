@@ -277,12 +277,15 @@
                             </div>
                         </div>
 
-                        <script nonce="<?php echo $csp_nonce; ?>">
-    window.PS_ROOMS_REGISTRY_BOOT = {
-        floorsByBuilding: <?php echo json_encode($floors_by_building_js); ?>,
-        defaultBuilding: <?php echo (int)$first_building_id; ?>
-    };
-</script>
+                        <script type="application/json" id="psRoomsRegistryBootData"><?php
+                            echo json_encode(
+                                [
+                                    'floorsByBuilding' => $floors_by_building_js,
+                                    'defaultBuilding' => (int)$first_building_id,
+                                ],
+                                JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE
+                            );
+                        ?></script>
 <script src="room-reservation/assets/js/admin-rooms-registry-filter.js?v=<?php echo @filemtime(PS_ROOT . '/room-reservation/assets/js/admin-rooms-registry-filter.js'); ?>"></script>
 
                         <script src="room-reservation/assets/js/admin-rooms-registry-actions.js?v=<?php echo @filemtime(PS_ROOT . '/room-reservation/assets/js/admin-rooms-registry-actions.js'); ?>"></script>

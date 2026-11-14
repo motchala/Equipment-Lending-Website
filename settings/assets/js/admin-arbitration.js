@@ -19,7 +19,7 @@
        only overrides what it changes. */
     var DEFAULTS = {
         rule_overdue_block_enabled: false, rule_missing_doc_block_enabled: false,
-        max_items_per_borrower: 3, max_borrow_days: 1, max_extensions: 2,
+        max_items_per_borrower: 3, max_borrow_days: 3, max_extensions: 2,
         low_stock_threshold: 2,
 
         equip_day_start: '07:00', equip_day_end: '21:00', equip_max_advance_days: 14,
