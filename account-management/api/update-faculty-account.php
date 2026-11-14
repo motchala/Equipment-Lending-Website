@@ -36,7 +36,6 @@ if (!admin_is_super_admin($conn)) {
 // ── Input collection ──────────────────────────────────────────────────────────
 $faculty_id     = trim($_POST['faculty_id'] ?? '');
 $pupsync_email  = strtolower(trim($_POST['pupsync_email'] ?? ''));
-$backup_email   = strtolower(trim($_POST['backup_email'] ?? ''));
 $first_name     = trim($_POST['first_name'] ?? '');
 $last_name      = trim($_POST['last_name'] ?? '');
 // The Faculty ID is never changed here - faculty set it themselves and admins cannot edit it.
@@ -72,11 +71,6 @@ if ($pupsync_email !== $current_email && faculty_email_normalize($pupsync_email)
     send_json(422, 'error', 'Use a PUPSync email ending in @' . FACULTY_EMAIL_DOMAIN . '.');
 }
 
-// ── Validation: backup_email (optional, but must be valid if provided) ───────
-if ($backup_email !== '' && (strlen($backup_email) > 254 || !filter_var($backup_email, FILTER_VALIDATE_EMAIL))) {
-    send_json(422, 'error', 'Backup email is not a valid email address.');
-}
-
 // ── Validation: first_name / last_name ────────────────────────────────────────
 if ($first_name === '' || strlen($first_name) > 150) {
     send_json(422, 'error', 'First name is required.');
@@ -106,24 +100,21 @@ $dup_stmt->close();
 //    but the last token is treated as first name) ─────────────────────────────
 $fullname = trim($first_name . ' ' . $last_name);
 
-$backup_val = ($backup_email === '') ? null : $backup_email;
-
 // -- Update -----------------------------------------------------------------------
 $in_tx = false;
 try {
     $upd_stmt = $conn->prepare(
         "UPDATE tbl_users
-            SET fullname = ?, email = ?, backup_email = ?
+            SET fullname = ?, email = ?
           WHERE faculty_id = ?"
     );
     if (!$upd_stmt) {
         throw new RuntimeException('UPDATE prepare failed: ' . $conn->error);
     }
     $upd_stmt->bind_param(
-        'ssss',
+        'sss',
         $fullname,
         $pupsync_email,
-        $backup_val,
         $faculty_id
     );
     if (!$upd_stmt->execute()) {

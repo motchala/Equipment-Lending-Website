@@ -35,13 +35,9 @@
                         <input type="text" id="fac-edit-last" class="form-control-custom" placeholder="Last">
                     </div>
                 </div>
-                <div class="form-group">
+                <div class="form-group" style="margin-bottom:0">
                     <label for="fac-edit-email">PUPSync email</label>
                     <input type="email" id="fac-edit-email" class="form-control-custom" placeholder="email@example.com">
-                </div>
-                <div class="form-group" style="margin-bottom:0">
-                    <label for="fac-edit-backup">Backup email <span class="fac-edit-opt">(optional)</span></label>
-                    <input type="email" id="fac-edit-backup" class="form-control-custom" placeholder="backup@gmail.com">
                 </div>
 
                 <div id="fac-edit-alert" class="alert-banner hidden" role="alert" style="margin-bottom:0"></div>

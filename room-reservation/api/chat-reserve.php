@@ -107,16 +107,22 @@ if ($start_time < '07:00' || $end_time > '20:00') {
     reserve_respond(422, 'error', 'Reservations must be within operating hours: 7:00 AM to 8:00 PM.');
 }
 
-// Max advance booking: 21 days
-$max_date = (new DateTime('now', new DateTimeZone('Asia/Manila')))->modify('+21 days')->format('Y-m-d');
-if ($res_date > $max_date) {
-    reserve_respond(422, 'error', 'Reservations can only be made up to 21 days in advance.');
-}
-
 // ── Database connection ───────────────────────────────────────────────────────
 require_once __DIR__ . '/../../config/db.php';
 $conn = getDB();
 $conn->set_charset('utf8mb4');
+
+// ── Reservation rules from Settings → Arbitration ───────────────────────────
+require_once __DIR__ . '/../core/room-rules.php';
+RoomRules::load($conn);
+$advance_err = RoomRules::advanceError($res_date);
+if ($advance_err !== null) {
+    reserve_respond(422, 'error', $advance_err);
+}
+// The assistant cannot attach a file, so when a letter is required a later date has to be booked on the Facilities page
+if (RoomRules::letterRequired() && RoomRules::isLaterDate($res_date)) {
+    reserve_respond(422, 'error', 'A request letter is required for later-date reservations. Please reserve it from the Facilities page so you can attach one.');
+}
 
 // ── Verify room exists and is bookable ────────────────────────────────────────
 $room_chk = $conn->prepare(
@@ -139,10 +145,10 @@ require_once __DIR__ . '/../core/room-quota.php';
 fcty_quota_lock($conn, $faculty_id);
 
 $active_now = fcty_active_room_reservations($conn, $faculty_id);
-if (count($active_now) >= FCTY_MAX_ACTIVE_ROOM_RESERVATIONS) {
+if (count($active_now) >= RoomRules::maxActive()) {
     fcty_quota_unlock($conn, $faculty_id);
     reserve_respond(409, 'error',
-        'You already have ' . FCTY_MAX_ACTIVE_ROOM_RESERVATIONS . ' active room reservations. '
+        'You already have ' . RoomRules::maxActive() . ' active room reservations. '
         . 'Cancel one or wait until it ends before reserving another.'
     );
 }
@@ -152,9 +158,10 @@ $submitted_as = 'personal';
 
 // ── Insert reservation ────────────────────────────────────────────────────────
 // Same-day: Approved at once. A LATER DATE waits for an admin's decision.
-$is_future_day  = ps_room_is_future_date($res_date);
-$initial_status = $is_future_day ? 'Waiting' : 'Approved';
-if ($is_future_day) {
+$is_future_day   = ps_room_is_future_date($res_date);
+$hold_for_review = RoomRules::holdsForReview($res_date);   // later date, or same-day when auto-confirm is off
+$initial_status = $hold_for_review ? 'Waiting' : 'Approved';
+if ($hold_for_review) {
     ps_room_ensure_waiting_status($conn);
 }
 $ins = $conn->prepare(
@@ -180,7 +187,7 @@ $ins->close();
 
 // ── Run Arbitration Engine ────────────────────────────────────────────────────
 require_once __DIR__ . '/../../equipment-booking/core/arbitration-engine.php';
-ArbitrationEngine::processRoomReservation($conn, $reservation_id, $is_future_day);
+ArbitrationEngine::processRoomReservation($conn, $reservation_id, $hold_for_review);
 
 // ── Check final status ────────────────────────────────────────────────────────
 $sel = $conn->prepare(

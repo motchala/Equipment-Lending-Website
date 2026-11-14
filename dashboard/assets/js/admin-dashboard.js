@@ -380,6 +380,8 @@
         if (activeBtn) activeBtn.classList.add('active');
         if (activePanel) _saveSubView('rooms', tabName);
     }
+    /* The Dashboard cards (a later script block) need to reach this helper. */
+    window.switchRoomsTab = switchRoomsTab;
 
     /* switchSettTab (legacy Settings-overlay tab helper) removed —
        the overlay it served no longer exists; Settings navigation
@@ -1156,16 +1158,13 @@
     function saveProfileEdit() {
         const nameInput = document.querySelector('[data-input="admin_name"]');
         const emailInput = document.querySelector('[data-input="admin_email"]');
-        const backupEmailInput = document.querySelector('[data-input="admin_backup_email"]');
         const saveBtn = document.getElementById('saveProfileBtn');
 
         const name = nameInput ? nameInput.value.trim() : '';
         const email = emailInput ? emailInput.value.trim() : '';
-        const backupEmail = backupEmailInput ? backupEmailInput.value.trim() : '';
 
         if (!name) { showToast('Display name cannot be empty.'); return; }
         if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showToast('Please enter a valid email address.'); return; }
-        if (backupEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(backupEmail)) { showToast('Please enter a valid backup email address or leave it blank.'); return; }
 
         if (saveBtn) saveBtn.disabled = true;
 
@@ -1173,7 +1172,6 @@
         fd.append('ajax_action', 'update_profile');
         fd.append('admin_name', name);
         fd.append('admin_email', email);
-        fd.append('admin_backup_email', backupEmail);
         fd.append('csrf_token', getCsrfToken());
 
         fetch('admin-dashboard.php', { method: 'POST', body: fd })
@@ -1184,11 +1182,6 @@
                     if (nameSpan) { nameSpan.textContent = data.admin_name; nameSpan.classList.remove('empty'); }
                     const emailSpan = document.querySelector('[data-field="admin_email"]');
                     if (emailSpan) { emailSpan.textContent = data.admin_email; emailSpan.classList.remove('empty'); }
-                    const backupEmailSpan = document.querySelector('[data-field="admin_backup_email"]');
-                    if (backupEmailSpan) {
-                        backupEmailSpan.textContent = data.admin_backup_email || '— Not provided';
-                        backupEmailSpan.classList.toggle('empty', !data.admin_backup_email);
-                    }
 
                     // Reflect the change everywhere else the admin's name/initials
                     // appear on this page (sidebar, hero, greeting) without
@@ -1797,7 +1790,6 @@
 
         tr.dataset.fullname = d.fullname || '';
         tr.dataset.email = d.email || '';
-        tr.dataset.backupEmail = d.backup_email || '';
         tr.dataset.facultyId = d.faculty_id || '';
         tr.dataset.init = init;
 
@@ -2737,12 +2729,12 @@
             const url = ADM_ACTIVITY_API + '?actor=' + encodeURIComponent(p.actor) +
                 '&filter=' + encodeURIComponent(p.filter) + '&range=' + encodeURIComponent(p.range) + '&page=' + page;
             return fetch(url, { credentials: 'same-origin' })
-                .then(function (res) { return res.json().catch(function () { return {}; }).then(function (j) { return { ok: res.ok, data: j }; }); })
+                .then(function (res) { return res.json().catch(function () { return {}; }).then(function (j) { return { ok: res.ok, status: res.status, data: j }; }); })
                 .then(function (r) {
                     if (myToken !== token) return; // the user moved on
                     if (!r.ok || r.data.status !== 'success') {
                         pg.hidden = true;
-                        message('error', (r.data && r.data.message) || 'Something went wrong. Please try again.', true);
+                        message('error', (r.data && r.data.message) || ('Something went wrong (server code ' + (r.status || 'none') + '). Please try again.'), true);
                         return;
                     }
                     const d = r.data;
@@ -6121,7 +6113,9 @@ function psSelectFmt(btn) {
                         }
                         if (roomsTab) {
                             // Navigate to the correct Rooms sub-panel (e.g. Reservations).
-                            if (typeof switchRoomsTab === 'function') switchRoomsTab(roomsTab);
+                            var roomsSubBtn = document.querySelector('#panel-rooms [data-rooms-tab="' + roomsTab + '"]');
+                            if (typeof window.switchRoomsTab === 'function') window.switchRoomsTab(roomsTab);
+                            else if (roomsSubBtn) roomsSubBtn.click();
                             if (roomsFilter) {
                                 setTimeout(function () {
                                     var tabBtn = document.querySelector('#rrTabs [data-rr-tab="' + roomsFilter + '"]');

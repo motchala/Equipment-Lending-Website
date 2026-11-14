@@ -116,6 +116,14 @@ if ($start_time < '07:00' || $end_time > '20:00') {
 }
 
 $conn = getDB();
+RoomRules::load($conn);   // Settings → Arbitration → Reservation rules
+
+// ── How far ahead a room can be reserved ────────────────────────────────────
+$advance_err = RoomRules::advanceError($res_date);
+if ($advance_err !== null) {
+    echo json_encode(['error' => $advance_err]);
+    exit();
+}
 
 // ── Verify room exists and is available ──────────────────────────────────
 $room_chk = $conn->prepare(
@@ -181,18 +189,24 @@ if ($is_future_day && $is_multipart && isset($_FILES['document']) && $_FILES['do
     $doc_ext = $ext_by_mime[$mime];
 }
 
+// ── "Require a request letter" (Settings → Arbitration): a later-date reservation needs one ──
+if ($is_future_day && RoomRules::letterRequired() && $doc_tmp === null) {
+    echo json_encode(['error' => 'A request letter is required for later-date reservations. Please attach one.']);
+    exit();
+}
+
 // ── Room limit: at most N active reservations per faculty account ─────────
 // Serialised per faculty so two quick submissions cannot both pass the check.
 fcty_quota_lock($conn, $faculty_id);
 
 $active_now = fcty_active_room_reservations($conn, $faculty_id);
-if (count($active_now) >= FCTY_MAX_ACTIVE_ROOM_RESERVATIONS) {
+if (count($active_now) >= RoomRules::maxActive()) {
     fcty_quota_unlock($conn, $faculty_id);
     echo json_encode([
         'error'         => fcty_quota_message(),
         'limit_reached' => true,
         'active'        => count($active_now),
-        'max'           => FCTY_MAX_ACTIVE_ROOM_RESERVATIONS,
+        'max'           => RoomRules::maxActive(),
     ]);
     exit();
 }
@@ -234,10 +248,11 @@ if ($doc_tmp !== null) {
 
 // ── Insert reservation ────────────────────────────────────────────────────
 $notes_val = $notes !== '' ? $notes : null;
-// A reservation for a LATER DATE always waits for an admin's decision, with or without a letter
-// (same-day ones keep the instant flow). See core/room-expiry.php for the 12:01 AM rule.
-$hold_for_review = $is_future_day;   // validated by the engine, never auto-approved
-$initial_status  = $is_future_day ? 'Waiting' : 'Approved';
+// A reservation for a LATER DATE always waits for an admin's decision, with or without a letter.
+// A same-day one is decided on the spot, unless the Super Admin turned "same-day confirmation" off
+// (then it waits like a later-date one). See core/room-expiry.php for the deadline rule.
+$hold_for_review = RoomRules::holdsForReview($res_date);   // validated by the engine, never auto-approved
+$initial_status  = $hold_for_review ? 'Waiting' : 'Approved';
 
 // The legacy schema used an ENUM without Waiting even though the application
 // already recognises pending room reservations. Add the value once when a
@@ -320,5 +335,5 @@ echo json_encode([
     'attached'       => $document_path !== null,
     'submitted_as'   => $submitted_as,
     'active'         => count($active_now) + (in_array($final_status, ['Approved', 'Waiting'], true) ? 1 : 0),
-    'max'            => FCTY_MAX_ACTIVE_ROOM_RESERVATIONS,
+    'max'            => RoomRules::maxActive(),
 ]);

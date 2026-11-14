@@ -103,18 +103,6 @@
                         </div>
                     </div>
                     <div class="info-row">
-                        <span class="info-lbl">Backup Email</span>
-                        <div class="info-value-wrap">
-                            <span class="info-val <?php echo empty($admin_backup_email) ? 'empty' : ''; ?>"
-                                data-field="admin_backup_email">
-                                <?php echo !empty($admin_backup_email) ? htmlspecialchars($admin_backup_email) : '— Not provided'; ?>
-                            </span>
-                            <input class="info-input-f" data-input="admin_backup_email" type="email"
-                                value="<?php echo htmlspecialchars($admin_backup_email ?? ''); ?>"
-                                placeholder="backup@example.com" autocomplete="email" disabled>
-                        </div>
-                    </div>
-                    <div class="info-row">
                         <span class="info-lbl">Campus</span>
                         <span class="info-val">PUPSync Biñan Campus</span>
                     </div>
@@ -442,7 +430,7 @@
                                     </summary>
                                     <div class="hc-faq-a">
                                         Go to <strong>Faculty → Create Faculty Account</strong>. Enter the first and last name and click <strong>Look up in Faculty Registry</strong> to fill in the Faculty ID, which is permanent. The email must end with <em>@pupsync.edu</em>. Set a password of at least 8 characters (rated Fair or stronger).<br><br>
-                                        Use the edit button on a faculty row to change the name, email or backup email. There is no password reset here; faculty change their own password in their Settings.<br><br>
+                                        Use the edit button on a faculty row to change the name or email. There is no password reset here; faculty change their own password in their Settings.<br><br>
                                         <strong>Delete Account</strong> is blocked while the faculty member still has pending requests, equipment that is not back, or upcoming reservations. You can override this by confirming with your own password. That declines their pending requests and cancels their upcoming reservations. Equipment already out can still be returned, and all history is kept.
                                     </div>
                                 </details>

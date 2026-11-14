@@ -228,7 +228,6 @@ $fullname = $first_name . ' ' . $last_name;
 // -- Password & role --------------------------------------------------------------
 $password_hash = password_hash($password_raw, PASSWORD_BCRYPT);
 $role = 'Regular Faculty';
-$backup_val = null;   // the backup email is no longer collected here
 
 // -- Insert -----------------------------------------------------------------------
 $in_tx = false;
@@ -242,11 +241,11 @@ try {
     if (!faculty_fl_ensure_schema($conn)) {
         send_json(500, 'error', 'Could not create account because the database needs a one-time update. Please try again, or contact the developer.');
     }
-    $ins_stmt = $conn->prepare("INSERT INTO tbl_users (fullname, faculty_id, email, backup_email, password, role, must_change_password) VALUES (?, ?, ?, ?, ?, ?, 1)");
+    $ins_stmt = $conn->prepare("INSERT INTO tbl_users (fullname, faculty_id, email, password, role, must_change_password) VALUES (?, ?, ?, ?, ?, 1)");
     if (!$ins_stmt) {
         throw new RuntimeException('INSERT prepare failed: ' . $conn->error);
     }
-    $ins_stmt->bind_param('ssssss', $fullname, $faculty_id, $pupsync_email, $backup_val, $password_hash, $role);
+    $ins_stmt->bind_param('sssss', $fullname, $faculty_id, $pupsync_email, $password_hash, $role);
     if ($ins_stmt->execute()) {
         $inserted = true;
     } else {

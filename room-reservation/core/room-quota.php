@@ -11,8 +11,8 @@
  *   1. Equipment never blocks a room: a faculty member may reserve a room even
  *      while equipment is out or overdue (the arbitration engine no longer
  *      applies the overdue block to rooms).
- *   2. One faculty account may hold at most FCTY_MAX_ACTIVE_ROOM_RESERVATIONS
- *      active room reservations at the same time (2 is fine, 3 is not).
+ *   2. One faculty account may hold at most RoomRules::maxActive() active room reservations
+ *      at the same time (Settings → Arbitration → Reservation rules; 2 unless the Super Admin changed it).
  *        "Active" = status Approved or Waiting AND not finished yet (the end
  *        time is still ahead). Declined / Cancelled / already-finished ones do
  *        not count, so a slot is freed by cancelling or simply by waiting for it to end.
@@ -23,6 +23,7 @@
  *      for the reviewing admin. Same-day reservations never need one.
  */
 
+require_once __DIR__ . '/room-rules.php';    // Settings → Arbitration values (limit, advance, cutoff, same-day, letter, expiry)
 require_once __DIR__ . '/room-expiry.php';   // 12:01 AM auto-decline of undecided Waiting reservations
 
 if (!defined('FCTY_MAX_ACTIVE_ROOM_RESERVATIONS')) {
@@ -39,6 +40,8 @@ if (!defined('FCTY_ROOM_DOC_MAX_BYTES')) {
  */
 function fcty_active_room_reservations(mysqli $conn, string $faculty_id): array
 {
+    RoomRules::load($conn);
+
     // An undecided request that has run out of time must stop counting before we count.
     ps_room_expire_unreviewed($conn);
 
@@ -109,8 +112,9 @@ function fcty_quota_unlock(mysqli $conn, string $faculty_id): void
 /** Human-friendly "limit reached" message. */
 function fcty_quota_message(): string
 {
-    return 'You already have ' . FCTY_MAX_ACTIVE_ROOM_RESERVATIONS
-        . ' active room reservations. Cancel one or wait until it ends to reserve another room.';
+    $max = RoomRules::maxActive();
+    return 'You already have ' . $max . ' active room ' . ($max === 1 ? 'reservation' : 'reservations')
+        . '. Cancel one or wait until it ends to reserve another room.';
 }
 
 
@@ -202,6 +206,7 @@ function fact_days_away(DateTimeImmutable $now, DateTimeImmutable $date): int
  */
 function fact_load_rooms(mysqli $conn, string $faculty_id): array
 {
+    RoomRules::load($conn);
     $out = [
         'live' => [],
         'pending' => [],
@@ -210,7 +215,7 @@ function fact_load_rooms(mysqli $conn, string $faculty_id): array
         'history' => [],
         'active' => 0,
         'student_active' => 0,
-        'max' => FCTY_MAX_ACTIVE_ROOM_RESERVATIONS,
+        'max' => RoomRules::maxActive(),
     ];
     $tz  = new DateTimeZone('Asia/Manila');
     $now = new DateTimeImmutable('now', $tz);
@@ -255,7 +260,7 @@ function fact_load_rooms(mysqli $conn, string $faculty_id): array
                     'letter'    => fact_s($row, 'document_path') !== '',
                     'start_ts'  => $start->getTimestamp(),
                     'days'      => fact_days_away($now, $start),
-                    'can_cancel' => ($start->getTimestamp() - $now->getTimestamp()) > 3600,
+                    'can_cancel' => ($start->getTimestamp() - $now->getTimestamp()) > RoomRules::cancelCutoffSeconds(),
                     'future'    => $start > $now,
                     'state'     => 'upcoming',
                 ];
@@ -570,7 +575,7 @@ function fact_render_room_item(array $it, string $kind): string
             $sub[] = 'Waiting for admin approval';
         }
         if ($kind === 'upcoming' && empty($it['can_cancel'])) {
-            $sub[] = 'Can\'t be cancelled within 1 hour of the start';
+            $sub[] = 'Can\'t be cancelled within ' . RoomRules::cancelCutoffLabel() . ' of the start';
         }
     }
 
@@ -587,14 +592,14 @@ function fact_render_room_item(array $it, string $kind): string
             'action' => 'cancel-reservation', 'rr-id' => fact_i($it, 'id'), 'room-name' => $room,
         ], ['danger' => true, 'title' => 'Withdraw this request']);
     } elseif ($kind === 'upcoming') {
-        // Only upcoming reservations can be cancelled, and not within 1 hour of the start
+        // Only upcoming reservations can be cancelled, and not within the cancellation cutoff of the start
         $end = !empty($it['can_cancel'])
             ? fact_action_btn('Cancel', 'close', [
                 'action' => 'cancel-reservation', 'rr-id' => fact_i($it, 'id'), 'room-name' => $room,
             ], ['danger' => true, 'title' => 'Cancel this reservation'])
             : fact_action_btn('Cancel', 'lock', [], [
                 'danger' => true, 'disabled' => true,
-                'title'  => 'Reservations can\'t be cancelled within 1 hour of the start time',
+                'title'  => 'Reservations can\'t be cancelled within ' . RoomRules::cancelCutoffLabel() . ' of the start time',
             ]);
     }
 

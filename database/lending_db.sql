@@ -38,18 +38,17 @@ CREATE TABLE `tbl_accounts` (
   `last_login` datetime DEFAULT NULL,
   `dormant_until` bigint(20) UNSIGNED DEFAULT NULL,
   `session_epoch` bigint(20) UNSIGNED NOT NULL DEFAULT 0,
-  `last_password_change` datetime DEFAULT NULL,
-  `backup_email` varchar(255) DEFAULT NULL
+  `last_password_change` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `tbl_accounts`
 --
 
-INSERT INTO `tbl_accounts` (`id`, `fullName`, `email`, `password`, `role`, `admin_no`, `created_at`, `last_login`, `dormant_until`, `session_epoch`, `last_password_change`, `backup_email`) VALUES
-(1, 'Redg Abelida', 'main@admin.edu', '$2y$10$dLNCtd5IGqTMf7VUHFYyEOPI00YWyd9h9n4uj6dTptlcKwFNcw57e', 'Super Admin', 1, '2026-01-01 00:00:00', '2026-11-12 08:49:29', NULL, 0, NULL, ''),
-(2, 'Chico Ramos', 'chico@admin.edu', '$2y$10$w.G7jIE6r6iSsVyn/T/G2OAhoqpyxgu4kkWKbHIhOky/CJk94xLGC', 'Admin', 2, '2026-10-02 11:05:03', '2026-11-09 23:25:05', NULL, 0, NULL, NULL),
-(3, 'Jell Alagon', 'jell@admin.edu', '$2y$10$Q2ZyDvxioT548b/LuPKdEe7XYwf3bh3t//5dN/mX2bNIKEQ3buhf6', 'Admin', 3, '2026-11-10 06:01:18', NULL, NULL, 0, NULL, NULL);
+INSERT INTO `tbl_accounts` (`id`, `fullName`, `email`, `password`, `role`, `admin_no`, `created_at`, `last_login`, `dormant_until`, `session_epoch`, `last_password_change`) VALUES
+(1, 'Redg Abelida', 'main@admin.edu', '$2y$10$dLNCtd5IGqTMf7VUHFYyEOPI00YWyd9h9n4uj6dTptlcKwFNcw57e', 'Super Admin', 1, '2026-01-01 00:00:00', '2026-11-12 08:49:29', NULL, 0, NULL),
+(2, 'Chico Ramos', 'chico@admin.edu', '$2y$10$w.G7jIE6r6iSsVyn/T/G2OAhoqpyxgu4kkWKbHIhOky/CJk94xLGC', 'Admin', 2, '2026-10-02 11:05:03', '2026-11-09 23:25:05', NULL, 0, NULL),
+(3, 'Jell Alagon', 'jell@admin.edu', '$2y$10$Q2ZyDvxioT548b/LuPKdEe7XYwf3bh3t//5dN/mX2bNIKEQ3buhf6', 'Admin', 3, '2026-11-10 06:01:18', NULL, NULL, 0, NULL);
 
 -- --------------------------------------------------------
 
@@ -2216,7 +2215,6 @@ CREATE TABLE `tbl_users` (
   `fullname` varchar(255) NOT NULL,
   `faculty_id` varchar(255) NOT NULL,
   `email` varchar(255) NOT NULL,
-  `backup_email` varchar(255) DEFAULT NULL,
   `password` varchar(255) NOT NULL,
   `last_password_change` datetime DEFAULT NULL,
   `profile_picture` varchar(255) DEFAULT NULL,
@@ -2229,13 +2227,13 @@ CREATE TABLE `tbl_users` (
 -- Dumping data for table `tbl_users`
 --
 
-INSERT INTO `tbl_users` (`fullname`, `faculty_id`, `email`, `backup_email`, `password`, `last_password_change`, `profile_picture`, `department`, `role`, `must_change_password`) VALUES
-('Indaleen Quinsayas', 'FA0002BN2016', 'indaleen.quinsayas@pupsync.edu', NULL, '$2y$10$oUbLCC9dtNYPFxcvkvcbtOrmsdae1iiw1IGenLcfrWZo5CSyvlf1C', NULL, NULL, NULL, 'Regular Faculty', 0),
-('Michael Anjelo Miguel', 'FA0005BN2016', 'michael.miguel@pupsync.edu', NULL, '$2y$10$cDg6QolF.l2mGo3v43go3e/fpglvD0WfWTxv3ifoAJ95wtEH4FGpC', NULL, NULL, NULL, 'Regular Faculty', 0),
-('Aaron Atienza', 'FA0006BN2024', 'aaron.atienza@pupsync.edu', NULL, '$2y$10$jhe4/CMvTgDYHbnB1XKaC.6NVO.di7gcuIk8cyQ8osmDIV.9uNs1.', NULL, NULL, NULL, 'Regular Faculty', 0),
-('Edmundo Dela Cruz', 'FA0008BN2023', 'edmundo.delacruz@pupsync.edu', NULL, '$2y$10$XdcZ7CBLZ6CvgSQtQ.oh0.S9VH91QWzR08IJLQexx4SMvgR5Bzl3S', NULL, NULL, NULL, 'Regular Faculty', 0),
-('Stephen Perez', 'FA0011BN2026', 'stephen.perez@pupsync.edu', NULL, '$2y$10$YjDFkqM4Ap0nQguCXFhcAOcUmLbEiEVLxE18CItSQEiBolMyVTunK', NULL, NULL, NULL, 'Regular Faculty', 0),
-('Archie Arevalo', 'FA0143MN2016', 'archie.arevalo@pupsync.edu', 'archiearevalo@gmail.com', '$2y$10$uvhw5DCm0BaZaRQkO9nR2ezH.IsY7uXqGUqcWALfSpDf3eSobffcq', '2026-11-10 22:25:09', NULL, 'Department of General Education & Social Sciences', 'Regular Faculty', 0);
+INSERT INTO `tbl_users` (`fullname`, `faculty_id`, `email`, `password`, `last_password_change`, `profile_picture`, `department`, `role`, `must_change_password`) VALUES
+('Indaleen Quinsayas', 'FA0002BN2016', 'indaleen.quinsayas@pupsync.edu', '$2y$10$oUbLCC9dtNYPFxcvkvcbtOrmsdae1iiw1IGenLcfrWZo5CSyvlf1C', NULL, NULL, NULL, 'Regular Faculty', 0),
+('Michael Anjelo Miguel', 'FA0005BN2016', 'michael.miguel@pupsync.edu', '$2y$10$cDg6QolF.l2mGo3v43go3e/fpglvD0WfWTxv3ifoAJ95wtEH4FGpC', NULL, NULL, NULL, 'Regular Faculty', 0),
+('Aaron Atienza', 'FA0006BN2024', 'aaron.atienza@pupsync.edu', '$2y$10$jhe4/CMvTgDYHbnB1XKaC.6NVO.di7gcuIk8cyQ8osmDIV.9uNs1.', NULL, NULL, NULL, 'Regular Faculty', 0),
+('Edmundo Dela Cruz', 'FA0008BN2023', 'edmundo.delacruz@pupsync.edu', '$2y$10$XdcZ7CBLZ6CvgSQtQ.oh0.S9VH91QWzR08IJLQexx4SMvgR5Bzl3S', NULL, NULL, NULL, 'Regular Faculty', 0),
+('Stephen Perez', 'FA0011BN2026', 'stephen.perez@pupsync.edu', '$2y$10$YjDFkqM4Ap0nQguCXFhcAOcUmLbEiEVLxE18CItSQEiBolMyVTunK', NULL, NULL, NULL, 'Regular Faculty', 0),
+('Archie Arevalo', 'FA0143MN2016', 'archie.arevalo@pupsync.edu', '$2y$10$uvhw5DCm0BaZaRQkO9nR2ezH.IsY7uXqGUqcWALfSpDf3eSobffcq', '2026-11-10 22:25:09', NULL, 'Department of General Education & Social Sciences', 'Regular Faculty', 0);
 
 --
 -- Indexes for dumped tables

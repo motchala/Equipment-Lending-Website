@@ -89,7 +89,6 @@
 
                 var fullname = row.dataset.fullname || '';
                 var email = row.dataset.email || '';
-                var backupEmail = row.dataset.backupEmail || '';
                 var facId = row.dataset.facultyId || '';
                 var init = row.dataset.init || (fullname.charAt(0).toUpperCase()) || 'F';
                 var idUnset = !facId || facId.indexOf('NOTSET-') === 0;
@@ -105,7 +104,6 @@
                 document.getElementById('fac-edit-first').value = firstName;
                 document.getElementById('fac-edit-last').value = lastName;
                 document.getElementById('fac-edit-email').value = email;
-                document.getElementById('fac-edit-backup').value = backupEmail;
                 document.getElementById('fac-delete-name').textContent = fullname;
 
                 openFacModal('fac-edit-modal');
@@ -312,7 +310,6 @@
                     var firstName = (document.getElementById('fac-edit-first').value || '').trim();
                     var lastName = (document.getElementById('fac-edit-last').value || '').trim();
                     var email = (document.getElementById('fac-edit-email').value || '').trim();
-                    var backup = (document.getElementById('fac-edit-backup').value || '').trim();
 
                     if (!firstName) {
                         _showFacEditAlert('First name is required.', true);
@@ -341,7 +338,6 @@
                         csrf_token: csrfEl ? csrfEl.value : '',
                         faculty_id: facultyId,
                         pupsync_email: email,
-                        backup_email: backup,
                         first_name: firstName,
                         last_name: lastName
                     });
@@ -364,7 +360,6 @@
                                     window.psFacRender(_facEditRow, {
                                         fullname: fullname,
                                         email: email,
-                                        backup_email: backup,
                                         faculty_id: facultyId
                                     });
                                 }

@@ -168,7 +168,6 @@ function fr_load_profile(mysqli $conn, string $faculty_id, ?string $employment):
         ['Full Name',             $g('fullname')],
         ['Faculty ID',            faculty_id_display($faculty_id, 'Not set yet')],
         ['Email Address',         $g('email')],
-        ['Backup Email',          $g('backup_email')],
         ['Department',            $g('department')],
         ['Employment Status',     (string)$employment],
         ['Account Role',          $g('role')],
@@ -545,6 +544,12 @@ function fr_build_report(mysqli $conn, string $faculty_id): array
     $count = static function (array $rows, array $statuses): int {
         return count(array_filter($rows, static fn(array $r): bool => in_array($r['status'], $statuses, true)));
     };
+    // Distinct subjects (same code + name counts once). A plain loop, so editors don't flag a callback
+    // parameter against the empty-array placeholder $schedule starts out as.
+    $subject_keys = [];
+    foreach ($schedule['subjects'] as $subject_row) {
+        $subject_keys[mb_strtolower($subject_row['code'] . '|' . $subject_row['subject'])] = true;
+    }
     $summary = [
         'equipment_total'    => count($equipment),
         'equipment_returned' => $count($equipment, ['Returned', 'Returned late']),
@@ -555,7 +560,7 @@ function fr_build_report(mysqli $conn, string $faculty_id): array
         'rooms_open'         => $count($rooms, ['Pending', 'Upcoming', 'In progress']),
         'rooms_other'        => $count($rooms, ['Declined', 'Cancelled']),
         'students_total'     => count($students),
-        'subjects'           => count(array_unique(array_filter(array_map(static fn(array $s): string => mb_strtolower($s['code'] . '|' . $s['subject']), $schedule['subjects']), 'strlen'))),
+        'subjects'           => count($subject_keys),
         'weekly_minutes'     => $schedule['weekly_minutes'],
     ];
 

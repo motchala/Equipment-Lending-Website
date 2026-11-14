@@ -20,14 +20,35 @@
  */
 ini_set('display_errors', '0');
 
+// Anything printed by accident (a warning, a stray space) would break the JSON, so hold output back
+// until a clean answer is ready; and an unexpected error still answers in JSON, never an empty page.
+ob_start();
+set_exception_handler(function (Throwable $e) {
+    error_log('[admin-activity] ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+    while (ob_get_level()) {
+        ob_end_clean();
+    }
+    if (!headers_sent()) {
+        http_response_code(500);
+        header('Content-Type: application/json');
+    }
+    echo '{"status":"error","message":"The activity could not be loaded just now. Please try again."}';
+    exit;
+});
+
 require_once __DIR__ . '/../../config/security-headers.php';
 require_once __DIR__ . '/../../config/session.php';
 
 function act_respond(int $code, string $status, string $message, array $extra = []): void
 {
+    while (ob_get_level()) {
+        ob_end_clean();
+    }
     http_response_code($code);
     header('Content-Type: application/json');
-    echo json_encode(array_merge(['status' => $status, 'message' => $message], $extra));
+    // A name saved with a broken character must not turn the whole answer into an empty reply.
+    $json = json_encode(array_merge(['status' => $status, 'message' => $message], $extra), JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR);
+    echo $json !== false ? $json : '{"status":"error","message":"The activity could not be loaded just now. Please try again."}';
     exit;
 }
 
@@ -106,6 +127,9 @@ if ($format === 'csv') {
         return ($v !== '' && strpos("=+-@\t\r", $v[0]) !== false) ? "'" . $v : $v;
     };
 
+    while (ob_get_level()) {
+        ob_end_clean();
+    }
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename="activity-' . date('Y-m-d') . '.csv"');
     header('Cache-Control: no-store');

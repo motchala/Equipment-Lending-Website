@@ -27,36 +27,6 @@
         </div>
     </div>
 
-    <!-- Backup Email Modal -->
-    <div class="modal-backdrop" id="backupEmailModal" style="display:none;" role="dialog" aria-modal="true">
-        <div class="modal-box">
-            <div class="modal-header">
-                <h3><span class="material-symbols-outlined"
-                        style="font-size:18px;vertical-align:middle;margin-right:8px;">alternate_email</span>Backup
-                    Email</h3>
-                <button class="modal-close-btn" data-action="close-backup-email-modal" aria-label="Close"><span
-                        class="material-symbols-outlined">close</span></button>
-            </div>
-            <div class="modal-body">
-                <p style="margin-bottom:1rem;color:var(--color-on-surface-variant);font-size:0.9rem;">Add a backup email
-                    for account recovery and important notifications.</p>
-                <div class="form-group">
-                    <label class="form-label">Backup Email Address</label>
-                    <input type="email" id="backupEmailInput" class="form-input" placeholder="Enter backup email"
-                        autocomplete="email" value="<?php echo htmlspecialchars($db_backup_email); ?>">
-                </div>
-                <p class="modal-error" id="backupEmailError" style="display:none;"></p>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-cancel-acc" data-action="close-backup-email-modal">Cancel</button>
-                <button class="btn-save-acc" id="backupEmailSaveBtn" data-action="save-backup-email">
-                    <span class="material-symbols-outlined" style="font-size:14px;margin-right:4px;">check</span>Save
-                    Backup Email
-                </button>
-            </div>
-        </div>
-    </div>
-
     <!-- Faculty ID Modal: set once, permanent -->
     <div class="modal-backdrop" id="facultyIdModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="facultyIdTitle">
         <div class="modal-box">

@@ -84,7 +84,6 @@ if (isset($_POST['ajax_action']) && $_POST['ajax_action'] === 'update_profile') 
 
     $new_name  = trim($_POST['admin_name'] ?? '');
     $new_email = trim($_POST['admin_email'] ?? '');
-    $new_backup_email = trim($_POST['admin_backup_email'] ?? '');
     $old_email = $_SESSION['admin_email'] ?? '';
 
     if ($new_name === '') {
@@ -102,10 +101,6 @@ if (isset($_POST['ajax_action']) && $_POST['ajax_action'] === 'update_profile') 
     }
     if ($new_email === '' || !filter_var($new_email, FILTER_VALIDATE_EMAIL)) {
         echo json_encode(['status' => 'error', 'message' => 'Please enter a valid email address.']);
-        exit();
-    }
-    if ($new_backup_email !== '' && !filter_var($new_backup_email, FILTER_VALIDATE_EMAIL)) {
-        echo json_encode(['status' => 'error', 'message' => 'Please enter a valid backup email address or leave it blank.']);
         exit();
     }
     if (empty($old_email)) {
@@ -127,13 +122,13 @@ if (isset($_POST['ajax_action']) && $_POST['ajax_action'] === 'update_profile') 
         }
     }
 
-    $stmt_upd = $conn->prepare("UPDATE tbl_accounts SET fullName = ?, email = ?, backup_email = ? WHERE email = ?");
+    $stmt_upd = $conn->prepare("UPDATE tbl_accounts SET fullName = ?, email = ? WHERE email = ?");
     if (!$stmt_upd) {
         error_log('[admin-profile] Profile update prepare failed: ' . $conn->error);
         echo json_encode(['status' => 'error', 'message' => 'Could not save changes. Please try again.']);
         exit();
     }
-    $stmt_upd->bind_param("ssss", $new_name, $new_email, $new_backup_email, $old_email);
+    $stmt_upd->bind_param("sss", $new_name, $new_email, $old_email);
 
     if ($stmt_upd->execute()) {
         // Keep the session in sync so every part of the page (header, dropdown,
@@ -146,7 +141,6 @@ if (isset($_POST['ajax_action']) && $_POST['ajax_action'] === 'update_profile') 
             'message'     => 'Profile updated successfully.',
             'admin_name'  => $new_name,
             'admin_email' => $new_email,
-            'admin_backup_email' => $new_backup_email,
         ]);
     } else {
         echo json_encode(['status' => 'error', 'message' => 'Could not save changes. Please try again.']);

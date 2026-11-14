@@ -4,7 +4,7 @@
  * faculty-setup.php - the one-time "first sign-in" screen for a brand-new faculty account.
  *
  * Step 1: replace the temporary password the Super Admin generated.
- * Step 2: the essential account details (department, mobile number, optional backup email).
+ * Step 2: the essential account details (department).
  * Everything is saved together by account-management/api/first-login-setup.php, which also
  * unlocks the account. Until then faculty_session_guard() keeps the rest of the portal closed
  * (see account-management/core/faculty-first-login.php). After that this page just forwards
@@ -41,7 +41,7 @@ faculty_fl_ensure_schema($conn);
 $faculty_id = (string)$_SESSION['faculty_id'];
 $acct = null;
 try {
-    $st = $conn->prepare('SELECT fullname, email, must_change_password, department, backup_email FROM tbl_users WHERE faculty_id = ? LIMIT 1');
+    $st = $conn->prepare('SELECT fullname, email, must_change_password, department FROM tbl_users WHERE faculty_id = ? LIMIT 1');
     if ($st) {
         $st->bind_param('s', $faculty_id);
         $st->execute();
@@ -70,7 +70,6 @@ if (count($name_parts) > 1) {
 $id_label    = faculty_id_display($faculty_id, '—');
 $dept_locked = trim((string)$acct['department']) !== '';
 $dept_value  = trim((string)$acct['department']);
-$backup_value = trim((string)$acct['backup_email']);
 
 $h = static fn($v): string => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
 // $rel is a path from the project root. This page lives one folder down (account-management/), so the URL
@@ -257,20 +256,6 @@ $asset = static function (string $rel): string {
                                 <p class="fs-hint" id="fsDepartmentHint"><span class="material-symbols-outlined" aria-hidden="true">info</span>You can choose this once. It can&rsquo;t be changed afterwards.</p>
                             <?php endif; ?>
                             <p class="fs-err" id="fsDepartmentErr" role="alert" hidden></p>
-                        </div>
-
-
-
-                        <div class="fs-field" data-field="backup_email">
-                            <label class="fs-label" for="fsBackupEmail">Backup email <span class="fs-opt">Optional</span></label>
-                            <div class="fs-input-wrap fs-input-wrap--prefix">
-                                <span class="material-symbols-outlined fs-input-lead" aria-hidden="true">alternate_email</span>
-                                <input class="fs-input fs-input--lead" id="fsBackupEmail" name="backup_email" type="email" inputmode="email"
-                                    autocomplete="email" maxlength="254" spellcheck="false" placeholder="name@example.com"
-                                    value="<?php echo $h($backup_value); ?>" aria-describedby="fsBackupHint fsBackupEmailErr">
-                            </div>
-                            <p class="fs-hint" id="fsBackupHint"><span class="material-symbols-outlined" aria-hidden="true">info</span>A personal address for account recovery. You can change it any time in Settings.</p>
-                            <p class="fs-err" id="fsBackupEmailErr" role="alert" hidden></p>
                         </div>
                     </section>
 

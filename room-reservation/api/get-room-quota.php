@@ -41,7 +41,7 @@ $conn       = getDB();
 $faculty_id = (string)$_SESSION['faculty_id'];
 
 $active = fcty_active_room_reservations($conn, $faculty_id);
-$max    = FCTY_MAX_ACTIVE_ROOM_RESERVATIONS;
+$max    = RoomRules::maxActive();
 
 echo json_encode([
     'max'          => $max,
@@ -51,6 +51,7 @@ echo json_encode([
     })),
     'remaining'    => max(0, $max - count($active)),
     'reservations' => $active,
+    'rules'        => RoomRules::meta(),   // Settings → Arbitration: advance, cutoff, letter, same-day
     'doc'          => [
         'types'     => ['image/jpeg', 'image/png', 'application/pdf'],
         'extensions'=> ['jpg', 'jpeg', 'png', 'pdf'],
