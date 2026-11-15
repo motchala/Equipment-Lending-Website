@@ -2370,7 +2370,7 @@
             if (m && m.scrollTop > 0) m.scrollTo({ top: 0, behavior: 'smooth' });
             if (window.scrollY > 0) window.scrollTo({ top: 0, behavior: 'smooth' });
         } catch (_) { }
-        if (tab === 'settings' || tab === 'imports') return;   // forms: nothing to reload
+        if (tab === 'settings' || tab === 'imports' || tab === 'reports') return;   // forms: nothing to reload
         if (_psRefreshBusy) return;
 
         let job = null;

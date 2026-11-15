@@ -39,21 +39,51 @@ if (!$is_super_admin) { return; }
                             </div>
                             <p class="imp-last" data-role="last"><span class="material-symbols-outlined">history</span><span data-role="last-text">Last sync •••••••••</span></p>
 
-                            <!-- Google Sheets link -->
+                            <!-- OAuth status row — shown only when connected -->
+                            <div class="imp-eq-block imp-eq-oauth"<?php if (empty($c['gs_connected'])): ?> style="display:none;"<?php endif; ?>>
+                                <div class="imp-eq-oauth-row">
+                                    <span class="imp-eq-oauth-status">
+                                        <span class="imp-eq-oauth-dot imp-eq-oauth-dot--on" aria-hidden="true"></span>
+                                        <span class="imp-eq-oauth-label">Connected to Google</span>
+                                    </span>
+                                    <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-role="gs-disconnect">
+                                        <span class="material-symbols-outlined">link_off</span> Disconnect
+                                    </button>
+                                </div>
+                                <p class="imp-eq-help">PUPSync updates the sheet automatically when equipment is added, edited, or archived.</p>
+                            </div>
+
+                            <!-- Google Sheets link — always present so JS can read data-role="url" and data-role="save-url" -->
                             <div class="imp-eq-block">
                                 <label class="imp-eq-label" for="imp-eq-url">Google Sheets link</label>
                                 <div class="imp-eq-row">
-                                    <input type="url" id="imp-eq-url" class="imp-eq-input" data-role="url" placeholder="https://docs.google.com/spreadsheets/d/..." maxlength="1000" autocomplete="off" spellcheck="false">
-                                    <button type="button" class="ps-btn ps-btn--ghost" data-role="save-url" disabled>
-                                        <span class="material-symbols-outlined">link</span> Save link
+                                    <input type="url" id="imp-eq-url" class="imp-eq-input" data-role="url"
+                                        placeholder="https://docs.google.com/spreadsheets/d/..."
+                                        maxlength="1000" autocomplete="off" spellcheck="false">
+                                    <!-- save-url always in DOM; JS needs it. Hidden behind Connect when not connected. -->
+                                    <button type="button" class="ps-btn ps-btn--ghost" data-role="save-url" disabled
+                                        <?php if (empty($c['gs_connected'])): ?>style="display:none;"<?php endif; ?>>
+                                        <span class="material-symbols-outlined">link</span>
+                                        <?php echo empty($c['gs_connected']) ? 'Save link' : 'Update URL'; ?>
                                     </button>
+                                    <!-- Connect button — shown only when not connected -->
+                                    <?php if (empty($c['gs_connected'])): ?>
+                                    <button type="button" class="ps-btn ps-btn--primary" data-role="gs-connect" disabled>
+                                        <span class="material-symbols-outlined">add_link</span> Connect
+                                    </button>
+                                    <?php endif; ?>
                                 </div>
-                                <p class="imp-eq-help">Set the sheet to <strong>&ldquo;Anyone with the link can view&rdquo;</strong>. Each tab of the sheet becomes a category.</p>
+                                <?php if (!empty($c['gs_connected'])): ?>
+                                    <p class="imp-eq-help">The sheet can be <strong>private</strong> — PUPSync accesses it through your connected Google account.</p>
+                                <?php else: ?>
+                                    <p class="imp-eq-help">Paste the link to your Google Sheet and click <strong>Connect</strong>. PUPSync will ask Google for permission — you just click Allow.</p>
+                                <?php endif; ?>
                             </div>
 
                             <div class="imp-alert hidden" data-role="alert" role="alert"></div>
 
-                            <button type="button" class="ps-btn ps-btn--primary imp-import-btn" data-role="sync" disabled>
+                            <button type="button" class="ps-btn ps-btn--primary imp-import-btn" data-role="sync" disabled
+                                <?php if (empty($c['gs_connected'])): ?>style="display:none;"<?php endif; ?>>
                                 <span class="material-symbols-outlined">sync</span> Sync now
                             </button>
 

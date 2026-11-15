@@ -46,21 +46,43 @@ if (!preg_match('#/spreadsheets/d/([a-zA-Z0-9_-]+)#', $gsheet_url, $m)) {
 }
 $sheet_id = $m[1];
 
-// ── Get API key from .env ────────────────────────────────────────────────────
-$api_key = trim((string)($_ENV['GOOGLE_SHEETS_API_KEY'] ?? ''));
-if ($api_key === '') {
-    // No API key — fall back to time-based polling: return changed=true only
-    // once every 30 seconds so we don't hammer Google's export endpoint.
+// ── Get modifiedTime — OAuth path first, API key fallback, interval fallback ──
+require_once __DIR__ . '/../../google-sheets/core/oauth.php';
+require_once __DIR__ . '/../../google-sheets/core/reader.php';
+
+$token = gs_token($conn);
+$current_modified = null;
+
+if ($token !== null) {
+    // OAuth path — works on private sheets
+    $current_modified = gs_sheet_modified_time($sheet_id, $token);
+} else {
+    // API key path — public sheets only
+    $api_key = trim((string)($_ENV['GOOGLE_SHEETS_API_KEY'] ?? ''));
+    if ($api_key !== '') {
+        $drive_url = "https://www.googleapis.com/drive/v3/files/{$sheet_id}?fields=modifiedTime&key=" . urlencode($api_key);
+        $ctx = stream_context_create([
+            'http' => ['timeout' => 10, 'follow_location' => 1, 'header' => "User-Agent: PUPSync/1.0\r\n"],
+            'ssl'  => ['verify_peer' => false],
+        ]);
+        $response = @file_get_contents($drive_url, false, $ctx);
+        if ($response !== false) {
+            $data = json_decode($response, true);
+            $current_modified = $data['modifiedTime'] ?? null;
+        }
+    }
+}
+
+if ($current_modified === null) {
+    // No token and no API key — fall back to time-based interval
     $last_sync_row = $conn->prepare(
         "SELECT value FROM tbl_sync_config WHERE config_key = 'gsheet_last_sync'"
     );
     $last_sync_row->execute();
     $last_sync_val = $last_sync_row->get_result()->fetch_assoc();
     $last_sync_row->close();
-
-    $last_sync_ts = $last_sync_val ? strtotime((string)$last_sync_val['value']) : 0;
+    $last_sync_ts  = $last_sync_val ? strtotime((string)$last_sync_val['value']) : 0;
     $seconds_since = time() - (int)$last_sync_ts;
-
     if ($seconds_since < 15) {
         echo json_encode(['changed' => false, 'reason' => 'too_soon', 'next_in' => 15 - $seconds_since]);
     } else {
@@ -68,33 +90,6 @@ if ($api_key === '') {
     }
     exit;
 }
-
-// ── Call Drive API for modifiedTime (50 bytes, ~100ms) ────────────────────────
-$drive_url = "https://www.googleapis.com/drive/v3/files/{$sheet_id}?fields=modifiedTime&key=" . urlencode($api_key);
-$ctx = stream_context_create([
-    'http' => [
-        'timeout'         => 10,
-        'follow_location' => 1,
-        'header'          => "User-Agent: PUPSync/1.0\r\n",
-    ],
-    'ssl' => ['verify_peer' => false],
-]);
-$response = @file_get_contents($drive_url, false, $ctx);
-
-if ($response === false) {
-    // Network error — assume changed so sync still runs
-    echo json_encode(['changed' => true, 'reason' => 'network_error']);
-    exit;
-}
-
-$data = json_decode($response, true);
-if (!isset($data['modifiedTime'])) {
-    // Unexpected response (wrong key, private sheet, etc.)
-    echo json_encode(['changed' => false, 'error' => $data['error']['message'] ?? 'Drive API error.']);
-    exit;
-}
-
-$current_modified  = $data['modifiedTime'];
 $stored_modified   = trim((string)($cfg['gsheet_last_modified'] ?? ''));
 
 // ── Compare ──────────────────────────────────────────────────────────────────

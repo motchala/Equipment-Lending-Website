@@ -127,8 +127,14 @@ if (isset($_POST['add_item'])) {
     $stmt->bind_param("ississs", $campus_id, $name, $category, $qty, $image_path, $condition, $description);
 
     if ($stmt->execute()) {
+        $new_item_id = (int)$conn->insert_id;
         $stmt->close();
         admin_log_activity($conn, 'equipment', 'Added equipment: ' . $name);
+        // Register sheet sync to run after response is fully sent
+        require_once __DIR__ . '/../../google-sheets/core/writer.php';
+        register_shutdown_function(function () use ($conn, $new_item_id) {
+            gs_sync_item($conn, $new_item_id, 'upsert');
+        });
         if ($is_ajax) {
             header('Content-Type: application/json');
             echo json_encode(['status' => 'success', 'message' => 'Equipment added successfully.']);
@@ -266,6 +272,10 @@ if (isset($_POST['update_item'])) {
     }
 
     admin_log_activity($conn, 'equipment', 'Updated equipment: ' . $name);
+    require_once __DIR__ . '/../../google-sheets/core/writer.php';
+    register_shutdown_function(function () use ($conn, $item_id) {
+        gs_sync_item($conn, $item_id, 'upsert');
+    });
     if ($is_ajax) {
         header('Content-Type: application/json');
         echo json_encode(['status' => 'success', 'message' => 'Equipment updated successfully.']);
@@ -289,6 +299,9 @@ if (isset($_GET['delete_item'])) {
     mysqli_stmt_bind_param($stmt, "i", $id);
     mysqli_stmt_execute($stmt);
     admin_log_activity($conn, 'equipment', 'Archived equipment: ' . admin_activity_item_name($conn, $id));
+    // Mirror to Google Sheet (silent on failure — DB is the master)
+    require_once __DIR__ . '/../../google-sheets/core/writer.php';
+    gs_sync_item($conn, $id, 'archive');
     if ($is_ajax) {
         header('Content-Type: application/json');
         echo json_encode(['status' => 'success', 'message' => 'Item archived.']);

@@ -235,6 +235,7 @@ final class BookingSchedule
         try {
             self::markOverdue($conn, $ready);
             self::expireNoShows($conn, $ready);
+            self::expireFutureNoShows($conn);
             if ($ready) {
                 self::activateDue($conn);
             }
@@ -332,6 +333,107 @@ final class BookingSchedule
                 }
             }
         }
+        return $closed;
+    }
+
+    /**
+     * Future-date bookings that were approved but never collected within 3 business days
+     * (Sundays excluded) after the borrow date are cancelled as no-shows.
+     *
+     * Pickup deadline = borrow_date + 3 business days at closing time (equip_day_end).
+     * Runs lazily inside tick() — no cron job needed.
+     *
+     * @return int how many bookings were closed by this call
+     */
+    public static function expireFutureNoShows(mysqli $conn): int
+    {
+        if (!self::ensureSchema($conn)) {
+            return 0;
+        }
+
+        $now     = new DateTimeImmutable('now', new DateTimeZone('Asia/Manila'));
+        $dayEnd  = self::dayEnd();   // e.g. '21:00' from ArbitrationConfig / DB
+        $closed  = 0;
+        $reason  = 'Not collected – the booking was not picked up within 3 business days.';
+        $rule    = 'rule_no_show';
+
+        // Fetch all Approved future-date bookings not yet claimed
+        $sel = $conn->prepare(
+            "SELECT id, equipment_name, borrow_qty, stock_applied, borrow_date
+               FROM tbl_requests
+              WHERE status       = 'Approved'
+                AND booking_mode = 'future'
+                AND claimed_at   IS NULL
+                AND borrow_date  IS NOT NULL"
+        );
+        if (!$sel) {
+            return 0;
+        }
+        $sel->execute();
+        $rows = $sel->get_result()->fetch_all(MYSQLI_ASSOC);
+        $sel->close();
+
+        foreach ($rows as $row) {
+            $borrowDate = $row['borrow_date'];   // 'YYYY-MM-DD'
+
+            // Compute deadline: borrow_date + 3 business days (skip Sundays), at closing time
+            try {
+                $deadline = new DateTimeImmutable(
+                    $borrowDate . ' ' . $dayEnd,
+                    new DateTimeZone('Asia/Manila')
+                );
+                $added = 0;
+                while ($added < 3) {
+                    $deadline = $deadline->modify('+1 day');
+                    // Sunday = 0
+                    if ((int)$deadline->format('w') !== 0) {
+                        $added++;
+                    }
+                }
+            } catch (\Throwable $e) {
+                error_log('BookingSchedule::expireFutureNoShows — deadline calc: ' . $e->getMessage());
+                continue;
+            }
+
+            if ($now < $deadline) {
+                continue;   // still within the pickup window
+            }
+
+            // Cancel the booking
+            $upd = $conn->prepare(
+                "UPDATE tbl_requests
+                    SET status = 'Cancelled', arbitration_rule = ?, reason = ?, stock_applied = 0
+                  WHERE id = ? AND status = 'Approved' AND claimed_at IS NULL"
+            );
+            if (!$upd) {
+                continue;
+            }
+            $id = (int)$row['id'];
+            $upd->bind_param('ssi', $rule, $reason, $id);
+            $upd->execute();
+            $won = $upd->affected_rows === 1;
+            $upd->close();
+
+            if (!$won) {
+                continue;   // claimed or cancelled a moment ago by someone else
+            }
+            $closed++;
+
+            // Restore inventory if stock was already taken off the shelf
+            if ((int)($row['stock_applied'] ?? 0) === 1) {
+                $back = $conn->prepare(
+                    'UPDATE tbl_inventory SET quantity = quantity + ? WHERE item_name = ?'
+                );
+                if ($back) {
+                    $q    = max(1, (int)$row['borrow_qty']);
+                    $name = (string)$row['equipment_name'];
+                    $back->bind_param('is', $q, $name);
+                    $back->execute();
+                    $back->close();
+                }
+            }
+        }
+
         return $closed;
     }
 

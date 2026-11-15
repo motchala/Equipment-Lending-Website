@@ -19,6 +19,7 @@
     <link rel="stylesheet" href="dashboard/assets/css/admin-dashboard-responsive.css?v=<?php echo @filemtime('dashboard/assets/css/admin-dashboard-responsive.css'); ?>">
     <link rel="stylesheet" href="settings/assets/css/admin-imports.css?v=<?php echo @filemtime('settings/assets/css/admin-imports.css'); ?>">
     <link rel="stylesheet" href="settings/assets/css/admin-arbitration.css?v=<?php echo @filemtime('settings/assets/css/admin-arbitration.css'); ?>">
+    <link rel="stylesheet" href="reports/assets/css/reports.css?v=<?php echo @filemtime(PS_ROOT . '/reports/assets/css/reports.css'); ?>">
     <!-- Shared logout confirmation dialog + loading state -->
     <link rel="stylesheet" href="shared/assets/css/logout-modal.css?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/css/logout-modal.css'); ?>">
     <link rel="stylesheet" href="shared/assets/css/semester-tag.css?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/css/semester-tag.css'); ?>">
@@ -37,7 +38,7 @@
            - Hard refresh (Ctrl+Shift+R / Ctrl+F5): back to the Dashboard (first screen).
            Also keeps the default dashboard from appearing while the restored tab loads. */
         (function() {
-            var TABS = ['rooms', 'faculty', 'admins', 'activity', 'inventory', 'settings', 'imports'];
+            var TABS = ['rooms', 'faculty', 'admins', 'activity', 'inventory', 'settings', 'imports', 'reports'];
             var loc = window.location;
 
             var nav = (window.performance && performance.getEntriesByType) ? performance.getEntriesByType('navigation')[0] : null;
@@ -225,6 +226,10 @@
                     <a class="nav-item" data-tab="activity" id="snav-activity" href="#">
                         <span class="material-symbols-outlined">history</span>
                         <span class="nav-label">Activity</span>
+                    </a>
+                    <a class="nav-item" data-tab="reports" id="snav-reports" href="#">
+                        <span class="material-symbols-outlined">summarize</span>
+                        <span class="nav-label">Reports</span>
                     </a>
                 </div>
                 <div class="nav-group" role="group" aria-labelledby="navg-operations">

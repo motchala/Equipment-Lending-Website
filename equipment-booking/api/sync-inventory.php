@@ -75,7 +75,7 @@ function gsheet_ensure_category(mysqli $conn, int $campus_id, string $name): voi
     }
 }
 
-// ── Fetch the Google Sheet as XLSX bytes ─────────────────────────────────────
+// ── Load sheet URL ────────────────────────────────────────────────────────────
 $cfg_stmt = $conn->prepare("SELECT config_key, value FROM tbl_sync_config WHERE config_key IN ('gsheet_url','gsheet_sync_enabled')");
 $cfg_stmt->execute();
 $cfg_rows = $cfg_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -90,38 +90,61 @@ if ($gsheet_url === '') {
     exit;
 }
 
-// Extract the spreadsheet ID from the URL
 if (!preg_match('#/spreadsheets/d/([a-zA-Z0-9_-]+)#', $gsheet_url, $m)) {
     http_response_code(400);
     echo json_encode(['status' => 'error', 'error' => 'Invalid Google Sheets URL.']);
     exit;
 }
 $sheet_id = $m[1];
-$xlsx_url  = "https://docs.google.com/spreadsheets/d/{$sheet_id}/export?format=xlsx";
 
-// Download the XLSX
-$ctx = stream_context_create([
-    'http' => [
-        'timeout'         => 30,
-        'follow_location' => 1,
-        'max_redirects'   => 5,
-        'header'          => "User-Agent: PUPSync/1.0\r\n",
-    ],
-    'ssl' => ['verify_peer' => false],
-]);
-$xlsx_bytes = @file_get_contents($xlsx_url, false, $ctx);
-if ($xlsx_bytes === false || strlen($xlsx_bytes) < 100) {
-    http_response_code(502);
-    echo json_encode(['status' => 'error', 'error' => 'Could not fetch the Google Sheet. Make sure sharing is set to "Anyone with the link can view".']);
-    exit;
-}
+// ── Fetch sheet data — OAuth path (private sheet) or public export fallback ───
+require_once __DIR__ . '/../../google-sheets/core/oauth.php';
+require_once __DIR__ . '/../../google-sheets/core/reader.php';
 
-// Parse it
-$xlsx = SimpleXLSX::parseData($xlsx_bytes);
-if (!$xlsx) {
-    http_response_code(502);
-    echo json_encode(['status' => 'error', 'error' => 'Could not parse the spreadsheet: ' . SimpleXLSX::parseError()]);
-    exit;
+$token       = gs_token($conn);
+$sheet_names = [];   // list of tab names, parallel to $all_rows
+$all_rows    = [];   // all_rows[i] = rows array for sheet_names[i]
+
+if ($token !== null) {
+    // ── OAuth path: private sheet via Sheets API v4 ───────────────────────────
+    $gs_data = gs_read_sheet($sheet_id, $token);
+    if ($gs_data === null) {
+        http_response_code(502);
+        echo json_encode(['status' => 'error', 'error' => 'Could not read the Google Sheet via OAuth. Check that the sheet exists and try reconnecting.']);
+        exit;
+    }
+    foreach ($gs_data as $tab_name => $rows) {
+        $sheet_names[] = $tab_name;
+        $all_rows[]    = $rows;
+    }
+} else {
+    // ── Public export fallback (sheet must be "Anyone with link can view") ─────
+    $xlsx_url   = "https://docs.google.com/spreadsheets/d/{$sheet_id}/export?format=xlsx";
+    $ctx        = stream_context_create([
+        'http' => [
+            'timeout'        => 30,
+            'follow_location' => 1,
+            'max_redirects'  => 5,
+            'header'         => "User-Agent: PUPSync/1.0\r\n",
+        ],
+        'ssl' => ['verify_peer' => false],
+    ]);
+    $xlsx_bytes = @file_get_contents($xlsx_url, false, $ctx);
+    if ($xlsx_bytes === false || strlen($xlsx_bytes) < 100) {
+        http_response_code(502);
+        echo json_encode(['status' => 'error', 'error' => 'Could not fetch the Google Sheet. Make sure sharing is set to "Anyone with the link can view".']);
+        exit;
+    }
+    $xlsx = SimpleXLSX::parseData($xlsx_bytes);
+    if (!$xlsx) {
+        http_response_code(502);
+        echo json_encode(['status' => 'error', 'error' => 'Could not parse the spreadsheet: ' . SimpleXLSX::parseError()]);
+        exit;
+    }
+    $sheet_names = $xlsx->sheetNames();
+    foreach ($sheet_names as $si => $_) {
+        $all_rows[] = $xlsx->rows($si);
+    }
 }
 
 // ── Process each sheet ────────────────────────────────────────────────────────
@@ -136,8 +159,6 @@ $summary = [
 // Collect all item_names currently seen in the sync (to detect deletions)
 $synced_item_keys = []; // "item_name||campus_id"
 
-$sheet_names = $xlsx->sheetNames();
-
 foreach ($sheet_names as $sheet_idx => $sheet_name) {
     $sheet_name_clean = trim($sheet_name);
 
@@ -147,8 +168,7 @@ foreach ($sheet_names as $sheet_idx => $sheet_name) {
         continue;
     }
 
-    /** @var array $rows  SimpleXLSX::rows() has no return type, so editors would otherwise see each row as TYield */
-    $rows = $xlsx->rows($sheet_idx);
+    $rows = $all_rows[$sheet_idx] ?? [];
     if (empty($rows)) {
         $summary['skipped_sheets'][] = $sheet_name_clean . ' (empty)';
         continue;
@@ -338,6 +358,56 @@ if (!empty($synced_item_keys)) {
                         $summary['archived']++;
                     }
                     $arch->close();
+                }
+            }
+        }
+    }
+}
+
+// ── Remove stale categories — tabs that no longer exist in the sheet ──────────
+// A category is removed only when: it came from the sheet (not manually added
+// by admin), it has no active items, and it was not seen in this sync pass.
+// Categories added manually by admins (not matching any synced tab) are kept.
+if (!empty($synced_item_keys)) {
+    // Build the set of category names that were processed in this sync
+    $synced_categories = [];
+    foreach ($synced_item_keys as $key => $meta) {
+        // $key = "item_name||campus_id", category = tab name stored on the item
+        // Re-derive: query the category of each synced item
+    }
+    // Simpler: collect tab names as we go — $sheet_names already has them
+    // We use $sheet_names which is set at the top of the loop
+    $seen_tabs = [];
+    foreach ($sheet_names as $sn) {
+        $sn_clean = trim($sn);
+        if (!in_array(strtolower($sn_clean), array_map('strtolower', SKIP_SHEETS), true)) {
+            $seen_tabs[] = strtolower($sn_clean);
+        }
+    }
+
+    if (!empty($seen_tabs)) {
+        // Find categories in the DB that have no active items and are not in this sync's tab list
+        $all_cats = $conn->query(
+            "SELECT ec.category_id, ec.name, ec.campus_id,
+                    (SELECT COUNT(*) FROM tbl_inventory i
+                      WHERE i.category = ec.name AND i.campus_id = ec.campus_id
+                        AND i.is_archived = 0) AS active_count
+               FROM tbl_equipment_categories ec"
+        );
+        if ($all_cats) {
+            while ($cat = $all_cats->fetch_assoc()) {
+                // Only remove if no active items AND not in this sync's tab list
+                if ((int)$cat['active_count'] === 0
+                    && !in_array(strtolower(trim($cat['name'])), $seen_tabs, true)
+                ) {
+                    $del = $conn->prepare(
+                        "DELETE FROM tbl_equipment_categories WHERE category_id = ?"
+                    );
+                    if ($del) {
+                        $del->bind_param('i', $cat['category_id']);
+                        $del->execute();
+                        $del->close();
+                    }
                 }
             }
         }

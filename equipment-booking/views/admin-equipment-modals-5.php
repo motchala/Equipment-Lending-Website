@@ -28,8 +28,12 @@
                         <select name="category" id="eqm-category" class="form-control-custom" required>
                             <option value="">Select category...</option>
                             <?php
-                            foreach (['Audio/Visual', 'Cables & Connectors', 'Computing', 'Lab Equipment', 'Networking', 'Power', 'Tools', 'Others'] as $c) {
-                                echo "<option value=\"$c\">$c</option>";
+                            $eqm_cats = $conn->query(
+                                "SELECT DISTINCT name FROM tbl_equipment_categories ORDER BY name ASC"
+                            );
+                            while ($eqm_cats && ($eqm_c = $eqm_cats->fetch_assoc())) {
+                                echo '<option value="' . htmlspecialchars($eqm_c['name'], ENT_QUOTES) . '">'
+                                   . htmlspecialchars($eqm_c['name']) . '</option>';
                             }
                             ?>
                         </select>
