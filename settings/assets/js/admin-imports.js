@@ -1019,6 +1019,96 @@ var unlocked = true;      // no password lock any more: the screen is always ope
                 refreshButtons();
             }
 
+            /* ── Google OAuth connection status ─────────────────────────── */
+            var connectModal  = document.getElementById('gsConnectModal');
+            var connectBtn    = role(card, 'gs-connect');
+            var disconnectBtn = role(card, 'gs-disconnect');
+            var connectCancel = document.getElementById('gsConnectCancel');
+
+            // Enable the Connect button only when a valid Sheets URL is typed
+            if (connectBtn && urlInput) {
+                function refreshConnectBtn() {
+                    var val = urlInput.value.trim();
+                    connectBtn.disabled = !ready || busy ||
+                        !val.match(/^https:\/\/docs\.google\.com\/spreadsheets\/d\//);
+                }
+                urlInput.addEventListener('input', refreshConnectBtn);
+                // Also refresh when the overview loads and sets ready = true
+                var _origLoad = load;
+                load = function () {
+                    return _origLoad().then(function () { refreshConnectBtn(); });
+                };
+
+                connectBtn.addEventListener('click', function () {
+                    if (connectBtn.disabled || busy) return;
+                    // Save the URL first, then open the modal
+                    busy = true; alertHide();
+                    saveUrl().then(function (ok) {
+                        busy = false;
+                        if (ok && connectModal) {
+                            connectModal.classList.add('ps-modal-open');
+                        }
+                        refreshButtons();
+                        refreshConnectBtn();
+                    });
+                });
+            }
+            if (connectCancel && connectModal) {
+                connectCancel.addEventListener('click', function () {
+                    connectModal.classList.remove('ps-modal-open');
+                });
+            }
+            if (disconnectBtn) {
+                disconnectBtn.addEventListener('click', function () {
+                    function doDisconnect() {
+                        alertHide();
+                        var fd = new FormData();
+                        fd.append('csrf_token', csrf());
+                        fetch('google-sheets/api/disconnect.php', { method: 'POST', credentials: 'same-origin', body: fd })
+                            .then(function (r) { return r.json(); })
+                            .then(function (d) {
+                                if (d && d.status === 'success') {
+                                    window.location.reload();
+                                } else {
+                                    alertShow((d && d.message) || 'Could not disconnect. Please try again.', 'err');
+                                }
+                            })
+                            .catch(function () { alertShow('Network error. Please try again.', 'err'); });
+                    }
+
+                    // Show confirmation in the card alert area
+                    alertShow('Are you sure you want to disconnect Google Sheets? PUPSync will no longer sync to the sheet.', 'info');
+
+                    // Append confirm + cancel buttons directly to the alert element (alertShow uses textContent, not innerHTML)
+                    var btnRow = el('div', null);
+                    btnRow.style.marginTop = '.6rem';
+
+                    var confirmBtn = el('button', 'ps-btn ps-btn--sm', 'Yes, disconnect');
+                    confirmBtn.type = 'button';
+                    confirmBtn.style.marginRight = '.4rem';
+                    confirmBtn.addEventListener('click', doDisconnect);
+
+                    var cancelBtn = el('button', 'ps-btn ps-btn--ghost ps-btn--sm', 'Cancel');
+                    cancelBtn.type = 'button';
+                    cancelBtn.addEventListener('click', alertHide);
+
+                    btnRow.appendChild(confirmBtn);
+                    btnRow.appendChild(cancelBtn);
+                    alertEl.appendChild(btnRow);
+                });
+            }
+
+            // Show success/error toast if returning from OAuth callback
+            if (window.location.search.includes('gs_connected=1')) {
+                alertShow('Google Sheets connected successfully.', 'ok');
+                history.replaceState({}, '', window.location.pathname + window.location.hash);
+            }
+            if (window.location.search.includes('gs_error=')) {
+                var msg = decodeURIComponent((window.location.search.match(/gs_error=([^&]*)/) || [])[1] || '');
+                alertShow(msg || 'Could not connect to Google. Please try again.', 'err');
+                history.replaceState({}, '', window.location.pathname + window.location.hash);
+            }
+
             return { reset: reset, load: load };
         }
 

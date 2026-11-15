@@ -45,6 +45,7 @@
             e.preventDefault();
             var fd = new FormData(itemForm);
             fd.set('ajax', '1');
+            fd.set('add_item', '1');
 
             var submitBtn = itemForm.querySelector('[name="add_item"]');
             if (submitBtn) {

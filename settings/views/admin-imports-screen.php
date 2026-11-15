@@ -13,6 +13,11 @@
 ============================================================ -->
 <?php if ($is_super_admin): ?>
 <?php
+// OAuth connection status — shown in the equipment card header
+require_once __DIR__ . '/../../google-sheets/core/oauth.php';
+$_gs_conn = getDB();
+$_gs_connected = gs_oauth_connected($_gs_conn);
+
 $imp_cards = [
     'equipment' => [
         // Not a file upload: drawn by admin-imports-equipment-card.php (Google Sheets link, Sync now, categories)
@@ -21,6 +26,7 @@ $imp_cards = [
         'sub'     => 'Equipment list synced from a Google Sheet',
         'stats'   => ['Items', 'Categories', 'Archived'],
         'what'    => 'Items added to equipment inventory for loan. They are read from the linked Google Sheet, and each tab of the sheet becomes a category.',
+        'gs_connected' => $_gs_connected,
     ],
     'faculty' => [
         'title'  => 'Faculty Registry',
@@ -337,4 +343,31 @@ $imp_cards = [
 
     </div><!-- /imp-shell -->
 </div><!-- /panel-imports -->
+<!-- ── Google Sheets OAuth Connect Modal ─────────────────────────────── -->
+<div class="ps-modal-backdrop" id="gsConnectModal">
+    <div class="ps-modal ps-modal--sm">
+        <div class="ps-modal-head">
+            <div class="ps-modal-head-icon">
+                <span class="material-symbols-outlined">add_link</span>
+            </div>
+            <h3>Connect Google Sheet</h3>
+        </div>
+        <div class="ps-modal-body">
+            <p style="font-size:.875rem;color:var(--text-dark);margin:0 0 .75rem;">
+                You'll be taken to Google to allow PUPSync to read and edit your spreadsheet.
+                Make sure you're signed in to the Google account that has access to the sheet before continuing.
+            </p>
+            <p style="font-size:.875rem;color:var(--text-dark);margin:0 0 1.25rem;">
+                After clicking Allow on Google's screen, you'll come back here automatically.
+            </p>
+            <div class="ps-modal-actions">
+                <button type="button" class="ps-btn ps-btn--ghost" id="gsConnectCancel">Not now</button>
+                <a class="ps-btn ps-btn--primary" id="gsConnectGo" href="google-sheets/api/connect.php">
+                    <span class="material-symbols-outlined">open_in_new</span>
+                    Continue to Google
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
 <?php endif; ?>
