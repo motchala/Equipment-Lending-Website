@@ -82,9 +82,33 @@
 
     <!-- ================================================================
      MODALS: SETTINGS -> IMPORTS
+     imp-confirm-modal  the in-system "are you sure?" box (replace a list, delete a category)
      imp-list-modal   read-only list of what was imported
      imp-files-modal  every original file that was imported (View / Download)
     ================================================================ -->
+    <div class="ps-modal-backdrop" id="imp-confirm-modal">
+        <div class="ps-modal ps-modal--sm imp-confirm" role="alertdialog" aria-modal="true" aria-labelledby="imp-confirm-title" aria-describedby="imp-confirm-text">
+            <div class="ps-modal-head">
+                <div class="ps-modal-head-icon ps-mhi--warning" id="imp-confirm-head-icon">
+                    <span class="material-symbols-outlined" id="imp-confirm-icon">warning</span>
+                </div>
+                <h3 id="imp-confirm-title">Are you sure?</h3>
+                <button class="ps-modal-close" id="imp-confirm-close" aria-label="Close">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="ps-modal-body">
+                <p class="imp-auth-lead" id="imp-confirm-text"></p>
+            </div>
+            <div class="ps-modal-foot">
+                <button class="ps-btn ps-btn--ghost" id="imp-confirm-cancel">Cancel</button>
+                <button class="ps-btn ps-btn--danger" id="imp-confirm-ok">
+                    <span id="imp-confirm-ok-text">Confirm</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div class="ps-modal-backdrop" id="imp-list-modal">
         <div class="ps-modal ps-modal--lg imp-list-modal">
             <div class="ps-modal-head">

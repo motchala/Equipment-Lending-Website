@@ -334,7 +334,7 @@
             '<span class="fcs-cls-top"><span class="fcs-cls-title">' + esc(c.purpose) + '</span>' +
             '<span class="fcs-cls-dur">' + esc(duration(c.minutes)) + '</span></span>' +
             '<span class="fcs-cls-when">' + esc(DOW[c.dow - 1] || '') + ' &middot; ' + esc(range(s, e)) + '</span>' +
-            (subject ? '<span class="fcs-cls-where">' + icon('menu_book') + '<span>' + esc(subject) + '</span></span>' : '') +
+            (subject ? '<span class="fcs-cls-where fcs-cls-subject">' + icon('menu_book') + '<span>' + esc(subject) + '</span></span>' : '') +
             (where ? '<span class="fcs-cls-where">' + icon('location_on') + '<span>' + esc(where) + '</span></span>' : '') +
             '<span class="fcs-cls-meta">' + esc(count) + ' &middot; ' + esc(state) + '</span>' +
             '</button>';

@@ -68,12 +68,7 @@ if (!$date_obj || $date_obj->format('Y-m-d') !== $res_date) {
     echo json_encode(['error' => 'reservation_date is not a valid calendar date.']);
     exit;
 }
-// Closed day — no room reservations on Sundays
-if ($date_obj->format('N') === '7') {
-    http_response_code(400);
-    echo json_encode(['error' => 'Reservations are not available on Sundays.']);
-    exit;
-}
+// Open days are checked below, once the Arbitration settings can be read
 
 // start_time — must match HH:MM and be within 00:00–23:59
 $start_time = isset($_GET['start_time']) ? trim($_GET['start_time']) : '';
@@ -123,6 +118,16 @@ if ($start_time >= $end_time) {
 // ── 1.3 Overlap query and JSON response ──────────────────────────────────────
 
 $conn = getDB();
+
+// ── Closed day (Settings → Arbitration → Room schedule → open days) ──────────
+require_once __DIR__ . '/../core/room-rules.php';
+RoomRules::load($conn);
+$closed_err = RoomRules::closedDayError($res_date);
+if ($closed_err !== null) {
+    http_response_code(400);
+    echo json_encode(['error' => $closed_err]);
+    exit;
+}
 
 // Strict-overlap predicate: existing.start_time < req.end_time
 //                       AND existing.end_time   > req.start_time

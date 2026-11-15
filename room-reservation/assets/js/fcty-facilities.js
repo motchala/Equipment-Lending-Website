@@ -269,7 +269,7 @@
             '<span class="fcty-panel-letter" aria-hidden="true">' + esc(b.letter) + '</span>' +
             '<span class="fcty-panel-live"><span class="fcty-dot"></span><span data-live-count>' + free + ' free now</span></span>' +
             '<span class="fcty-panel-info">' +
-            '<span class="fcty-panel-name">' + esc(b.base) + (b.tag ? '<em class="fcty-tag">' + esc(b.tag) + '</em>' : '') + '</span>' +
+            '<span class="fcty-panel-name"><span class="fcty-panel-name-text">' + esc(b.base) + '</span>' + (b.tag ? '<em class="fcty-tag">' + esc(b.tag) + '</em>' : '') + '</span>' +
             '<span class="fcty-panel-meta">' + plural(b.rooms, 'room') + ' \u00b7 ' + plural(b.floors.length, 'floor') + '</span>' +
             '<span class="fcty-panel-reveal"><span class="fcty-panel-floors">' +
             b.floors.map(function (f) { return '<span>' + esc(f.label) + '</span>'; }).join('') +

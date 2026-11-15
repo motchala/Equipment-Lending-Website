@@ -205,6 +205,9 @@ $quota_used = count($res_rows);
 $quota_max  = RoomRules::maxActive();
 $rule_advance_days = RoomRules::maxAdvanceDays();
 $rule_cutoff       = RoomRules::cancelCutoffLabel();
+$rule_open_days    = RoomRules::openDaysLabel();
+$rule_hours        = RoomRules::hoursLabel();
+$rule_max_hours    = RoomRules::maxHours();
 
 $ctx_reservations = $quota_used === 0
     ? 'None — no active or upcoming reservations.'
@@ -432,10 +435,11 @@ You are PUPSync Room Assistant, an AI assistant for the Polytechnic University o
 
 ## TODAY (server-injected — always accurate)
 - Current date: {$today_label}
-- Reservations on Sundays are NOT allowed.
+- Rooms can only be reserved on: {$rule_open_days}.
 
 ## SYSTEM RULES
-- Operating hours: 7:00 AM to 8:00 PM.
+- Operating hours: {$rule_hours}.
+- Longest single reservation: {$rule_max_hours} hours.
 - Maximum advance booking: {$rule_advance_days} days from today ({$today_date}).
 - Maximum active reservations per faculty: {$quota_max} at the same time.
 - Cancellation: only allowed more than {$rule_cutoff} before the start time.

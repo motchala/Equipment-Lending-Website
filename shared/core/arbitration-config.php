@@ -49,6 +49,12 @@ final class ArbitrationConfig
         'room_letter_required'           => ['type' => 'bool', 'default' => false],
         'room_expiry_mode'               => ['type' => 'enum', 'default' => 'day', 'allowed' => ['day', 'start', 'never']],
 
+        // ── Rooms: schedule (read through RoomRules). Days are ISO numbers: 1 = Monday … 7 = Sunday ──
+        'room_day_start'                 => ['type' => 'time', 'default' => '07:00'],
+        'room_day_end'                   => ['type' => 'time', 'default' => '20:00'],
+        'room_open_days'                 => ['type' => 'int_list', 'default' => [1, 2, 3, 4, 5, 6], 'allowed' => [1, 2, 3, 4, 5, 6, 7]],
+        'room_max_hours'                 => ['type' => 'int', 'default' => 13, 'min' => 1, 'max' => 16],
+
         // ── Semester (shown as a small tag on every dashboard; the dates also anchor the service-survey
         //    reporting windows). Never saved yet? all() falls back to the dates already in the survey settings. ──
         'semester_name'                  => ['type' => 'enum', 'default' => 'none', 'allowed' => ['first', 'second', 'summer', 'none']],
@@ -253,6 +259,12 @@ final class ArbitrationConfig
     public static function crossCheck(array $merged): array
     {
         $errors = [];
+        $roomStart = self::hour((string)$merged['room_day_start']);
+        $roomEnd   = self::hour((string)$merged['room_day_end']);
+        if ($roomEnd - $roomStart < 1) {
+            $errors['room_day_end'] = 'Reservations must end at least 1 hour after they can start.';
+        }
+
         $start = self::hour((string)$merged['equip_day_start']);
         $end   = self::hour((string)$merged['equip_day_end']);
 
@@ -436,6 +448,10 @@ final class ArbitrationConfig
     /** If hand-edited rows leave no usable window, fall back to the default hours. */
     private static function repairHours(array $v): array
     {
+        if (self::hour((string)$v['room_day_end']) - self::hour((string)$v['room_day_start']) < 1) {
+            $v['room_day_start'] = self::SCHEMA['room_day_start']['default'];
+            $v['room_day_end']   = self::SCHEMA['room_day_end']['default'];
+        }
         $start = self::hour((string)$v['equip_day_start']);
         $end   = self::hour((string)$v['equip_day_end']);
         if ($end - $start < max(1, min($v['equip_durations']))) {

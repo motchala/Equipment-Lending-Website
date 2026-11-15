@@ -94,10 +94,7 @@ $date_obj = DateTimeImmutable::createFromFormat('Y-m-d', $res_date,
 if (!$date_obj || $date_obj->format('Y-m-d') !== $res_date) {
     slot_respond(400, ['error' => 'date is not a valid calendar date.']);
 }
-// No Sundays
-if ($date_obj->format('N') === '7') {
-    slot_respond(400, ['error' => 'Reservations are not available on Sundays.']);
-}
+// Open days are checked below, once the Arbitration settings can be read
 // Not in the past
 $today = new DateTimeImmutable('today', new DateTimeZone('Asia/Manila'));
 if ($date_obj < $today) {
@@ -110,9 +107,6 @@ $start_time = trim((string)($body['start_time'] ?? ''));
 if (!preg_match('/^\d{2}:\d{2}$/', $start_time)) {
     slot_respond(400, ['error' => 'start_time must be in HH:MM format.']);
 }
-if ($start_time < '07:00' || $start_time >= '20:00') {
-    slot_respond(400, ['error' => 'Start time must be between 7:00 AM and 8:00 PM.']);
-}
 
 // ── Validate end_time ─────────────────────────────────────────────────────────
 $end_time = trim((string)($body['end_time'] ?? ''));
@@ -121,9 +115,6 @@ if (!preg_match('/^\d{2}:\d{2}$/', $end_time)) {
 }
 if ($end_time <= $start_time) {
     slot_respond(400, ['error' => 'End time must be after start time.']);
-}
-if ($end_time > '20:00') {
-    slot_respond(400, ['error' => 'End time cannot be after 8:00 PM.']);
 }
 
 // ── Database connection ───────────────────────────────────────────────────────
@@ -134,6 +125,20 @@ $conn->set_charset('utf8mb4');
 // ── How far ahead a room can be reserved (Settings → Arbitration → Reservation rules) ──
 require_once __DIR__ . '/../core/room-rules.php';
 RoomRules::load($conn);
+$closed_err = RoomRules::closedDayError($res_date);
+if ($closed_err !== null) {
+    slot_respond(400, ['error' => $closed_err]);
+}
+if ($start_time < RoomRules::dayStart() || $start_time >= RoomRules::dayEnd()) {
+    slot_respond(400, ['error' => 'Start time must be between ' . RoomRules::clock(RoomRules::dayStart()) . ' and ' . RoomRules::clock(RoomRules::dayEnd()) . '.']);
+}
+if ($end_time > RoomRules::dayEnd()) {
+    slot_respond(400, ['error' => 'End time cannot be after ' . RoomRules::clock(RoomRules::dayEnd()) . '.']);
+}
+$length_err = RoomRules::lengthError($start_time, $end_time);
+if ($length_err !== null) {
+    slot_respond(400, ['error' => $length_err]);
+}
 $advance_err = RoomRules::advanceError($date_obj->format('Y-m-d'));
 if ($advance_err !== null) {
     slot_respond(400, ['error' => $advance_err]);
