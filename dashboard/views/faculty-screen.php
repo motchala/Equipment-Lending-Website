@@ -277,6 +277,19 @@
 
                     <div class="fdb-grid">
 
+                        <!-- Upcoming classes: the next 3 subjects this faculty member teaches (drawn live by
+                             dashboard/assets/js/faculty-upcoming-classes.js). It is an <article>, not a <section>, so the
+                             phone layout's "nth section" ordering rules are untouched. -->
+                        <article class="fdb-card fdb-area-classes" aria-labelledby="fdbClassesTitle">
+                            <header class="fdb-card-head">
+                                <h2 id="fdbClassesTitle">Upcoming Classes</h2>
+                                <button type="button" class="fdb-link" data-action="go-tab" data-tab="rooms">View schedule</button>
+                            </header>
+                            <div class="fdbc-body" id="fdbClassesBody" aria-live="polite" aria-busy="true">
+                                <div class="fdbc-skel" aria-hidden="true"><span></span><span></span><span></span></div>
+                            </div>
+                        </article>
+
                         <!-- My activity: borrows + reservations, Months / Week (CSS-only toggle), hover for details -->
                         <section class="fdb-card fdb-area-chart" aria-labelledby="fdbChartTitle">
                             <?php if ($fdb_has_chart): ?>

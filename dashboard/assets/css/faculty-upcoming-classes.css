@@ -1,0 +1,211 @@
+/* ============================================================
+   Dashboard -> Upcoming Classes
+   The next 3 subjects this faculty member teaches. Plain text with a clear hierarchy (no card per subject):
+   when (small caps) > subject (largest, bold) > code and section > time + duration > room.
+   Drawn by dashboard/assets/js/faculty-upcoming-classes.js
+   ============================================================ */
+
+/* full-width strip at the top of the dashboard grid */
+#panel-home .fdb-area-classes {
+    grid-column: span 12;
+}
+
+#panel-home .fdbc-body {
+    min-height: 118px;
+}
+
+#panel-home .fdbc-list {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+#panel-home .fdbc-item {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+    padding: 2px 22px;
+    border-left: 1px solid var(--fdb-line);
+}
+
+#panel-home .fdbc-item:first-child {
+    padding-left: 0;
+    border-left: 0;
+}
+
+#panel-home .fdbc-item:last-child {
+    padding-right: 0;
+}
+
+/* 1 · when: Today / Tomorrow / Wednesday, Nov 18 / In session now */
+#panel-home .fdbc-when {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: .68rem;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--fdb-muted);
+}
+
+#panel-home .fdbc-item.is-today .fdbc-when {
+    color: var(--color-primary);
+}
+
+#panel-home .fdbc-item.is-live .fdbc-when {
+    color: #1f7a45;
+}
+
+#panel-home .fdbc-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #1f7a45;
+    box-shadow: 0 0 0 0 rgba(31, 122, 69, .45);
+    animation: fdbcPulse 1.8s ease-out infinite;
+}
+
+/* 2 · subject */
+#panel-home .fdbc-subject {
+    margin-top: 2px;
+    font-size: 1.02rem;
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: -.005em;
+    color: var(--fdb-ink);
+    overflow-wrap: anywhere;
+}
+
+/* 3 · code and section */
+#panel-home .fdbc-code {
+    font-size: .8rem;
+    font-weight: 600;
+    color: color-mix(in srgb, var(--fdb-ink) 78%, transparent);
+}
+
+/* 4 · time, with the duration beside it */
+#panel-home .fdbc-time {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-top: 6px;
+    font-size: .9rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--fdb-ink);
+}
+
+#panel-home .fdbc-dur {
+    font-size: .76rem;
+    font-weight: 600;
+    color: var(--fdb-muted);
+}
+
+/* 5 · room */
+#panel-home .fdbc-room {
+    font-size: .8rem;
+    font-weight: 500;
+    color: var(--fdb-muted);
+}
+
+/* loading, empty and error states */
+#panel-home .fdbc-skel {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 22px;
+}
+
+#panel-home .fdbc-skel span {
+    height: 104px;
+    border-radius: 6px;
+    background: var(--color-surface-container);
+    animation: fdbcFade 1.4s ease-in-out infinite;
+}
+
+#panel-home .fdbc-empty {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 84px;
+    color: var(--fdb-muted);
+    font-size: .88rem;
+}
+
+#panel-home .fdbc-empty .material-symbols-outlined {
+    font-size: 24px;
+}
+
+#panel-home .fdbc-empty button {
+    border: 0;
+    background: none;
+    padding: 0;
+    font: 700 .88rem var(--font-sans);
+    color: var(--color-primary);
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+@keyframes fdbcPulse {
+    70% {
+        box-shadow: 0 0 0 7px rgba(31, 122, 69, 0);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(31, 122, 69, 0);
+    }
+}
+
+@keyframes fdbcFade {
+
+    0%,
+    100% {
+        opacity: .55;
+    }
+
+    50% {
+        opacity: 1;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    #panel-home .fdbc-dot,
+    #panel-home .fdbc-skel span {
+        animation: none;
+    }
+}
+
+/* tablet and phone: one class per row, separated by a thin line */
+@media (max-width: 900px) {
+
+    #panel-home .fdbc-list,
+    #panel-home .fdbc-skel {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    #panel-home .fdbc-item,
+    #panel-home .fdbc-item:first-child,
+    #panel-home .fdbc-item:last-child {
+        padding: 14px 0;
+        border-left: 0;
+        border-top: 1px solid var(--fdb-line);
+    }
+
+    #panel-home .fdbc-item:first-child {
+        padding-top: 2px;
+        border-top: 0;
+    }
+
+    #panel-home .fdbc-item:last-child {
+        padding-bottom: 2px;
+    }
+}
+
+/* the phone layout stacks the dashboard sections in a set order: classes come right after "Needs your attention" */
+html.rx-mobile #panel-home .fdb-area-classes {
+    order: 2;
+}

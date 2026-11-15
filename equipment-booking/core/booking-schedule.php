@@ -92,19 +92,55 @@ final class BookingSchedule
         return self::$rules ?? self::buildRules(ArbitrationConfig::defaults());
     }
 
-    public static function dayStart(): string       { return (string)self::liveRules()['dayStart']; }
-    public static function dayEnd(): string         { return (string)self::liveRules()['dayEnd']; }
-    public static function lastStart(): string      { return (string)self::liveRules()['lastStart']; }
-    public static function maxAhead(): int          { return (int)self::liveRules()['maxAhead']; }
-    public static function graceMin(): int          { return (int)self::liveRules()['graceMin']; }
+    public static function dayStart(): string
+    {
+        return (string)self::liveRules()['dayStart'];
+    }
+    public static function dayEnd(): string
+    {
+        return (string)self::liveRules()['dayEnd'];
+    }
+    public static function lastStart(): string
+    {
+        return (string)self::liveRules()['lastStart'];
+    }
+    public static function maxAhead(): int
+    {
+        return (int)self::liveRules()['maxAhead'];
+    }
+    public static function graceMin(): int
+    {
+        return (int)self::liveRules()['graceMin'];
+    }
     /** @return list<int> */
-    public static function durations(): array       { return self::liveRules()['durations']; }
-    public static function maxBorrowDays(): int     { return (int)self::liveRules()['maxBorrowDays']; }
-    public static function maxItems(): int          { return (int)self::liveRules()['maxItems']; }
-    public static function maxExtensions(): int     { return (int)self::liveRules()['maxExtensions']; }
-    public static function cancelCutoffSeconds(): int { return (int)self::liveRules()['cancelCutoffMin'] * 60; }
-    public static function overdueBlock(): bool     { return (bool)self::liveRules()['overdueBlock']; }
-    public static function letterRequired(): bool   { return (bool)self::liveRules()['letterRequired']; }
+    public static function durations(): array
+    {
+        return self::liveRules()['durations'];
+    }
+    public static function maxBorrowDays(): int
+    {
+        return (int)self::liveRules()['maxBorrowDays'];
+    }
+    public static function maxItems(): int
+    {
+        return (int)self::liveRules()['maxItems'];
+    }
+    public static function maxExtensions(): int
+    {
+        return (int)self::liveRules()['maxExtensions'];
+    }
+    public static function cancelCutoffSeconds(): int
+    {
+        return (int)self::liveRules()['cancelCutoffMin'] * 60;
+    }
+    public static function overdueBlock(): bool
+    {
+        return (bool)self::liveRules()['overdueBlock'];
+    }
+    public static function letterRequired(): bool
+    {
+        return (bool)self::liveRules()['letterRequired'];
+    }
 
     /** The rules the Borrow Request screens (JS) need. */
     public static function metaRules(): array
@@ -235,7 +271,6 @@ final class BookingSchedule
         try {
             self::markOverdue($conn, $ready);
             self::expireNoShows($conn, $ready);
-            self::expireFutureNoShows($conn);
             if ($ready) {
                 self::activateDue($conn);
             }
@@ -269,7 +304,9 @@ final class BookingSchedule
         $stmt  = $conn->prepare("UPDATE tbl_requests SET status = 'Overdue' WHERE status = 'On Loan' AND " . self::pastReturnSql($ready));
         if ($stmt) {
             // Without the booking columns only the date can be compared; the 2nd/3rd values are equal so the clause reduces to "return_date < today"
-            $a = $today; $b = $ready ? $today : 'x'; $c = $ready ? $now : 'x';
+            $a = $today;
+            $b = $ready ? $today : 'x';
+            $c = $ready ? $now : 'x';
             $stmt->bind_param('sss', $a, $b, $c);
             $stmt->execute();
             $stmt->close();
@@ -299,7 +336,9 @@ final class BookingSchedule
         if (!$sel) {
             return 0;
         }
-        $a = $today; $b = $ready ? $today : 'x'; $c = $ready ? $now : 'x';
+        $a = $today;
+        $b = $ready ? $today : 'x';
+        $c = $ready ? $now : 'x';
         $sel->bind_param('sss', $a, $b, $c);
         $sel->execute();
         $rows = $sel->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -333,107 +372,6 @@ final class BookingSchedule
                 }
             }
         }
-        return $closed;
-    }
-
-    /**
-     * Future-date bookings that were approved but never collected within 3 business days
-     * (Sundays excluded) after the borrow date are cancelled as no-shows.
-     *
-     * Pickup deadline = borrow_date + 3 business days at closing time (equip_day_end).
-     * Runs lazily inside tick() — no cron job needed.
-     *
-     * @return int how many bookings were closed by this call
-     */
-    public static function expireFutureNoShows(mysqli $conn): int
-    {
-        if (!self::ensureSchema($conn)) {
-            return 0;
-        }
-
-        $now     = new DateTimeImmutable('now', new DateTimeZone('Asia/Manila'));
-        $dayEnd  = self::dayEnd();   // e.g. '21:00' from ArbitrationConfig / DB
-        $closed  = 0;
-        $reason  = 'Not collected – the booking was not picked up within 3 business days.';
-        $rule    = 'rule_no_show';
-
-        // Fetch all Approved future-date bookings not yet claimed
-        $sel = $conn->prepare(
-            "SELECT id, equipment_name, borrow_qty, stock_applied, borrow_date
-               FROM tbl_requests
-              WHERE status       = 'Approved'
-                AND booking_mode = 'future'
-                AND claimed_at   IS NULL
-                AND borrow_date  IS NOT NULL"
-        );
-        if (!$sel) {
-            return 0;
-        }
-        $sel->execute();
-        $rows = $sel->get_result()->fetch_all(MYSQLI_ASSOC);
-        $sel->close();
-
-        foreach ($rows as $row) {
-            $borrowDate = $row['borrow_date'];   // 'YYYY-MM-DD'
-
-            // Compute deadline: borrow_date + 3 business days (skip Sundays), at closing time
-            try {
-                $deadline = new DateTimeImmutable(
-                    $borrowDate . ' ' . $dayEnd,
-                    new DateTimeZone('Asia/Manila')
-                );
-                $added = 0;
-                while ($added < 3) {
-                    $deadline = $deadline->modify('+1 day');
-                    // Sunday = 0
-                    if ((int)$deadline->format('w') !== 0) {
-                        $added++;
-                    }
-                }
-            } catch (\Throwable $e) {
-                error_log('BookingSchedule::expireFutureNoShows — deadline calc: ' . $e->getMessage());
-                continue;
-            }
-
-            if ($now < $deadline) {
-                continue;   // still within the pickup window
-            }
-
-            // Cancel the booking
-            $upd = $conn->prepare(
-                "UPDATE tbl_requests
-                    SET status = 'Cancelled', arbitration_rule = ?, reason = ?, stock_applied = 0
-                  WHERE id = ? AND status = 'Approved' AND claimed_at IS NULL"
-            );
-            if (!$upd) {
-                continue;
-            }
-            $id = (int)$row['id'];
-            $upd->bind_param('ssi', $rule, $reason, $id);
-            $upd->execute();
-            $won = $upd->affected_rows === 1;
-            $upd->close();
-
-            if (!$won) {
-                continue;   // claimed or cancelled a moment ago by someone else
-            }
-            $closed++;
-
-            // Restore inventory if stock was already taken off the shelf
-            if ((int)($row['stock_applied'] ?? 0) === 1) {
-                $back = $conn->prepare(
-                    'UPDATE tbl_inventory SET quantity = quantity + ? WHERE item_name = ?'
-                );
-                if ($back) {
-                    $q    = max(1, (int)$row['borrow_qty']);
-                    $name = (string)$row['equipment_name'];
-                    $back->bind_param('is', $q, $name);
-                    $back->execute();
-                    $back->close();
-                }
-            }
-        }
-
         return $closed;
     }
 
@@ -899,8 +837,10 @@ final class BookingSchedule
                 return ['ok' => false, 'error' => 'That start time has already passed.'];
             }
         } else {
-            if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $date, $dateParts) ||
-                !checkdate((int)$dateParts[2], (int)$dateParts[3], (int)$dateParts[1])) {
+            if (
+                !preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $date, $dateParts) ||
+                !checkdate((int)$dateParts[2], (int)$dateParts[3], (int)$dateParts[1])
+            ) {
                 return ['ok' => false, 'error' => 'Please choose a borrow date.'];
             }
             $startDate = $date;
