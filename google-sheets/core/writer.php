@@ -219,8 +219,15 @@ function gs_sync_item(mysqli $conn, int $item_id, string $action): void
                         $no = (int)($row[0] ?? 0);
                         if ($no > $last_no) $last_no = $no;
                     }
-                    // Derive prefix from existing control numbers (e.g. BIN-CL- from BIN-CL-001)
-                    $prefix = 'BIN-' . strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $category), 0, 3)) . '-';
+                    // Derive prefix from existing control numbers in the tab (e.g. BIN-CL- from BIN-CL-001)
+                    $prefix = 'BIN-NEW-';
+                    foreach ($rows as $row) {
+                        $ctrl = trim((string)($row[2] ?? ''));
+                        if ($ctrl !== '' && preg_match('/^(BIN-[A-Z]+-)/i', $ctrl, $pm)) {
+                            $prefix = strtoupper($pm[1]);
+                            break;
+                        }
+                    }
                     $new_rows = [];
                     for ($n = 1; $n <= $qty; $n++) {
                         $no         = $last_no + $n;
