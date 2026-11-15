@@ -100,6 +100,11 @@ if (!defined('EQ_SAMEDAY_MAX_CART_ITEMS')) {
     // A cart with more items than this always waits for an admin.
     define('EQ_SAMEDAY_MAX_CART_ITEMS', 3);
 }
+if (!defined('EQ_AUTO_APPROVE_REASON')) {
+    // Reason stored when an admin approves a request that already meets every automatic-approval rule
+    // and so needs no typed reason or internal note.
+    define('EQ_AUTO_APPROVE_REASON', 'Approved – meets the automatic approval rules.');
+}
 if (!defined('EQ_DECIDE_GRACE_SECONDS')) {
     // A same-day request still Waiting after this long was missed at submit time (error, crash):
     // the next poll decides it. Short enough to feel instant, long enough not to race the submit.
@@ -297,6 +302,66 @@ function equipment_same_day_gate(mysqli $conn, int $id): array
         $waiting
     );
     return ['block' => null, 'review' => $why];
+}
+
+/**
+ * Does a request that is still Waiting meet EVERY automatic-approval rule right now (same-day, faculty,
+ * one day, no attachment, healthy quantity, nothing else booked or waiting for that time)? The admin
+ * Approve screen uses this to skip the Reason / Internal Note fields, and admin-override.php re-checks
+ * it on the server so the fields can only be skipped for such a request.
+ */
+function equipment_waiting_meets_auto_rules(mysqli $conn, int $id): bool
+{
+    $stmt = $conn->prepare("SELECT status, COALESCE(booking_mode, '') AS booking_mode FROM tbl_requests WHERE id = ? LIMIT 1");
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param('i', $id);
+    $stmt->execute();
+    $r = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$r || $r['status'] !== 'Waiting' || !in_array($r['booking_mode'], ['today', ''], true)) {
+        return false;
+    }
+    $gate = equipment_same_day_gate($conn, $id);
+    return $gate['block'] === null && $gate['review'] === null;
+}
+
+/**
+ * Same check for a whole cart (batch): it has at most EQ_SAMEDAY_MAX_CART_ITEMS items and every item
+ * still Waiting meets the rules. Used by the "approve all" (bundle) screen.
+ */
+function equipment_cart_meets_auto_rules(mysqli $conn, string $batch_id): bool
+{
+    static $cache = [];
+    if ($batch_id === '') {
+        return false;
+    }
+    if (isset($cache[$batch_id])) {
+        return $cache[$batch_id];
+    }
+    $ok = false;
+    $stmt = $conn->prepare('SELECT id, status FROM tbl_requests WHERE batch_id = ? ORDER BY id');
+    if ($stmt) {
+        $stmt->bind_param('s', $batch_id);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $rows = [];
+        while ($row = $res->fetch_assoc()) {
+            $rows[] = $row;
+        }
+        $stmt->close();
+        $ok = $rows !== [] && count($rows) <= EQ_SAMEDAY_MAX_CART_ITEMS;
+        $waiting = 0;
+        foreach ($rows as $row) {
+            if ($ok && $row['status'] === 'Waiting') {
+                $waiting++;
+                $ok = equipment_waiting_meets_auto_rules($conn, (int)$row['id']);
+            }
+        }
+        $ok = $ok && $waiting > 0;
+    }
+    return $cache[$batch_id] = $ok;
 }
 
 /**

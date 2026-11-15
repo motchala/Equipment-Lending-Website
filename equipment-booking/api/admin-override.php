@@ -69,7 +69,10 @@ if (mb_strlen($raw_admin_notes) > 1000) {
 $admin_notes_value = $raw_admin_notes !== '' ? $raw_admin_notes : null;
 
 // ── Validate override_reason — must be at least 5 characters ─────────────────
-if (mb_strlen($raw_override_reason) < 5) {
+// Only an APPROVAL of a request that already meets every automatic-approval rule may skip the reason
+// (and the internal note); that is checked below once the request is loaded. Everything else needs one.
+$reason_missing = mb_strlen($raw_override_reason) < 5;
+if ($reason_missing && ($_POST['new_status'] ?? '') !== 'Approved') {
     send_json(400, 'error', 'Override reason is required.');
 }
 
@@ -144,6 +147,24 @@ $equipment_name  = (string)$request['equipment_name'];
 $current_status  = (string)$request['status'];
 // Today / Later bookings are judged against the schedule, not the shelf count
 $is_scheduled    = in_array((string)($request['booking_mode'] ?? ''), ['today', 'future'], true);
+
+// ── Approval without a typed reason: only for a request that meets every automatic-approval rule ──
+if ($reason_missing) {
+    require_once __DIR__ . '/../core/request-decision.php';
+    if ($new_status === 'Approved' && $current_status === 'Waiting' && equipment_waiting_meets_auto_rules($conn, $request_id)) {
+        $raw_override_reason = EQ_AUTO_APPROVE_REASON;
+        $admin_notes_value   = null;   // no internal note for this case
+    } else {
+        ob_end_clean();
+        http_response_code(400);
+        echo json_encode([
+            'status'       => 'error',
+            'message'      => 'This request needs an approval reason. Please enter one (min. 5 characters).',
+            'needs_reason' => true,
+        ]);
+        exit;
+    }
+}
 
 // ── Enforce direction rules ───────────────────────────────────────────────────
 // Approved/Overdue → only Declined is allowed (item is out on loan)

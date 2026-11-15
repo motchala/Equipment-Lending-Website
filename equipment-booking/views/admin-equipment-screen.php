@@ -17,6 +17,7 @@
         <?php
         // ── On Loan tab data (read-only; does not touch the shared $approved_result / $waiting_result) ──
         require_once PS_ROOT . '/equipment-booking/core/booking-schedule.php';
+        require_once PS_ROOT . '/equipment-booking/core/request-decision.php';   // equipment_*_meets_auto_rules()
         BookingSchedule::ensureSchema($conn);   // later-date booking columns (idempotent, same call the return handler uses)
         $eq_today        = date('Y-m-d');
         $eq_now          = date('Y-m-d H:i:s');   // Asia/Manila
@@ -720,6 +721,17 @@
                                         data-return-date="<?php echo htmlspecialchars($r['return_date']); ?>"
                                         data-return-date-display="<?php echo date('M d, Y', strtotime($r['return_date'])); ?>"
                                         data-arb-rule="<?php echo htmlspecialchars($r['arbitration_rule'] ?? ''); ?>"
+                                        data-auto-ok="<?php
+                                            // 1 = this waiting request meets every automatic-approval rule, so the Approve screen
+                                            // asks for no reason / internal note (a cart is judged as a whole)
+                                            $lauto = '0';
+                                            if ($lst === 'waiting') {
+                                                $lauto_batch = trim((string)($r['batch_id'] ?? ''));
+                                                $lauto = ($lauto_batch !== ''
+                                                    ? equipment_cart_meets_auto_rules($conn, $lauto_batch)
+                                                    : equipment_waiting_meets_auto_rules($conn, (int)$r['id'])) ? '1' : '0';
+                                            }
+                                            echo $lauto; ?>"
                                         data-note="<?php echo htmlspecialchars($r['reason'] ?? ''); ?>"
                                         data-doc-url="<?php echo $ldoc ? htmlspecialchars($ldoc['url']) : ''; ?>"
                                         data-doc-open-url="<?php echo $ldoc ? htmlspecialchars($ldoc['open_url']) : ''; ?>"
@@ -795,7 +807,7 @@
                                             <div class="eq-act-wrap">
                                                 <?php if ($lst === 'waiting'): ?>
                                                     <button type="button" class="ps-btn ps-btn--success ps-btn--sm" data-action="ps-open-modal" data-modal="ps-approve-modal"><span class="material-symbols-outlined">check</span> Approve</button>
-                                                    <?php if ($lbundle !== '' && ($eq_wait_bundle_counts[$lbundle] ?? 0) > 1 && empty($eq_bundle_approve_shown[$lbundle])): $eq_bundle_approve_shown[$lbundle] = true; ?><button type="button" class="ps-btn ps-btn--outline ps-btn--sm" data-action="eq-open-bundle-approve" data-batch-id="<?php echo htmlspecialchars($lbundle, ENT_QUOTES); ?>"><span class="material-symbols-outlined">done_all</span> All</button><?php endif; ?>
+                                                    <?php if ($lbundle !== '' && ($eq_wait_bundle_counts[$lbundle] ?? 0) > 1 && empty($eq_bundle_approve_shown[$lbundle])): $eq_bundle_approve_shown[$lbundle] = true; ?><button type="button" class="ps-btn ps-btn--outline ps-btn--sm" data-action="eq-open-bundle-approve" data-batch-id="<?php echo htmlspecialchars($lbundle, ENT_QUOTES); ?>" data-auto-ok="<?php echo equipment_cart_meets_auto_rules($conn, $lbundle) ? '1' : '0'; ?>"><span class="material-symbols-outlined">done_all</span> All</button><?php endif; ?>
                                                     <button type="button" class="ps-btn ps-btn--danger ps-btn--sm" data-action="ps-open-modal" data-modal="ps-decline-modal"><span class="material-symbols-outlined">close</span> Decline</button>
                                                 <?php elseif ($lst === 'scheduled'): ?>
                                                     <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-action="eq-open-loan-detail">View</button>

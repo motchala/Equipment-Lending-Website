@@ -4405,8 +4405,18 @@
                 submittedAs: d.submittedAs, studentName: d.studentName, studentId: d.studentId,
                 room: d.room, submitted: d.submitted, dateNeeded: d.dateNeeded,
                 returnDate: d.returnDate, returnDateDisplay: d.returnDateDisplay,
-                arbRule: d.arbRule
+                arbRule: d.arbRule,
+                autoOk: d.autoOk === '1'   // meets every automatic-approval rule: approve without reason / internal note
             };
+        }
+
+        // Approve screen: a request that meets every automatic-approval rule needs no reason and no internal note
+        let approveAutoOk = false;
+        function setApproveFieldsHidden(hide) {
+            [approveReasonInput, document.getElementById('approve-admin-note')].forEach(function (el) {
+                const grp = el && el.closest('.ps-form-group');
+                if (grp) grp.style.display = hide ? 'none' : '';
+            });
         }
 
         function reqNo(id) { return '#R-' + String(id || 0).padStart(4, '0'); }
@@ -4437,7 +4447,9 @@
             if (approveReasonInput) approveReasonInput.value = '';
             const approveAdminNoteEl = document.getElementById('approve-admin-note');
             if (approveAdminNoteEl) approveAdminNoteEl.value = '';
-            if (approveConfirmBtn) approveConfirmBtn.disabled = true;
+            approveAutoOk = !!ctx.autoOk;
+            setApproveFieldsHidden(approveAutoOk);
+            if (approveConfirmBtn) approveConfirmBtn.disabled = !approveAutoOk;
             clearAlert('ps-approve-alert');
         }
 
@@ -4608,6 +4620,12 @@
 
                         if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
                     } else {
+                        // The request stopped meeting the automatic rules since the list was drawn: ask for the reason
+                        if (data && data.needs_reason && newStatus === 'Approved') {
+                            approveAutoOk = false;
+                            setApproveFieldsHidden(false);
+                            if (approveConfirmBtn) approveConfirmBtn.disabled = true;
+                        }
                         showAlert(alertId, (data && data.message) || 'Action failed. Please try again.');
                         btn.disabled = false;
                         btn.innerHTML = btn.dataset.origLabel;
@@ -4626,11 +4644,11 @@
                 const reason = (approveReasonInput.value || '').trim();
                 const adminNoteEl = document.getElementById('approve-admin-note');
                 const adminNote = adminNoteEl ? adminNoteEl.value.trim() : '';
-                if (reason.length < 5) {
+                if (!approveAutoOk && reason.length < 5) {
                     showAlert('ps-approve-alert', 'Please enter a reason (min. 5 characters).');
                     return;
                 }
-                submitDecision(id, 'Approved', reason, 'ps-approve-alert', approveConfirmBtn, 'Approving…', adminNote);
+                submitDecision(id, 'Approved', approveAutoOk ? '' : reason, 'ps-approve-alert', approveConfirmBtn, 'Approving…', approveAutoOk ? '' : adminNote);
             });
         }
         if (declineConfirmBtn) {
@@ -4656,6 +4674,11 @@
         if (!modal || !batchInput || !itemsBox || !reasonInput || !confirmButton) return;
 
         var pendingRows = [];
+        var bundleAutoOk = false;
+        function setBundleReasonHidden(hide) {
+            var grp = reasonInput.closest('.ps-form-group');
+            if (grp) grp.style.display = hide ? 'none' : '';
+        }
         function showError(message) {
             alertBox.textContent = message;
             alertBox.style.display = 'block';
@@ -4674,6 +4697,8 @@
             e.stopPropagation();
             batchInput.value = trigger.dataset.batchId || '';
             reasonInput.value = '';
+            bundleAutoOk = trigger.dataset.autoOk === '1';   // whole cart meets the automatic-approval rules: no reason needed
+            setBundleReasonHidden(bundleAutoOk);
             confirmButton.disabled = true;
             clearError();
             itemsBox.textContent = '';
@@ -4699,6 +4724,7 @@
             if (pendingRows.length < 2) {
                 showError('At least two requests in this bundle must still be pending.');
             }
+            confirmButton.disabled = !bundleAutoOk || pendingRows.length < 2;
             if (typeof psOpenModal === 'function') psOpenModal('eq-bundle-approve-modal');
         });
 
@@ -4707,8 +4733,8 @@
         });
 
         confirmButton.addEventListener('click', function () {
-            var reason = reasonInput.value.trim();
-            if (reason.length < 5 || pendingRows.length < 2) {
+            var reason = bundleAutoOk ? '' : reasonInput.value.trim();
+            if ((!bundleAutoOk && reason.length < 5) || pendingRows.length < 2) {
                 showError('Enter an approval reason of at least 5 characters.');
                 return;
             }
@@ -4725,7 +4751,9 @@
                 .then(function (response) {
                     return response.json().then(function (data) {
                         if (!response.ok || data.status !== 'success') {
-                            throw new Error(data.message || 'Bundle approval failed.');
+                            var failure = new Error(data.message || 'Bundle approval failed.');
+                            failure.needsReason = !!data.needs_reason;   // the cart stopped meeting the automatic rules
+                            throw failure;
                         }
                         return data;
                     });
@@ -4760,10 +4788,14 @@
                     if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
                 })
                 .catch(function (error) {
+                    if (error.needsReason) {
+                        bundleAutoOk = false;
+                        setBundleReasonHidden(false);
+                    }
                     showError(error.message || 'Network error. Please try again.');
                 })
                 .finally(function () {
-                    confirmButton.disabled = reasonInput.value.trim().length < 5 || pendingRows.length < 2;
+                    confirmButton.disabled = (!bundleAutoOk && reasonInput.value.trim().length < 5) || pendingRows.length < 2;
                     confirmButton.innerHTML = confirmButton.dataset.originalText || '<span class="material-symbols-outlined">done_all</span> Approve Bundle';
                 });
         });
