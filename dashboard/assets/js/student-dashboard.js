@@ -254,23 +254,25 @@
     }
 
     /* Request letter: optional, recommended only for a later date. Returns { file, error }. */
-    var LETTER_HTML = function (id, text) {
-        return '<div class="st-field" id="' + id + 'Wrap" hidden>' +
-            '<label for="' + id + '">Request letter <span class="st-hint" style="display:inline">(recommended)</span></label>' +
+    var LETTER_HTML = function (id, text, always) {
+        /* always = shown for every date (the room reservation form); otherwise only for a later date */
+        return '<div class="st-field" id="' + id + 'Wrap"' + (always ? ' data-always="1"' : ' hidden') + '>' +
+            '<label for="' + id + '">Request letter <span class="st-hint" style="display:inline">(' + (always ? 'optional' : 'recommended') + ')</span></label>' +
             '<input type="file" class="st-input" id="' + id + '" accept=".pdf,.jpg,.jpeg,.png,.webp">' +
             '<button type="button" class="pslc-trigger" data-letter-camera="' + id + '"><span class="material-symbols-outlined" aria-hidden="true">photo_camera</span> Take a photo of the letter</button>' +
             '<p class="st-hint">' + text + ' PDF, JPG, PNG or WEBP, up to 5 MB.</p></div>';
     };
     function syncLetter(id, dateStr) {
         var wrap = $(id + 'Wrap'), input = $(id);
-        if (!wrap) return;
+        if (!wrap || wrap.hasAttribute('data-always')) return;
         var later = !!dateStr && dateStr > todayStr();
         wrap.hidden = !later;
         if (!later && input) input.value = '';   /* a same-day request never carries a letter */
     }
     function pickLetter(id, dateStr) {
         var input = $(id);
-        if (!input || !input.files || !input.files[0] || !(dateStr > todayStr())) return { file: null, error: '' };
+        var wrapEl = $(id + 'Wrap'), always = !!(wrapEl && wrapEl.hasAttribute('data-always'));
+        if (!input || !input.files || !input.files[0] || (!always && !(dateStr > todayStr()))) return { file: null, error: '' };
         var f = input.files[0];
         if (!/\.(pdf|jpe?g|png|webp)$/i.test(f.name)) return { file: null, error: 'The request letter must be a PDF, JPG, PNG or WEBP file.' };
         if (f.size > 5 * 1024 * 1024) return { file: null, error: 'The request letter is too large. Maximum size is 5 MB.' };
@@ -1171,7 +1173,7 @@
             '<div class="st-field" style="max-width:200px"><label for="reserveAttendees">Attendees</label>' +
             '<input type="number" class="st-input" id="reserveAttendees" value="1" min="1" inputmode="numeric">' +
             (r.seating_capacity != null && toInt(r.seating_capacity) > 0 ? '<p class="st-hint">This room seats ' + toInt(r.seating_capacity) + '.</p>' : '') + '</div>' +
-            LETTER_HTML('reserveLetter', 'Recommended for reservations on a later date. You can still submit without one.') +
+            LETTER_HTML('reserveLetter', 'Optional. You can still submit without one.', true) +
             '<div class="st-actions">' +
             '<button type="button" class="st-btn st-btn-ghost" data-action="back-rooms">Back</button>' +
             '<button type="submit" class="st-btn st-btn-primary" id="btnSubmitRoom">' + icon('event_available') + 'Reserve room</button>' +

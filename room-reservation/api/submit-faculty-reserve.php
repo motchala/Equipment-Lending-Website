@@ -19,10 +19,10 @@
  * Rules (see core/faculty-room-quota.php):
  *   • Equipment never blocks a room — overdue / outstanding equipment is fine.
  *   • A faculty account may hold at most 2 active room reservations at once.
- *   • A request letter (JPG, PNG, PDF; 5 MB) may be attached to a reservation for a
- *     LATER DATE. It is optional but recommended, and is stored in document_path for the
- *     reviewing admin. A same-day reservation never needs one: an attached file is ignored
- *     and the request is decided on availability alone.
+ *   • A request letter (JPG, PNG, PDF; 5 MB) may be attached to any reservation, same-day
+ *     or later. It is optional (unless Settings require one for a LATER date) and is stored
+ *     in document_path for the reviewing admin. A same-day reservation never needs one and
+ *     is still decided on availability alone.
  *   • Every reservation from this endpoint is filed as 'personal'.
  */
 
@@ -143,11 +143,11 @@ $room_name = $room_row['room_name'];
 // a same-day one is decided on availability alone and needs no letter.
 $is_future_day = ps_room_is_future_date($res_date);
 
-// ── Optional request letter (later-date reservations only) ───────────────
+// ── Optional request letter (any date) ───────────────────────────────────
 // Validated first so a bad file is rejected before anything is saved.
 $doc_tmp  = null;   // temp path of a validated upload
 $doc_ext  = '';
-if ($is_future_day && $is_multipart && isset($_FILES['document']) && $_FILES['document']['error'] !== UPLOAD_ERR_NO_FILE) {
+if ($is_multipart && isset($_FILES['document']) && $_FILES['document']['error'] !== UPLOAD_ERR_NO_FILE) {
     $f = $_FILES['document'];
 
     if ($f['error'] === UPLOAD_ERR_INI_SIZE || $f['error'] === UPLOAD_ERR_FORM_SIZE) {

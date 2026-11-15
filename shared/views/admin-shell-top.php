@@ -32,12 +32,12 @@ if (
 }
 ?>
 <!DOCTYPE html>
-<html lang="en" data-theme="light"<?php
-if ($ps_bridge_tab !== '') {
-    // ps-restored: the screen appears in place, no slide-in (same class the reveal script adds)
-    echo ' class="ps-restored" data-ps-tab="' . $ps_bridge_tab . '"' . ($ps_bridge_sub !== '' ? ' data-ps-sub="' . $ps_bridge_sub . '"' : '');
-}
-?>>
+<html lang="en" data-theme="light" <?php
+                                    if ($ps_bridge_tab !== '') {
+                                        // ps-restored: the screen appears in place, no slide-in (same class the reveal script adds)
+                                        echo ' class="ps-restored" data-ps-tab="' . $ps_bridge_tab . '"' . ($ps_bridge_sub !== '' ? ' data-ps-sub="' . $ps_bridge_sub . '"' : '');
+                                    }
+                                    ?>>
 
 <head>
     <meta charset="UTF-8">
@@ -79,13 +79,18 @@ if ($ps_bridge_tab !== '') {
             // Drop it as soon as this script decides otherwise; admin-dashboard.js drops it once its start-up is done.
             var root = document.documentElement;
             var bridged = root.getAttribute('data-ps-tab');
-            var dropBridge = function() { root.removeAttribute('data-ps-tab'); root.removeAttribute('data-ps-sub'); };
+            var dropBridge = function() {
+                root.removeAttribute('data-ps-tab');
+                root.removeAttribute('data-ps-sub');
+            };
 
             // Remember a hard-refresh shortcut so the page that loads next knows about it.
             window.addEventListener('keydown', function(e) {
                 var k = (e.key || '').toLowerCase();
                 if (((e.ctrlKey || e.metaKey) && ((e.shiftKey && k === 'r') || k === 'f5')) || (e.shiftKey && k === 'f5')) {
-                    try { sessionStorage.setItem('adminHardRefresh', String(Date.now())); } catch (_) {}
+                    try {
+                        sessionStorage.setItem('adminHardRefresh', String(Date.now()));
+                    } catch (_) {}
                 }
             }, true);
 
@@ -108,9 +113,13 @@ if ($ps_bridge_tab !== '') {
             // Hard refresh: forget the screen and any leftover URL state, land on the Dashboard.
             if (hard) {
                 dropBridge();
-                try { sessionStorage.removeItem('adminSubView'); } catch (_) {}
                 try {
-                    ['ps_admin_tab', 'ps_sub_rooms', 'ps_sub_settings'].forEach(function(c) { document.cookie = c + '=; path=/; Max-Age=0'; });
+                    sessionStorage.removeItem('adminSubView');
+                } catch (_) {}
+                try {
+                    ['ps_admin_tab', 'ps_sub_rooms', 'ps_sub_settings'].forEach(function(c) {
+                        document.cookie = c + '=; path=/; Max-Age=0';
+                    });
                 } catch (_) {}
                 if (loc.search || loc.hash) {
                     window._adminLeaving = true;
@@ -134,21 +143,27 @@ if ($ps_bridge_tab !== '') {
                 if (restore) {
                     params.delete('view');
                     params.delete('tab');
-                    if (!hashTab) { hash = '#tab-' + restore; }
-                } else if (wasEquipment) { hash = '#tab-inventory'; }
+                    if (!hashTab) {
+                        hash = '#tab-' + restore;
+                    }
+                } else if (wasEquipment) {
+                    hash = '#tab-inventory';
+                }
                 var qs = params.toString();
                 window._adminLeaving = true;
                 // Keep the Dashboard (and its sidebar highlight) from showing while the page reloads once more.
                 dropBridge();
                 document.documentElement.classList.add('admin-tab-pending');
-                setTimeout(function() { document.documentElement.classList.remove('admin-tab-pending'); }, 5000);
+                setTimeout(function() {
+                    document.documentElement.classList.remove('admin-tab-pending');
+                }, 5000);
                 loc.replace(loc.pathname + (qs ? '?' + qs : '') + hash);
                 return;
             }
 
             var tab = null;
             if (restore) {
-                tab = restore;                       // the screen you were on beats leftover URL params
+                tab = restore; // the screen you were on beats leftover URL params
             } else if (params.has('edit_item')) {
                 tab = 'inventory';
             } else {
@@ -165,7 +180,9 @@ if ($ps_bridge_tab !== '') {
             if (TABS.indexOf(tab) === -1) {
                 // Nothing to restore, so the Dashboard is right: drop a wrong guess by the server and forget the stale screen.
                 dropBridge();
-                try { document.cookie = 'ps_admin_tab=dashboard; path=/; SameSite=Lax'; } catch (_) {}
+                try {
+                    document.cookie = 'ps_admin_tab=dashboard; path=/; SameSite=Lax';
+                } catch (_) {}
                 return;
             }
             window._preJumpTab = tab;
@@ -179,8 +196,12 @@ if ($ps_bridge_tab !== '') {
             // Safety net: never leave the page hidden if the reveal script below fails to run.
             // It waits for the page to finish loading (a slow connection can take longer than any fixed
             // timeout, and lifting early would flash the Dashboard), then lifts after a short grace.
-            var lift = function() { document.documentElement.classList.remove('admin-tab-pending'); };
-            window.addEventListener('load', function() { setTimeout(lift, 1500); });
+            var lift = function() {
+                document.documentElement.classList.remove('admin-tab-pending');
+            };
+            window.addEventListener('load', function() {
+                setTimeout(lift, 1500);
+            });
             setTimeout(lift, 20000);
         })();
     </script>
@@ -245,7 +266,8 @@ if ($ps_bridge_tab !== '') {
             </div>
 
             <!-- Tabs are grouped by purpose: Overview (what's happening) · Operations (day-to-day work) ·
-                 Accounts and Data (Super Admin only). Each group title shares a row with its thin separator line. -->
+                 Accounts (Super Admin only) · Data (Imports for Super Admin only, Reports for every admin).
+                 Each group title shares a row with its thin separator line. -->
             <div class="sidebar-links">
                 <div class="nav-group" role="group" aria-labelledby="navg-overview">
                     <span class="nav-group-title" id="navg-overview">Overview</span>
@@ -256,10 +278,6 @@ if ($ps_bridge_tab !== '') {
                     <a class="nav-item" data-tab="activity" id="snav-activity" href="#">
                         <span class="material-symbols-outlined">history</span>
                         <span class="nav-label">Activity</span>
-                    </a>
-                    <a class="nav-item" data-tab="reports" id="snav-reports" href="#">
-                        <span class="material-symbols-outlined">summarize</span>
-                        <span class="nav-label">Reports</span>
                     </a>
                 </div>
                 <div class="nav-group" role="group" aria-labelledby="navg-operations">
@@ -285,14 +303,21 @@ if ($ps_bridge_tab !== '') {
                             <span class="nav-label">Admins</span>
                         </a>
                     </div>
-                    <div class="nav-group" role="group" aria-labelledby="navg-data">
-                        <span class="nav-group-title" id="navg-data">Data</span>
+                <?php endif; ?>
+                <!-- Data: Imports (Super Admin only) sits next to Reports (Admin and Super Admin) -->
+                <div class="nav-group" role="group" aria-labelledby="navg-data">
+                    <span class="nav-group-title" id="navg-data">Data</span>
+                    <?php if ($is_super_admin): ?>
                         <a class="nav-item" data-tab="imports" id="snav-imports" href="#">
                             <span class="material-symbols-outlined">upload_file</span>
                             <span class="nav-label">Imports</span>
                         </a>
-                    </div>
-                <?php endif; ?>
+                    <?php endif; ?>
+                    <a class="nav-item" data-tab="reports" id="snav-reports" href="#">
+                        <span class="material-symbols-outlined">summarize</span>
+                        <span class="nav-label">Reports</span>
+                    </a>
+                </div>
             </div>
             <div class="sidebar-footer">
                 <!-- Signed-in admin: the name only. Not a button, no avatar. Notifications and Settings

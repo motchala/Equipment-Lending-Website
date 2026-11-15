@@ -919,8 +919,8 @@
             '<div class="fcty-sub"><span class="fcty-sublabel">Purpose</span>' +
             chipRow('fcty-purpose-chips', PURPOSES.concat(['Other'])) +
             '<input type="text" id="fcty-res-purpose" class="fcty-input" placeholder="What is the room for?" maxlength="200" aria-label="Purpose" hidden></div>' +
-            '<details class="fcty-sub fcty-doc" id="fcty-doc-block" hidden>' +
-            '<summary class="fcty-sublabel">Request letter <small>(recommended)</small><span class="fcty-doc-state" id="fcty-doc-state"></span></summary>' +
+            '<div class="fcty-sub fcty-doc" id="fcty-doc-block">' +
+            '<span class="fcty-sublabel fcty-doc-label">Request letter <small>(optional)</small><span class="fcty-doc-state" id="fcty-doc-state"></span></span>' +
             '<div class="pslc-pair">' +
             '<label class="fcty-drop" id="fcty-drop" for="fcty-res-doc">' + icon('upload_file') +
             '<span><strong>Upload a file</strong><small>JPG, PNG or PDF \u00b7 max 5 MB</small></span></label>' +
@@ -930,7 +930,7 @@
             '<input type="file" id="fcty-res-doc" class="fcty-sr-only" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf">' +
             '<div class="fcty-file" id="fcty-file" hidden></div>' +
             '<p class="fcty-hint" id="fcty-doc-hint"></p>' +
-            '</details>' +
+            '</div>' +
             '</div>' +
 
             '</div>' +
@@ -996,10 +996,10 @@
             if (!r) return;
             elDate.max = ymd(addDays(now, r.maxAdvanceDays));
             DOC_HINT = r.letterRequired
-                ? 'Required for reservations on a later date.'
-                : 'Recommended for reservations on a later date. You can still submit without one.';
-            var tag = $('fcty-doc-block') && $('fcty-doc-block').querySelector('summary small');
-            if (tag) tag.textContent = r.letterRequired ? '(required)' : '(recommended)';
+                ? 'Required for reservations on a later date. Optional for a same-day reservation.'
+                : 'Optional. You can still submit without one.';
+            var tag = $('fcty-doc-block') && $('fcty-doc-block').querySelector('.fcty-doc-label small');
+            if (tag) tag.textContent = r.letterRequired ? '(required for later dates)' : '(optional)';
             docMessage('');
         }
         function advanceLabel() {
@@ -1007,11 +1007,11 @@
             return w + (w === 1 ? ' week' : ' weeks');
         }
 
-        /* ── Request letter: recommended for a LATER date, never needed for same-day ── */
+        /* ── Request letter: always shown. Optional, unless Settings require one for a LATER date ── */
         var docFile = null;
         var DOC_TYPES = ['image/jpeg', 'image/png', 'application/pdf'];
         var DOC_MAX = 5 * 1024 * 1024;
-        var DOC_HINT = 'Recommended for reservations on a later date. You can still submit without one.';
+        var DOC_HINT = 'Optional. You can still submit without one.';
         function isLaterDate() { return st.date > ymd(now); }
         var elDoc = $('fcty-res-doc'), elDrop = $('fcty-drop'), elFile = $('fcty-file'), elDocHint = $('fcty-doc-hint'), elCam = $('fcty-doc-cam');
 
@@ -1051,14 +1051,6 @@
             $('fcty-file-remove').addEventListener('click', function () { setDoc(null); });
         }
         docMessage('');
-        /* Show the letter field only for a later date; a same-day request is decided on availability alone. */
-        function syncDocBlock() {
-            var block = $('fcty-doc-block');
-            if (!block) return;
-            var later = isLaterDate();
-            block.hidden = !later;
-            if (!later && docFile) setDoc(null);   /* never send a letter with a same-day request */
-        }
         elDoc.addEventListener('change', function () { setDoc(elDoc.files && elDoc.files[0] ? elDoc.files[0] : null); });
         ['dragenter', 'dragover'].forEach(function (ev) {
             elDrop.addEventListener(ev, function (e) { e.preventDefault(); elDrop.classList.add('is-drag'); });
@@ -1227,7 +1219,7 @@
             syncSubmit();
         }
 
-        function refresh() { syncControls(); renderSummary(); syncDocBlock(); }
+        function refresh() { syncControls(); renderSummary(); }
 
         function loadWeek() {
             weekData = null;
@@ -1376,7 +1368,7 @@
             fd.append('end_time', minToHHMM(st.end));
             fd.append('purpose', purpose);
             fd.append('csrf_token', csrf());
-            if (docFile && isLaterDate()) fd.append('document', docFile, docFile.name);
+            if (docFile) fd.append('document', docFile, docFile.name);
 
             fetch(apiBase() + 'room-reservation/api/submit-faculty-reserve.php', {
                 method: 'POST',

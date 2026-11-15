@@ -10,8 +10,8 @@
  *   student_name, optional student_id,
  *   room_id, reservation_date, start_time, end_time,
  *   purpose, attendees, notes (optional)
- * Sent as multipart/form-data instead when a request letter is attached (later-date
- * reservations only): the same fields plus the file field "document".
+ * Sent as multipart/form-data instead when a request letter is attached (any date):
+ * the same fields plus the file field "document".
  */
 
 ini_set('display_errors', '0');
@@ -138,10 +138,10 @@ if ($hold_for_review) {
 }
 $notes_val = $notes !== '' ? $notes : null;
 
-// ── Optional request letter: recommended for a LATER date, ignored for a same-day one ──
+// ── Optional request letter: accepted for any date (recommended for a later one) ──
 require_once __DIR__ . '/../../shared/core/document-helpers.php';
 $letter_path = null;
-if ($is_future_day && $is_multipart && isset($_FILES['document'])) {
+if ($is_multipart && isset($_FILES['document'])) {
     $letter_err  = null;
     $letter_path = ps_store_request_letter($_FILES['document'], 'uploads/room_documents', $student_id, $letter_err);
     if ($letter_path === null && $letter_err !== null) {
