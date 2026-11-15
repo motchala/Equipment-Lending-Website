@@ -22,6 +22,34 @@
 
         if (!form || !submitBtn) return;
 
+        // ── Select All ────────────────────────────────────────────────────
+        var selectAllCb   = document.getElementById('rptSelectAll');
+        var selectAllLbl  = document.getElementById('rptSelectAllLabel');
+        var cardCheckboxes = form.querySelectorAll('input[name="report_type[]"]');
+
+        function updateSelectAllState() {
+            var total   = cardCheckboxes.length;
+            var checked = form.querySelectorAll('input[name="report_type[]"]:checked').length;
+            if (selectAllCb) {
+                selectAllCb.checked       = checked === total;
+                selectAllCb.indeterminate = checked > 0 && checked < total;
+            }
+            if (selectAllLbl) {
+                selectAllLbl.classList.toggle('is-indeterminate', checked > 0 && checked < total);
+            }
+        }
+
+        if (selectAllCb) {
+            selectAllCb.addEventListener('change', function () {
+                cardCheckboxes.forEach(function (cb) { cb.checked = selectAllCb.checked; });
+                if (selectAllLbl) selectAllLbl.classList.remove('is-indeterminate');
+            });
+        }
+
+        cardCheckboxes.forEach(function (cb) {
+            cb.addEventListener('change', updateSelectAllState);
+        });
+
         // ── Format toggle ─────────────────────────────────────────────────
         fmtBtns.forEach(function (btn) {
             btn.addEventListener('click', function () {
@@ -91,10 +119,18 @@
             // Clear previous error
             if (errorEl) errorEl.textContent = '';
 
-            // Validate: a report type must be selected
-            var checked = form.querySelector('input[name="report_type"]:checked');
-            if (!checked) {
-                if (errorEl) errorEl.textContent = 'Please choose a report type first.';
+            // Validate: at least one report type must be selected
+            var checkedBoxes = form.querySelectorAll('input[name="report_type[]"]:checked');
+            if (checkedBoxes.length === 0) {
+                if (errorEl) errorEl.textContent = 'Please choose at least one report first.';
+                return;
+            }
+
+            // Validate: From cannot be after To
+            var fromVal = fromInput ? fromInput.value : '';
+            var toVal   = toInput   ? toInput.value   : '';
+            if (fromVal && toVal && fromVal > toVal) {
+                if (errorEl) errorEl.textContent = 'The "From" date cannot be later than the "To" date.';
                 return;
             }
 
@@ -110,7 +146,6 @@
             })
             .then(function (res) {
                 if (!res.ok) {
-                    // Try to read the JSON error body
                     return res.json().then(function (j) {
                         throw new Error(j.message || 'Server error (' + res.status + ').');
                     });
@@ -118,15 +153,16 @@
                 return res.blob();
             })
             .then(function (blob) {
-                // Trigger the browser download dialog
                 var url  = URL.createObjectURL(blob);
                 var link = document.createElement('a');
                 link.href = url;
-                // Filename comes from Content-Disposition but the browser may ignore it;
-                // fall back to a sensible name here.
                 var fmt  = formatIn.value === 'xlsx' ? 'xlsx' : 'pdf';
                 var date = new Date().toISOString().slice(0, 10);
-                var type = checked ? checked.value.replace(/_/g, '-') : 'report';
+                var allSelected = checkedBoxes.length === cardCheckboxes.length;
+                var type = allSelected
+                    ? 'all-reports'
+                    : checkedBoxes[0].value.replace(/_/g, '-')
+                      + (checkedBoxes.length > 1 ? '-and-more' : '');
                 link.download = 'pupsync-' + type + '-' + date + '.' + fmt;
                 document.body.appendChild(link);
                 link.click();

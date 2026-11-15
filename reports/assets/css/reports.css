@@ -40,6 +40,67 @@
 }
 .rpt-hint { font-size: .8rem; font-weight: 400; color: var(--text-muted, #888); margin-left: .25rem; }
 
+/* ── Section title row (title + Select All on the same line) ────────── */
+.rpt-section-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+.rpt-section-title-row .rpt-section-title { margin-bottom: 0; }
+
+/* Select All label */
+.rpt-select-all-label {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    cursor: pointer;
+    user-select: none;
+}
+.rpt-select-all-label input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.rpt-select-all-box {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--border, #ccc);
+    border-radius: 4px;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background .12s, border-color .12s;
+    flex-shrink: 0;
+}
+.rpt-select-all-box::after {
+    content: '';
+    display: none;
+    width: 10px;
+    height: 6px;
+    border-left: 2px solid #fff;
+    border-bottom: 2px solid #fff;
+    transform: rotate(-45deg) translateY(-1px);
+}
+.rpt-select-all-label:has(input:checked) .rpt-select-all-box,
+.rpt-select-all-label.is-indeterminate .rpt-select-all-box {
+    background: var(--accent-maroon, #800000);
+    border-color: var(--accent-maroon, #800000);
+}
+.rpt-select-all-label:has(input:checked) .rpt-select-all-box::after { display: block; }
+.rpt-select-all-label.is-indeterminate .rpt-select-all-box::after {
+    display: block;
+    width: 10px;
+    height: 0;
+    border-bottom: 2px solid #fff;
+    border-left: none;
+    transform: none;
+    margin-top: 1px;
+}
+.rpt-select-all-text { font-size: .82rem; font-weight: 500; color: var(--text-secondary, #555); }
+
 /* ── Report cards ───────────────────────────────────────────────────── */
 .rpt-cards {
     display: grid;
@@ -57,16 +118,41 @@
     transition: border-color .15s, background .15s;
     position: relative;
 }
-.rpt-card input[type="radio"] {
+.rpt-card input[type="checkbox"] {
     position: absolute;
     opacity: 0;
     width: 0;
     height: 0;
 }
+/* Checkmark badge — top-right corner, hidden until checked */
+.rpt-card-check {
+    position: absolute;
+    top: .5rem;
+    right: .5rem;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--accent-maroon, #800000);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transform: scale(.6);
+    transition: opacity .15s, transform .15s;
+    pointer-events: none;
+}
+.rpt-card-check .material-symbols-outlined {
+    font-size: .85rem;
+    color: #fff;
+}
 .rpt-card:hover { border-color: var(--accent-maroon, #800000); background: #fdf5f5; }
 .rpt-card:has(input:checked) {
     border-color: var(--accent-maroon, #800000);
     background: #fff5f5;
+}
+.rpt-card:has(input:checked) .rpt-card-check {
+    opacity: 1;
+    transform: scale(1);
 }
 .rpt-card-icon {
     font-size: 1.4rem;

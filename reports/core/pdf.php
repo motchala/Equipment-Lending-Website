@@ -122,6 +122,33 @@ class ReportPdf extends FPDF
  * @param  array $data  ['title', 'date_range', 'cols', 'rows', 'generated_at']
  * @return string       raw PDF bytes
  */
+/** Render multiple reports into one PDF, each starting on a new page. */
+function rpt_render_pdf_multi(array $datasets): string
+{
+    if (count($datasets) === 1) {
+        return rpt_render_pdf($datasets[0]);
+    }
+
+    $pdf = new ReportPdf('L', 'mm', 'A4');
+    // Use the first dataset title as the cover; each section header overrides per page.
+    $pdf->rptTitle = 'PUPSync — All Reports';
+    $pdf->rptRange = $datasets[0]['date_range'] ?? '';
+    $pdf->rptGenAt = $datasets[0]['generated_at'] ?? date('Y-m-d H:i:s');
+
+    $pdf->SetAutoPageBreak(true, 15);
+    $pdf->SetMargins(ReportPdf::MARGIN, 22, ReportPdf::MARGIN);
+
+    foreach ($datasets as $data) {
+        $pdf->rptTitle = $data['title'] ?? 'Report';
+        $pdf->rptRange = $data['date_range'] ?? '';
+        $pdf->rptGenAt = $data['generated_at'] ?? '';
+        $pdf->AddPage();
+        $pdf->buildTable($data['cols'] ?? [], $data['rows'] ?? []);
+    }
+
+    return $pdf->Output('S');
+}
+
 function rpt_render_pdf(array $data): string
 {
     $pdf = new ReportPdf('L', 'mm', 'A4');

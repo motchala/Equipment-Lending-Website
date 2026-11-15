@@ -48,10 +48,20 @@ if ($csrf === '' || empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['cs
 
 require_once __DIR__ . '/../../reports/core/data.php';
 
-// Validate report type
-$type = trim((string)($_POST['report_type'] ?? ''));
-if (!in_array($type, RPT_TYPES, true)) {
-    rpt_api_fail(400, 'Unknown report type.');
+// Validate report types (accept both single string and array)
+$rawTypes = $_POST['report_type[]'] ?? $_POST['report_type'] ?? [];
+if (is_string($rawTypes)) {
+    $rawTypes = [$rawTypes];
+}
+$types = [];
+foreach ((array)$rawTypes as $t) {
+    $t = trim((string)$t);
+    if (in_array($t, RPT_TYPES, true)) {
+        $types[] = $t;
+    }
+}
+if (empty($types)) {
+    rpt_api_fail(400, 'Please select at least one report type.');
 }
 
 // Validate format
@@ -76,25 +86,34 @@ date_default_timezone_set('Asia/Manila');
 $conn = getDB();
 $conn->set_charset('utf8mb4');
 
-$data = rpt_generate($conn, $type, $from, $to);
-if ($data === null) {
+// Generate data for every selected report type
+$datasets = [];
+foreach ($types as $type) {
+    $data = rpt_generate($conn, $type, $from, $to);
+    if ($data !== null) {
+        $datasets[] = $data;
+    }
+}
+if (empty($datasets)) {
     rpt_api_fail(500, 'Failed to generate report data.');
 }
 
-// Safe filename
-$slug    = preg_replace('/[^a-z0-9]+/', '-', strtolower($data['title']));
-$dated   = date('Y-m-d');
-$ext     = $format === 'xlsx' ? 'xlsx' : 'pdf';
-$filename = 'pupsync-' . $slug . '-' . $dated . '.' . $ext;
+// Filename
+$dated    = date('Y-m-d');
+$ext      = $format === 'xlsx' ? 'xlsx' : 'pdf';
+$nameSlug = count($datasets) === 1
+    ? preg_replace('/[^a-z0-9]+/', '-', strtolower($datasets[0]['title']))
+    : 'all-reports';
+$filename = 'pupsync-' . $nameSlug . '-' . $dated . '.' . $ext;
 
 try {
     if ($format === 'xlsx') {
         require_once __DIR__ . '/../../reports/core/xlsx.php';
-        $bytes = rpt_render_xlsx($data);
+        $bytes = rpt_render_xlsx_multi($datasets);
         $mime  = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
     } else {
         require_once __DIR__ . '/../../reports/core/pdf.php';
-        $bytes = rpt_render_pdf($data);
+        $bytes = rpt_render_pdf_multi($datasets);
         $mime  = 'application/pdf';
     }
 } catch (Throwable $e) {

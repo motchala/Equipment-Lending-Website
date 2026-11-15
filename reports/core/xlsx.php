@@ -44,29 +44,119 @@ function rpt_xlsx_col_name(int $n): string   // 0-indexed → A, B, ... Z, AA, .
  * @param  array $data  ['title', 'date_range', 'cols', 'rows', 'generated_at']
  * @return string       raw XLSX bytes
  */
-function rpt_render_xlsx(array $data): string
+/** Render multiple reports into one XLSX workbook, one sheet per report. */
+function rpt_render_xlsx_multi(array $datasets): string
 {
-    $cols    = $data['cols']        ?? [];
-    $rows    = $data['rows']        ?? [];
-    $title   = $data['title']       ?? 'Report';
-    $range   = $data['date_range']  ?? '';
-    $genAt   = $data['generated_at'] ?? '';
+    if (count($datasets) === 1) {
+        return rpt_render_xlsx($datasets[0]);
+    }
 
-    // ── Build the sheet XML ───────────────────────────────────────────────────
+    $tmp = tempnam(sys_get_temp_dir(), 'rpt_');
+    if ($tmp === false) {
+        throw new RuntimeException('Could not create temp file for XLSX.');
+    }
+
+    $zip = new ZipArchive();
+    if ($zip->open($tmp, ZipArchive::OVERWRITE) !== true) {
+        unlink($tmp);
+        throw new RuntimeException('Could not open ZipArchive for XLSX.');
+    }
+
+    $sheetXmls  = [];
+    $sheetRels  = [];
+    $sheetNames = [];
+    $overrides  = '';
+
+    foreach ($datasets as $i => $data) {
+        $sheetNum  = $i + 1;
+        $partName  = "/xl/worksheets/sheet{$sheetNum}.xml";
+        $sheetXml  = rpt_build_sheet_xml($data);
+        $zip->addFromString("xl/worksheets/sheet{$sheetNum}.xml", $sheetXml);
+
+        // Safe sheet name: max 31 chars, no special chars
+        $rawName = $data['title'] ?? 'Report';
+        $safeName = substr(preg_replace('/[\/\\\?\*\[\]:]+/', '', $rawName), 0, 31);
+        $sheetNames[] = htmlspecialchars($safeName, ENT_XML1, 'UTF-8');
+
+        $overrides   .= '<Override PartName="' . $partName . '"'
+            . ' ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>';
+        $sheetRels[] = '<Relationship Id="rId' . $sheetNum . '"'
+            . ' Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet"'
+            . ' Target="worksheets/sheet' . $sheetNum . '.xml"/>';
+    }
+
+    // [Content_Types].xml
+    $zip->addFromString('[Content_Types].xml',
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        . '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        . '<Default Extension="xml"  ContentType="application/xml"/>'
+        . '<Override PartName="/xl/workbook.xml"'
+        . ' ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+        . $overrides
+        . '</Types>'
+    );
+
+    // _rels/.rels
+    $zip->addFromString('_rels/.rels',
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        . '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+        . '</Relationships>'
+    );
+
+    // xl/workbook.xml — one <sheet> per dataset
+    $sheetsXml = '';
+    foreach ($sheetNames as $i => $name) {
+        $sheetsXml .= '<sheet name="' . $name . '" sheetId="' . ($i + 1) . '" r:id="rId' . ($i + 1) . '"/>';
+    }
+    $zip->addFromString('xl/workbook.xml',
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"'
+        . ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+        . '<sheets>' . $sheetsXml . '</sheets>'
+        . '</workbook>'
+    );
+
+    // xl/_rels/workbook.xml.rels
+    $zip->addFromString('xl/_rels/workbook.xml.rels',
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        . implode('', $sheetRels)
+        . '</Relationships>'
+    );
+
+    $zip->close();
+    $bytes = file_get_contents($tmp);
+    unlink($tmp);
+
+    if ($bytes === false) {
+        throw new RuntimeException('Could not read generated XLSX file.');
+    }
+
+    return $bytes;
+}
+
+/** Build the inner sheet XML string for one dataset (shared by single and multi renderers). */
+function rpt_build_sheet_xml(array $data): string
+{
+    $cols  = $data['cols']         ?? [];
+    $rows  = $data['rows']         ?? [];
+    $title = $data['title']        ?? 'Report';
+    $range = $data['date_range']   ?? '';
+    $genAt = $data['generated_at'] ?? '';
+
     $xmlRows = '';
     $rowIdx  = 1;
 
-    // Meta row (title + period)
     $xmlRows .= '<row r="' . $rowIdx . '">';
     $xmlRows .= rpt_xlsx_cell(0, $rowIdx, $title . '  |  ' . $range . '  |  Generated: ' . $genAt);
     $xmlRows .= '</row>';
     $rowIdx++;
 
-    // Blank spacer
     $xmlRows .= '<row r="' . $rowIdx . '"></row>';
     $rowIdx++;
 
-    // Header row
     if ($cols) {
         $xmlRows .= '<row r="' . $rowIdx . '">';
         foreach ($cols as $ci => $label) {
@@ -76,7 +166,6 @@ function rpt_render_xlsx(array $data): string
         $rowIdx++;
     }
 
-    // Data rows
     foreach ($rows as $row) {
         $xmlRows .= '<row r="' . $rowIdx . '">';
         foreach ($cols as $ci => $_) {
@@ -86,10 +175,15 @@ function rpt_render_xlsx(array $data): string
         $rowIdx++;
     }
 
-    $sheetXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         . '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
         . '<sheetData>' . $xmlRows . '</sheetData>'
         . '</worksheet>';
+}
+
+function rpt_render_xlsx(array $data): string
+{
+    $sheetXml = rpt_build_sheet_xml($data);
 
     // ── Assemble the XLSX (ZIP) ───────────────────────────────────────────────
     $tmp = tempnam(sys_get_temp_dir(), 'rpt_');
