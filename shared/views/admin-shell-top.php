@@ -1,5 +1,43 @@
+<?php
+/* First-paint bridge for a page refresh.
+   Hiding the page until a script has restored your screen depends on that script running early, and on a slower host
+   the Dashboard can show first. So the server says which screen to paint, in the HTML itself:
+   - F5 / the reload button sends "Cache-Control: max-age=0" (a hard refresh sends no-cache, a normal visit neither);
+   - admin-dashboard.js keeps your last screen and open sub-tab in cookies (ps_admin_tab, ps_sub_rooms, ps_sub_settings).
+   When both say "refresh of screen X", <html> gets data-ps-tab="X" (and data-ps-sub), and admin-shell.css paints that screen
+   from the very first frame, no script involved. It is only a guess: the head script below drops it at once if it
+   disagrees, and admin-dashboard.js drops it when its own start-up is done. */
+$ps_bridge_tab = '';
+$ps_bridge_sub = '';
+$ps_cache_ctl  = strtolower((string)($_SERVER['HTTP_CACHE_CONTROL'] ?? ''));
+if (
+    strpos($ps_cache_ctl, 'max-age=0') !== false && strpos($ps_cache_ctl, 'no-cache') === false
+    && !isset($_GET['edit_item']) && !isset($_GET['edit_room']) && !isset($_GET['view']) && !isset($_GET['tab'])
+) {
+    $ps_cookie_tab = (string)($_COOKIE['ps_admin_tab'] ?? '');
+    if (in_array($ps_cookie_tab, ['rooms', 'faculty', 'admins', 'activity', 'inventory', 'settings', 'imports'], true)) {
+        $ps_bridge_tab = $ps_cookie_tab;
+        if ($ps_cookie_tab === 'rooms') {
+            $ps_cookie_sub = (string)($_COOKIE['ps_sub_rooms'] ?? '');
+            if (in_array($ps_cookie_sub, ['rooms-active', 'rooms-reservations', 'rooms-archived'], true)) {
+                $ps_bridge_sub = $ps_cookie_sub;
+            }
+        } elseif ($ps_cookie_tab === 'settings') {
+            $ps_cookie_sub = (string)($_COOKIE['ps_sub_settings'] ?? '');
+            if (in_array($ps_cookie_sub, ['sett-account', 'sett-prefs', 'sett-arbitration', 'sett-ratings', 'sett-help'], true)) {
+                $ps_bridge_sub = $ps_cookie_sub;
+            }
+        }
+    }
+}
+?>
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="light"<?php
+if ($ps_bridge_tab !== '') {
+    // ps-restored: the screen appears in place, no slide-in (same class the reveal script adds)
+    echo ' class="ps-restored" data-ps-tab="' . $ps_bridge_tab . '"' . ($ps_bridge_sub !== '' ? ' data-ps-sub="' . $ps_bridge_sub . '"' : '');
+}
+?>>
 
 <head>
     <meta charset="UTF-8">
@@ -23,14 +61,6 @@
     <link rel="stylesheet" href="shared/assets/css/logout-modal.css?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/css/logout-modal.css'); ?>">
     <link rel="stylesheet" href="shared/assets/css/semester-tag.css?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/css/semester-tag.css'); ?>">
     <?php role_splash_head(); ?>
-    <!-- Critical anti-flash rules, inline on purpose: they must be in effect on the very first paint, even if
-         admin-shell.css is slow to arrive or comes from the cache (same rules as the top of that file). -->
-    <style>
-        html.admin-tab-pending #panel-dashboard { display: none !important; }
-        html.admin-tab-pending .app-body { visibility: hidden; }
-        html.admin-tab-pending *, html.admin-tab-pending *::before, html.admin-tab-pending *::after { transition: none !important; }
-        html.ps-restored .tab-panel.active { animation: none !important; }
-    </style>
     <script nonce="<?php echo $csp_nonce; ?>">
         /* Refresh behaviour (admin interface)
            - Soft refresh (F5 / reload button): stay on the screen you are on; an open edit form is dropped.
@@ -44,24 +74,11 @@
             var isReload = nav ? nav.type === 'reload' : !!(performance.navigation && performance.navigation.type === 1);
             window._adminIsReload = isReload;
 
-            // Puts the restored screen (and its sidebar highlight) in place. Used by the reveal script at the end of the
-            // page and by the safety timers below, so even a late reveal never shows the Dashboard first.
-            window.psActivateRestoredScreen = function() {
-                var tab = window._preJumpTab;
-                if (!tab) return false;
-                var target = document.getElementById('panel-' + tab);
-                if (!target) return false;
-                document.querySelectorAll('.tab-panel.active').forEach(function(p) { if (p !== target) p.classList.remove('active'); });
-                target.classList.add('active');
-                document.querySelectorAll('.nav-item[data-tab]').forEach(function(item) {
-                    item.classList.toggle('active', item.dataset.tab === tab);
-                });
-                var accountToggle = document.getElementById('navAccountToggle');
-                if (accountToggle) accountToggle.classList.toggle('active', tab === 'settings');
-                document.documentElement.classList.add('ps-restored');   // shows in place, no slide-in
-                if (document.body) void document.body.offsetWidth;       // commit now, while transitions are still off
-                return true;
-            };
+            // First-paint bridge (see the top of this file): the server may already have painted the screen it expects.
+            // Drop it as soon as this script decides otherwise; admin-dashboard.js drops it once its start-up is done.
+            var root = document.documentElement;
+            var bridged = root.getAttribute('data-ps-tab');
+            var dropBridge = function() { root.removeAttribute('data-ps-tab'); root.removeAttribute('data-ps-sub'); };
 
             // Remember a hard-refresh shortcut so the page that loads next knows about it.
             window.addEventListener('keydown', function(e) {
@@ -89,7 +106,11 @@
 
             // Hard refresh: forget the screen and any leftover URL state, land on the Dashboard.
             if (hard) {
+                dropBridge();
                 try { sessionStorage.removeItem('adminSubView'); } catch (_) {}
+                try {
+                    ['ps_admin_tab', 'ps_sub_rooms', 'ps_sub_settings'].forEach(function(c) { document.cookie = c + '=; path=/; Max-Age=0'; });
+                } catch (_) {}
                 if (loc.search || loc.hash) {
                     window._adminLeaving = true;
                     loc.replace(loc.pathname);
@@ -117,8 +138,9 @@
                 var qs = params.toString();
                 window._adminLeaving = true;
                 // Keep the Dashboard (and its sidebar highlight) from showing while the page reloads once more.
+                dropBridge();
                 document.documentElement.classList.add('admin-tab-pending');
-                setTimeout(function() { document.documentElement.classList.remove('admin-tab-pending'); }, 30000);
+                setTimeout(function() { document.documentElement.classList.remove('admin-tab-pending'); }, 5000);
                 loc.replace(loc.pathname + (qs ? '?' + qs : '') + hash);
                 return;
             }
@@ -139,16 +161,24 @@
                 }
             }
 
-            if (TABS.indexOf(tab) === -1) return;
+            if (TABS.indexOf(tab) === -1) {
+                // Nothing to restore, so the Dashboard is right: drop a wrong guess by the server and forget the stale screen.
+                dropBridge();
+                try { document.cookie = 'ps_admin_tab=dashboard; path=/; SameSite=Lax'; } catch (_) {}
+                return;
+            }
             window._preJumpTab = tab;
+            if (bridged === tab) {
+                // The server already painted this very screen, so there is nothing to hide: the page shows it from the
+                // first frame. The reveal script at the end of the page still puts the real classes in place.
+                return;
+            }
+            dropBridge();
             document.documentElement.classList.add('admin-tab-pending');
             // Safety net: never leave the page hidden if the reveal script below fails to run.
             // It waits for the page to finish loading (a slow connection can take longer than any fixed
             // timeout, and lifting early would flash the Dashboard), then lifts after a short grace.
-            var lift = function() {
-                window.psActivateRestoredScreen();   // never reveal the Dashboard by accident
-                document.documentElement.classList.remove('admin-tab-pending');
-            };
+            var lift = function() { document.documentElement.classList.remove('admin-tab-pending'); };
             window.addEventListener('load', function() { setTimeout(lift, 1500); });
             setTimeout(lift, 20000);
         })();

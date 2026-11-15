@@ -60,3 +60,67 @@ html.ps-restored .tab-panel.active {
 @media (prefers-reduced-motion: reduce) {
     #ps-refresh-bar::before { animation-duration: 2.4s; }
 }
+
+/* ── First-paint bridge for a page refresh ─────────────────────────────────────────────────────
+   admin-shell-top.php puts data-ps-tab="<screen>" (and data-ps-sub="<sub-tab>") on <html> when the server expects a
+   refresh of that screen. These rules paint it from the very first frame, with no script involved, so the Dashboard is
+   never shown first. admin-dashboard.js removes the attributes once its own start-up has put the real classes in place
+   (the look is the same, so nothing changes on screen when it does). */
+html[data-ps-tab] #panel-dashboard { display: none; }
+
+html[data-ps-tab="rooms"] #panel-rooms,
+html[data-ps-tab="faculty"] #panel-faculty,
+html[data-ps-tab="admins"] #panel-admins,
+html[data-ps-tab="activity"] #panel-activity,
+html[data-ps-tab="inventory"] #panel-inventory,
+html[data-ps-tab="settings"] #panel-settings,
+html[data-ps-tab="imports"] #panel-imports { display: block; }
+
+/* Sidebar: the Dashboard item looks inactive, the expected one looks active (same values as .nav-item / .nav-item.active). */
+html[data-ps-tab] .nav-item[data-tab="dashboard"] {
+    background: none;
+    color: var(--nav-text);
+    font-weight: 500;
+}
+html[data-ps-tab] .nav-item[data-tab="dashboard"] .material-symbols-outlined { font-variation-settings: 'FILL' 0; }
+
+html[data-ps-tab="rooms"] .nav-item[data-tab="rooms"],
+html[data-ps-tab="faculty"] .nav-item[data-tab="faculty"],
+html[data-ps-tab="admins"] .nav-item[data-tab="admins"],
+html[data-ps-tab="activity"] .nav-item[data-tab="activity"],
+html[data-ps-tab="inventory"] .nav-item[data-tab="inventory"],
+html[data-ps-tab="settings"] .nav-item[data-tab="settings"],
+html[data-ps-tab="settings"] #navAccountToggle,
+html[data-ps-tab="imports"] .nav-item[data-tab="imports"] {
+    background: var(--nav-active-bg);
+    color: var(--nav-on-active);
+    font-weight: 600;
+}
+html[data-ps-tab="rooms"] .nav-item[data-tab="rooms"] .material-symbols-outlined,
+html[data-ps-tab="faculty"] .nav-item[data-tab="faculty"] .material-symbols-outlined,
+html[data-ps-tab="admins"] .nav-item[data-tab="admins"] .material-symbols-outlined,
+html[data-ps-tab="activity"] .nav-item[data-tab="activity"] .material-symbols-outlined,
+html[data-ps-tab="inventory"] .nav-item[data-tab="inventory"] .material-symbols-outlined,
+html[data-ps-tab="settings"] .nav-item[data-tab="settings"] .material-symbols-outlined,
+html[data-ps-tab="settings"] #navAccountToggle .material-symbols-outlined,
+html[data-ps-tab="imports"] .nav-item[data-tab="imports"] .material-symbols-outlined { font-variation-settings: 'FILL' 1; }
+
+/* Open sub-tab of Facilities / Settings (the sub-tab buttons catch up when the script runs). Hide rules first, then the
+   chosen panel; both have the same weight, so the later rule wins. */
+html[data-ps-sub^="rooms-"] #rooms-active-panel,
+html[data-ps-sub^="rooms-"] #rooms-reservations-panel,
+html[data-ps-sub^="rooms-"] #rooms-archived-panel,
+html[data-ps-sub^="sett-"] #sett-account,
+html[data-ps-sub^="sett-"] #sett-prefs,
+html[data-ps-sub^="sett-"] #sett-arbitration,
+html[data-ps-sub^="sett-"] #sett-ratings,
+html[data-ps-sub^="sett-"] #sett-help { display: none; }
+
+html[data-ps-sub="rooms-active"] #rooms-active-panel,
+html[data-ps-sub="rooms-reservations"] #rooms-reservations-panel,
+html[data-ps-sub="rooms-archived"] #rooms-archived-panel,
+html[data-ps-sub="sett-account"] #sett-account,
+html[data-ps-sub="sett-prefs"] #sett-prefs,
+html[data-ps-sub="sett-arbitration"] #sett-arbitration,
+html[data-ps-sub="sett-ratings"] #sett-ratings,
+html[data-ps-sub="sett-help"] #sett-help { display: block; }
