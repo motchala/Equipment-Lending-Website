@@ -7,12 +7,12 @@ ini_set('display_errors', '0');
  * Saves the one-time setup a NEW faculty account must finish before it can be used
  * (screen: faculty-setup.php). In ONE statement it:
  *   - replaces the generated password with the person's own,
- *   - saves the essential details (department),
+ *   - saves the essential details (1 to 3 departments, the first one required),
  *   - clears tbl_users.must_change_password, which unlocks the account for good.
  * Doing it all at once means there is never a half-finished state to resume from, and the
  * WHERE must_change_password = 1 makes a double click (or a replayed request) harmless.
  *
- * POST: csrf_token, new_password, confirm_password, department
+ * POST: csrf_token, new_password, confirm_password, department (the picked names joined by "; ")
  * JSON: { success, msg, field?, redirect? }
  */
 
@@ -108,12 +108,12 @@ $cur_dept   = trim((string)($cur['department'] ?? ''));
 if ($cur_dept !== '') {
     $department = $cur_dept;                       // already on file: it is permanent, keep it
 } else {
-    if ($department === '') {
-        $fail('Select your department.', 'department');
+    // 1 to 3 different departments from the list; the first one is required, the other two are optional
+    [$dept_names, $dept_err] = faculty_departments_validate_input($department);
+    if ($dept_err !== '') {
+        $fail($dept_err, 'department');
     }
-    if (!faculty_department_is_valid($department)) {
-        $fail('Please choose a department from the list.', 'department');
-    }
+    $department = faculty_departments_join($dept_names);
     if (!faculty_ensure_department_column($conn)) {
         $fail('Your department could not be saved because the database needs a one-time update. Please contact the administrator.', 'department', 500);
     }

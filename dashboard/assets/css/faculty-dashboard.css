@@ -13801,3 +13801,67 @@ html.rx-mobile body #settingsOverlay .sov-pagehead::after {
     opacity: 0.55;
     cursor: not-allowed;
 }
+
+/* ================================================================
+   SETTINGS > PERSONAL INFORMATION > Departments (check-mark dropdown)
+   Shown only while editing; the static "Not provided" text steps aside.
+   Colours follow the page tokens, so dark mode works too.
+   ================================================================ */
+.sov-edit-card .ps-multisel {
+    display: none;
+    --psms-bg: var(--color-surface-lowest);
+    --psms-text: var(--color-on-surface);
+    --psms-muted: var(--color-secondary);
+    --psms-border: var(--control-border, var(--color-outline-variant));
+    --psms-border-hover: var(--color-outline);
+    --psms-accent: var(--color-primary);
+    --psms-check-bg: var(--color-primary-container);
+    --psms-on-accent: #fff;
+    --psms-ring: color-mix(in srgb, var(--color-primary) 22%, transparent);
+    --psms-error: var(--color-error);
+    --psms-chip-bg: var(--color-surface-container);
+    --psms-chip-text: var(--color-on-surface);
+    --psms-panel-bg: var(--color-surface-lowest);
+    --psms-hover: var(--color-surface-container);
+    --psms-selected-bg: color-mix(in srgb, var(--color-primary) 9%, var(--color-surface-lowest));
+    --psms-soft-border: var(--color-outline-variant);
+    --psms-radius: var(--radius-sm);
+    --psms-font: var(--font-sans);
+    --psms-font-size: 0.875rem;
+    --psms-min-h: 36px;
+}
+
+.sov-edit-card[data-editing="true"] .acct-row--dept .ps-multisel {
+    display: block;
+}
+
+.sov-edit-card[data-editing="true"] .acct-row--dept .acct-row-value>[data-view="department"] {
+    display: none;
+}
+
+.acct-row--dept {
+    align-items: flex-start;
+}
+
+/* the chosen departments once they are locked: one per line */
+.acct-dept-list {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.acct-dept-item {
+    display: block;
+    line-height: 1.35;
+}
+
+.acct-dept-hint {
+    margin: 8px 0 0;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: var(--color-secondary);
+}
+
+.acct-dept-hint[hidden] {
+    display: none;
+}

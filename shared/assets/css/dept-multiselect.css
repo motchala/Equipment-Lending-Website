@@ -1,0 +1,231 @@
+/* ==================================================================
+   shared/assets/css/dept-multiselect.css
+   The check-mark dropdown for choosing 1-3 departments
+   (markup: faculty_department_multiselect(); behaviour: js/dept-multiselect.js).
+   Colours come from --psms-* variables. The defaults below are the PUPSync maroon
+   look; each page maps them to its own tokens (first-login page, Settings) so dark
+   mode and the page's look are followed.
+   ================================================================== */
+.ps-multisel {
+    --psms-bg: #fff;
+    --psms-text: #1f1414;
+    --psms-muted: #8c7474;
+    --psms-border: #ddbdbd;
+    --psms-border-hover: #9e7070;
+    --psms-accent: #800000;
+    --psms-on-accent: #fff;
+    --psms-ring: rgba(128, 0, 0, 0.10);
+    --psms-error: #c0392b;
+    --psms-chip-bg: #f8ecec;
+    --psms-chip-text: #5a0000;
+    --psms-panel-bg: #fff;
+    --psms-hover: #fdf1f1;
+    --psms-selected-bg: #fdf1f1;
+    --psms-soft-border: #f0e0e0;
+    --psms-radius: 12px;
+    --psms-font: inherit;
+    --psms-font-size: 0.95rem;
+    --psms-min-h: 48px;
+
+    position: relative;
+    width: 100%;
+    font-family: var(--psms-font);
+}
+
+.ps-multisel-trigger {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: var(--psms-min-h);
+    padding: 7px 44px 7px 12px;
+    border: 1.5px solid var(--psms-border);
+    border-radius: var(--psms-radius);
+    background: var(--psms-bg);
+    color: var(--psms-text);
+    font: inherit;
+    font-size: var(--psms-font-size);
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.18s, box-shadow 0.18s, background 0.18s;
+}
+
+.ps-multisel-trigger:hover {
+    border-color: var(--psms-border-hover);
+}
+
+.ps-multisel-trigger:focus-visible,
+.ps-multisel.is-open .ps-multisel-trigger {
+    outline: none;
+    border-color: var(--psms-accent);
+    box-shadow: 0 0 0 4px var(--psms-ring);
+}
+
+.ps-multisel.is-invalid .ps-multisel-trigger {
+    border-color: var(--psms-error);
+}
+
+.ps-multisel.is-disabled .ps-multisel-trigger {
+    cursor: default;
+    opacity: 0.7;
+}
+
+.ps-multisel-display {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.ps-multisel-placeholder {
+    color: var(--psms-muted);
+}
+
+.ps-multisel-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-width: 0;
+}
+
+.ps-multisel-chip {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: var(--psms-chip-bg);
+    color: var(--psms-chip-text);
+    font-size: 0.8rem;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.ps-multisel-chip>span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ps-multisel-caret {
+    position: absolute;
+    top: 50%;
+    right: 12px;
+    transform: translateY(-50%);
+    color: var(--psms-muted);
+    pointer-events: none;
+    transition: transform 0.18s;
+}
+
+.ps-multisel.is-open .ps-multisel-caret {
+    transform: translateY(-50%) rotate(180deg);
+}
+
+/* the list opens inline, under the trigger */
+.ps-multisel-panel {
+    margin-top: 6px;
+    padding: 6px;
+    border: 1.5px solid var(--psms-border);
+    border-radius: var(--psms-radius);
+    background: var(--psms-panel-bg);
+    outline: none;
+}
+
+.ps-multisel-panel[hidden],
+.ps-multisel-note[hidden] {
+    display: none;
+}
+
+.ps-multisel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 4px;
+    padding: 6px 10px 8px;
+    border-bottom: 1px solid var(--psms-soft-border);
+    color: var(--psms-muted);
+    font-size: 0.78rem;
+}
+
+.ps-multisel-count.is-full {
+    color: var(--psms-accent);
+    font-weight: 700;
+}
+
+.ps-multisel-opt {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: 8px;
+    color: var(--psms-text);
+    font-size: 0.9rem;
+    line-height: 1.35;
+    cursor: pointer;
+    user-select: none;
+    outline: none;
+}
+
+.ps-multisel-opt:hover,
+.ps-multisel-opt.is-active,
+.ps-multisel-opt:focus-visible {
+    background: var(--psms-hover);
+}
+
+.ps-multisel-opt:focus-visible {
+    box-shadow: inset 0 0 0 2px var(--psms-accent);
+}
+
+.ps-multisel-opt[aria-selected="true"] {
+    background: var(--psms-selected-bg);
+    font-weight: 600;
+}
+
+.ps-multisel-opt[aria-disabled="true"] {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.ps-multisel-box {
+    flex: 0 0 18px;
+    width: 18px;
+    height: 18px;
+    margin-top: 1px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px solid var(--psms-border-hover);
+    border-radius: 5px;
+    background: var(--psms-bg);
+    color: transparent;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.ps-multisel-box .material-symbols-outlined {
+    font-size: 15px;
+    line-height: 1;
+}
+
+.ps-multisel-opt[aria-selected="true"] .ps-multisel-box {
+    background: var(--psms-check-bg, var(--psms-accent));
+    border-color: var(--psms-check-bg, var(--psms-accent));
+    color: var(--psms-on-accent);
+}
+
+.ps-multisel-note {
+    margin: 4px 0 2px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--psms-selected-bg);
+    color: var(--psms-accent);
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    .ps-multisel-trigger,
+    .ps-multisel-caret,
+    .ps-multisel-box {
+        transition: none;
+    }
+}

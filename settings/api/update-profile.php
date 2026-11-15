@@ -29,7 +29,7 @@ $action = trim($_POST['action'] ?? '');
    Settings > Personal Information ("Edit Account" -> "Save Changes").
    Saves, in ONE request and with no extra confirmation step:
      - fullname    always editable
-     - department  can be chosen ONCE; locked after that (same rule as the Faculty ID)
+     - department  1 to 3 departments, chosen ONCE; locked after that (same rule as the Faculty ID)
    The email address is the sign-in ID and is managed by the administrator, so it is
    deliberately NOT editable here.
 ══════════════════════════════════════════════════════════════════ */
@@ -76,21 +76,22 @@ if ($action === 'save_account') {
         $set['fullname'] = $in_name;
     }
 
-    /* ── Department (set once) ── */
-    $in_dept = trim((string)($_POST['department'] ?? $cur_dept));
-    if ($in_dept !== $cur_dept) {
-        if ($cur_dept !== '') {
-            $fail('Your department is already set and cannot be changed here.', 'department');
+    /* ── Departments: 1 to 3 (the first is required, the others optional), set once ── */
+    $in_dept = trim((string)($_POST['department'] ?? ''));
+    if ($cur_dept !== '') {
+        // already on file => permanent; anything different that is sent is refused
+        if ($in_dept !== '' && faculty_departments_split($in_dept) !== faculty_departments_split($cur_dept)) {
+            $fail('Your departments are already set and cannot be changed here.', 'department');
         }
-        if ($in_dept !== '') {
-            if (!faculty_department_is_valid($in_dept)) {
-                $fail('Please choose a department from the list.', 'department');
-            }
-            if (!faculty_ensure_department_column($conn)) {
-                $fail('Your department could not be saved because the database needs a one-time update. Please contact the administrator.', 'department');
-            }
-            $set['department'] = $in_dept;
+    } elseif ($in_dept !== '') {
+        [$dept_names, $dept_err] = faculty_departments_validate_input($in_dept);
+        if ($dept_err !== '') {
+            $fail($dept_err, 'department');
         }
+        if (!faculty_ensure_department_column($conn)) {
+            $fail('Your departments could not be saved because the database needs a one-time update. Please contact the administrator.', 'department');
+        }
+        $set['department'] = faculty_departments_join($dept_names);
     }
 
     if (!$set) {
@@ -142,6 +143,8 @@ if ($action === 'save_account') {
             'first_name'        => $parts[0] ?? '',
             'initials'          => $initials,
             'department'        => $new_dept,
+            'departments'       => faculty_departments_split($new_dept),
+            'department_summary' => faculty_departments_summary($new_dept),
             'department_locked' => $new_dept !== '',
         ],
     ]);

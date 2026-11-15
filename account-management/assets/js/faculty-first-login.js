@@ -126,7 +126,7 @@
         if (!box) return false;
         var err = box.querySelector('.fs-err');
         box.classList.add('has-error');
-        var input = box.querySelector('input, select');
+        var input = box.querySelector('.ps-multisel-trigger') || box.querySelector('input, select');
         if (input) input.setAttribute('aria-invalid', 'true');
         if (err) { err.textContent = msg; err.hidden = false; }
         return true;
@@ -136,7 +136,7 @@
         var box = fieldBox(name);
         if (!box) return;
         box.classList.remove('has-error');
-        var input = box.querySelector('input, select');
+        var input = box.querySelector('.ps-multisel-trigger') || box.querySelector('input, select');
         if (input) input.removeAttribute('aria-invalid');
         var err = box.querySelector('.fs-err');
         if (err) { err.hidden = true; err.textContent = ''; }
@@ -154,7 +154,7 @@
 
     function focusField(name) {
         var box = fieldBox(name);
-        var input = box && box.querySelector('input, select');
+        var input = box && (box.querySelector('.ps-multisel-trigger') || box.querySelector('input, select'));
         if (input) input.focus();
     }
 
@@ -216,8 +216,9 @@
     function validateStep2() {
         clearFieldError('department');
 
-        if (el.dept && el.dept.tagName === 'SELECT' && !el.dept.value) {
-            return fail('department', 'Select your department.');
+        /* the dropdown keeps the picked departments in a hidden field; a locked (read-only) value needs no check */
+        if (el.dept && !el.dept.readOnly && !el.dept.value) {
+            return fail('department', 'Select at least one department.');
         }
 
         return true;

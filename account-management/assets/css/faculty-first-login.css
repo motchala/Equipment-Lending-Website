@@ -1207,6 +1207,8 @@ html {
 
     .fs-btn {
         width: 100%;
+        /* stacked in a column the row layout's flex: 1 would shrink the button to its text height */
+        flex: none;
     }
 
     .fs-meter-label {
@@ -1233,4 +1235,40 @@ html {
     .fs-done-bar::after {
         transform: scaleX(1);
     }
+}
+
+/* ── Department check-mark dropdown (shared/assets/css/dept-multiselect.css) ── */
+.fs-field .ps-multisel {
+    --psms-bg: #fff;
+    --psms-text: var(--fs-on-surface);
+    --psms-muted: #8c7474;
+    --psms-border: var(--fs-outline-variant);
+    --psms-border-hover: var(--fs-outline);
+    --psms-accent: var(--fs-maroon);
+    --psms-ring: rgba(128, 0, 0, 0.10);
+    --psms-error: var(--fs-error);
+    --psms-chip-bg: var(--fs-surface-container);
+    --psms-chip-text: var(--fs-maroon-dark);
+    --psms-panel-bg: #fff;
+    --psms-hover: var(--fs-surface-low);
+    --psms-selected-bg: var(--fs-surface-low);
+    --psms-soft-border: var(--fs-surface-container);
+    --psms-radius: var(--fs-radius-md);
+    --psms-font: var(--fs-font-sans);
+    --psms-font-size: 16px;
+    --psms-min-h: 48px;
+}
+
+.fs-field.has-error .ps-multisel-trigger {
+    border-color: var(--fs-error);
+    background: #fffafa;
+}
+
+.fs-opt-note {
+    margin-left: 6px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--fs-secondary);
 }

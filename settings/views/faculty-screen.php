@@ -210,7 +210,7 @@
         <div class="sov-body">
 
             <?php
-            $acct_meta_parts = array_filter([$db_department]);
+            $acct_meta_parts = array_filter([faculty_departments_summary($db_department)]);
             $acct_meta = $acct_meta_parts ? implode(' &middot; ', array_map('htmlspecialchars', $acct_meta_parts)) : 'PUPSync Faculty';
             ?>
 
@@ -300,29 +300,25 @@
                                         </div>
                                         <span class="material-symbols-outlined fid-lock" title="Your email is your sign-in ID and is managed by the administrator">lock</span>
                                     </div>
-                                    <div class="acct-row">
-                                        <label class="acct-row-label" for="sovDepartment">Department</label>
+                                    <div class="acct-row acct-row--dept">
+                                        <label class="acct-row-label"<?php echo $department_locked ? '' : ' for="sovDepartmentBtn"'; ?>>Departments</label>
                                         <div class="acct-row-value">
                                             <?php if ($department_locked): ?>
-                                                <span class="acct-row-static" id="sovDepartmentView"><?php echo htmlspecialchars($db_department); ?></span>
+                                                <span class="acct-row-static acct-dept-list" id="sovDepartmentView"><?php foreach (faculty_departments_split($db_department) as $sov_dept_name): ?><span class="acct-dept-item"><?php echo htmlspecialchars($sov_dept_name); ?></span><?php endforeach; ?></span>
                                             <?php else: ?>
-                                                <span class="acct-row-static acct-row-static-muted acct-row-not-provided" id="sovDepartmentView" data-view="department">— Not provided</span>
-                                                <select class="acct-row-input" id="sovDepartment" name="department" data-edit-field="department" disabled>
-                                                    <option value="">Select your department&hellip;</option>
-                                                    <?php foreach (faculty_departments() as $sov_dept): ?>
-                                                        <option value="<?php echo htmlspecialchars($sov_dept); ?>"><?php echo htmlspecialchars($sov_dept); ?></option>
-                                                    <?php endforeach; ?>
-                                                </select>
-                                                <button type="button" class="sov-field-info" data-sov-edit-gated hidden
-                                                    aria-label="Department selection information" aria-describedby="sovDepartmentHint">
-                                                    <span class="material-symbols-outlined" aria-hidden="true">info</span>
-                                                    <span class="sov-field-info-tip" id="sovDepartmentHint" role="tooltip">You can choose your department once; it can&rsquo;t be changed afterwards.</span>
-                                                </button>
+                                                <span class="acct-row-static acct-row-static-muted acct-row-not-provided" id="sovDepartmentView" data-view="department">&mdash; Not provided</span>
+                                                <?php echo faculty_department_multiselect('sovDepartment', 'department', [], [
+                                                    'edit_field'  => 'department',
+                                                    'disabled'    => true,
+                                                    'describedby' => 'sovDepartmentHint',
+                                                    'label'       => 'Departments',
+                                                ]); ?>
+                                                <p class="acct-dept-hint" id="sovDepartmentHint" data-sov-edit-gated hidden>Choose up to 3 departments. You can choose them once; they can&rsquo;t be changed afterwards.</p>
                                             <?php endif; ?>
                                             <p class="acct-field-error" data-error-for="department" role="alert" hidden></p>
                                         </div>
                                         <?php if ($department_locked): ?>
-                                            <span class="material-symbols-outlined fid-lock" title="Your department is permanent once set">lock</span>
+                                            <span class="material-symbols-outlined fid-lock" title="Your departments are permanent once set">lock</span>
                                         <?php endif; ?>
                                     </div>
                                 </div>
