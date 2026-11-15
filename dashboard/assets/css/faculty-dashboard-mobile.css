@@ -332,6 +332,20 @@ html.rx-mobile .act-ai-fab-popover {
     bottom: calc(var(--rxm-tab-h) + var(--rxm-sb) + 14px + 56px + 10px) !important;
 }
 
+/* The one-time assistant hint would otherwise sit over the page until it is dismissed.
+   On a phone it fades away by itself after a few seconds (the x still closes it sooner). */
+@keyframes rxmHintOut {
+    to {
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(6px);
+    }
+}
+
+html.rx-mobile .act-ai-fab-popover.visible {
+    animation: actPopoverIn .25s cubic-bezier(.16, 1, .3, 1) both, rxmHintOut .3s ease 9s forwards;
+}
+
 html.rx-mobile .overdue-toast {
     bottom: calc(var(--rxm-tab-h) + var(--rxm-sb) + 12px) !important;
 }
@@ -1089,6 +1103,8 @@ html.rx-mobile #panel-lending .catalog-filters {
     order: 1 !important;
     display: flex !important;
     flex-direction: column !important;
+    flex-wrap: nowrap !important;
+    min-width: 0 !important;
     gap: 12px !important;
     margin: 2px 0 18px !important;
     padding: 0 !important;
@@ -1130,6 +1146,8 @@ html.rx-mobile .rxm-chips {
     gap: 8px;
     margin: 0 calc(var(--rxm-gutter) * -1);
     padding: 2px var(--rxm-gutter);
+    min-width: 0;
+    max-width: calc(100% + var(--rxm-gutter) * 2);
     overflow-x: auto;
     scroll-snap-type: x proximity;
     scroll-padding-inline: var(--rxm-gutter);
@@ -1372,6 +1390,37 @@ html.rx-mobile #panel-lending .eq-item-card {
 
 html.rx-mobile #panel-lending .eq-item-card:last-child {
     border-bottom: 0 !important;
+}
+
+/* An item that is already in the request. The quantity stepper (158px) used to take its own
+   grid column and squeezed the equipment name down to a few pixels, with the tick badge
+   crowding the chevron. On a phone the stepper now sits on its own line under the name and
+   stock badge, and the tick moves onto the corner of the photo. */
+html.rx-mobile #panel-lending .eq-item-card--in-cart {
+    grid-template-columns: 70px minmax(0, 1fr) auto !important;
+    grid-template-areas:
+        "img name ic"
+        "img cat ic"
+        "img stock ic"
+        "img act act"
+        "panel panel panel" !important;
+}
+
+html.rx-mobile #panel-lending .eq-item-card--in-cart .eq-item-img {
+    align-self: start !important;
+}
+
+html.rx-mobile #panel-lending .eq-item-card--in-cart .bf-slot--card {
+    grid-area: act !important;
+    justify-self: start !important;
+    margin-top: 4px !important;
+    max-width: 100% !important;
+}
+
+html.rx-mobile #panel-lending .eq-item-card--in-cart .bf-tick {
+    top: 6px !important;
+    right: auto !important;
+    left: 44px !important;
 }
 
 html.rx-mobile #panel-lending .eq-item-card::before,
