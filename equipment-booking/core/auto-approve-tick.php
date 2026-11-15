@@ -7,17 +7,20 @@ declare(strict_types=1);
  *
  * Lazy housekeeping for equipment requests that are still Waiting.
  *
- * NOTE: the file and function keep their old name so the existing callers do not change, but
- * NOTHING IS AUTO-APPROVED ANY MORE. The old "approve after the buffer time" behaviour is gone:
- * it approved requests without applying the borrowing rules and made the outcome depend on whose
- * page happened to poll first. Now (see request-decision.php for the full rules):
+ * NOTE: the file and function keep their old name so the existing callers do not change. The old
+ * "approve after the buffer time" behaviour is gone: it approved requests without applying the
+ * borrowing rules and made the outcome depend on whose page happened to poll first. Now (see
+ * request-decision.php for the full rules):
  *
- *   - a same-day request is decided at the moment it is submitted;
+ *   - a same-day request is decided at the moment it is submitted: auto-approved only when it
+ *     passes every same-day rule (faculty, one day, no attachment, 3+ in stock...), otherwise
+ *     it waits for an admin;
  *   - a later-date request waits for an admin and, if nobody decides, is DECLINED at
  *     12:01 AM on its borrow date.
  *
  * What this tick does on every poll:
- *   1. decide any same-day request that was missed at submit time (safety net);
+ *   1. decide any same-day request that was missed at submit time (safety net; requests sent to an
+ *      admin on purpose are left alone);
  *   2. decline every undecided request whose deadline has passed.
  *
  * Call sites (mirrors BookingSchedule::tick):

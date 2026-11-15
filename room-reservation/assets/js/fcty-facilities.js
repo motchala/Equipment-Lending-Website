@@ -269,7 +269,7 @@
             '<span class="fcty-panel-letter" aria-hidden="true">' + esc(b.letter) + '</span>' +
             '<span class="fcty-panel-live"><span class="fcty-dot"></span><span data-live-count>' + free + ' free now</span></span>' +
             '<span class="fcty-panel-info">' +
-            '<span class="fcty-panel-name">' + esc(b.base) + (b.tag ? '<em class="fcty-tag">' + esc(b.tag) + '</em>' : '') + '</span>' +
+            '<span class="fcty-panel-name"><span class="fcty-panel-name-text">' + esc(b.base) + '</span>' + (b.tag ? '<em class="fcty-tag">' + esc(b.tag) + '</em>' : '') + '</span>' +
             '<span class="fcty-panel-meta">' + plural(b.rooms, 'room') + ' \u00b7 ' + plural(b.floors.length, 'floor') + '</span>' +
             '<span class="fcty-panel-reveal"><span class="fcty-panel-floors">' +
             b.floors.map(function (f) { return '<span>' + esc(f.label) + '</span>'; }).join('') +
@@ -825,9 +825,9 @@
        Left: live summary + day timeline.  Right: guided form.
     ══════════════════════════════════════════════════════════ */
     /* disabledFn(minute) -> true greys an option out (taken by a class / reservation, or already past) */
-    function timeOptions(from, to, selected, disabledFn) {
+    function timeOptions(from, to, selected, disabledFn, step) {
         var html = '';
-        for (var m = from; m <= to; m += 30) {
+        for (var m = from; m <= to; m += (step || 30)) {
             html += '<option value="' + minToHHMM(m) + '"' + (m === selected ? ' selected' : '') + (disabledFn && disabledFn(m) ? ' disabled' : '') + '>' + minToLabel(m) + '</option>';
         }
         return html;
@@ -839,7 +839,7 @@
 
         /* Smart defaults: next half-hour today, or 8 AM on the next open day if it's too late
            (or today is Sunday) */
-        var st = { date: ymd(now), start: 0, end: 0, purpose: '', other: false };
+        var st = { date: ymd(now), start: 0, end: 0, purpose: '', other: false, custom: false };   /* custom: false = pick a duration, true = pick an end time */
         if (isClosedDay(now) || nowMin >= SCHOOL_END_MIN - 60) {
             st.date = ymd(nextOpenDay(addDays(now, 1))); st.start = SCHOOL_START_MIN + 60;
         } else {
@@ -904,10 +904,14 @@
             '<input type="date" id="fcty-res-date" class="fcty-input" aria-label="Pick a date" min="' + firstOpenStr + '" value="' + st.date + '">' +
             '</div></div>' +
             '<div class="fcty-row">' +
-            '<div class="fcty-sub"><label class="fcty-sublabel" for="fcty-res-start">From</label>' +
+            '<div class="fcty-sub"><label class="fcty-sublabel" for="fcty-res-start">Start time</label>' +
             '<select id="fcty-res-start" class="fcty-input"></select></div>' +
-            '<div class="fcty-sub"><label class="fcty-sublabel" for="fcty-res-end">To</label>' +
-            '<select id="fcty-res-end" class="fcty-input"></select></div>' +
+            '<div class="fcty-sub"><label class="fcty-sublabel" id="fcty-end-label" for="fcty-res-dur">Duration</label>' +
+            '<div class="fcty-dur-row">' +
+            '<select id="fcty-res-dur" class="fcty-input"></select>' +
+            '<select id="fcty-res-end" class="fcty-input" aria-label="End time" hidden></select>' +
+            '<button type="button" class="fcty-gear-btn" id="fcty-res-gear" aria-pressed="false" aria-label="Pick a custom end time" title="Pick a custom end time">' + icon('settings') + '</button>' +
+            '</div></div>' +
             '</div>' +
             '</div>' +
 
@@ -917,10 +921,13 @@
             '<input type="text" id="fcty-res-purpose" class="fcty-input" placeholder="What is the room for?" maxlength="200" aria-label="Purpose" hidden></div>' +
             '<details class="fcty-sub fcty-doc" id="fcty-doc-block" hidden>' +
             '<summary class="fcty-sublabel">Request letter <small>(recommended)</small><span class="fcty-doc-state" id="fcty-doc-state"></span></summary>' +
+            '<div class="pslc-pair">' +
             '<label class="fcty-drop" id="fcty-drop" for="fcty-res-doc">' + icon('upload_file') +
             '<span><strong>Upload a file</strong><small>JPG, PNG or PDF \u00b7 max 5 MB</small></span></label>' +
+            '<button type="button" class="pslc-trigger" id="fcty-doc-cam" data-letter-camera="fcty-res-doc">' + icon('photo_camera') +
+            '<span class="pslc-trigger-text"><strong>Take a photo</strong><small>Use your camera</small></span></button>' +
+            '</div>' +
             '<input type="file" id="fcty-res-doc" class="fcty-sr-only" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf">' +
-            '<button type="button" class="pslc-trigger" id="fcty-doc-cam" data-letter-camera="fcty-res-doc">' + icon('photo_camera') + 'Take a photo of the letter</button>' +
             '<div class="fcty-file" id="fcty-file" hidden></div>' +
             '<p class="fcty-hint" id="fcty-doc-hint"></p>' +
             '</details>' +
@@ -939,6 +946,7 @@
         $('fcty-form-close').addEventListener('click', function () { closeOverlay(formOverlay); });
 
         var elDate = $('fcty-res-date'), elStart = $('fcty-res-start'), elEnd = $('fcty-res-end');
+        var elDur = $('fcty-res-dur'), elGear = $('fcty-res-gear'), elEndLabel = $('fcty-end-label');
         var elMsg = $('fcty-res-msg'), btnSubmit = $('fcty-res-submit');
         var elPurpose = $('fcty-res-purpose');
         var confirmHTML = icon('event_available') + 'Confirm reservation';
@@ -1116,6 +1124,19 @@
             return (c - SCHOOL_START_MIN) / (SCHOOL_END_MIN - SCHOOL_START_MIN) * 100;
         }
 
+        /* Duration choices. A length that is not one of the presets (e.g. from an open-time chip) is listed
+           too, so the field never shows something different from what will be booked. */
+        var DURATIONS = [60, 120, 180, 360];
+        function durationOptions(cur) {
+            var list = DURATIONS.slice();
+            if (list.indexOf(cur) === -1) { list.push(cur); list.sort(function (a, b) { return a - b; }); }
+            return list.map(function (d) {
+                var preset = DURATIONS.indexOf(d) !== -1;
+                var off = preset && (st.start + d > SCHOOL_END_MIN || !rangeFree(st.start, st.start + d));
+                return '<option value="' + d + '"' + (d === cur ? ' selected' : '') + (off ? ' disabled' : '') + '>' + durLabel(d) + '</option>';
+            }).join('');
+        }
+
         /* ── Rendering ── */
         function syncControls() {
             /* Start / end selects (end must be after start) */
@@ -1123,7 +1144,25 @@
                 return !rangeFree(m, m + 30) || (isToday() && m <= nowMin);
             });
             if (st.end <= st.start) st.end = Math.min(SCHOOL_END_MIN, st.start + 60);
-            elEnd.innerHTML = timeOptions(st.start + 30, SCHOOL_END_MIN, st.end, function (m) { return !rangeFree(st.start, m); });
+            /* A custom end time is whole hours only (no :30): pull a half-hour end back to the o'clock */
+            if (st.custom && st.end % 60) {
+                var dn = Math.floor(st.end / 60) * 60;
+                st.end = dn > st.start ? dn : Math.min(SCHOOL_END_MIN, Math.ceil(st.end / 60) * 60);
+            }
+            /* End time list: every o'clock after the start, up to 8 PM */
+            elEnd.innerHTML = timeOptions(Math.floor(st.start / 60) * 60 + 60, SCHOOL_END_MIN, st.end, function (m) { return !rangeFree(st.start, m); }, 60);
+            /* Duration list: 1 / 2 / 3 / 6 hours */
+            elDur.innerHTML = durationOptions(st.end - st.start);
+            /* The gear switches the second field between Duration and End time */
+            elDur.hidden = st.custom;
+            elEnd.hidden = !st.custom;
+            elEndLabel.textContent = st.custom ? 'End time' : 'Duration';
+            elEndLabel.setAttribute('for', st.custom ? 'fcty-res-end' : 'fcty-res-dur');
+            elGear.setAttribute('aria-pressed', st.custom ? 'true' : 'false');
+            elGear.classList.toggle('is-on', st.custom);
+            var gearTip = st.custom ? 'Back to choosing a duration' : 'Pick a custom end time';
+            elGear.title = gearTip;
+            elGear.setAttribute('aria-label', gearTip);
 
             /* Date chips */
             var dateChips = $('fcty-date-chips');
@@ -1264,10 +1303,32 @@
         elStart.addEventListener('change', function () {
             var keep = st.end - st.start;
             st.start = timeToMin(elStart.value);
-            st.end = Math.min(SCHOOL_END_MIN, st.start + Math.max(30, keep));
+            if (st.custom) {
+                /* custom end time: keep the chosen end unless the new start is at or past it */
+                if (st.end <= st.start) st.end = Math.min(SCHOOL_END_MIN, Math.floor(st.start / 60) * 60 + 60);
+            } else {
+                /* duration: keep the same length */
+                st.end = Math.min(SCHOOL_END_MIN, st.start + Math.max(30, keep));
+            }
             changed(false);
         });
-        elEnd.addEventListener('change', function () { st.end = timeToMin(elEnd.value); changed(false); });
+        elDur.addEventListener('change', function () {
+            var d = parseInt(elDur.value, 10);
+            if (!d) return;
+            st.end = Math.min(SCHOOL_END_MIN, st.start + d);
+            changed(false);
+        });
+        elEnd.addEventListener('change', function () {
+            var v = timeToMin(elEnd.value);
+            if (isNaN(v)) return;
+            st.end = v;
+            changed(false);
+        });
+        elGear.addEventListener('click', function () {
+            st.custom = !st.custom;
+            changed(false);
+            (st.custom ? elEnd : elDur).focus();
+        });
         $('fcty-open').addEventListener('click', function (e) {
             var c = e.target.closest('.fcty-open-chip');
             if (!c || c.tagName !== 'BUTTON') return;
@@ -1544,6 +1605,11 @@
                                     elStart.dispatchEvent(new Event('change', { bubbles: true }));
                                 }
                                 if (elEnd) {
+                                    if (![].some.call(elEnd.options, function (o) { return o.value === endT; })) {
+                                        var extra = document.createElement('option');
+                                        extra.value = endT; extra.textContent = endT;
+                                        elEnd.appendChild(extra);
+                                    }
                                     elEnd.value = endT;
                                     elEnd.dispatchEvent(new Event('change', { bubbles: true }));
                                 }

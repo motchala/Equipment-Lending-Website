@@ -119,6 +119,52 @@
     function openModal(id) { var m = $(id); if (m) m.classList.add('ps-modal-open'); }
     function closeModal(id) { var m = $(id); if (m) m.classList.remove('ps-modal-open'); }
 
+    /* ── In-system confirmation (replaces the browser's own confirm box) ───────────
+       askConfirm({ title, message, confirmText, tone: 'danger'|'warning', icon }) returns a Promise
+       that resolves true (confirmed) or false (cancelled, Esc, X, or a click outside the dialog).
+       The dialog is #imp-confirm-modal in settings/views/admin-modals.php. Text is set with
+       textContent only. */
+    var confirmState = { wired: false, resolve: null };
+    function confirmSettle(answer) {
+        closeModal('imp-confirm-modal');
+        var done = confirmState.resolve;
+        confirmState.resolve = null;
+        if (done) done(answer);
+    }
+    function confirmWire() {
+        if (confirmState.wired) return;
+        var modal = $('imp-confirm-modal');
+        if (!modal) return;
+        confirmState.wired = true;
+        $('imp-confirm-ok').addEventListener('click', function () { confirmSettle(true); });
+        $('imp-confirm-cancel').addEventListener('click', function () { confirmSettle(false); });
+        $('imp-confirm-close').addEventListener('click', function () { confirmSettle(false); });
+        modal.addEventListener('click', function (e) { if (e.target === modal) confirmSettle(false); });
+        document.addEventListener('keydown', function (e) {
+            if (e.key !== 'Escape' || !modal.classList.contains('ps-modal-open')) return;
+            e.stopImmediatePropagation();
+            confirmSettle(false);
+        }, true);
+    }
+    function askConfirm(o) {
+        confirmWire();
+        return new Promise(function (resolve) {
+            if (!$('imp-confirm-modal')) { resolve(false); return; }   // never import or delete without asking
+            if (confirmState.resolve) confirmState.resolve(false);     // an older question is superseded
+            confirmState.resolve = resolve;
+            var tone = o.tone === 'danger' ? 'danger' : 'warning';
+            $('imp-confirm-title').textContent = o.title || 'Are you sure?';
+            $('imp-confirm-text').textContent = o.message || '';
+            $('imp-confirm-icon').textContent = o.icon || 'warning';
+            $('imp-confirm-head-icon').className = 'ps-modal-head-icon ps-mhi--' + tone;
+            var ok = $('imp-confirm-ok');
+            ok.className = 'ps-btn ' + (tone === 'danger' ? 'ps-btn--danger' : 'ps-btn--primary');
+            $('imp-confirm-ok-text').textContent = o.confirmText || 'Confirm';
+            openModal('imp-confirm-modal');
+            setTimeout(function () { $('imp-confirm-cancel').focus(); }, 60);   // Cancel is the safe default
+        });
+    }
+
     /* ── Server calls ───────────────────────────────────────────── */
     function post(action, data, url) {
         var body = new URLSearchParams();
@@ -445,7 +491,16 @@ var unlocked = true;      // no password lock any more: the screen is always ope
                 if ((!rows.length && !timetableOnly) || !file || busy) return;
                 var mode = card.querySelector('input[name="imp-mode-' + kind + '"]:checked');
                 var replaceAll = !!(mode && mode.value === 'replace') && !timetableOnly;
-                if (replaceAll && !window.confirm('Replace the whole ' + cfg.label + '? Everyone currently listed will be removed first.')) return;
+                if (!replaceAll) { runImport(timetableOnly, replaceAll); return; }
+                askConfirm({
+                    title: 'Replace the whole ' + cfg.label + '?',
+                    message: 'Everyone currently listed will be removed first, then the people in this file are saved.',
+                    confirmText: 'Replace list', tone: 'danger', icon: 'swap_horiz'
+                }).then(function (ok) { if (ok) runImport(timetableOnly, replaceAll); });
+            });
+
+            function runImport(timetableOnly, replaceAll) {
+                if (busy) return;
                 var token = csrf();
                 if (!token) { alertShow('Session expired. Please refresh the page.', 'err'); return; }
 
@@ -490,7 +545,7 @@ var unlocked = true;      // no password lock any more: the screen is always ope
                         importBtn.disabled = false; importBtn.innerHTML = importHtml;
                         alertShow((err && err.message) || 'Network error. Please try again.', 'err', err && err.details);
                     });
-            });
+            }
 
             role(card, 'view-list').addEventListener('click', function () { openList(kind); });
             role(card, 'view-files').addEventListener('click', function () { openFiles(kind); });
@@ -675,7 +730,16 @@ var unlocked = true;      // no password lock any more: the screen is always ope
                 if (!file || !summary || busy) return;
                 var picked2 = card.querySelector('input[name="imp-mode-' + kind + '"]:checked');
                 var replaceAll = !!(picked2 && picked2.value === 'replace') && summary.kind !== 'room_timetable';
-                if (replaceAll && !window.confirm('Replace every class on the Rooms Assigned list? All saved class meetings will be removed first, then the ones in this file are saved. Classes with no instructor yet are kept.')) return;
+                if (!replaceAll) { runRoomsImport(replaceAll); return; }
+                askConfirm({
+                    title: 'Replace every class on the Rooms Assigned list?',
+                    message: 'All saved class meetings will be removed first, then the ones in this file are saved. Classes with no instructor yet are kept.',
+                    confirmText: 'Replace all', tone: 'danger', icon: 'swap_horiz'
+                }).then(function (ok) { if (ok) runRoomsImport(replaceAll); });
+            });
+
+            function runRoomsImport(replaceAll) {
+                if (!file || !summary || busy) return;
                 if (!csrf()) { alertShow('Session expired. Please refresh the page.', 'err'); return; }
 
                 busy = true;
@@ -694,7 +758,7 @@ var unlocked = true;      // no password lock any more: the screen is always ope
                     importBtn.disabled = false; importBtn.innerHTML = importHtml;
                     alertShow((err && err.message) || 'Network error. Please try again.', 'err');
                 });
-            });
+            }
 
             role(card, 'view-list').addEventListener('click', function () { openList(kind); });
             role(card, 'view-files').addEventListener('click', function () { openFiles(kind); });
@@ -863,21 +927,28 @@ var unlocked = true;      // no password lock any more: the screen is always ope
                 }).catch(function () { busy = false; catNote('Network error. Please try again.', true); refreshButtons(); });
             }
             function removeCat(c) {
-                if (busy || !window.confirm('Delete the category "' + c.name + '"? Items already assigned to it are not affected.')) return;
-                busy = true; refreshButtons();
-                postJson('category_delete', { category_id: c.category_id }, EP).then(function (d) {
-                    busy = false;
-                    if (guard(d)) return;
-                    if (d && d.status === 'success') {
-                        sync(d);
-                        counts.categories = Math.max(0, counts.categories - 1); paint(counts);
-                        catNote('Category deleted.', false);
-                        loadCats();
-                    } else {
-                        catNote((d && d.error) || 'Could not delete the category.', true);
-                    }
-                    refreshButtons();
-                }).catch(function () { busy = false; catNote('Network error. Please try again.', true); refreshButtons(); });
+                if (busy) return;
+                askConfirm({
+                    title: 'Delete this category?',
+                    message: 'Delete the category "' + c.name + '"? Items already assigned to it are not affected.',
+                    confirmText: 'Delete', tone: 'danger', icon: 'delete'
+                }).then(function (ok) {
+                    if (!ok || busy) return;
+                    busy = true; refreshButtons();
+                    postJson('category_delete', { category_id: c.category_id }, EP).then(function (d) {
+                        busy = false;
+                        if (guard(d)) return;
+                        if (d && d.status === 'success') {
+                            sync(d);
+                            counts.categories = Math.max(0, counts.categories - 1); paint(counts);
+                            catNote('Category deleted.', false);
+                            loadCats();
+                        } else {
+                            catNote((d && d.error) || 'Could not delete the category.', true);
+                        }
+                        refreshButtons();
+                    }).catch(function () { busy = false; catNote('Network error. Please try again.', true); refreshButtons(); });
+                });
             }
 
             /* ── Link ── */

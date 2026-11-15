@@ -323,16 +323,19 @@
     background: linear-gradient(160deg, #6b1515, #2b0d0d);
     cursor: pointer;
     box-shadow: var(--shadow-sm);
-    transition: flex-grow .6s cubic-bezier(.22, 1, .36, 1), box-shadow .3s;
+    /* each panel does its own layout, so one panel growing never re-lays-out the text of the others */
+    contain: layout paint;
+    transition: flex-grow .5s cubic-bezier(.22, 1, .36, 1), box-shadow .3s;
 }
 
+/* A gentler width change (was .78 / 1.7): less movement, so the text inside has less to keep up with. */
 #rooms-browse .fcty-panels:hover .fcty-panel:not(.is-skeleton) {
-    flex-grow: .78;
+    flex-grow: .86;
 }
 
 #rooms-browse .fcty-panels .fcty-panel:not(.is-skeleton):hover,
 #rooms-browse .fcty-panels .fcty-panel:not(.is-skeleton):focus-visible {
-    flex-grow: 1.7;
+    flex-grow: 1.5;
     box-shadow: var(--shadow-lg);
 }
 
@@ -340,15 +343,20 @@
     position: absolute;
     inset: 0;
     z-index: -2;
-    width: 100%;
+    inset: 0 auto 0 50%;
+    /* a fixed width (never narrower than the panel) keeps the photo from being re-cropped while the
+       panel grows or shrinks: it is only revealed or covered, which looks smooth instead of swimming */
+    width: 680px;
+    min-width: 100%;
     height: 100%;
     object-fit: cover;
-    transform: scale(1.02);
+    transform: translateX(-50%) scale(1.02);
+    will-change: transform;
     transition: transform .9s cubic-bezier(.22, 1, .36, 1);
 }
 
 #rooms-browse .fcty-panel:hover .fcty-panel-img {
-    transform: scale(1.08);
+    transform: translateX(-50%) scale(1.08);
 }
 
 #rooms-browse .fcty-panel-shade {
@@ -407,7 +415,9 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-    padding: 24px 84px 24px 24px;
+    /* the bottom band (64px) is always reserved for the floor chips, so the name and the room count
+       stay exactly where they are whether or not the panel is hovered */
+    padding: 24px 84px 64px 24px;
 }
 
 #rooms-browse .fcty-panel-name,
@@ -430,25 +440,53 @@
 #rooms-browse .fcty-panel-meta {
     font-size: .875rem;
     color: rgba(255, 255, 255, .82);
+    /* one line, always: the text never re-wraps (and jumps) while the panel width is animating */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
+/* Name on one line too. The tag (e.g. OLD) keeps its size; a long name is trimmed with an ellipsis. */
+#rooms-browse .fcty-panel-name {
+    flex-wrap: nowrap;
+}
+
+#rooms-browse .fcty-panel-name-text {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+#rooms-browse .fcty-panel-name .fcty-tag {
+    flex: none;
+}
+
+/* The floors fade and slide up INSIDE the reserved band: only opacity and position change, never the
+   height, so nothing above them is pushed. They wait a moment so the panel has mostly finished widening. */
 #rooms-browse .fcty-panel-reveal {
-    display: grid;
-    grid-template-rows: 0fr;
+    position: absolute;
+    left: 24px;
+    right: 24px;
+    bottom: 22px;
+    height: 30px;
+    overflow: hidden;
     opacity: 0;
-    transition: grid-template-rows .5s cubic-bezier(.22, 1, .36, 1), opacity .4s, margin .5s;
+    transform: translateY(8px);
+    pointer-events: none;
+    transition: opacity .25s ease, transform .35s cubic-bezier(.22, 1, .36, 1);
 }
 
 #rooms-browse .fcty-panel:hover .fcty-panel-reveal,
 #rooms-browse .fcty-panel:focus-visible .fcty-panel-reveal {
-    grid-template-rows: 1fr;
     opacity: 1;
-    margin-top: 12px;
+    transform: none;
+    transition-delay: .14s;
 }
 
 #rooms-browse .fcty-panel-floors {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 8px;
     overflow: hidden;
     min-height: 0;
@@ -479,6 +517,19 @@
     background: #fff;
     color: #570000;
     transform: translateX(2px);
+}
+
+/* With hover, the floor chips use the full width of the bottom band, so the arrow sits level with the
+   name and room count instead of on top of the chips. (Touch and phones keep it in the corner.) */
+@media (hover: hover) and (min-width: 761px) {
+    #rooms-browse .fcty-panel .fcty-go {
+        bottom: 64px;
+    }
+
+    #rooms-browse .fcty-panel-reveal {
+        -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+        mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+    }
 }
 
 /* Skeleton */
@@ -1768,6 +1819,10 @@ textarea.fcty-input {
     #rooms-browse .fcty-panel-reveal {
         display: none;
     }
+
+    #rooms-browse .fcty-panel-info {
+        padding-bottom: 24px;
+    }
 }
 
 @media (max-width: 760px) {
@@ -1784,6 +1839,10 @@ textarea.fcty-input {
 
     #rooms-browse .fcty-panel-reveal {
         display: none;
+    }
+
+    #rooms-browse .fcty-panel-info {
+        padding-bottom: 24px;
     }
 
     #rooms-browse .fcty-panel-letter {
@@ -2305,7 +2364,11 @@ textarea.fcty-input {
     container-name: fcs;
     /* margin around the timetable: space above and below it, and at the sides so the list and
        the calendar are not pushed against the panel edges */
-    margin: 44px clamp(12px, 2.5vw, 32px) 48px;
+    margin: 64px 0 48px;
+    /* a clear break from the buildings above: space, a divider line (with a short maroon accent) and
+       the section's own heading. Full width, so the timetable lines up with the three panels. */
+    padding-top: 40px;
+    position: relative;
     --fcs-line: color-mix(in srgb, var(--fcty-line) 55%, transparent);
     --fcs-maroon: #800000;
     /* day row */
@@ -2314,6 +2377,54 @@ textarea.fcty-input {
     --fcs-yellow: #f5cc4a;
     /* time column */
     --fcs-time-w: 62px;
+}
+
+#rooms-browse .fcs::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--fcty-brand) 0, var(--fcty-brand) 72px, var(--fcty-line) 72px, var(--fcty-line) 100%);
+}
+
+/* Both sections read as siblings: same heading style (a maroon bar, title, one-line description). */
+#rooms-browse #fcty-buildings-view .fcty-landing-head .fcty-title,
+#rooms-browse .fcs-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#rooms-browse #fcty-buildings-view .fcty-landing-head .fcty-title::before,
+#rooms-browse .fcs-title::before {
+    content: '';
+    flex: none;
+    width: 4px;
+    height: 1.1em;
+    border-radius: 2px;
+    background: var(--fcty-brand);
+}
+
+#rooms-browse .fcty-landing-heading {
+    min-width: 0;
+}
+
+#rooms-browse .fcty-landing-heading .fcty-title {
+    margin: 0;
+}
+
+/* own class name: .fcty-sub is already used by the reservation form */
+#rooms-browse .fcty-landing-sub {
+    margin: 4px 0 0 14px;
+    font-size: .875rem;
+    color: var(--fcty-muted);
+}
+
+#rooms-browse .fcs-sub {
+    margin-left: 14px;
 }
 
 #rooms-browse .fcs-head {
@@ -2469,13 +2580,16 @@ textarea.fcty-input {
     color: rgba(255, 255, 255, .78);
 }
 
+/* Semester classes: plain text, not cards. Each class is one text block separated from the next by a thin
+   line, and the hierarchy is carried by size, weight and colour alone:
+   class (largest, bold)  >  day and time (semi-bold)  >  subject (regular)  >  room (muted)  >  sessions (smallest). */
 #rooms-browse .fcs-list-scroll {
     flex: 1;
     min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    padding: 8px;
+    gap: 0;
+    padding: 2px 16px 6px;
     overflow-y: auto;
     scrollbar-width: thin;
 }
@@ -2483,35 +2597,42 @@ textarea.fcty-input {
 #rooms-browse .fcs-cls {
     display: flex;
     flex-direction: column;
-    gap: 1px;
+    gap: 2px;
     width: 100%;
-    padding: 6px 9px 6px 10px;
-    border: 1px solid color-mix(in srgb, var(--ev, var(--fcty-static)) 24%, transparent);
-    border-left: 3px solid var(--ev, var(--fcty-static));
-    border-radius: 9px;
-    background: var(--fcty-card);
+    margin: 0;
+    padding: 12px 0;
+    border: 0;
+    border-bottom: 1px solid var(--fcs-line);
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
     color: var(--fcty-ink);
     font: inherit;
-    font-size: .72rem;
-    line-height: 1.3;
+    font-size: .76rem;
+    line-height: 1.35;
     text-align: left;
     cursor: pointer;
-    transition: background .15s, box-shadow .15s, opacity .15s;
+    transition: opacity .15s;
 }
 
-#rooms-browse .fcs-cls:hover {
-    background: color-mix(in srgb, var(--ev, var(--fcty-static)) 9%, var(--fcty-card));
+#rooms-browse .fcs-cls:last-child {
+    border-bottom: 0;
+}
+
+#rooms-browse .fcs-cls:hover .fcs-cls-title {
+    text-decoration: underline;
+    text-underline-offset: 3px;
 }
 
 #rooms-browse .fcs-cls:focus-visible {
     outline: 2px solid var(--fcty-brand);
     outline-offset: 2px;
+    border-radius: 4px;
 }
 
-/* a class that has a session in the week shown on the right */
-#rooms-browse .fcs-cls.is-week {
-    background: color-mix(in srgb, var(--ev, var(--fcty-static)) 13%, var(--fcty-card));
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--ev, var(--fcty-static)) 38%, transparent);
+/* a class that has a session in the week shown on the right: its name picks up the brand colour */
+#rooms-browse .fcs-cls.is-week .fcs-cls-title {
+    color: var(--fcty-brand);
 }
 
 #rooms-browse .fcs-cls.is-done {
@@ -2524,60 +2645,63 @@ textarea.fcty-input {
 
 #rooms-browse .fcs-cls-top {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     justify-content: space-between;
-    gap: 6px;
+    gap: 10px;
     min-width: 0;
 }
 
+/* 1 · the class */
 #rooms-browse .fcs-cls-title {
     min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: .8rem;
+    font-size: .92rem;
     font-weight: 700;
-    color: color-mix(in srgb, var(--ev, var(--fcty-static)) 60%, var(--fcty-ink));
+    letter-spacing: -.005em;
+    color: var(--fcty-ink);
 }
 
+/* hours: small muted text, no pill */
 #rooms-browse .fcs-cls-dur {
     flex-shrink: 0;
-    padding: 1px 7px;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--ev, var(--fcty-static)) 16%, transparent);
-    color: color-mix(in srgb, var(--ev, var(--fcty-static)) 60%, var(--fcty-ink));
-    font-size: .64rem;
-    font-weight: 700;
+    font-size: .72rem;
+    font-weight: 600;
+    color: var(--fcty-muted);
     white-space: nowrap;
 }
 
+/* 2 · day and time */
 #rooms-browse .fcs-cls-when {
     color: var(--fcty-ink);
+    font-size: .8rem;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
 }
 
+/* 3 · subject and 4 · room: plain lines (the little icons are dropped, the text says it all) */
 #rooms-browse .fcs-cls-where {
-    display: flex;
-    align-items: center;
-    gap: 3px;
+    display: block;
     min-width: 0;
     color: var(--fcty-muted);
-}
-
-#rooms-browse .fcs-cls-where>span:last-child {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    font-size: .74rem;
+    font-weight: 500;
 }
 
 #rooms-browse .fcs-cls-where .material-symbols-outlined {
-    font-size: 13px;
+    display: none;
 }
 
+#rooms-browse .fcs-cls-where.fcs-cls-subject {
+    color: color-mix(in srgb, var(--fcty-ink) 82%, transparent);
+    font-size: .78rem;
+    font-weight: 500;
+}
+
+/* 5 · sessions */
 #rooms-browse .fcs-cls-meta {
+    margin-top: 2px;
     color: var(--fcty-muted);
     font-size: .68rem;
+    opacity: .85;
 }
 
 #rooms-browse .fcs-list-foot {
@@ -2604,7 +2728,7 @@ textarea.fcty-input {
 
 #rooms-browse .fcs-list-skel span {
     height: 58px;
-    border-radius: 9px;
+    border-radius: 4px;
     background: var(--fcty-soft);
     animation: fcsPulse 1.4s ease-in-out infinite;
 }
@@ -3799,4 +3923,46 @@ button.fcty-open-chip {
 
 .fcty-doc[open] > summary {
     margin-bottom: 8px;
+}
+
+/* Duration dropdown + gear: the gear swaps Duration for an End time list (whole hours only) */
+.fcty-dur-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.fcty-dur-row .fcty-input {
+    flex: 1;
+    min-width: 0;
+}
+
+.fcty-gear-btn {
+    display: inline-grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--fcty-line);
+    border-radius: 10px;
+    background: var(--fcty-card);
+    color: var(--fcty-muted);
+    cursor: pointer;
+    transition: border-color .18s, background .18s, color .18s;
+}
+
+.fcty-gear-btn .material-symbols-outlined {
+    font-size: 20px;
+}
+
+.fcty-gear-btn:hover,
+.fcty-gear-btn:focus-visible {
+    border-color: var(--fcty-brand);
+    color: var(--color-primary, #800000);
+}
+
+.fcty-gear-btn.is-on {
+    border-color: var(--fcty-brand);
+    background: color-mix(in srgb, var(--fcty-brand) 8%, var(--fcty-card));
+    color: var(--color-primary, #800000);
 }

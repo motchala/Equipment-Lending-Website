@@ -31,6 +31,7 @@ declare(strict_types=1);
 
 date_default_timezone_set('Asia/Manila');
 require_once __DIR__ . '/booking-schedule.php';
+require_once __DIR__ . '/../../room-reservation/core/room-rules.php';   // room open days / hours / longest reservation
 
 class ArbitrationEngine
 {
@@ -1242,8 +1243,14 @@ class ArbitrationEngine
                 return;
             }
 
-            // ── Step 4b: Operating hours check ──────────────────────────────
-            if (!self::checkOperatingHours($start_time, $end_time)) {
+            // ── Step 4b: Room schedule rules (Settings → Arbitration → Room schedule) ──
+            // Reservation hours, open days and the longest single reservation, whichever route
+            // the reservation came in by.
+            RoomRules::load($conn);
+            $schedule_err = RoomRules::hoursError($start_time, $end_time)
+                ?? RoomRules::closedDayError($res_date)
+                ?? RoomRules::lengthError($start_time, $end_time);
+            if ($schedule_err !== null) {
                 self::writeRoomDecision(
                     $conn,
                     $reservation_id,
@@ -1253,24 +1260,7 @@ class ArbitrationEngine
                     (string)$reservation['faculty_name'],
                     'Declined',
                     self::RULE_ARCHIVED,
-                    'Reservations must be within operating hours: 7:00 AM to 8:00 PM.'
-                );
-                return;
-            }
-
-            // ── Step 4c: Closed day check ───────────────────────────────────
-            // Rooms are closed on Sundays, whichever route the reservation came in by.
-            if ((int)date('N', strtotime($res_date)) === 7) {
-                self::writeRoomDecision(
-                    $conn,
-                    $reservation_id,
-                    $room_id,
-                    $room_name,
-                    $faculty_id,
-                    (string)$reservation['faculty_name'],
-                    'Declined',
-                    self::RULE_ARCHIVED,
-                    'Reservations are not available on Sundays. Please choose another day.'
+                    $schedule_err
                 );
                 return;
             }
@@ -1588,9 +1578,8 @@ class ArbitrationEngine
     private static function checkOperatingHours(string $start_time, string $end_time): bool
     {
         // Normalise to 'HH:MM' for reliable string comparison
-        $start = substr($start_time, 0, 5);
-        $end   = substr($end_time,   0, 5);
-        return $start >= '07:00' && $end <= '20:00';
+        // Now follows Settings → Arbitration → Room schedule (RoomRules)
+        return RoomRules::hoursError($start_time, $end_time) === null;
     }
 
     /**

@@ -228,6 +228,7 @@
         if (clickedEl !== false) document.documentElement.classList.remove('ps-restored');
         // Remember the screen for a soft refresh (backup for the #tab- part of the URL; see admin-shell-top.php)
         try { sessionStorage.setItem('adminCurrentTab', tabName); } catch (_) { }
+        _syncBridgeCookies(tabName);
         // If the pre-paint script already activated this panel (no flash), skip
         // the remove-all/re-add cycle so the slideIn animation doesn't re-fire.
         const alreadyActive = panel && panel.classList.contains('active');
@@ -344,6 +345,22 @@
             const s = JSON.parse(sessionStorage.getItem('adminSubView') || '{}');
             s[key] = val;
             sessionStorage.setItem('adminSubView', JSON.stringify(s));
+        } catch (_) { }
+        _syncBridgeCookies();
+    }
+
+    /* Cookies the server reads to paint the right screen from the first frame after a refresh (see the top of
+       admin-shell-top.php). They only mirror the sessionStorage values above; a hard refresh clears them. */
+    function _syncBridgeCookies(tab) {
+        try {
+            const s = JSON.parse(sessionStorage.getItem('adminSubView') || '{}');
+            const secure = location.protocol === 'https:' ? '; Secure' : '';
+            const put = function (name, value) {
+                document.cookie = name + '=' + (value || '') + '; path=/; SameSite=Lax' + secure + (value ? '' : '; Max-Age=0');
+            };
+            if (tab) put('ps_admin_tab', tab);
+            put('ps_sub_rooms', s.rooms);
+            put('ps_sub_settings', s.settings);
         } catch (_) { }
     }
 
@@ -4754,6 +4771,19 @@
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
     else init();
+
+    /* The server may have painted the expected screen from the first frame (html[data-ps-tab] / [data-ps-sub], see
+       admin-shell.css). Once start-up above has put the real classes in place, drop it. Registered after init, so it runs
+       after it, and again on load as a safety net. */
+    (function () {
+        var dropBridge = function () {
+            document.documentElement.removeAttribute('data-ps-tab');
+            document.documentElement.removeAttribute('data-ps-sub');
+        };
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', dropBridge);
+        else dropBridge();
+        window.addEventListener('load', dropBridge);
+    })();
 
 
     /* ================================================================

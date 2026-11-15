@@ -59,25 +59,22 @@ if ($req_datetime === false || $req_datetime <= $now_manila) {
     echo json_encode(['error' => 'Reservation date and time cannot be in the past.']);
     exit();
 }
-// Closed day — no room reservations on Sundays
-if ($req_datetime->format('N') === '7') {
-    echo json_encode(['error' => 'Reservations are not available on Sundays. Please choose another day.']);
-    exit();
-}
 if ($end_time <= $start_time) {
     echo json_encode(['error' => 'End time must be after start time.']);
     exit();
 }
-// ── Operating hours enforcement (07:00–20:00) ─────────────────────────────
-if ($start_time < '07:00' || $end_time > '20:00') {
-    echo json_encode(['error' => 'Reservations must be within operating hours: 7:00 AM to 8:00 PM.']);
-    exit();
-}
-
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../core/room-quota.php';
 $conn = getDB();
 RoomRules::load($conn);   // Settings → Arbitration → Reservation rules
+
+// ── Room schedule rules (Settings → Arbitration → Room schedule): open days, hours, longest reservation ──
+foreach ([RoomRules::closedDayError($res_date), RoomRules::hoursError($start_time, $end_time), RoomRules::lengthError($start_time, $end_time)] as $schedule_err) {
+    if ($schedule_err !== null) {
+        echo json_encode(['error' => $schedule_err]);
+        exit();
+    }
+}
 
 // ── How far ahead a room can be reserved ────────────────────────────────────
 $advance_err = RoomRules::advanceError($res_date);

@@ -17,13 +17,29 @@ declare(strict_types=1);
  *      A request that is declined LATER (by an admin, or by the deadline below) stays in My Activity history.
  *
  *   2. SAME-DAY request (booking_mode = 'today')
- *      Decided immediately against the schedule (ArbitrationEngine::process): Approved with its
- *      Claim / Return QR codes, or Declined with the reason (already booked, out right now).
- *      It is never left "Waiting".
+ *      Decided immediately, in this order:
+ *        a. Not possible at all (out right now, not enough free units): Declined with the reason.
+ *        b. Possible, but not an automatic approval: left WAITING for an admin to approve or decline
+ *           (rule_same_day_review). It is auto-approved ONLY when ALL of these hold:
+ *             - a faculty member submitted it (not a student);
+ *             - no letter / photo / file is attached;
+ *             - it starts and ends on the same day;
+ *             - the quantity of the item keeps its stock healthy (see equipment_same_day_quantity_limit()):
+ *               fewer than 3 in stock = never; 3 to 9 in stock = at most one third of the stock (never
+ *               fewer than 1 unit), so the item is not left low; 10 or more = at most 50% of the stock;
+ *             - a cart has at most 3 items, and EVERY item in it passes these rules: if one item needs
+ *               an admin, the whole cart waits for an admin (an item that cannot be done at all is still
+ *               declined on its own);
+ *             - nobody else has the item booked for any part of that time;
+ *             - no other request for the item is still waiting for review for that time.
+ *           A same-day request that is not decided by the time it starts is declined by the deadline below.
+ *        c. Everything holds: Approved right away with its Claim / Return QR codes (Ready for Pick Up).
+ *           An Approved request nobody collects is Cancelled once its end date/time passes
+ *           (BookingSchedule::expireNoShows).
  *
  *   3. LATER-DATE request (booking_mode = 'future')
  *      Waits for an admin, exactly like a room reservation for a later date. If nobody has decided
- *      by the deadline it is DECLINED automatically (never auto-approved):
+ *      by the deadline it is DECLINED automatically (a later-date request is never auto-approved):
  *
  *          deadline = 12:01 AM (Asia/Manila) on the borrow date
  *
@@ -59,6 +75,30 @@ if (!defined('EQ_EXPIRY_SETTLE_SECONDS')) {
     // For a request submitted AFTER 12:01 AM of its own borrow day (its deadline is its start time):
     // how long it must have existed before the deadline may decline it.
     define('EQ_EXPIRY_SETTLE_SECONDS', 300);
+}
+if (!defined('EQ_SAMEDAY_REVIEW_RULE')) {
+    // Marks a same-day request that is waiting for an admin because it did not meet the auto-approve rules.
+    // equipment_decide_stuck() leaves these alone; an admin decision replaces the rule with 'override'.
+    define('EQ_SAMEDAY_REVIEW_RULE', 'rule_same_day_review');
+}
+if (!defined('EQ_SAMEDAY_MIN_STOCK')) {
+    // A same-day request is only auto-approved for an item with at least this many in total stock.
+    define('EQ_SAMEDAY_MIN_STOCK', 3);
+}
+if (!defined('EQ_SAMEDAY_BIG_STOCK')) {
+    // From this much total stock up, the "at most 50% of the stock" rule applies; below it the stricter
+    // low-stock rule (at most one third of the stock) applies.
+    define('EQ_SAMEDAY_BIG_STOCK', 10);
+}
+if (!defined('EQ_SAMEDAY_BIG_SHARE_PCT')) {
+    define('EQ_SAMEDAY_BIG_SHARE_PCT', 50);
+}
+if (!defined('EQ_SAMEDAY_SMALL_DIVISOR')) {
+    define('EQ_SAMEDAY_SMALL_DIVISOR', 3);
+}
+if (!defined('EQ_SAMEDAY_MAX_CART_ITEMS')) {
+    // A cart with more items than this always waits for an admin.
+    define('EQ_SAMEDAY_MAX_CART_ITEMS', 3);
 }
 if (!defined('EQ_DECIDE_GRACE_SECONDS')) {
     // A same-day request still Waiting after this long was missed at submit time (error, crash):
@@ -117,6 +157,168 @@ function equipment_request_tokens(mysqli $conn, int $id): array
 }
 
 /**
+ * Most units of one item a same-day request may ask for and still be auto-approved (0 = never).
+ * The point is to never let an automatic approval leave an item low on stock:
+ *   - under 3 in stock ........ 0 (always reviewed by an admin)
+ *   - 3 to 9 in stock ......... one third of the stock, at least 1 (3 -> 1, 6 -> 2, 9 -> 3), so at least
+ *                               two thirds of the stock stays available for everybody else
+ *   - 10 or more in stock ..... 50% of the stock (10 -> 5, 11 -> 5, 20 -> 10)
+ */
+function equipment_same_day_quantity_limit(int $total_stock): int
+{
+    if ($total_stock < EQ_SAMEDAY_MIN_STOCK) {
+        return 0;
+    }
+    if ($total_stock < EQ_SAMEDAY_BIG_STOCK) {
+        return max(1, intdiv($total_stock, EQ_SAMEDAY_SMALL_DIVISOR));
+    }
+    return intdiv($total_stock * EQ_SAMEDAY_BIG_SHARE_PCT, 100);
+}
+
+/**
+ * The same-day auto-approval rules, as a pure check (no database), so they can be tested on their own.
+ * Returns null when the request may be auto-approved, otherwise the reason it needs an admin
+ * (a short phrase that completes "Waiting for an admin to decide because ...").
+ *
+ * @param array{submitted_as:string, has_document:bool, borrow_date:string, return_date:string, qty:int} $req
+ * @param int $total_stock      total units of the item (on the shelf + out)
+ * @param int $other_bookings   units of the item already booked by others for any part of the time
+ * @param int $other_waiting    other requests for the item still waiting for review for that time
+ */
+function equipment_same_day_review_reason(array $req, int $total_stock, int $other_bookings, int $other_waiting): ?string
+{
+    if ($req['submitted_as'] !== 'personal') {
+        return 'same-day requests from students are reviewed by an admin';
+    }
+    if ($req['has_document']) {
+        return 'it has a letter or photo attached';
+    }
+    if ($req['return_date'] !== $req['borrow_date']) {
+        return 'it runs for more than one day';
+    }
+    if ($total_stock < EQ_SAMEDAY_MIN_STOCK) {
+        return 'this item has fewer than ' . EQ_SAMEDAY_MIN_STOCK . ' in stock';
+    }
+    $limit = equipment_same_day_quantity_limit($total_stock);
+    if ($req['qty'] > $limit) {
+        return $total_stock >= EQ_SAMEDAY_BIG_STOCK
+            ? 'the quantity is more than half of the ' . $total_stock . ' in stock (up to ' . $limit . ' can be approved automatically)'
+            : 'this item is low on stock (' . $total_stock . ' in stock), so only up to ' . $limit . ' can be approved automatically';
+    }
+    if ($other_bookings > 0) {
+        return 'the item is already reserved for part of that time';
+    }
+    if ($other_waiting > 0) {
+        return 'another request for this item is still waiting for review';
+    }
+    return null;
+}
+
+/**
+ * What should happen to a same-day request: be declined, wait for an admin, or be auto-approved.
+ *
+ * @return array{block:?array{rule:string, reason:string}, review:?string}
+ *         block  = cannot be done at all (declined on the spot, same messages the engine uses);
+ *         review = reason it needs an admin; both null = auto-approve it.
+ */
+function equipment_same_day_gate(mysqli $conn, int $id): array
+{
+    $wait = static fn (string $why): array => ['block' => null, 'review' => $why];
+
+    if (!BookingSchedule::ensureSchema($conn)) {
+        return $wait('the booking schedule could not be checked');
+    }
+    $stmt = $conn->prepare(
+        "SELECT equipment_name, COALESCE(borrow_qty, 1) AS qty, borrow_date, return_date,
+                borrow_time, return_time, COALESCE(submitted_as, '') AS submitted_as,
+                COALESCE(document_path, '') AS document_path
+           FROM tbl_requests WHERE id = ? LIMIT 1"
+    );
+    if (!$stmt) {
+        return $wait('the request could not be checked');
+    }
+    $stmt->bind_param('i', $id);
+    $stmt->execute();
+    $r = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$r) {
+        return $wait('the request could not be checked');
+    }
+
+    $item    = (string)$r['equipment_name'];
+    $qty     = max(1, (int)$r['qty']);
+    $startTs = $r['borrow_date'] . ' ' . (!empty($r['borrow_time']) ? $r['borrow_time'] : '00:00:00');
+    $endTs   = $r['return_date'] . ' ' . (!empty($r['return_time']) ? $r['return_time'] : '23:59:59');
+
+    $shelf = BookingSchedule::shelfQuantity($conn, $item);
+    if ($shelf === null) {
+        return $wait('the item could not be found in the inventory');
+    }
+
+    // a. Not possible at all: declined on the spot (same rules and messages as ArbitrationEngine::processScheduled)
+    $total    = BookingSchedule::totalStock($conn, $item);
+    $occupied = BookingSchedule::occupancy($conn, $item, $startTs, $endTs, $id);
+    $free     = $total - $occupied;
+    if ($shelf < 1) {
+        return ['block' => ['rule' => ArbitrationEngine::RULE_OUT_OF_STOCK, 'reason' => 'Out right now – book it for a later date instead.'], 'review' => null];
+    }
+    if ($free < $qty) {
+        $why = $free <= 0
+            ? 'Already fully booked for the requested schedule.'
+            : 'Only ' . $free . ' unit(s) are free for the requested schedule (' . $qty . ' requested).';
+        return ['block' => ['rule' => ArbitrationEngine::RULE_SCHEDULE_CONFLICT, 'reason' => $why], 'review' => null];
+    }
+
+    // b. Possible: auto-approve only when every rule holds, otherwise an admin decides
+    $waiting = 0;
+    $q = $conn->prepare(
+        "SELECT COUNT(*) AS n FROM tbl_requests
+          WHERE equipment_name = ? AND id <> ? AND status = 'Waiting'
+            AND TIMESTAMP(borrow_date, COALESCE(borrow_time, '00:00:00')) < ?
+            AND TIMESTAMP(return_date, COALESCE(return_time, '23:59:59')) > ?"
+    );
+    if ($q) {
+        $q->bind_param('siss', $item, $id, $endTs, $startTs);
+        $q->execute();
+        $waiting = (int)($q->get_result()->fetch_assoc()['n'] ?? 0);
+        $q->close();
+    }
+
+    $why = equipment_same_day_review_reason(
+        [
+            'submitted_as' => (string)$r['submitted_as'],
+            'has_document' => trim((string)$r['document_path']) !== '',
+            'borrow_date'  => (string)$r['borrow_date'],
+            'return_date'  => (string)$r['return_date'],
+            'qty'          => $qty,
+        ],
+        $total,
+        $occupied,
+        $waiting
+    );
+    return ['block' => null, 'review' => $why];
+}
+
+/**
+ * Keep a same-day request Waiting for an admin, with the reason shown to the borrower.
+ *
+ * @return string the note written to the request
+ */
+function equipment_same_day_hold(mysqli $conn, int $id, string $because): string
+{
+    $text = 'Waiting for an admin to decide because ' . $because
+        . '. If nobody decides before the start time, it is declined automatically.';
+    $rule = EQ_SAMEDAY_REVIEW_RULE;
+    $note = $conn->prepare("UPDATE tbl_requests SET reason = ?, arbitration_rule = ? WHERE id = ? AND status = 'Waiting'");
+    if ($note) {
+        $note->bind_param('ssi', $text, $rule, $id);
+        $note->execute();
+        $note->close();
+    }
+    return $text;
+}
+
+/**
  * Decide freshly submitted requests (all of them Waiting, usually the items of one cart).
  *
  * @param  list<int> $request_ids
@@ -126,6 +328,7 @@ function equipment_decide_on_submit(mysqli $conn, array $request_ids): array
 {
     $out      = [];
     $approved = [];
+    $sameDay  = [];   // id => ['review' => ?string, 'batch' => string]: same-day rows that passed the hard checks
 
     foreach (array_values(array_unique(array_map('intval', $request_ids))) as $id) {
         $out[$id] = ['status' => 'Waiting', 'reason' => ''];
@@ -162,21 +365,70 @@ function equipment_decide_on_submit(mysqli $conn, array $request_ids): array
                 continue;
             }
 
-            // 2. Same day (and old rows without a booking mode): decide now
-            ArbitrationEngine::process($conn, $id);
-            $after = equipment_decision_row($conn, $id);
-            if ($after === null) {
+            // 2. Same day (and old rows without a booking mode): decide now.
+            //    Impossible -> declined; possible but not an automatic case -> waits for an admin; else approved.
+            $gate = equipment_same_day_gate($conn, $id);
+            if ($gate['block'] !== null) {
+                ArbitrationEngine::record($conn, $id, 'Declined', $gate['block']['rule'], $gate['block']['reason']);
+                ArbitrationEngine::discardIfDeclined($conn, $id);
+                $out[$id] = ['status' => 'Declined', 'reason' => $gate['block']['reason']];
                 continue;
             }
-            if ($after['status'] === 'Approved') {
-                $approved[] = $id;
-            } elseif ($after['status'] === 'Declined') {
-                ArbitrationEngine::discardIfDeclined($conn, $id);
-            }
-            // Still Waiting here means the engine hit an error and could not decide; the next poll retries.
-            $out[$id] = ['status' => $after['status'], 'reason' => $after['reason']];
+            // Possible: remember it. Whether it is approved depends on the WHOLE cart (see below).
+            $sameDay[$id] = ['review' => $gate['review'], 'batch' => $row['batch_id']];
         } catch (\Throwable $e) {
             error_log('equipment_decide_on_submit[' . $id . '] - ' . $e->getMessage());
+        }
+    }
+
+    // Same-day rows, grouped by cart (a single item is its own group). A cart is approved only when
+    // EVERY item in it passes the rules and it has at most EQ_SAMEDAY_MAX_CART_ITEMS items; otherwise
+    // the whole cart waits for an admin. (Items that cannot be done at all were declined above, so
+    // they do not count as part of the cart.)
+    $groups = [];
+    foreach ($sameDay as $id => $g) {
+        $key = $g['batch'] !== '' ? 'b:' . $g['batch'] : 's:' . $id;
+        $groups[$key][$id] = $g['review'];
+    }
+    foreach ($groups as $key => $members) {
+        try {
+            $cart_why = null;
+            if (strncmp($key, 'b:', 2) === 0) {
+                $cnt = $conn->prepare('SELECT COUNT(*) AS n FROM tbl_requests WHERE batch_id = ?');
+                if ($cnt) {
+                    $bid = substr($key, 2);
+                    $cnt->bind_param('s', $bid);
+                    $cnt->execute();
+                    $n = (int)($cnt->get_result()->fetch_assoc()['n'] ?? 0);
+                    $cnt->close();
+                    if ($n > EQ_SAMEDAY_MAX_CART_ITEMS) {
+                        $cart_why = 'the request has more than ' . EQ_SAMEDAY_MAX_CART_ITEMS . ' items';
+                    }
+                }
+            }
+            $needs_admin = $cart_why !== null || count(array_filter($members, static fn ($r) => $r !== null)) > 0;
+
+            foreach ($members as $id => $own) {
+                if ($needs_admin) {
+                    $because = $own ?? $cart_why ?? 'it was requested together with another item that needs an admin\'s review';
+                    $out[$id] = ['status' => 'Waiting', 'reason' => equipment_same_day_hold($conn, $id, $because)];
+                    continue;
+                }
+                ArbitrationEngine::process($conn, $id);
+                $after = equipment_decision_row($conn, $id);
+                if ($after === null) {
+                    continue;
+                }
+                if ($after['status'] === 'Approved') {
+                    $approved[] = $id;
+                } elseif ($after['status'] === 'Declined') {
+                    ArbitrationEngine::discardIfDeclined($conn, $id);
+                }
+                // Still Waiting here means the engine hit an error and could not decide; the next poll retries.
+                $out[$id] = ['status' => $after['status'], 'reason' => $after['reason']];
+            }
+        } catch (\Throwable $e) {
+            error_log('equipment_decide_on_submit[group ' . $key . '] - ' . $e->getMessage());
         }
     }
 
@@ -320,7 +572,8 @@ function equipment_expire_unreviewed(mysqli $conn, ?DateTimeInterface $now = nul
 
 /**
  * Same-day requests that were left Waiting (the submit crashed before deciding, or an old row from
- * before this flow existed): decide them now. Later-date requests are never touched here.
+ * before this flow existed): decide them now. Later-date requests are never touched here, and neither
+ * are same-day requests already sent to an admin on purpose (rule_same_day_review).
  */
 function equipment_decide_stuck(mysqli $conn): void
 {
@@ -330,6 +583,7 @@ function equipment_decide_stuck(mysqli $conn): void
             "SELECT id FROM tbl_requests
               WHERE status = 'Waiting'
                 AND COALESCE(booking_mode, '') <> 'future'
+                AND COALESCE(arbitration_rule, '') <> '" . EQ_SAMEDAY_REVIEW_RULE . "'
                 AND request_date < ?
               ORDER BY request_date ASC
               LIMIT 50"

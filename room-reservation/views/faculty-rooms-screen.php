@@ -19,7 +19,10 @@
 <section class="fcty-view" id="fcty-buildings-view" aria-label="Choose a building">
 
     <div class="fcty-head-row fcty-landing-head">
-        <h2 class="fcty-title">Choose a building</h2>
+        <div class="fcty-landing-heading">
+            <h2 class="fcty-title">Choose a building</h2>
+            <p class="fcty-landing-sub">Pick a building to browse its rooms and see which are free.</p>
+        </div>
         <span class="fcty-pill is-live" id="fcty-landing-summary"></span>
     </div>
 
@@ -42,7 +45,7 @@
     <section class="fcs" id="fcty-class-schedule" aria-labelledby="fcs-title">
         <div class="fcty-head-row fcty-landing-head fcs-head">
             <div class="fcs-heading">
-                <h2 class="fcty-title fcs-title" id="fcs-title">My class schedule</h2>
+                <h2 class="fcty-title fcs-title" id="fcs-title">My Class Schedule</h2>
                 <p class="fcs-sub">Your classes and approved bookings this semester, and week by week.</p>
             </div>
             <div class="fcs-nav">

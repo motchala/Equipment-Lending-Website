@@ -92,19 +92,9 @@ if ($req_datetime === false || $req_datetime <= $now_manila) {
     reserve_respond(422, 'error', 'The reservation date and time is in the past. Please choose a future time.');
 }
 
-// Sunday check
-if ($req_datetime->format('N') === '7') {
-    reserve_respond(422, 'error', 'Reservations are not available on Sundays. Please choose another day.');
-}
-
 // End must be after start
 if ($end_time <= $start_time) {
     reserve_respond(422, 'error', 'End time must be after start time.');
-}
-
-// Operating hours
-if ($start_time < '07:00' || $end_time > '20:00') {
-    reserve_respond(422, 'error', 'Reservations must be within operating hours: 7:00 AM to 8:00 PM.');
 }
 
 // ── Database connection ───────────────────────────────────────────────────────
@@ -115,6 +105,12 @@ $conn->set_charset('utf8mb4');
 // ── Reservation rules from Settings → Arbitration ───────────────────────────
 require_once __DIR__ . '/../core/room-rules.php';
 RoomRules::load($conn);
+// Room schedule rules (Settings → Arbitration → Room schedule): open days, hours, longest reservation
+foreach ([RoomRules::closedDayError($res_date), RoomRules::hoursError($start_time, $end_time), RoomRules::lengthError($start_time, $end_time)] as $schedule_err) {
+    if ($schedule_err !== null) {
+        reserve_respond(422, 'error', $schedule_err);
+    }
+}
 $advance_err = RoomRules::advanceError($res_date);
 if ($advance_err !== null) {
     reserve_respond(422, 'error', $advance_err);
