@@ -39,9 +39,6 @@
     var ROOM_MAX_MIN = 13 * 60;               /* longest single reservation */
     var ROOM_STEP_MIN = 30;                   /* start times every 30 minutes */
     var ROOM_DURATIONS = [60, 120, 180, 360]; /* 1 / 2 / 3 / 6 hours */
-    var TL_START_MIN = 7 * 60;                /* availability bar runs 7 AM ... */
-    var TL_END_MIN = 20 * 60;                 /* ... to 8 PM (same as the faculty form) */
-    var TL_TICKS = [[7, '7 AM'], [10, '10 AM'], [13, '1 PM'], [16, '4 PM'], [20, '8 PM']];
     var DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     var QR_SRC = 'https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js';
     var RECEIPT_KEY = 'pup_last_receipt';
@@ -271,19 +268,33 @@
 
     /* Request letter: optional, recommended only for a later date. Returns { file, error }. */
     var LETTER_HTML = function (id, text, always) {
-        /* always = shown for every date (the room reservation form); otherwise only for a later date */
+        /* always = shown for every date (the room reservation form); otherwise only for a later date.
+           Two icon buttons side by side: pick a file (the hidden file input) or take a photo (letter-camera.js). */
         return '<div class="st-field" id="' + id + 'Wrap"' + (always ? ' data-always="1"' : ' hidden') + '>' +
-            '<label for="' + id + '">Request letter <span class="st-hint" style="display:inline">(' + (always ? 'optional' : 'recommended') + ')</span></label>' +
-            '<input type="file" class="st-input" id="' + id + '" accept=".pdf,.jpg,.jpeg,.png,.webp">' +
-            '<button type="button" class="pslc-trigger" data-letter-camera="' + id + '"><span class="material-symbols-outlined" aria-hidden="true">photo_camera</span> Take a photo of the letter</button>' +
+            '<span class="st-label">Request letter <span class="st-hint" style="display:inline">(' + (always ? 'optional' : 'recommended') + ')</span></span>' +
+            '<div class="st-letter-pair">' +
+            '<button type="button" class="st-letter-btn" id="' + id + 'Pick" data-action="letter-pick" data-for="' + id + '" aria-label="Upload a file" title="Upload a file">' + icon('upload_file') + '</button>' +
+            '<button type="button" class="st-letter-btn" id="' + id + 'Cam" data-letter-camera="' + id + '" aria-label="Take a photo of the letter" title="Take a photo of the letter">' + icon('photo_camera') + '</button>' +
+            '</div>' +
+            '<input type="file" class="st-sr-only" id="' + id + '" tabindex="-1" accept=".pdf,.jpg,.jpeg,.png,.webp">' +
+            '<div class="st-letter-file" id="' + id + 'File" hidden></div>' +
             '<p class="st-hint">' + text + ' PDF, JPG, PNG or WEBP, up to 5 MB.</p></div>';
     };
+    /* Shows the chosen file's name (with a remove button) under the two icons */
+    function letterShow(id) {
+        var input = $(id), box = $(id + 'File');
+        if (!input || !box) return;
+        var f = input.files && input.files[0];
+        box.hidden = !f;
+        box.innerHTML = f ? icon('description') + '<span class="st-letter-name">' + esc(f.name) + '</span>' +
+            '<button type="button" class="st-icon-btn" data-action="letter-clear" data-for="' + id + '" aria-label="Remove the file" title="Remove the file">' + icon('close') + '</button>' : '';
+    }
     function syncLetter(id, dateStr) {
         var wrap = $(id + 'Wrap'), input = $(id);
         if (!wrap || wrap.hasAttribute('data-always')) return;
         var later = !!dateStr && dateStr > todayStr();
         wrap.hidden = !later;
-        if (!later && input) input.value = '';   /* a same-day request never carries a letter */
+        if (!later && input) { input.value = ''; letterShow(id); }   /* a same-day request never carries a letter */
     }
     function pickLetter(id, dateStr) {
         var input = $(id);
@@ -688,7 +699,7 @@
     }
 
     function lockWhere(lock) {
-        ['borrowRoomId', 'borrowRoom', 'borrowRoomPicker', 'borrowDate', 'borrowStartTime', 'borrowDuration', 'borrowLetter'].forEach(function (id) { var e = $(id); if (e) e.disabled = lock; });
+        ['borrowRoomId', 'borrowRoom', 'borrowRoomPicker', 'borrowDate', 'borrowStartTime', 'borrowDuration', 'borrowLetter', 'borrowLetterPick', 'borrowLetterCam'].forEach(function (id) { var e = $(id); if (e) e.disabled = lock; });
     }
 
     function submitBorrow() {
@@ -1185,7 +1196,15 @@
 
     /* ── Availability bar (thin version of the faculty form's "Room schedule" timeline) ──
        Open time is green, classes and approved reservations are hatched, the chosen time is the outlined box. */
-    function tlPct(m) { return Math.max(0, Math.min(100, (m - TL_START_MIN) / (TL_END_MIN - TL_START_MIN) * 100)); }
+    /* The bar spans the room opening hours (OPEN_MIN ... ROOM_END_MIN, set in Settings → Arbitration → Room schedule) */
+    function tlPct(m) { return Math.max(0, Math.min(100, (m - OPEN_MIN) / (ROOM_END_MIN - OPEN_MIN) * 100)); }
+    function tlLabel(m) { return m % 60 ? minToLabel(m) : (m / 60 % 12 || 12) + (m < 12 * 60 ? ' AM' : ' PM'); }
+    function tlTickMins() {                       /* opening time, every 3 hours, closing time (7 AM, 10 AM, 1 PM, 4 PM, 8 PM by default) */
+        var out = [];
+        for (var m = OPEN_MIN; m < ROOM_END_MIN - 120; m += 180) out.push(m);
+        out.push(ROOM_END_MIN);
+        return out;
+    }
 
     function tlHTML() {
         return '<div class="st-tl" id="reserveTl">' +
@@ -1193,14 +1212,19 @@
             '<span class="st-tl-legend"><i class="st-tl-key is-free"></i>Free<i class="st-tl-key is-busy"></i>Booked<i class="st-tl-key is-pick"></i>Yours</span></div>' +
             '<div class="st-tl-bar" role="img" aria-label="Room availability for the chosen day">' +
             '<div class="st-tl-track" id="reserveTlTrack"></div><div class="st-tl-pick" id="reserveTlPick" hidden></div></div>' +
-            '<div class="st-tl-ticks" aria-hidden="true">' +
-            TL_TICKS.map(function (t) { return '<span data-pos="' + tlPct(t[0] * 60) + '">' + t[1] + '</span>'; }).join('') + '</div>' +
+            '<div class="st-tl-ticks" id="reserveTlTicks" aria-hidden="true"></div>' +
             '<p class="st-tl-note" id="reserveTlNote" aria-live="polite"></p></div>';
     }
 
-    function tlPlaceTicks() {
-        Array.prototype.forEach.call(document.querySelectorAll('#reserveTl .st-tl-ticks span'), function (el) {
-            el.style.left = el.getAttribute('data-pos') + '%';
+    function tlDrawTicks() {
+        var box = $('reserveTlTicks');
+        if (!box) return;
+        box.innerHTML = '';
+        tlTickMins().forEach(function (m) {
+            var el = document.createElement('span');
+            el.textContent = tlLabel(m);
+            el.style.left = tlPct(m) + '%';
+            box.appendChild(el);
         });
     }
 
@@ -1217,6 +1241,7 @@
         var s = resState, track = $('reserveTlTrack'), pick = $('reserveTlPick');
         if (!s || !track || !pick) return;
         $('reserveTlDay').textContent = DAY_NAMES[parseYmd(s.date).getDay()];
+        tlDrawTicks();
 
         Array.prototype.forEach.call(track.querySelectorAll('.st-tl-block'), function (n) { n.remove(); });
         var blocks = resDay.state === 'ok' ? resDay.blocks : [];
@@ -1415,11 +1440,11 @@
             '<p class="st-picked-sub">' + esc(b.name) + ' &middot; ' + esc(hit.floor.label) + seats + '</p></div>' +
             '<button type="button" class="st-btn st-btn-ghost st-btn-sm" data-action="back-rooms">Change</button></div>' +
             '<div class="st-alert is-error" id="flowError" role="alert" hidden></div>' +
+            tlHTML() +
             '<div class="st-field"><span class="st-label">Date <span class="st-star">*</span></span>' +
             '<div class="st-chiprow" id="reserveDateChips">' + dateChips +
             '<input type="date" class="st-input" id="reserveDate" aria-label="Pick a date" min="' + firstOpenStr + '" max="' + roomMaxDate() + '" value="' + resState.date + '">' +
             '</div></div>' +
-            tlHTML() +
             '<div class="st-row">' +
             '<div class="st-field"><label for="reserveStart">Start time <span class="st-star">*</span></label>' +
             '<select class="st-input" id="reserveStart"></select></div>' +
@@ -1441,7 +1466,6 @@
             '<button type="button" class="st-btn st-btn-ghost" data-action="back-rooms">Back</button>' +
             '<button type="submit" class="st-btn st-btn-primary" id="btnSubmitRoom">' + icon('event_available') + 'Reserve room</button>' +
             '</div></form>', 2);
-        tlPlaceTicks();
         resSync();
     }
 
@@ -1902,6 +1926,12 @@
             case 'floor': st.fac.floor = toInt(t.getAttribute('data-i')); return renderRooms();
             case 'room': return renderReserve(toInt(t.getAttribute('data-id')));
             case 'back-rooms': return renderRooms();
+            case 'letter-pick':
+                if ($(t.getAttribute('data-for'))) $(t.getAttribute('data-for')).click();
+                return;
+            case 'letter-clear':
+                if ($(t.getAttribute('data-for'))) { $(t.getAttribute('data-for')).value = ''; letterShow(t.getAttribute('data-for')); }
+                return;
             case 'res-day':
                 if (!resState) return;
                 hideAlert('flowError');
@@ -1951,6 +1981,8 @@
             syncStudentSchedule('item');
         } else if (t.id === 'reserveDate' || t.id === 'reserveStart' || t.id === 'reserveDuration' || t.id === 'reserveEnd') {
             resOnChange(t);
+        } else if (t.type === 'file') {
+            letterShow(t.id);   /* the chosen (or photographed) request letter */
         }
     }
 

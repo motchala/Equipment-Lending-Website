@@ -1907,6 +1907,82 @@ select.st-input option:disabled {
     font-size: 17px;
 }
 
+/* ── Request letter: camera + file icon buttons side by side ── */
+.st-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.st-letter-pair {
+    display: flex;
+    gap: 10px;
+}
+
+.st-letter-btn {
+    flex: 1;
+    min-height: 46px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    background: var(--st-maroon-soft);
+    border: 1.5px dashed var(--st-line-strong);
+    border-radius: var(--st-r-md);
+    color: var(--st-maroon);
+    cursor: pointer;
+    transition: background .2s, border-color .2s, transform .2s;
+}
+
+.st-letter-btn .material-symbols-outlined {
+    font-size: 24px;
+}
+
+.st-letter-btn:hover:not(:disabled) {
+    background: var(--st-tint);
+    border-color: var(--st-maroon);
+}
+
+.st-letter-btn:active:not(:disabled) {
+    transform: translateY(1px);
+}
+
+.st-letter-btn:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+}
+
+.st-letter-file {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 6px 8px 6px 12px;
+    background: var(--st-tint);
+    border-radius: var(--st-r-md);
+    font-size: .84rem;
+    font-weight: 600;
+    color: var(--st-ink);
+}
+
+.st-letter-file>.material-symbols-outlined {
+    flex-shrink: 0;
+    color: var(--st-maroon);
+}
+
+.st-letter-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 /* ── Receipt / result ───────────────────────────────────────── */
 .st-result {
     max-width: 640px;
@@ -2871,6 +2947,23 @@ select.st-input option:disabled {
 
     .st-tl-note .material-symbols-outlined {
         font-size: 16px;
+    }
+
+    .st-letter-pair {
+        gap: 8px;
+    }
+
+    .st-letter-btn {
+        min-height: 42px;
+    }
+
+    .st-letter-btn .material-symbols-outlined {
+        font-size: 22px;
+    }
+
+    .st-letter-file {
+        margin-top: 6px;
+        font-size: .8rem;
     }
 
     /* Receipt / result (QR codes are left at full size so they scan) */
