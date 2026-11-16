@@ -14,6 +14,10 @@
     animation: ps-push-fadein .18s ease;
 }
 
+.ps-push-backdrop[hidden] {
+    display: none !important;
+}
+
 @keyframes ps-push-fadein {
     from { opacity: 0; }
     to   { opacity: 1; }
