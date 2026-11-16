@@ -2934,7 +2934,7 @@ textarea.fcty-input {
 #rooms-browse .fcs-ev:hover,
 #rooms-browse .fcs-ev:focus-visible {
     box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--ev) 55%, transparent);
-    z-index: 4;
+    z-index: 10 !important;
 }
 
 #rooms-browse .fcs-ag-ev {
@@ -3022,16 +3022,39 @@ textarea.fcty-input {
     font-size: 13px;
 }
 
-/* bookings that overlap in time sit side by side, so each is narrow: stack the length under the title */
-#rooms-browse .fcs-ev.is-lane .fcs-ev-top {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
+/* Bookings that overlap in time are stacked, not squeezed side by side: the later one sits on top of the earlier
+   one (indented by the script), so every block keeps nearly the full width of the day. */
+#rooms-browse .fcs-ev.is-stacked {
+    box-shadow: -3px 3px 10px -5px rgba(0, 0, 0, .35);
 }
 
-/* short bookings drop detail instead of overflowing */
+/* less text: a block shows what fits. Short ones keep the code and section only; the time appears from 1.5 h,
+   the room from 2 h. (The full details are always in the tooltip and in the semester list.) */
 #rooms-browse .fcs-ev.is-short .fcs-ev-where {
     display: none;
+}
+
+/* the time is the longest line in a block: a touch smaller so "9:00 AM – 12:00 NN" fits even when stacked */
+#rooms-browse .fcs-ev .fcs-ev-time {
+    font-size: .72rem;
+}
+
+#rooms-browse .fcs-ev-sub {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: .72rem;
+    font-weight: 600;
+    color: color-mix(in srgb, var(--ev) 45%, var(--fcty-muted));
+}
+
+/* the room is a plain short line now (no icon, no building) */
+#rooms-browse .fcs-ev .fcs-ev-where {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: .72rem;
 }
 
 #rooms-browse .fcs-ev.is-tiny {
@@ -3112,11 +3135,7 @@ textarea.fcty-input {
     display: none;
 }
 
-/* on blocks tall enough, let the class title wrap so the section (BSIT 2-2) is never cut off */
-#rooms-browse .fcs-ev.fcs-t-class:not(.is-short) .fcs-ev-title {
-    white-space: normal;
-    overflow-wrap: anywhere;
-}
+/* (a class's section now has its own line under the code, so the title no longer needs to wrap) */
 
 /* the subject name lives in the semester list, the tooltip and the mobile agenda; the grid stays uncluttered */
 #rooms-browse .fcs-ev.fcs-t-class .fcs-ev-student {
