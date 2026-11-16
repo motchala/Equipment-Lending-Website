@@ -2496,12 +2496,6 @@ CREATE TABLE `tbl_sync_config` (
 -- Dumping data for table `tbl_sync_config`
 --
 
-INSERT INTO `tbl_sync_config` (`config_key`, `value`, `updated_at`) VALUES
-('gsheet_last_modified', '2026-11-15T14:55:18.998Z', '2026-11-15 22:55:21'),
-('gsheet_last_sync', '2026-11-15 16:25:05', '2026-11-15 23:25:05'),
-('gsheet_sync_enabled', '0', '2026-11-08 16:09:50'),
-('gsheet_url', 'https://docs.google.com/spreadsheets/d/1EYyWGgDsMwYSQIGQG_dZD5cwsWn0daJTLCItmkMvpBs/edit?gid=1579991349#gid=1579991349', '2026-11-15 19:04:24');
-
 -- --------------------------------------------------------
 
 --
