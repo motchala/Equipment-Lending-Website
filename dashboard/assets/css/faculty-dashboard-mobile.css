@@ -1789,6 +1789,268 @@ html.rx-mobile #panel-rooms .fcty-room-foot {
 }
 
 /* ---------------------------------------------------------------
+   10b. SIMPLER PHONE VIEW
+   One rule for every screen: a row is a name, one key fact and (at most) one action.
+   Anything secondary — helper sentences, counters, repeated locations, long subject names,
+   decorative images, second buttons — is not drawn on a phone. Nothing is removed from the
+   page itself, and wider screens are untouched.
+--------------------------------------------------------------- */
+
+/* ===== HOME ===== */
+/* the stat tiles: number + label only (the icons repeat the label), three across */
+html.rx-mobile #panel-home .fdb-kpis {
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+}
+
+html.rx-mobile #panel-home .fdb-kpi {
+    grid-column: span 2 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0 !important;
+    min-height: 0 !important;
+    padding: 12px 6px !important;
+    text-align: center !important;
+}
+
+html.rx-mobile #panel-home .fdb-kpi:nth-child(n+4) {
+    grid-column: span 3 !important;
+}
+
+html.rx-mobile #panel-home .fdb-kpi-icon {
+    display: none !important;
+}
+
+html.rx-mobile #panel-home .fdb-kpi-body {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 1px !important;
+}
+
+html.rx-mobile #panel-home .fdb-kpi-val {
+    font-size: 1.4rem !important;
+    line-height: 1.1 !important;
+}
+
+html.rx-mobile #panel-home .fdb-kpi-label {
+    font-size: .72rem !important;
+    line-height: 1.25 !important;
+}
+
+html.rx-mobile #panel-home .fdb-kpi:nth-child(1),
+html.rx-mobile #panel-home .fdb-kpi:nth-child(2) {
+    border-right: 1px solid var(--rxm-line) !important;
+    border-bottom: 1px solid var(--rxm-line) !important;
+}
+
+html.rx-mobile #panel-home .fdb-kpi:nth-child(3) {
+    border-right: 0 !important;
+    border-bottom: 1px solid var(--rxm-line) !important;
+}
+
+html.rx-mobile #panel-home .fdb-kpi:nth-child(4) {
+    border-right: 1px solid var(--rxm-line) !important;
+    border-bottom: 0 !important;
+}
+
+html.rx-mobile #panel-home .fdb-kpi:nth-child(5) {
+    border-right: 0 !important;
+    border-bottom: 0 !important;
+}
+
+/* the chart and the recent-activity list live in the Activity tab; "today" stays as its own card */
+html.rx-mobile #panel-home .fdb-area-chart,
+html.rx-mobile #panel-home .fdb-area-third:nth-of-type(5) {
+    display: none !important;
+}
+
+html.rx-mobile #panel-home .fdb-area-third:nth-of-type(4) {
+    border-radius: var(--rxm-r) !important;
+}
+
+/* access code: no explanation when there is no code, and no "ACTIVE" tag without one */
+html.rx-mobile #panel-home .fcc-no-code,
+html.rx-mobile #panel-home .dash-code-body:has(> .fcc-no-code),
+html.rx-mobile #panel-home .dash-code-card:has(.fcc-no-code) .dash-code-active-badge {
+    display: none !important;
+}
+
+/* ===== ACTIVITY ===== */
+html.rx-mobile #panel-activity .fact-todo-card .fact-card-sub,
+html.rx-mobile #panel-activity #factRooms .fact-card-sub,
+html.rx-mobile #panel-activity .fact-empty-sub,
+html.rx-mobile #panel-activity .fact-pager-info,
+html.rx-mobile #panel-activity .fact-search {
+    display: none !important;
+}
+
+html.rx-mobile #panel-activity .fact-live .fact-card-foot:not(:has(button)),
+html.rx-mobile #panel-activity #factHistFoot:not(:has(button)) {
+    display: none !important;
+}
+
+html.rx-mobile #panel-activity .fact-empty {
+    padding-top: 18px !important;
+    padding-bottom: 18px !important;
+}
+
+/* Next steps and equipment cards: one-line titles, no location / note lines */
+html.rx-mobile #panel-activity .fact-todo-text {
+    min-width: 0 !important;
+}
+
+html.rx-mobile #panel-activity .fact-todo-title,
+html.rx-mobile #panel-activity .fact-todo-sub,
+html.rx-mobile #panel-activity .fact-item-title,
+html.rx-mobile #panel-activity .fact-row-title {
+    display: block !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+    text-overflow: ellipsis !important;
+}
+
+html.rx-mobile #panel-activity .fact-item-sub,
+html.rx-mobile #panel-activity .fact-item .fact-note,
+html.rx-mobile #panel-activity .fact-item .rx-more {
+    display: none !important;
+}
+
+html.rx-mobile #panel-activity .fact-item-top {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
+
+html.rx-mobile #panel-activity .fact-item-top .fact-item-title {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+}
+
+/* an overdue row already says how late it is: the due date is not repeated */
+html.rx-mobile #panel-activity .fact-item-meta:has(.fact-late) {
+    font-size: 0 !important;
+}
+
+html.rx-mobile #panel-activity .fact-item-meta .fact-late {
+    font-size: .8rem !important;
+}
+
+/* one clear button (the QR); Extend / Cancel become quiet text instead of more buttons */
+html.rx-mobile #panel-activity .fact-slot-extend .fact-btn,
+html.rx-mobile #panel-activity .fact-slot-end .fact-btn {
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: var(--rxm-muted) !important;
+    font-weight: 700 !important;
+}
+
+/* History: name, date, status */
+html.rx-mobile #panel-activity .fact-row .fact-row-sub,
+html.rx-mobile #panel-activity .fact-row .rx-more {
+    display: none !important;
+}
+
+/* ===== EQUIPMENT ===== */
+/* the big "Most borrowed" carousel is the full list again; the list below has everything */
+html.rx-mobile #panel-lending .featured-section,
+html.rx-mobile #panel-lending .catalog-section-header {
+    display: none !important;
+}
+
+/* campus switch: one slim row */
+html.rx-mobile #panel-lending .eq-campus-tabs {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    gap: 6px !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
+}
+
+html.rx-mobile #panel-lending .eq-campus-tabs::-webkit-scrollbar {
+    display: none !important;
+}
+
+html.rx-mobile #panel-lending .eq-campus-tabs {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}
+
+html.rx-mobile #panel-lending .eq-campus-tab {
+    flex: 0 0 auto !important;
+    gap: 4px !important;
+    height: 34px !important;
+    padding: 0 10px !important;
+    font-size: .74rem !important;
+    white-space: nowrap !important;
+}
+
+/* list rows: smaller photo, no category line, quiet expand arrow */
+html.rx-mobile #panel-lending .eq-item-card {
+    grid-template-columns: 56px minmax(0, 1fr) auto auto !important;
+    row-gap: 2px !important;
+    padding: 10px 0 !important;
+}
+
+html.rx-mobile #panel-lending .eq-item-card--in-cart {
+    grid-template-columns: 56px minmax(0, 1fr) auto !important;
+}
+
+html.rx-mobile #panel-lending .eq-item-img {
+    width: 56px !important;
+    height: 56px !important;
+    border-radius: 14px !important;
+}
+
+html.rx-mobile #panel-lending .eq-item-card--in-cart .bf-tick {
+    left: 32px !important;
+}
+
+html.rx-mobile #panel-lending .eq-item-cat {
+    display: none !important;
+}
+
+html.rx-mobile #panel-lending .eq-ic-btn {
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+/* ===== FACILITIES ===== */
+html.rx-mobile #panel-rooms .fcty-landing-sub,
+html.rx-mobile #panel-rooms .fcty-landing-head>.fcty-pill.is-live,
+html.rx-mobile #panel-rooms .fcs-sub {
+    display: none !important;
+}
+
+/* building cards: shorter, name + free rooms + arrow only */
+html.rx-mobile #panel-rooms .fcty-panels {
+    gap: 12px !important;
+}
+
+html.rx-mobile #panel-rooms .fcty-panel {
+    height: 132px !important;
+    min-height: 0 !important;
+}
+
+html.rx-mobile #panel-rooms .fcty-panel-letter,
+html.rx-mobile #panel-rooms .fcty-panel-meta {
+    display: none !important;
+}
+
+/* class schedule: the week list only (the semester list repeats it), and each class is a
+   code, a time and a room — no subject name, no duration tag */
+html.rx-mobile #panel-rooms .fcs-list,
+html.rx-mobile #panel-rooms .fcs-ev-student,
+html.rx-mobile #panel-rooms .fcs-ev-dur {
+    display: none !important;
+}
+
+/* ---------------------------------------------------------------
    11. GUARDS — the page's own JS hides filtered / paginated items
    with inline `display:none` or the [hidden] attribute. The layout
    rules above force `display`, so these must win to keep search,
