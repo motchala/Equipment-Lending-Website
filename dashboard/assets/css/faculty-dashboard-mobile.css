@@ -2011,6 +2011,25 @@ html.rx-mobile #panel-lending .eq-item-card--in-cart .bf-tick {
     left: 32px !important;
 }
 
+/* The Add button, the arrow and the photo share one vertical centre. The button used to sit in
+   the first text row only, so it looked pushed up compared with the arrow and the photo. */
+html.rx-mobile #panel-lending .eq-item-card:not(.eq-item-card--in-cart) {
+    align-content: center !important;
+}
+
+html.rx-mobile #panel-lending .eq-item-card:not(.eq-item-card--in-cart) .bf-slot {
+    grid-area: act !important;
+    align-self: center !important;
+}
+
+html.rx-mobile #panel-lending .eq-item-card:not(.eq-item-card--in-cart) .eq-item-img {
+    align-self: center !important;
+}
+
+html.rx-mobile #panel-lending .eq-item-card .eq-ic-btn {
+    align-self: center !important;
+}
+
 html.rx-mobile #panel-lending .eq-item-cat {
     display: none !important;
 }
@@ -2048,6 +2067,190 @@ html.rx-mobile #panel-rooms .fcs-list,
 html.rx-mobile #panel-rooms .fcs-ev-student,
 html.rx-mobile #panel-rooms .fcs-ev-dur {
     display: none !important;
+}
+
+/* ---------------------------------------------------------------
+   10c. SIMPLER PHONE VIEW — Notifications, Settings, Help & Support
+   Same rule as the main screens: a row is a name, one key fact and (at most) one action.
+   Helper sentences, counters, repeated details and per-row buttons are not drawn on a phone.
+   Nothing is removed from the page itself, and wider screens are untouched.
+--------------------------------------------------------------- */
+
+/* ===== NOTIFICATIONS ===== */
+html.rx-mobile .fnotif-count-text,
+html.rx-mobile .fnotif-pill-count,
+html.rx-mobile .fnotif-pg-info,
+html.rx-mobile .fnotif-box .notif-section-label .material-symbols-outlined,
+html.rx-mobile .fnotif-box .notif-card .notif-time,
+html.rx-mobile .fnotif-box .notif-card .fnotif-del {
+    display: none !important;
+}
+
+/* each notification is a plain row (the dot already marks unread; Delete / Mark as read
+   live behind the arrow and in Select) */
+html.rx-mobile .fnotif-box .notif-card {
+    align-items: center !important;
+    gap: 12px !important;
+    padding: 12px 2px !important;
+    border: 0 !important;
+    border-bottom: 1px solid var(--rxm-line) !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+html.rx-mobile .fnotif-box .notif-card.is-selected {
+    background: var(--rxm-tonal) !important;
+}
+
+html.rx-mobile .fnotif-box .notif-card.is-expanded {
+    align-items: flex-start !important;
+}
+
+html.rx-mobile .fnotif-box .notif-card.is-expanded .notif-card-meta {
+    align-self: flex-start !important;
+}
+
+html.rx-mobile .fnotif-box .notif-card-body {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+}
+
+html.rx-mobile .fnotif-box .notif-card:not(.is-expanded) .notif-card-sub {
+    display: block !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+    text-overflow: ellipsis !important;
+}
+
+html.rx-mobile .fnotif-box .notif-card-meta {
+    flex: 0 0 auto !important;
+    align-self: center !important;
+    width: auto !important;
+}
+
+html.rx-mobile .fnotif-box .notif-section-label {
+    margin: 12px 2px 2px !important;
+    font-size: .7rem !important;
+}
+
+html.rx-mobile .fnotif-box .fnotif-pagination {
+    justify-content: center !important;
+}
+
+/* ===== SETTINGS ===== */
+/* the banner is a name and one button; department and ID are in Personal Information below */
+html.rx-mobile #settingsOverlay .acct-banner-meta,
+html.rx-mobile #settingsOverlay .acct-banner-badge,
+html.rx-mobile #settingsOverlay .sx-section-sub,
+html.rx-mobile #settingsOverlay .acct-device-note,
+html.rx-mobile #settingsOverlay .sov-desc-small,
+html.rx-mobile #settingsOverlay .acct-row:has(.acct-device),
+html.rx-mobile #settingsOverlay .acct-card:has(#sovExportBtn) .acct-row-static-muted,
+html.rx-mobile #settingsOverlay #notifPrefsPanel .acct-row-value {
+    display: none !important;
+}
+
+/* Help & Support has its own tab: no profile banner above it */
+html.rx-mobile #settingsOverlay:has(#sov-tab-help.active) .acct-banner {
+    display: none !important;
+}
+
+html.rx-mobile #settingsOverlay .acct-row {
+    gap: 2px !important;
+    padding-top: 10px !important;
+    padding-bottom: 10px !important;
+}
+
+/* a row being edited keeps a little room between its label and the box */
+html.rx-mobile #settingsOverlay .acct-row:has(input:not([type="checkbox"])) {
+    gap: 6px !important;
+}
+
+/* every card the full width (the Theme card used to shrink to its content) */
+html.rx-mobile #settingsOverlay .sx-grid>.acct-card {
+    align-self: stretch !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* Export: the name on the left, the button on the right */
+html.rx-mobile #settingsOverlay .acct-row:has(#sovExportBtn) {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+}
+
+/* notification switches: the name and the switch, no explanation under each */
+html.rx-mobile #settingsOverlay #notifPrefsPanel .acct-row {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 12px !important;
+    min-height: 0 !important;
+    padding-top: 13px !important;
+    padding-bottom: 13px !important;
+}
+
+html.rx-mobile #settingsOverlay #notifPrefsPanel .acct-row-label,
+html.rx-mobile #settingsOverlay .acct-row:has(#sovExportBtn) .acct-row-label {
+    width: auto !important;
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+    margin: 0 !important;
+    font-size: .95rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0 !important;
+    text-transform: none !important;
+    color: var(--rxm-text) !important;
+}
+
+/* ===== HELP & SUPPORT ===== */
+/* questions are a plain list; the section titles repeat the tab name */
+html.rx-mobile #settingsOverlay #sov-tab-help>.sx-section-head,
+html.rx-mobile #settingsOverlay #sov-tab-help .acct-card-head,
+html.rx-mobile #settingsOverlay .help-contact-icon,
+html.rx-mobile #settingsOverlay .help-contact-card p {
+    display: none !important;
+}
+
+html.rx-mobile #settingsOverlay .help-item {
+    padding: 0 !important;
+    border: 0 !important;
+    border-bottom: 1px solid var(--rxm-line) !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+html.rx-mobile #settingsOverlay .help-item-q {
+    min-height: 0 !important;
+    padding: 14px 2px !important;
+    font-size: .95rem !important;
+}
+
+html.rx-mobile #settingsOverlay .help-item-q>.material-symbols-outlined:first-child {
+    display: none !important;
+}
+
+html.rx-mobile #settingsOverlay .help-item-a {
+    padding: 0 2px 14px !important;
+    font-size: .88rem !important;
+    line-height: 1.5 !important;
+}
+
+html.rx-mobile #settingsOverlay .help-contact-card {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 10px !important;
+    margin-top: 16px !important;
+    padding: 16px !important;
+    text-align: center !important;
 }
 
 /* ---------------------------------------------------------------

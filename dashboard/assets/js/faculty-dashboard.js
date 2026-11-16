@@ -4536,7 +4536,7 @@
 /* ================================================================
    MY ACTIVITY  (faculty)  --  behaviour for #panel-activity
 
-   1. History table   filter All / Equipment / Rooms, search, paging
+   1. History table   filter All / Equipment / Rooms, search, paging (15 rows per page)
    2. Cards           Equipment and Room reservations show 5 rows per page
    4. Live refresh    Rooms:     room-reservation/api/poll-reservations.php?view=activity
                       Equipment: equipment-booking/api/poll-requests.php?view=activity
@@ -4572,7 +4572,7 @@
 
     function startMyActivity() {
 
-        var PER_PAGE = 10;
+        var PER_PAGE = 15;   // History table: rows per page
         var REFRESH_MS = 30000;
         var API_ROOMS = 'room-reservation/api/poll-reservations.php?view=activity';
         var API_EQUIP = 'equipment-booking/api/poll-requests.php?view=activity';
@@ -4628,8 +4628,8 @@
             return out;
         }
 
-        /* The page navigation lives in the History header, next to the filters:
-           "Showing 1-10 of 24" + previous / numbers / next. With one page only the count shows. */
+        /* The page navigation sits at the bottom of the History card (its footer):
+           "Showing 1-15 of 40" + previous / numbers / next. With one page only the count shows. */
         function renderPager(matched) {
             var pages = Math.max(1, Math.ceil(matched / PER_PAGE));
             var ctl = pager.querySelector('.fact-pager-ctl');
@@ -5002,7 +5002,7 @@
             }
 
             var late = data.status === 'Overdue' ? '<span class="fact-ext-late">Overdue</span> \u00b7 ' : '';
-            var which = data.max ? ' \u00b7 Extension ' + (Number(data.used || 0) + 1) + ' of ' + data.max : '';
+            var which = ' \u00b7 One extension per loan';
             html += '<div class="fact-ext-item"><strong>' + esc(data.item) + (data.qty > 1 ? ' <span class="fact-qty">\u00d7' + data.qty + '</span>' : '') + '</strong>'
                 + '<span>' + late + 'Due ' + esc(data.due) + esc(which) + '</span></div>';
 
@@ -5030,7 +5030,7 @@
             if (!anyAvailable) {
                 html += '<p class="fact-ext-hint">Other bookings need this equipment, so it cannot be extended right now. Please return it to the Admin Office.</p>';
             } else {
-                html += '<p class="fact-ext-hint">Counted from now. Your request is checked against other bookings, today and later, before it is approved.</p>';
+                html += '<p class="fact-ext-hint">' + esc(data.hint || 'You can extend once. Your request is checked against other bookings first.') + '</p>';
             }
             extBody.innerHTML = html;
             extSubmit.disabled = !anyAvailable;
@@ -5125,7 +5125,11 @@
             if (!btn) return;
             e.preventDefault();
             var name = btn.dataset.equipment || 'this request';
-            if (!confirm('Cancel your request for ' + name + '?\n\nThis cannot be undone.')) return;
+            var whole = btn.dataset.scope === 'bundle';
+            var question = whole
+                ? 'Cancel all ' + (btn.dataset.count || '') + ' items in this bundle?\n\nThis cannot be undone.'
+                : 'Cancel your request for ' + name + '?\n\nThis cannot be undone.';
+            if (!confirm(question)) return;
 
             var label = btn.textContent;
             btn.disabled = true;
@@ -5133,6 +5137,7 @@
 
             var fd = new FormData();
             fd.append('id', btn.dataset.requestId);
+            if (whole) fd.append('scope', 'bundle');
             fd.append('csrf_token', csrfToken());
 
             fetch(API_CANCEL, { method: 'POST', body: fd, credentials: 'same-origin' })

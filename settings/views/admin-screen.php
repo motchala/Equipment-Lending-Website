@@ -16,6 +16,7 @@
         <button class="rq-sub-tab" data-sett-panel="sett-prefs">Preferences</button>
         <?php if ($is_super_admin): ?>
             <button class="rq-sub-tab" data-sett-panel="sett-arbitration">Arbitration</button>
+            <button class="rq-sub-tab" data-sett-panel="sett-data">Data</button>
         <?php endif; ?>
         <button class="rq-sub-tab" data-sett-panel="sett-ratings">Service Ratings</button>
         <button class="rq-sub-tab" data-sett-panel="sett-help">Help &amp; FAQ</button>
@@ -273,6 +274,8 @@
     <?php if ($is_super_admin): ?>
 
         <?php require __DIR__ . '/admin-arbitration-panel.php'; /* Arbitration rules (Super Admin only, UI only) */ ?>
+
+        <?php require __DIR__ . '/admin-clear-history-panel.php'; /* Data: clear equipment / room history (Super Admin only) */ ?>
 
     <?php endif; ?>
 

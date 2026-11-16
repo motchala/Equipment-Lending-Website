@@ -619,9 +619,17 @@
                 // JavaScript syntax error that killed every click handler on this tab.
                 $ps_boot_flags = JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP
                     | JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR;
+                // Reservation hours / open days from Settings → Arbitration → Room schedule (the timetable follows them)
+                $ps_room_rules = null;
+                if (isset($conn) && $conn instanceof mysqli) {
+                    require_once __DIR__ . '/../core/room-rules.php';
+                    RoomRules::load($conn);
+                    $ps_room_rules = RoomRules::meta();
+                }
                 $ps_boot_json = json_encode([
                     'rooms'        => array_values($ps_rooms_json),
                     'reservations' => array_values($ps_rsvp_json),
+                    'roomRules'    => $ps_room_rules,
                 ], $ps_boot_flags);
                 if (!is_string($ps_boot_json) || $ps_boot_json === '') {
                     $ps_boot_json = '{"rooms":[],"reservations":[]}';

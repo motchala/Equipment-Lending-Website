@@ -113,6 +113,7 @@ html[data-ps-sub^="rooms-"] #rooms-archived-panel,
 html[data-ps-sub^="sett-"] #sett-account,
 html[data-ps-sub^="sett-"] #sett-prefs,
 html[data-ps-sub^="sett-"] #sett-arbitration,
+html[data-ps-sub^="sett-"] #sett-data,
 html[data-ps-sub^="sett-"] #sett-ratings,
 html[data-ps-sub^="sett-"] #sett-help { display: none; }
 
@@ -122,5 +123,6 @@ html[data-ps-sub="rooms-archived"] #rooms-archived-panel,
 html[data-ps-sub="sett-account"] #sett-account,
 html[data-ps-sub="sett-prefs"] #sett-prefs,
 html[data-ps-sub="sett-arbitration"] #sett-arbitration,
+html[data-ps-sub="sett-data"] #sett-data,
 html[data-ps-sub="sett-ratings"] #sett-ratings,
 html[data-ps-sub="sett-help"] #sett-help { display: block; }

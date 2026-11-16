@@ -19,7 +19,7 @@
                                         Waitlist). Both cards are a fixed size and show 5 rows per page,
                                         with the page navigation in the card footer.
                      3. History         one table for both, filtered All / Equipment / Rooms
-                                        (filters and search in the header, page navigation in the footer)
+                                        (filters and search in the header, 15 rows per page, page navigation in the footer)
 
                    Where every button lives (so a button is only ever in one place):
                      page header                   title only (no buttons)

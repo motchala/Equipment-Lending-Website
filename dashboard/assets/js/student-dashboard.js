@@ -20,7 +20,7 @@
     /* ── Constants ───────────────────────────────────────────── */
     /* Must match STUDENT_COURSES in shared/core/student-courses.php */
     var COURSES = ['BSIT', 'BSCpE', 'BSIE', 'BSBA', 'BSEEd', 'BSEd', 'BSPSY', 'DIT', 'DCET'];
-    var OPEN_MIN = 7 * 60;       /* room reservations open at 7:00 AM */
+    var OPEN_MIN = 7 * 60;       /* room reservations open at 7:00 AM (loadBorrowRules() applies Settings → Arbitration → Room schedule) */
     var CLOSE_MIN = 21 * 60;     /* … 9:00 PM (server enforces the same) */
     var BORROW_OPEN_MIN = 7 * 60;
     var BORROW_LAST_START_MIN = 20 * 60;
@@ -35,6 +35,8 @@
     var PURPOSES = ['Lecture', 'Lab session', 'Meeting', 'Exam', 'Seminar'];
     /* Room reservation inputs follow the faculty reservation form (room-reservation/assets/js/fcty-facilities.js) */
     var ROOM_END_MIN = 20 * 60;               /* rooms close at 8:00 PM */
+    var ROOM_OPEN_DOW = [1, 2, 3, 4, 5, 6];   /* the days rooms can be reserved, as getDay() numbers (Sunday = 0) */
+    var ROOM_MAX_MIN = 13 * 60;               /* longest single reservation */
     var ROOM_STEP_MIN = 30;                   /* start times every 30 minutes */
     var ROOM_DURATIONS = [60, 120, 180, 360]; /* 1 / 2 / 3 / 6 hours */
     var TL_START_MIN = 7 * 60;                /* availability bar runs 7 AM ... */
@@ -105,6 +107,10 @@
             if (r.durationHours && r.durationHours.length) BORROW_HOURS = r.durationHours.map(Number);
             if (r.maxAhead) BORROW_ADVANCE_DAYS = +r.maxAhead;
             if (r.roomMaxAdvanceDays) ROOM_ADVANCE_DAYS = +r.roomMaxAdvanceDays;
+            if (r.roomDayStart) OPEN_MIN = hhmmToMin(r.roomDayStart);
+            if (r.roomDayEnd) ROOM_END_MIN = hhmmToMin(r.roomDayEnd);
+            if (r.roomOpenDays && r.roomOpenDays.length) ROOM_OPEN_DOW = r.roomOpenDays.map(function (n) { return n % 7; });
+            if (r.roomMaxHours) ROOM_MAX_MIN = +r.roomMaxHours * 60;
         }).catch(function () { /* keep the defaults */ });
     }
     /* Latest date a room can be reserved (Settings → Arbitration → Book ahead) */
@@ -154,7 +160,7 @@
         }).join('');
     }
     function studentDurationOptions(dateStr, time, selected) {
-        var start = time ? hhmmToMin(time) : OPEN_MIN;
+        var start = time ? hhmmToMin(time) : BORROW_OPEN_MIN;
         return '<option value="" disabled' + (!selected ? ' selected' : '') + '>Choose duration</option>' +
             BORROW_HOURS.map(function (hours) {
                 var disabled = !dateStr || start + hours * 60 > BORROW_CLOSE_MIN;
@@ -1148,7 +1154,17 @@
     var resDayCache = {};                                       /* 'roomId|date' -> { at, blocks } (kept for a minute) */
     var resState = null;   /* { date, start, end (minutes; start is null when no time is left today), custom, other, purpose } */
 
-    function isClosedDay(d) { return d.getDay() === 0; }
+    /* Days rooms are closed on (Settings → Arbitration → Room schedule) */
+    function isClosedDay(d) { return ROOM_OPEN_DOW.indexOf(d.getDay()) === -1; }
+    function roomClosedList() {
+        var names = ['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'], closed = [];
+        [1, 2, 3, 4, 5, 6, 0].forEach(function (n) { if (ROOM_OPEN_DOW.indexOf(n) === -1) closed.push(names[n]); });
+        return closed.length > 1 ? closed.slice(0, -1).join(', ') + ' and ' + closed[closed.length - 1] : (closed[0] || '');
+    }
+    function roomMaxLengthMsg() {
+        var h = ROOM_MAX_MIN / 60;
+        return 'A reservation can be at most ' + h + (h === 1 ? ' hour' : ' hours') + ' long.';
+    }
     function nextOpenDay(d) { while (isClosedDay(d)) d = addDays(d, 1); return d; }
     function durLabel(mins) {
         var h = Math.floor(mins / 60), m = mins % 60;
@@ -1265,6 +1281,7 @@
         else if (s.start == null || s.start < earliest) s.start = earliest;
         if (s.start != null) {
             if (wasNone || s.end <= s.start) s.end = Math.min(ROOM_END_MIN, s.start + 60);
+            if (s.end - s.start > ROOM_MAX_MIN) s.end = s.start + ROOM_MAX_MIN;   /* the longest single reservation */
             /* a custom end time is whole hours only: pull a half-hour end back to the o'clock */
             if (s.custom && s.end % 60) {
                 var dn = Math.floor(s.end / 60) * 60;
@@ -1284,10 +1301,10 @@
             var cur = s.end - s.start, list = ROOM_DURATIONS.slice();
             if (list.indexOf(cur) === -1) { list.push(cur); list.sort(function (x, y) { return x - y; }); }
             durHtml = list.map(function (d) {
-                var off = ROOM_DURATIONS.indexOf(d) !== -1 && s.start + d > ROOM_END_MIN;
+                var off = ROOM_DURATIONS.indexOf(d) !== -1 && (s.start + d > ROOM_END_MIN || d > ROOM_MAX_MIN);
                 return '<option value="' + d + '"' + (d === cur ? ' selected' : '') + (off ? ' disabled' : '') + '>' + durLabel(d) + '</option>';
             }).join('');
-            for (var e = Math.floor(s.start / 60) * 60 + 60; e <= ROOM_END_MIN; e += 60) {
+            for (var e = Math.floor(s.start / 60) * 60 + 60; e <= ROOM_END_MIN && e - s.start <= ROOM_MAX_MIN; e += 60) {
                 endHtml += '<option value="' + minToHHMM(e) + '"' + (e === s.end ? ' selected' : '') + '>' + minToLabel(e) + '</option>';
             }
         }
@@ -1338,7 +1355,7 @@
             }
             s.date = picked;
             if (tooFar) note = roomAdvanceMsg() + ' We moved you to ' + niceDate(s.date) + '.';
-            else if (closed) note = 'Reservations are not available on Sundays. We moved you to ' + niceDate(s.date) + '.';
+            else if (closed) note = 'Reservations are not available on ' + roomClosedList() + '. We moved you to ' + niceDate(s.date) + '.';
         } else if (t.id === 'reserveStart') {
             var keep = s.end - s.start;
             s.start = hhmmToMin(t.value);
@@ -1442,9 +1459,10 @@
 
         if (!date) return showAlert('flowError', 'Please select a date.');
         if (date < todayStr()) return showAlert('flowError', 'Reservation date and time cannot be in the past.');
-        if (parseYmd(date).getDay() === 0) return showAlert('flowError', 'Reservations are not available on Sundays. Please choose another day.');
+        if (isClosedDay(parseYmd(date))) return showAlert('flowError', 'Reservations are not available on ' + roomClosedList() + '. Please choose another day.');
         if (!start) return showAlert('flowError', date === todayStr() ? 'No start times are left today. Please choose another date.' : 'Please select a start time.');
         if (end <= start) return showAlert('flowError', 'End time must be after start time.');
+        if (s.end - s.start > ROOM_MAX_MIN) return showAlert('flowError', roomMaxLengthMsg());
         if (!purpose) return showAlert('flowError', 'Please choose or enter the purpose.');
         var letter = pickLetter('reserveLetter', date);
         if (letter.error) return showAlert('flowError', letter.error);

@@ -5,14 +5,22 @@ declare(strict_types=1);
 /**
  * equipment-booking/core/borrow-cancellation.php
  *
- * A faculty member cancelling an equipment request that has NOT started yet (My Activity > Upcoming).
- * The equipment twin of room-reservation/core/room-cancellation.php, with the same rules:
+ * A faculty member cancelling an equipment request that has NOT been collected yet (My Activity).
+ * The equipment twin of room-reservation/core/room-cancellation.php, but with a rule that fits instant
+ * same-day approval: nothing is out until the item is collected, so there is nothing to protect.
  *
  *   WHAT CAN BE CANCELLED
- *     - Pending (Waiting) requests, any time before they would start.
- *     - Approved bookings that have not started, up to 1 hour before the start time
- *       ("Cancellations are not allowed within 1 hour of the start time", like rooms).
- *     Not: loans already out (use the Return QR), Overdue, Returned, Declined, or already Cancelled.
+ *     - Pending (Waiting) requests, any time.
+ *     - Approved SAME-DAY bookings, any time until the item is collected (even after the start time, so a
+ *       booking made by mistake a few minutes before its slot can always be undone).
+ *     - Approved LATER-DATE bookings, until the cancellation cutoff before the start (Settings → Arbitration,
+ *       default 1 hour: an admin may already be preparing it). After the start time, if nobody collected it,
+ *       it can be cancelled again.
+ *     Not: items already collected (use the Return QR), Overdue, Returned, Declined, or already Cancelled.
+ *
+ *   CANCEL ALL
+ *     A request made together with others (a bundle) can be cancelled as a whole: cancelBundle() cancels
+ *     every item of that bundle that can still be cancelled, one at a time, with the same rules.
  *
  *   WHAT HAPPENS
  *     - tbl_requests.status becomes 'Cancelled' (reason "Cancelled by faculty") and the return QR is voided.
@@ -65,7 +73,7 @@ final class BorrowCancellation
 
     /**
      * Why this request cannot be cancelled by its owner right now, or null when it can.
-     * Needs: status, borrow_date, borrow_time. No database access.
+     * Needs: status, borrow_date, borrow_time (and booking_mode when known). No database access.
      */
     public static function blocker(array $row, DateTimeImmutable $now): ?string
     {
@@ -73,18 +81,31 @@ final class BorrowCancellation
         if ($status === 'Cancelled') {
             return 'This request was already cancelled.';
         }
+        if ($status === 'On Loan' || $status === 'Overdue') {
+            return 'This item is already with you. Return it with the Return QR instead.';
+        }
         if ($status !== 'Waiting' && $status !== 'Approved') {
-            return 'Only requests that have not started yet can be cancelled.';
+            return 'Only requests that have not been collected yet can be cancelled.';
         }
 
-        $time  = trim((string)($row['borrow_time'] ?? ''));
-        $start = new DateTimeImmutable((string)$row['borrow_date'] . ' ' . ($time !== '' ? $time : '00:00:00'), self::tz());
-        if ($start <= $now) {
-            return 'This borrowing has already started. Return it with the Return QR instead.';
+        // A pending request holds nothing for anyone else, so it can go any time.
+        if ($status === 'Waiting') {
+            return null;
         }
-        // A pending request holds nothing for anyone else, so it can go any time before it starts.
-        if ($status === 'Approved' && self::cutoffSeconds() > 0 && $start->getTimestamp() - $now->getTimestamp() <= self::cutoffSeconds()) {
-            return 'Cancellations are not allowed within ' . self::cutoffLabel() . ' of the borrow start time.';
+
+        // Approved and not collected. A same-day booking was approved on the spot, so it can be undone
+        // any time; only a later-date booking has a cutoff before its start.
+        $mode = (string)($row['booking_mode'] ?? '');
+        if ($mode !== 'today' && $mode !== 'future') {
+            $mode = (string)($row['borrow_date'] ?? '') > $now->format('Y-m-d') ? 'future' : 'today';
+        }
+        if ($mode === 'future' && self::cutoffSeconds() > 0) {
+            $time  = trim((string)($row['borrow_time'] ?? ''));
+            $start = new DateTimeImmutable((string)$row['borrow_date'] . ' ' . ($time !== '' ? $time : '00:00:00'), self::tz());
+            $left  = $start->getTimestamp() - $now->getTimestamp();
+            if ($left > 0 && $left <= self::cutoffSeconds()) {
+                return 'Cancellations are not allowed within ' . self::cutoffLabel() . ' of the borrow start time.';
+            }
         }
         return null;
     }
@@ -93,7 +114,7 @@ final class BorrowCancellation
     private static function fetch(mysqli $conn, int $requestId, string $facultyId, bool $lock): ?array
     {
         $stmt = $conn->prepare(
-            'SELECT id, faculty_id, faculty_name, equipment_name, borrow_qty, status, stock_applied,
+            'SELECT id, faculty_id, faculty_name, equipment_name, borrow_qty, status, stock_applied, booking_mode,
                     borrow_date, borrow_time
                FROM tbl_requests WHERE id = ? AND faculty_id = ? LIMIT 1' . ($lock ? ' FOR UPDATE' : '')
         );
@@ -216,5 +237,63 @@ final class BorrowCancellation
             error_log('BorrowCancellation::cancel — ' . $e->getMessage());
             return ['success' => false, 'error' => 'Something went wrong while cancelling. Please try again.'];
         }
+    }
+
+    /**
+     * Cancels every item of the request's bundle that can still be cancelled ("Cancel all"). A request that
+     * is not part of a bundle is cancelled on its own. Each item goes through cancel(), so every rule and
+     * side effect is the same as for a single item; items that cannot be cancelled are skipped and counted.
+     *
+     * @return array{success:bool, error?:string, item?:string, count?:int, skipped?:int}
+     */
+    public static function cancelBundle(mysqli $conn, int $requestId, string $facultyId): array
+    {
+        $stmt = $conn->prepare('SELECT batch_id FROM tbl_requests WHERE id = ? AND faculty_id = ? LIMIT 1');
+        if (!$stmt) {
+            return ['success' => false, 'error' => 'Something went wrong. Please try again.'];
+        }
+        $stmt->bind_param('is', $requestId, $facultyId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        if (!$row) {
+            return ['success' => false, 'error' => 'We could not find that request.'];
+        }
+        $batch = trim((string)($row['batch_id'] ?? ''));
+        if ($batch === '') {
+            return self::cancel($conn, $requestId, $facultyId);
+        }
+
+        $ids  = [];
+        $list = $conn->prepare("SELECT id FROM tbl_requests WHERE batch_id = ? AND faculty_id = ? AND status IN ('Waiting','Approved') ORDER BY id");
+        if (!$list) {
+            return ['success' => false, 'error' => 'Something went wrong. Please try again.'];
+        }
+        $list->bind_param('ss', $batch, $facultyId);
+        $list->execute();
+        $res = $list->get_result();
+        while ($res && ($r = $res->fetch_assoc())) {
+            $ids[] = (int)$r['id'];
+        }
+        $list->close();
+
+        $done    = 0;
+        $skipped = 0;
+        $first   = '';
+        $error   = '';
+        foreach ($ids as $id) {
+            $one = self::cancel($conn, $id, $facultyId);
+            if ($one['success']) {
+                $done++;
+                $first = $first !== '' ? $first : (string)($one['item'] ?? '');
+            } else {
+                $skipped++;
+                $error = $error !== '' ? $error : (string)($one['error'] ?? '');
+            }
+        }
+        if ($done === 0) {
+            return ['success' => false, 'error' => $error !== '' ? $error : 'There is nothing left in this bundle to cancel.'];
+        }
+        return ['success' => true, 'item' => $first, 'count' => $done, 'skipped' => $skipped];
     }
 }

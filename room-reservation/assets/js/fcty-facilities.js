@@ -41,12 +41,13 @@
     var pollTimer = null;
     var POLL_MS = 30000;
 
-    var SCHOOL_START_MIN = 7 * 60;
-    var SCHOOL_END_MIN = 20 * 60;
+    var SCHOOL_START_MIN = 7 * 60;             /* reservation hours: defaults; setRoomRules() applies */
+    var SCHOOL_END_MIN = 20 * 60;              /* Settings → Arbitration → Room schedule              */
     var DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
     var DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    var WEEK_ORDER = [1, 2, 3, 4, 5, 6];      /* Mon → Sat (Sunday is closed) */
-    var CLOSED_DAY = 0;                        /* Sunday: no reservations       */
+    var WEEK_ORDER = [1, 2, 3, 4, 5, 6];      /* the days rooms can be reserved, Mon → Sun (default Mon → Sat) */
+    var OPEN_DOW = [1, 2, 3, 4, 5, 6];        /* the same days as getDay() numbers (Sunday = 0)               */
+    var MAX_RES_MIN = 13 * 60;                /* longest single reservation                                    */
     var TL_START_MIN = 7 * 60;                 /* schedule timelines: 7 AM (classes start then) ... */
     var TL_END_MIN = 20 * 60;                  /* … 8 PM                        */
     var TL_TICKS = [[7, '7 AM', 0], [10, '10 AM', 1], [13, '1 PM', 0], [16, '4 PM', 1], [20, '8 PM', 0]];   /* [hour, label, minor] */
@@ -131,7 +132,44 @@
     function addDays(d, n) { var x = new Date(d.getTime()); x.setDate(x.getDate() + n); return x; }
     function mondayOf(d) { return addDays(d, -((d.getDay() + 6) % 7)); }
     function longDate(d) { return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); }
-    function isClosedDay(d) { return d.getDay() === CLOSED_DAY; }
+    function isClosedDay(d) { return OPEN_DOW.indexOf(d.getDay()) === -1; }
+    /* "Sundays" / "Saturdays and Sundays": the days rooms are closed on */
+    function closedDaysText() {
+        var names = [];
+        [1, 2, 3, 4, 5, 6, 0].forEach(function (n) { if (OPEN_DOW.indexOf(n) === -1) names.push(DAY_NAMES[n] + 's'); });
+        return names.length > 1 ? names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1] : (names[0] || '');
+    }
+    /* Reservation hours, open days and the longest reservation: Settings → Arbitration → Room schedule */
+    function setRoomRules(r) {
+        if (!r || !r.dayStart) return;
+        SCHOOL_START_MIN = timeToMin(r.dayStart);
+        SCHOOL_END_MIN = timeToMin(r.dayEnd);
+        var dows = (r.openDays || []).map(function (n) { return n % 7; });   /* ISO 7 (Sunday) → 0 */
+        if (dows.length) {
+            OPEN_DOW = dows;
+            WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0].filter(function (n) { return dows.indexOf(n) !== -1; });
+        }
+        MAX_RES_MIN = Math.max(60, (+r.maxHours || 13) * 60);
+        TL_START_MIN = Math.min(7 * 60, SCHOOL_START_MIN);   /* the schedule also lists classes, which start at 7 AM */
+        TL_END_MIN = Math.max(20 * 60, SCHOOL_END_MIN);
+        if (schedule) renderSchedule();
+    }
+    var rulesRequested = false;
+    function loadRoomRules() {
+        if (rulesRequested) return;
+        rulesRequested = true;
+        fetch(apiBase() + 'room-reservation/api/get-room-quota.php', { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (q) { if (q && q.rules) setRoomRules(q.rules); })
+            .catch(function () { rulesRequested = false; /* the server enforces the rules anyway */ });
+    }
+    /* tick labels under the reservation timeline: the opening hour, every third hour after it, and the closing hour */
+    function formTicks() {
+        var a = Math.ceil(SCHOOL_START_MIN / 60), b = Math.floor(SCHOOL_END_MIN / 60), t = [[a, hourLabel(a)]];
+        for (var h = a + 3; h < b - 1; h += 3) t.push([h, hourLabel(h)]);
+        t.push([b, hourLabel(b)]);
+        return t;
+    }
     function nextOpenDay(d) { while (isClosedDay(d)) d = addDays(d, 1); return d; }
     /* Monday of the week the schedule shows. Sunday is closed, so on a Sunday the
        overview rolls on to the coming week instead of listing a week that is over. */
@@ -232,6 +270,7 @@
     }
 
     function start() {
+        loadRoomRules();
         onlyFree = true;
         var onlyFreeToggle = $('fcty-only-free');
         if (onlyFreeToggle) onlyFreeToggle.checked = true;
@@ -555,8 +594,8 @@
     var ttIndex = {};      /* key -> { s, date } for the detail line */
 
     function ttPct(min) {
-        var c = Math.min(SCHOOL_END_MIN, Math.max(SCHOOL_START_MIN, min));
-        return (c - SCHOOL_START_MIN) / (SCHOOL_END_MIN - SCHOOL_START_MIN) * 100;
+        var c = Math.min(TL_END_MIN, Math.max(TL_START_MIN, min));
+        return (c - TL_START_MIN) / (TL_END_MIN - TL_START_MIN) * 100;
     }
 
     function ttDetailHTML(key) {
@@ -574,7 +613,7 @@
         var today = ymd(now), nowMin = now.getHours() * 60 + now.getMinutes();
         var heads = '<div class="fcty-tt-corner" aria-hidden="true"></div>', cols = '', hours = '';
         ttIndex = {};
-        for (var h = SCHOOL_START_MIN / 60; h < SCHOOL_END_MIN / 60; h++) {
+        for (var h = TL_START_MIN / 60; h < TL_END_MIN / 60; h++) {
             hours += '<span data-t="' + ttPct(h * 60) + '">' + hourLabel(h) + '</span>';
         }
         WEEK_ORDER.forEach(function (d) {
@@ -595,7 +634,7 @@
                     '<span class="fcty-tt-name">' + esc(name) + '</span>' +
                     (who ? '<span class="fcty-tt-who">' + esc(who) + '</span>' : '') + '</button>';
             }).join('');
-            var nowLine = isToday && nowMin >= SCHOOL_START_MIN && nowMin <= SCHOOL_END_MIN
+            var nowLine = isToday && nowMin >= TL_START_MIN && nowMin <= TL_END_MIN
                 ? '<div class="fcty-tt-now" data-t="' + ttPct(nowMin) + '"></div>' : '';
             cols += '<div class="fcty-tt-col' + (isToday ? ' is-today' : '') + '">' + blocks + nowLine + '</div>';
         });
@@ -695,7 +734,7 @@
     /* "Free until 2:00 PM" / "In use until 10:30 AM" — shown in the status pill */
     function availabilityHint(daySchedule) {
         var now = new Date(), m = now.getHours() * 60 + now.getMinutes();
-        if (isClosedDay(now)) return 'Closed on Sundays';
+        if (isClosedDay(now)) return 'Closed on ' + closedDaysText();
         if (m < SCHOOL_START_MIN) return 'Opens at ' + minToLabel(SCHOOL_START_MIN);
         if (m >= SCHOOL_END_MIN) return 'Closed for today';
         var list = sortByStart(daySchedule), i;
@@ -879,7 +918,7 @@
             '<div class="fcty-tl-head"><span>Room schedule</span><span id="fcty-tl-day"></span></div>' +
             '<div class="fcty-tl-track" id="fcty-tl-track"><div class="fcty-tl-pick" id="fcty-tl-pick"></div></div>' +
             '<div class="fcty-tl-ticks" aria-hidden="true">' +
-            [[7, '7 AM'], [10, '10 AM'], [13, '1 PM'], [16, '4 PM'], [20, '8 PM']].map(function (t) {
+            formTicks().map(function (t) {
                 return '<span style="left:' + ((t[0] * 60 - SCHOOL_START_MIN) / (SCHOOL_END_MIN - SCHOOL_START_MIN) * 100) + '%">' + t[1] + '</span>';
             }).join('') +
             '</div>' +
@@ -994,6 +1033,7 @@
         function applyRules() {
             var r = quota && quota.rules;
             if (!r) return;
+            setRoomRules(r);   /* hours, open days and longest reservation (in case they arrived after the form opened) */
             elDate.max = ymd(addDays(now, r.maxAdvanceDays));
             DOC_HINT = r.letterRequired
                 ? 'Required for reservations on a later date. Optional for a same-day reservation.'
@@ -1124,7 +1164,7 @@
             if (list.indexOf(cur) === -1) { list.push(cur); list.sort(function (a, b) { return a - b; }); }
             return list.map(function (d) {
                 var preset = DURATIONS.indexOf(d) !== -1;
-                var off = preset && (st.start + d > SCHOOL_END_MIN || !rangeFree(st.start, st.start + d));
+                var off = preset && (st.start + d > SCHOOL_END_MIN || d > MAX_RES_MIN || !rangeFree(st.start, st.start + d));
                 return '<option value="' + d + '"' + (d === cur ? ' selected' : '') + (off ? ' disabled' : '') + '>' + durLabel(d) + '</option>';
             }).join('');
         }
@@ -1136,13 +1176,14 @@
                 return !rangeFree(m, m + 30) || (isToday() && m <= nowMin);
             });
             if (st.end <= st.start) st.end = Math.min(SCHOOL_END_MIN, st.start + 60);
+            if (st.end - st.start > MAX_RES_MIN) st.end = st.start + MAX_RES_MIN;   /* the longest single reservation (Settings → Arbitration) */
             /* A custom end time is whole hours only (no :30): pull a half-hour end back to the o'clock */
             if (st.custom && st.end % 60) {
                 var dn = Math.floor(st.end / 60) * 60;
                 st.end = dn > st.start ? dn : Math.min(SCHOOL_END_MIN, Math.ceil(st.end / 60) * 60);
             }
             /* End time list: every o'clock after the start, up to 8 PM */
-            elEnd.innerHTML = timeOptions(Math.floor(st.start / 60) * 60 + 60, SCHOOL_END_MIN, st.end, function (m) { return !rangeFree(st.start, m); }, 60);
+            elEnd.innerHTML = timeOptions(Math.floor(st.start / 60) * 60 + 60, SCHOOL_END_MIN, st.end, function (m) { return !rangeFree(st.start, m) || m - st.start > MAX_RES_MIN; }, 60);
             /* Duration list: 1 / 2 / 3 / 6 hours */
             elDur.innerHTML = durationOptions(st.end - st.start);
             /* The gear switches the second field between Duration and End time */
@@ -1290,7 +1331,7 @@
             elDate.value = st.date;
             changed(true);
             if (tooFar) setAlert(elMsg, 'warn', 'event_busy', 'Rooms can only be reserved up to ' + advanceLabel() + ' ahead. We moved you to ' + longDate(parseYmd(st.date)) + '.');
-            else if (closed) setAlert(elMsg, 'warn', 'event_busy', 'Reservations are not available on Sundays. We moved you to ' + longDate(parseYmd(st.date)) + '.');
+            else if (closed) setAlert(elMsg, 'warn', 'event_busy', 'Reservations are not available on ' + closedDaysText() + '. We moved you to ' + longDate(parseYmd(st.date)) + '.');
         });
         elStart.addEventListener('change', function () {
             var keep = st.end - st.start;
@@ -1353,7 +1394,8 @@
             var purpose = String(st.purpose || '').trim();
             if (!purpose) return fail(st.other ? 'Tell us what the room is for.' : 'Pick what the room is for.');
             if (st.end <= st.start) return fail('End time must be after the start time.');
-            if (isClosedDay(parseYmd(st.date))) return fail('Reservations are not available on Sundays. Please choose another day.');
+            if (isClosedDay(parseYmd(st.date))) return fail('Reservations are not available on ' + closedDaysText() + '. Please choose another day.');
+            if (st.end - st.start > MAX_RES_MIN) return fail('A reservation can be at most ' + (MAX_RES_MIN / 60) + (MAX_RES_MIN === 60 ? ' hour' : ' hours') + ' long.');
             if (weekData && clashes().length) return fail('That time is already taken. Pick one of the open times.');
             if (elDate.max && st.date > elDate.max) return fail('Rooms can only be reserved up to ' + advanceLabel() + ' ahead. Please pick an earlier date.');
             if (quota && quota.rules && quota.rules.letterRequired && isLaterDate() && !docFile) return fail('A request letter is required for later-date reservations. Please attach one.');

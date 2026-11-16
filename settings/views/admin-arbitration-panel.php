@@ -6,9 +6,9 @@
  * Included from settings/views/admin-screen.php as a direct child of #panel-settings,
  * so the existing Settings sub-tab switcher can show and hide it.
  *
- * LIVE cards (marked data-arb-live): "Current semester", "Borrowing rules", "Booking window" and "Reservation rules". They load their
+ * LIVE cards (marked data-arb-live): "Current semester", "Borrowing rules", "Booking window", "Reservation rules" and "Room schedule". They load their
  * values through ArbitrationConfig and save through settings/api/save-arbitration.php.
- * The other cards (room schedule, role weights, priority faculty) are still UI only
+ * The other cards (role weights, priority faculty) are still UI only
  * and carry a "Not connected yet" badge.
  *
  * Styles : settings/assets/css/admin-arbitration.css  (all classes are arb-*)
@@ -225,7 +225,7 @@ $arb_date = static function (string $key, string $title, string $sub, string $va
                 $arb_toggle('rule_missing_doc_block_enabled', 'Require a request letter', 'Faculty must attach a request letter when booking for a later date. Same-day requests never need one.', (bool)$arb_live['rule_missing_doc_block_enabled']);
                 $arb_stepper('max_items_per_borrower', 'Items per borrower', 'Most items a borrower can hold or have requested at the same time.', (int)$arb_live['max_items_per_borrower'], 1, 20, 1, 'items');
                 $arb_stepper('max_borrow_days', 'Longest loan', 'The most days a faculty member can pick in the Borrow form.', (int)$arb_live['max_borrow_days'], 1, 3, 1, 'days');
-                $arb_stepper('max_extensions', 'Extensions per loan', 'How many times a borrower can extend. 0 turns extensions off.', (int)$arb_live['max_extensions'], 0, 5, 1, 'times');
+                $arb_stepper('max_extensions', 'Extensions per loan', 'A borrower can extend a loan once. 0 turns extensions off.', (int)$arb_live['max_extensions'], 0, 1, 1, 'times');
                 $arb_stepper('low_stock_threshold', 'Low-stock warning', 'Shows in Stock watch when an item has this many units or fewer.', (int)$arb_live['low_stock_threshold'], 0, 20, 1, 'units');
                 ?>
             </div>
@@ -276,17 +276,18 @@ $arb_date = static function (string $key, string $title, string $sub, string $va
             </div>
         </div>
 
-        <div class="sett-card arb-card">
+        <div class="sett-card arb-card" data-arb-live>
             <div class="sett-card-head">
                 <span class="material-symbols-outlined">calendar_month</span>
                 <h3>Room schedule</h3>
-                <span class="arb-badge">Not connected yet</span>
             </div>
             <div class="sett-card-body">
                 <?php
-                $arb_time('Reservation hours', 'Earliest start and latest end of a reservation.', 'room_day_start', '07:00', 'room_day_end', '20:00');
-                $arb_chips('room_day', 'Days rooms can be reserved', 'Unticked days are closed to new reservations.', ['mon' => 'Mon', 'tue' => 'Tue', 'wed' => 'Wed', 'thu' => 'Thu', 'fri' => 'Fri', 'sat' => 'Sat', 'sun' => 'Sun'], ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']);
-                $arb_stepper('room_max_hours', 'Longest single reservation', 'Longest a room can be held in one reservation.', $arb_num('room_max_hours', 13), 1, 13, 1, 'hours');
+                $arb_room_day_keys = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];   // ISO weekday 1..7
+                $arb_room_open = array_map(static function ($n) use ($arb_room_day_keys) { return $arb_room_day_keys[(int)$n - 1]; }, (array)$arb_live['room_open_days']);
+                $arb_time('Reservation hours', 'Earliest start and latest end of a reservation. Times are on the hour.', 'room_day_start', (string)$arb_live['room_day_start'], 'room_day_end', (string)$arb_live['room_day_end']);
+                $arb_chips('room_day', 'Days rooms can be reserved', 'Unticked days are closed to new reservations. At least one day must stay open.', ['mon' => 'Mon', 'tue' => 'Tue', 'wed' => 'Wed', 'thu' => 'Thu', 'fri' => 'Fri', 'sat' => 'Sat', 'sun' => 'Sun'], $arb_room_open);
+                $arb_stepper('room_max_hours', 'Longest single reservation', 'Longest a room can be held in one reservation.', (int)$arb_live['room_max_hours'], 1, 16, 1, 'hours');
                 ?>
             </div>
         </div>

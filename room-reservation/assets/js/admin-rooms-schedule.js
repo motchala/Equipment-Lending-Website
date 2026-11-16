@@ -8,11 +8,13 @@
                            failure here used to leave the whole Facilities tab unclickable. */
                         let PS_ROOMS = [];
                         let PS_RSVP = [];
+                        let PS_RULES = null; // reservation hours / open days (Settings → Arbitration → Room schedule)
                         try {
                             const bootEl = document.getElementById('psRoomsScheduleBootData');
                             const boot = bootEl ? JSON.parse(bootEl.textContent || '{}') : (window.PS_ROOMS_SCHEDULE_BOOT || {});
                             PS_ROOMS = Array.isArray(boot.rooms) ? boot.rooms : [];
                             PS_RSVP = Array.isArray(boot.reservations) ? boot.reservations : [];
+                            PS_RULES = boot.roomRules || null;
                         } catch (err) {
                             console.warn('Room schedule data could not be read; the schedule will load it live instead.', err);
                         }
@@ -21,8 +23,10 @@
                            Reservations run 7 AM – 8 PM, Monday to Saturday (Sunday is closed; see
                            submit-faculty-reserve.php). The time axis starts at those hours and only
                            grows if a reservation ever falls outside them, so nothing is ever hidden. */
-                        const AXIS_START = 7 * 60;
-                        const AXIS_END = 20 * 60;
+                        const ruleMin = (t) => { const p = String(t || '').split(':'); return (+p[0]) * 60 + (+p[1] || 0); };
+                        const AXIS_START = PS_RULES && PS_RULES.dayStart ? Math.min(7 * 60, ruleMin(PS_RULES.dayStart)) : 7 * 60; // classes start at 7 AM
+                        const AXIS_END = PS_RULES && PS_RULES.dayEnd ? Math.max(20 * 60, ruleMin(PS_RULES.dayEnd)) : 20 * 60;
+                        const SUNDAY_OPEN = !!(PS_RULES && Array.isArray(PS_RULES.openDays) && PS_RULES.openDays.indexOf(7) !== -1);
                         const HOUR_PX = 42; // height of one hour on screen (13 h fits one screen)
                         const REFRESH_MS = 30000; // re-pull reservations while the modal is open
                         const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -308,7 +312,7 @@
 
                         function todayColumn(now) {
                             const dow = new Date(isoToMs(now.iso)).getUTCDay(); // 0 = Sun
-                            return dow >= 1 && dow <= 6 ? dow : 1; // Sunday is closed → Monday
+                            return dow >= 1 && dow <= 6 ? dow : (SUNDAY_OPEN ? 7 : 1); // Sunday is closed → Monday, unless rooms are open on Sundays
                         }
 
                         function applyMobileDay(dayCount) {
@@ -344,8 +348,8 @@
                             const sunday = addDays(monday, 6);
                             const wk = _rows.filter(r => r.date >= monday && r.date <= sunday).concat(classRowsFor(monday));
 
-                            /* Mon–Sat always; Sunday only if a reservation somehow sits on it */
-                            const dayCount = wk.some(r => r.date === sunday) ? 7 : 6;
+                            /* Mon–Sat always; Sunday when rooms are open on Sundays or a reservation sits on it */
+                            const dayCount = (SUNDAY_OPEN || wk.some(r => r.date === sunday)) ? 7 : 6;
                             const days = [];
                             for (let i = 0; i < dayCount; i++) {
                                 const iso = addDays(monday, i);
