@@ -168,6 +168,16 @@ function fact_i(array $row, string $key): int
 }
 
 /** The three PUP buildings use the same display names as the Facilities tab. */
+/** Cut long text to $max characters with an ellipsis (the full text stays in the title tooltip). */
+function fact_short(string $text, int $max = 40): string
+{
+    $text = trim($text);
+    if (function_exists('mb_strlen') && mb_strlen($text) > $max) {
+        return rtrim(mb_substr($text, 0, $max - 1)) . '…';
+    }
+    return !function_exists('mb_strlen') && strlen($text) > $max ? rtrim(substr($text, 0, $max - 1)) . '…' : $text;
+}
+
 function fact_building_label(string $key, string $name): string
 {
     $labels = [
@@ -439,17 +449,16 @@ function fact_render_group(string $label, array $itemsHtml): string
  *   Next steps list               no action buttons: each entry only points at the row below
  *                                 where the real button is (it scrolls to it and flashes it)
  *   Card / table header           filters and search                     (nothing else)
- *   Row action bar, bottom of     the buttons that apply to this row, packed to the left in this
- *   every Equipment / Room row    order, with the way OUT always last, pushed to the far right:
- *                                   claim   Claim QR            (main action, tinted)
- *                                   return  Return QR           (main action, tinted)
- *                                   extend  Extend
- *                                   end     Cancel / Withdraw / Leave waitlist
+ *   Row action bar, bottom of     three fixed places, the same on every row (a button that does not
+ *   every Equipment / Room row    apply leaves its place empty, it never shifts into another one):
+ *                                   left    Claim QR or Return QR   (never both at once; tinted)
+ *                                   middle  Extend
+ *                                   right   Cancel / Withdraw / Leave
  *   History table, last column    Action: Join waitlist
  *   Card / table footer           page navigation (previous, numbers, next)
- * A slot that does not apply to a row is simply not drawn (no empty gaps). A button that is not
- * allowed right now (too late to cancel, extension limit reached) stays on the row, greyed out,
- * with the reason on hover.
+ * A button that is not allowed right now (too late to cancel, extension limit reached) stays in its
+ * place, greyed out, with the reason on hover. The status (Pending, Approved, ...) is plain coloured
+ * text with a dot, never a pill, so it can't be mistaken for a button.
  */
 
 /**
@@ -478,19 +487,28 @@ function fact_action_btn(string $label, string $icon, array $data = [], array $o
 }
 
 /**
- * The action bar at the bottom of a row: the slots above, always in the same order. A slot with no
- * button is left out, so the bar is only as wide as the buttons the row really has.
+ * The action bar at the bottom of a row: three fixed places, always the same (left: Claim QR or Return
+ * QR, middle: Extend, right: Cancel / Withdraw / Leave). Claim QR and Return QR are never on the same
+ * row (Approved vs. on loan), so they share the left place. The bar is not drawn at all when the row
+ * has no button.
  *
  * @param array{claim?: string, return?: string, extend?: string, end?: string} $slots ready-made buttons
  */
 function fact_render_actions(array $slots): string
 {
+    $cells = [
+        'qr'     => ($slots['claim'] ?? '') !== '' ? $slots['claim'] : ($slots['return'] ?? ''),
+        'extend' => $slots['extend'] ?? '',
+        'end'    => $slots['end'] ?? '',
+    ];
+    if ($cells['qr'] === '' && $cells['extend'] === '' && $cells['end'] === '') {
+        return '';
+    }
     $html = '<div class="fact-item-actions" role="group" aria-label="Actions">';
-    foreach (['claim', 'return', 'extend', 'end'] as $slot) {
-        if (($slots[$slot] ?? '') === '') {
-            continue;
+    foreach ($cells as $name => $button) {
+        if ($button !== '') {
+            $html .= '<span class="fact-slot fact-slot-' . $name . '">' . $button . '</span>';
         }
-        $html .= '<span class="fact-slot fact-slot-' . $slot . '">' . $slots[$slot] . '</span>';
     }
     return $html . '</div>';
 }
@@ -554,52 +572,42 @@ function fact_render_room_item(array $it, string $kind): string
         : fact_time(fact_s($it, 'start')) . ' – ' . fact_time(fact_s($it, 'end'));
     $room  = fact_s($it, 'room');
 
+    // Detail line: short facts only. Pending / Waitlisted is in the status, and why Cancel is greyed
+    // out is on the button (hover), so none of that is repeated here.
     $sub = [fact_h(fact_s($it, 'where'))];
-    if ($kind === 'waitlist') {
-        $sub[] = 'We\'ll notify you if this slot opens up';
-    } else {
+    if ($kind !== 'waitlist') {
         if (fact_s($it, 'student_name') !== '') {
-            $student = 'Student reservation by ' . fact_s($it, 'student_name');
-            if (fact_s($it, 'student_id') !== '') {
-                $student .= ' (' . fact_s($it, 'student_id') . ')';
-            }
-            $sub[] = fact_h($student . ' · authorized through your faculty code');
+            $sub[] = 'For ' . fact_h(fact_s($it, 'student_name'));
         }
         if (fact_s($it, 'purpose') !== '') {
-            $sub[] = fact_h(fact_s($it, 'purpose'));
+            $sub[] = '<span title="' . fact_h(fact_s($it, 'purpose')) . '">' . fact_h(fact_short(fact_s($it, 'purpose'), 22)) . '</span>';
         }
         if (!empty($it['letter'])) {
-            $sub[] = '<span class="fact-attach" title="A supporting letter is attached">' . fact_icon('attach_file') . 'Letter</span>';
-        }
-        if ($kind === 'pending') {
-            $sub[] = 'Waiting for admin approval';
-        }
-        if ($kind === 'upcoming' && empty($it['can_cancel'])) {
-            $sub[] = 'Can\'t be cancelled within ' . RoomRules::cancelCutoffLabel() . ' of the start';
+            $sub[] = '<span class="fact-attach" title="Letter attached">' . fact_icon('attach_file') . 'Letter</span>';
         }
     }
 
     // Rooms only have the "end" slot: leave the waitlist / withdraw a request / cancel a reservation
     $end = '';
     if ($kind === 'waitlist') {
-        $end = fact_action_btn('Leave waitlist', 'close', [
+        $end = fact_action_btn('Leave', 'close', [
             'action' => 'leave-waitlist', 'room-id' => fact_i($it, 'room_id'), 'room-name' => $room,
             'res-date' => fact_s($it, 'date'), 'start-time' => fact_s($it, 'start'), 'end-time' => fact_s($it, 'end'),
-        ], ['danger' => true, 'title' => 'Stop waiting for this slot']);
+        ], ['danger' => true, 'title' => 'Leave the waitlist']);
     } elseif ($kind === 'pending') {
         // A request that is still waiting holds no slot, so it can be withdrawn at any time
         $end = fact_action_btn('Withdraw', 'close', [
             'action' => 'cancel-reservation', 'rr-id' => fact_i($it, 'id'), 'room-name' => $room,
-        ], ['danger' => true, 'title' => 'Withdraw this request']);
+        ], ['danger' => true, 'title' => 'Withdraw request']);
     } elseif ($kind === 'upcoming') {
         // Only upcoming reservations can be cancelled, and not within the cancellation cutoff of the start
         $end = !empty($it['can_cancel'])
             ? fact_action_btn('Cancel', 'close', [
                 'action' => 'cancel-reservation', 'rr-id' => fact_i($it, 'id'), 'room-name' => $room,
-            ], ['danger' => true, 'title' => 'Cancel this reservation'])
+            ], ['danger' => true, 'title' => 'Cancel reservation'])
             : fact_action_btn('Cancel', 'lock', [], [
                 'danger' => true, 'disabled' => true,
-                'title'  => 'Reservations can\'t be cancelled within ' . RoomRules::cancelCutoffLabel() . ' of the start time',
+                'title'  => 'Can\'t cancel within ' . RoomRules::cancelCutoffLabel() . ' of the start',
             ]);
     }
 
@@ -625,8 +633,8 @@ function fact_render_rooms_status(array $d): string
     $max    = max(1, fact_i($d, 'max'));
     $full   = $active >= $max;
     return '<span class="fact-limit' . ($full ? ' is-full' : '') . '"'
-        . ($full ? ' title="Limit reached. Cancel one or wait until it ends to reserve another."' : '') . '>'
-        . '<strong>' . $active . ' of ' . $max . '</strong> active reservations'
+        . ($full ? ' title="Cancel one or wait until it ends to reserve another."' : '') . '>'
+        . '<strong>' . $active . ' of ' . $max . '</strong> active'
         . ($full ? ' &middot; Limit reached' : '') . '</span>';
 }
 
@@ -644,7 +652,7 @@ function fact_render_rooms_body(array $d): string
     $html     = '';
 
     if (!$live && !$pending && !$upcoming && !$waitlist) {
-        return $html . fact_render_empty('event_available', 'No room reservations', 'Reserve a room for your class, lab session or meeting.');
+        return $html . fact_render_empty('event_available', 'No room reservations', 'Nothing reserved yet.');
     }
 
     $groups = [
@@ -701,16 +709,14 @@ function fact_render_room_history_rows(array $d): string
         $times = fact_time(fact_s($it, 'start')) . ' – ' . fact_time(fact_s($it, 'end'));
 
         // Second line: why it ended this way (or what it was for)
-        $note = fact_h(fact_s($it, 'purpose'));
+        $note = '';
         if (fact_s($it, 'student_name') !== '') {
-            $student = 'Student reservation by ' . fact_s($it, 'student_name');
-            if (fact_s($it, 'student_id') !== '') {
-                $student .= ' (' . fact_s($it, 'student_id') . ')';
-            }
-            $note = fact_h($student . ' · ' . fact_s($it, 'purpose'));
+            $note = fact_h('For ' . fact_s($it, 'student_name') . (fact_s($it, 'purpose') !== '' ? ' · ' . fact_short(fact_s($it, 'purpose'), 32) : ''));
+        } else {
+            $note = fact_h(fact_short(fact_s($it, 'purpose'), 40));
         }
         if (fact_s($it, 'reason') !== '' && $state !== 'completed') {
-            $note = fact_h(fact_s($it, 'reason'));
+            $note = '<span title="' . fact_h(fact_s($it, 'reason')) . '">' . fact_h(fact_short(fact_s($it, 'reason'), 48)) . '</span>';
         }
         // The only action a history row can have lives in its own "Action" column
         $action   = '';
@@ -914,14 +920,10 @@ function fact_room_todo(array $d): array
     if ($pending) {
         $first = $pending[0];
         $n     = count($pending);
-        $date  = DateTimeImmutable::createFromFormat('Y-m-d', fact_s($first, 'date'), $tz);
-        $by    = $date !== false && fact_s($first, 'date') > $today
-            ? 'before ' . fact_day_label($now, $date, false)
-            : 'before it starts';
         $out[] = fact_todo_item(
             'rooms', 4, 'wait', 'hourglass_top',
             $n === 1 ? fact_s($first, 'room') . ' is waiting for approval' : $n . ' room requests are waiting for approval',
-            'An admin has to decide ' . $by . ', otherwise it is declined automatically · You can withdraw ' . ($n === 1 ? 'it' : 'them') . ' any time',
+            'Waiting for an admin',
             'rr:' . fact_i($first, 'id'),
             fact_i($first, 'start_ts')
         );
@@ -934,7 +936,7 @@ function fact_room_todo(array $d): array
         $out[] = fact_todo_item(
             'rooms', 5, 'ok', 'meeting_room',
             fact_s($it, 'room') . ' is yours until ' . fact_time(fact_s($it, 'end')),
-            'In use now · ' . fact_s($it, 'where'),
+            'In use now',
             'rr:' . fact_i($it, 'id'),
             fact_i($it, 'start_ts')
         );
@@ -954,7 +956,7 @@ function fact_room_todo(array $d): array
         $out[] = fact_todo_item(
             'rooms', 5, 'info', 'notifications',
             $n === 1 ? 'On the waitlist for ' . fact_s($w, 'room') : 'On the waitlist for ' . $n . ' room slots',
-            ($n === 1 ? $slot . ' · ' : '') . 'We will notify you if ' . ($n === 1 ? 'the slot' : 'one') . ' opens up',
+            $n === 1 ? $slot : 'We\'ll tell you if one opens',
             'rooms',
             fact_i($w, 'start_ts')
         );
@@ -981,7 +983,7 @@ function fact_room_todo(array $d): array
             $n === 1
                 ? fact_s($it, 'room') . ($date !== false ? ' on ' . fact_day_label($now, $date, false) : '') . ' was declined'
                 : $n . ' room reservations were declined for dates still ahead',
-            'Join the waitlist in History to be told if the slot opens up',
+            'You can join the waitlist in History',
             'history-room',
             fact_i($it, 'start_ts')
         );

@@ -1220,18 +1220,9 @@ html {
         gap: 6px;
     }
 
-    /* On a phone the buttons share the row evenly (big, equal tap targets) instead of leaving gaps */
-    #panel-activity .fact-slot {
-        flex: 1 1 0;
-    }
-
-    #panel-activity .fact-slot-end {
-        margin-left: 0;
-    }
-
-    #panel-activity .fact-slot>.fact-btn {
-        width: 100%;
-        min-width: 0;
+    /* On a phone the three places stay the same (left / middle / right), just full width */
+    #panel-activity .fact-item-actions {
+        max-width: none;
     }
 
     #panel-activity .fact-item-actions .fact-btn {

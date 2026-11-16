@@ -27,9 +27,12 @@ declare(strict_types=1);
  *             - the quantity of the item keeps its stock healthy (see equipment_same_day_quantity_limit()):
  *               fewer than 3 in stock = never; 3 to 9 in stock = at most one third of the stock (never
  *               fewer than 1 unit), so the item is not left low; 10 or more = at most 50% of the stock;
- *             - a cart has at most 3 items, and EVERY item in it passes these rules: if one item needs
- *               an admin, the whole cart waits for an admin (an item that cannot be done at all is still
- *               declined on its own);
+ *             - a cart of several items (see EQ_CART_FACULTY_AUTO) is the exception: when a FACULTY
+ *               member submitted it, the whole cart is approved automatically whatever the stock-health /
+ *               one-day / already-booked rules above say about its items. Only the rules that make a
+ *               request impossible still apply: an item that cannot be done at all is declined on its
+ *               own, and the borrowing limits (at most 3 items at a time, overdue, duplicates, ...) are
+ *               still enforced by ArbitrationEngine. A cart a student submitted still goes to an admin;
  *             - nobody else has the item booked for any part of that time;
  *             - no other request for the item is still waiting for review for that time.
  *           A same-day request that is not decided by the time it starts is declined by the deadline below.
@@ -97,8 +100,14 @@ if (!defined('EQ_SAMEDAY_SMALL_DIVISOR')) {
     define('EQ_SAMEDAY_SMALL_DIVISOR', 3);
 }
 if (!defined('EQ_SAMEDAY_MAX_CART_ITEMS')) {
-    // A cart with more items than this always waits for an admin.
+    // Only used for carts that do NOT qualify for EQ_CART_FACULTY_AUTO (see below).
     define('EQ_SAMEDAY_MAX_CART_ITEMS', 3);
+}
+if (!defined('EQ_CART_FACULTY_AUTO')) {
+    // true  = a same-day cart of several items submitted by a faculty member is approved automatically
+    //         (only a student's cart waits for an admin).
+    // false = every item of the cart must also pass the per-item stock rules, else the whole cart waits.
+    define('EQ_CART_FACULTY_AUTO', true);
 }
 if (!defined('EQ_AUTO_APPROVE_REASON')) {
     // Reason stored when an admin approves a request that already meets every automatic-approval rule
@@ -222,9 +231,10 @@ function equipment_same_day_review_reason(array $req, int $total_stock, int $oth
 /**
  * What should happen to a same-day request: be declined, wait for an admin, or be auto-approved.
  *
- * @return array{block:?array{rule:string, reason:string}, review:?string}
+ * @return array{block:?array{rule:string, reason:string}, review:?string, personal?:bool}
  *         block  = cannot be done at all (declined on the spot, same messages the engine uses);
- *         review = reason it needs an admin; both null = auto-approve it.
+ *         review = reason it needs an admin; both null = auto-approve it;
+ *         personal = a faculty member (not a student) submitted it.
  */
 function equipment_same_day_gate(mysqli $conn, int $id): array
 {
@@ -301,7 +311,7 @@ function equipment_same_day_gate(mysqli $conn, int $id): array
         $occupied,
         $waiting
     );
-    return ['block' => null, 'review' => $why];
+    return ['block' => null, 'review' => $why, 'personal' => (string)$r['submitted_as'] === 'personal'];
 }
 
 /**
@@ -328,8 +338,9 @@ function equipment_waiting_meets_auto_rules(mysqli $conn, int $id): bool
 }
 
 /**
- * Same check for a whole cart (batch): it has at most EQ_SAMEDAY_MAX_CART_ITEMS items and every item
- * still Waiting meets the rules. Used by the "approve all" (bundle) screen.
+ * Same check for a whole cart (batch): a faculty member's same-day cart (EQ_CART_FACULTY_AUTO), or one with
+ * at most EQ_SAMEDAY_MAX_CART_ITEMS items where every item still Waiting meets the rules. Used by the
+ * "approve all" (bundle) screen.
  */
 function equipment_cart_meets_auto_rules(mysqli $conn, string $batch_id): bool
 {
@@ -341,7 +352,7 @@ function equipment_cart_meets_auto_rules(mysqli $conn, string $batch_id): bool
         return $cache[$batch_id];
     }
     $ok = false;
-    $stmt = $conn->prepare('SELECT id, status FROM tbl_requests WHERE batch_id = ? ORDER BY id');
+    $stmt = $conn->prepare("SELECT id, status, COALESCE(booking_mode, '') AS booking_mode, COALESCE(submitted_as, '') AS submitted_as FROM tbl_requests WHERE batch_id = ? ORDER BY id");
     if ($stmt) {
         $stmt->bind_param('s', $batch_id);
         $stmt->execute();
@@ -360,6 +371,18 @@ function equipment_cart_meets_auto_rules(mysqli $conn, string $batch_id): bool
             }
         }
         $ok = $ok && $waiting > 0;
+
+        // A faculty member's same-day cart is an automatic approval whatever its items' own rules say
+        // (EQ_CART_FACULTY_AUTO): it qualifies when it has several items, none of them from a student.
+        if (!$ok && EQ_CART_FACULTY_AUTO && count($rows) > 1 && $waiting > 0) {
+            $faculty = true;
+            foreach ($rows as $row) {
+                if ($row['status'] === 'Waiting' && ($row['submitted_as'] !== 'personal' || !in_array($row['booking_mode'], ['today', ''], true))) {
+                    $faculty = false;
+                }
+            }
+            $ok = $faculty;
+        }
     }
     return $cache[$batch_id] = $ok;
 }
@@ -393,7 +416,7 @@ function equipment_decide_on_submit(mysqli $conn, array $request_ids): array
 {
     $out      = [];
     $approved = [];
-    $sameDay  = [];   // id => ['review' => ?string, 'batch' => string]: same-day rows that passed the hard checks
+    $sameDay  = [];   // id => ['review' => ?string, 'batch' => string, 'personal' => bool]: same-day rows that passed the hard checks
 
     foreach (array_values(array_unique(array_map('intval', $request_ids))) as $id) {
         $out[$id] = ['status' => 'Waiting', 'reason' => ''];
@@ -440,25 +463,30 @@ function equipment_decide_on_submit(mysqli $conn, array $request_ids): array
                 continue;
             }
             // Possible: remember it. Whether it is approved depends on the WHOLE cart (see below).
-            $sameDay[$id] = ['review' => $gate['review'], 'batch' => $row['batch_id']];
+            $sameDay[$id] = ['review' => $gate['review'], 'batch' => $row['batch_id'], 'personal' => !empty($gate['personal'])];
         } catch (\Throwable $e) {
             error_log('equipment_decide_on_submit[' . $id . '] - ' . $e->getMessage());
         }
     }
 
-    // Same-day rows, grouped by cart (a single item is its own group). A cart is approved only when
-    // EVERY item in it passes the rules and it has at most EQ_SAMEDAY_MAX_CART_ITEMS items; otherwise
-    // the whole cart waits for an admin. (Items that cannot be done at all were declined above, so
-    // they do not count as part of the cart.)
+    // Same-day rows, grouped by cart (a single item is its own group).
+    //   - a cart a FACULTY member submitted (EQ_CART_FACULTY_AUTO) is approved as a whole;
+    //   - anything else (a single item, or a cart with a student's item) is approved only when EVERY item
+    //     passes the rules and it has at most EQ_SAMEDAY_MAX_CART_ITEMS items; otherwise the whole group
+    //     waits for an admin.
+    // (Items that cannot be done at all were declined above, so they do not count as part of the cart.)
     $groups = [];
     foreach ($sameDay as $id => $g) {
         $key = $g['batch'] !== '' ? 'b:' . $g['batch'] : 's:' . $id;
-        $groups[$key][$id] = $g['review'];
+        $groups[$key][$id] = $g;
     }
     foreach ($groups as $key => $members) {
         try {
             $cart_why = null;
-            if (strncmp($key, 'b:', 2) === 0) {
+            $is_cart  = strncmp($key, 'b:', 2) === 0;
+            $faculty_cart = EQ_CART_FACULTY_AUTO && $is_cart
+                && count(array_filter($members, static fn ($m) => empty($m['personal']))) === 0;
+            if ($is_cart && !$faculty_cart) {
                 $cnt = $conn->prepare('SELECT COUNT(*) AS n FROM tbl_requests WHERE batch_id = ?');
                 if ($cnt) {
                     $bid = substr($key, 2);
@@ -471,11 +499,12 @@ function equipment_decide_on_submit(mysqli $conn, array $request_ids): array
                     }
                 }
             }
-            $needs_admin = $cart_why !== null || count(array_filter($members, static fn ($r) => $r !== null)) > 0;
+            $needs_admin = !$faculty_cart
+                && ($cart_why !== null || count(array_filter($members, static fn ($m) => $m['review'] !== null)) > 0);
 
-            foreach ($members as $id => $own) {
+            foreach ($members as $id => $meta) {
                 if ($needs_admin) {
-                    $because = $own ?? $cart_why ?? 'it was requested together with another item that needs an admin\'s review';
+                    $because = $meta['review'] ?? $cart_why ?? 'it was requested together with another item that needs an admin\'s review';
                     $out[$id] = ['status' => 'Waiting', 'reason' => equipment_same_day_hold($conn, $id, $because)];
                     continue;
                 }

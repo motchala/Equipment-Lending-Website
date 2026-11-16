@@ -11575,14 +11575,17 @@ body .side-nav .side-nav-user .side-nav-user-name {
     font-size: 13px;
 }
 
-/* The action bar: only the buttons this row really has, packed to the left in a fixed order
-   (Claim QR, Return QR, Extend). The way out (Cancel / Withdraw / Leave waitlist) is always last and
-   sits at the far right, so it is never next to the main action. No empty slots, no floating buttons. */
+/* The action bar: three fixed places, the same on every row, so a button is always where you expect it.
+     left    Claim QR / Return QR   (never both on one row)
+     middle  Extend
+     right   Cancel / Withdraw / Leave
+   A button that does not apply leaves its place empty; nothing shifts into another place. */
 #panel-activity .fact-item-actions {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     align-items: center;
     gap: 8px;
+    max-width: 360px;
     margin-top: 8px;
 }
 
@@ -11591,12 +11594,21 @@ body .side-nav .side-nav-user .side-nav-user-name {
     min-width: 0;
 }
 
+#panel-activity .fact-slot-qr {
+    grid-column: 1;
+}
+
+#panel-activity .fact-slot-extend {
+    grid-column: 2;
+}
+
 #panel-activity .fact-slot-end {
-    margin-left: auto;
+    grid-column: 3;
 }
 
 #panel-activity .fact-slot>.fact-btn {
-    min-width: 96px;
+    width: 100%;
+    min-width: 0;
 }
 
 /* Icon tile (equipment photo / room icon) */
@@ -11623,20 +11635,35 @@ body .side-nav .side-nav-user .side-nav-user-name {
     object-fit: contain;
 }
 
-/* ── Status pill: four tones, same as the Home tab ───────────── */
+/* ── Status: plain coloured text with a dot ─────────────────────
+   Deliberately NOT a pill (no fill, no border, no rounded box) so it can't be mistaken for a button.
+   Buttons have a border and an icon; a status is only a dot and a word. */
 #panel-activity .fact-chip {
     --tone: var(--color-secondary);
     display: inline-flex;
     align-items: center;
+    gap: 6px;
     flex-shrink: 0;
-    padding: 3px 10px;
-    border-radius: 999px;
-    font-size: 0.6875rem;
-    font-weight: 700;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    font-size: 0.75rem;
+    font-weight: 600;
     line-height: 1.4;
     white-space: nowrap;
     color: var(--tone);
-    background: color-mix(in srgb, var(--tone) 13%, transparent);
+    pointer-events: none;
+    user-select: none;
+}
+
+#panel-activity .fact-chip::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--tone);
 }
 
 #panel-activity .fact-chip.is-ok {
