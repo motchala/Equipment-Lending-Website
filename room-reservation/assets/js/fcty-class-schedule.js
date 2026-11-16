@@ -87,6 +87,19 @@
             : clock(a) + ' ' + meridiem(a) + ' – ' + clock(b) + ' ' + meridiem(b);
     }
 
+    /* The calendar blocks are narrow, so their times drop the ":00": "9 AM – 12 NN", "7 – 10 AM", "7:30 – 9 AM".
+       (The tooltip, the semester list and the phone list keep the full "9:00 AM – 12:00 NN".) */
+    function clockShort(min) {
+        var h = Math.floor(min / 60) % 24, m = min % 60;
+        return ((h % 12) || 12) + (m ? ':' + pad(m) : '');
+    }
+
+    function rangeShort(a, b) {
+        return meridiem(a) === meridiem(b)
+            ? clockShort(a) + ' – ' + clockShort(b) + ' ' + meridiem(b)
+            : clockShort(a) + ' ' + meridiem(a) + ' – ' + clockShort(b) + ' ' + meridiem(b);
+    }
+
     function hourLabel(min) {
         var h = Math.floor(min / 60) % 24;
         if (h === 12) return '12 NN';
@@ -162,10 +175,12 @@
         return { start: Math.max(0, lo), end: Math.min(24 * 60, hi) };
     }
 
-    /* Side-by-side lanes for bookings that overlap in time */
+    /* Bookings that overlap in time are STACKED, not squeezed side by side: each one keeps (almost) the full
+       width of the day, and the later one sits on top of the earlier one, indented a little so the earlier
+       block's edge and title stay visible. `lane` is the stack depth. The longer block starts underneath. */
     function lanes(items) {
         var evs = items.map(function (it) { return { it: it, s: toMin(it.start), e: toMin(it.end), lane: 0, lanes: 1 }; })
-            .sort(function (a, b) { return a.s - b.s || a.e - b.e; });
+            .sort(function (a, b) { return a.s - b.s || b.e - a.e; });
         var out = [], cluster = [], clusterEnd = -1;
 
         function flush() {
@@ -202,14 +217,31 @@
         return [it.room, m ? 'Bldg ' + m[1] : it.building].filter(Boolean).join(' · ');
     }
 
+    /* A class is "COMP 019 · DIT 3-1": show the code and the section on two short lines instead of one that wraps */
+    function titleParts(it) {
+        var title = String(it.purpose || ''), sub = '';
+        if (it.kind === 'class' && it.section) {
+            var tail = ' \u00b7 ' + it.section;
+            if (title.slice(-tail.length) === tail) { sub = it.section; title = title.slice(0, -tail.length); }
+        }
+        return { title: title, sub: sub };
+    }
+
+    var STACK_STEP = 12;     /* px each stacked block is indented from the one underneath */
+    var STACK_MAX = 3;       /* never indent more than 3 steps, so the text always keeps room */
+
     function eventHtml(l, win, date) {
         var it = l.it;
         var top = PAD + (l.s - win.start) / 60 * HOUR_H;
         var h = Math.max((l.e - l.s) / 60 * HOUR_H, 24);
         var isClass = it.kind === 'class';
+        var parts = titleParts(it);
+        var depth = Math.min(l.lane, STACK_MAX);
+        var indent = depth * STACK_STEP;
+        /* only what fits: the time from 1.5 h up, the room from 2 h up (everything is still in the tooltip) */
         var cls = 'fcs-ev ' + itemClass(it) +
-            (l.lanes > 1 ? ' is-lane' : '') +
-            (h < 60 ? ' is-short' : '') + (h < 44 ? ' is-tiny' : '') +
+            (l.lane > 0 ? ' is-stacked' : '') +
+            (h < 76 ? ' is-short' : '') + (h < 56 ? ' is-tiny' : '') +
             (isPast(date, l.e) ? ' is-past' : '') +
             (it.student_name ? ' is-student' : '');
         var where = whereOf(it);
@@ -221,19 +253,17 @@
         var text = it.purpose + (isClass ? ' (class)' : '') + ', ' + range(l.s, l.e) + ', ' + duration(it.minutes) +
             (student ? ', ' + student : '') + (where ? ', ' + where : '');
         var style = 'top:' + top + 'px;height:' + (h - 2) + 'px;' +
-            'left:calc(' + (l.lane * 100 / l.lanes) + '% + 3px);' +
-            'width:calc(' + (100 / l.lanes) + '% - 6px)';
+            'left:' + (3 + indent) + 'px;' +
+            'width:calc(100% - ' + (6 + indent) + 'px);' +
+            'z-index:' + (l.lane + 1);
 
         return '<div class="' + cls + '" style="' + style + '" tabindex="0" role="group"' +
             ' data-date="' + esc(date) + '" data-end="' + l.e + '"' +
             ' aria-label="' + esc(text) + '" title="' + esc(text) + '">' +
-            '<span class="fcs-ev-top">' +
-            '<span class="fcs-ev-title">' + esc(it.purpose) + '</span>' +
-            '<span class="fcs-ev-dur">' + esc(duration(it.minutes)) + '</span>' +
-            '</span>' +
-            '<span class="fcs-ev-time">' + esc(range(l.s, l.e)) + '</span>' +
-            (student ? '<span class="fcs-ev-student">' + icon(isClass ? 'menu_book' : 'school') + esc(student) + '</span>' : '') +
-            (where ? '<span class="fcs-ev-where">' + icon('location_on') + '<span>' + esc(whereShort(it)) + '</span></span>' : '') +
+            '<span class="fcs-ev-title">' + esc(parts.title) + '</span>' +
+            (parts.sub ? '<span class="fcs-ev-sub">' + esc(parts.sub) + '</span>' : '') +
+            '<span class="fcs-ev-time">' + esc(rangeShort(l.s, l.e)) + '</span>' +
+            (it.room ? '<span class="fcs-ev-where">' + esc(it.room) + '</span>' : '') +
             '</div>';
     }
 
@@ -294,11 +324,8 @@
                 day.items.forEach(function (it) {
                     var s = toMin(it.start), e = toMin(it.end), where = whereOf(it);
                     out += '<div class="fcs-ag-ev ' + itemClass(it) + (isPast(day.date, e) ? ' is-past' : '') + '">' +
-                        '<span class="fcs-ev-top"><span class="fcs-ev-title">' + esc(it.purpose) + '</span>' +
-                        '<span class="fcs-ev-dur">' + esc(duration(it.minutes)) + '</span></span>' +
-                        '<span class="fcs-ev-time">' + esc(range(s, e)) + '</span>' +
-                        (it.kind === 'class' && it.subject ? '<span class="fcs-ev-student">' + icon('menu_book') + esc(it.subject + (it.component === 'Laboratory' ? ' (Lab)' : '')) + '</span>' : '') +
-                        (where ? '<span class="fcs-ev-where">' + icon('location_on') + '<span>' + esc(where) + '</span></span>' : '') +
+                        '<span class="fcs-ev-title">' + esc(it.purpose) + '</span>' +
+                        '<span class="fcs-ev-time">' + esc(range(s, e)) + (whereShort(it) ? ' &middot; ' + esc(whereShort(it)) : '') + '</span>' +
                         '</div>';
                 });
             }
@@ -324,19 +351,16 @@
         var target = c.next_date || c.last_date;
         var where = whereShort({ room: c.room, building: c.building });
         var count = c.sessions + (c.sessions === 1 ? ' session' : ' sessions');
-        var state = c.next_date ? 'Next: ' + shortDate(c.next_date) : 'Done';
         var isClass = c.kind === 'class';
         var subject = isClass && c.subject ? c.subject + (c.component === 'Laboratory' ? ' (Lab)' : '') : '';
         var tip = c.purpose + (isClass ? ' (class)' : '') + ', ' + DOW[c.dow - 1] + ' ' + range(s, e) + (subject ? ', ' + subject : '') + ', ' + [c.room, c.building].filter(Boolean).join(', ') +
             ', ' + count + (c.student ? ', includes student bookings' : '');
         return '<button type="button" class="fcs-cls ' + itemClass(c) + (inWeek ? ' is-week' : '') +
             (c.next_date ? '' : ' is-done') + '" data-date="' + esc(target) + '" title="' + esc(tip) + '">' +
-            '<span class="fcs-cls-top"><span class="fcs-cls-title">' + esc(c.purpose) + '</span>' +
-            '<span class="fcs-cls-dur">' + esc(duration(c.minutes)) + '</span></span>' +
+            '<span class="fcs-cls-top"><span class="fcs-cls-title">' + esc(c.purpose) + '</span></span>' +
             '<span class="fcs-cls-when">' + esc(DOW[c.dow - 1] || '') + ' &middot; ' + esc(range(s, e)) + '</span>' +
-            (subject ? '<span class="fcs-cls-where fcs-cls-subject">' + icon('menu_book') + '<span>' + esc(subject) + '</span></span>' : '') +
-            (where ? '<span class="fcs-cls-where">' + icon('location_on') + '<span>' + esc(where) + '</span></span>' : '') +
-            '<span class="fcs-cls-meta">' + esc(count) + ' &middot; ' + esc(state) + '</span>' +
+            (subject ? '<span class="fcs-cls-where fcs-cls-subject"><span>' + esc(subject) + '</span></span>' : '') +
+            (where ? '<span class="fcs-cls-where"><span>' + esc(where) + '</span></span>' : '') +
             '</button>';
     }
 
