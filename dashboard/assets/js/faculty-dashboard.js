@@ -4536,7 +4536,7 @@
 /* ================================================================
    MY ACTIVITY  (faculty)  --  behaviour for #panel-activity
 
-   1. History table   filter All / Equipment / Rooms, search, paging
+   1. History table   filter All / Equipment / Rooms, search, paging (15 rows per page)
    2. Cards           Equipment and Room reservations show 5 rows per page
    4. Live refresh    Rooms:     room-reservation/api/poll-reservations.php?view=activity
                       Equipment: equipment-booking/api/poll-requests.php?view=activity
@@ -4572,7 +4572,7 @@
 
     function startMyActivity() {
 
-        var PER_PAGE = 10;
+        var PER_PAGE = 15;   // History table: rows per page
         var REFRESH_MS = 30000;
         var API_ROOMS = 'room-reservation/api/poll-reservations.php?view=activity';
         var API_EQUIP = 'equipment-booking/api/poll-requests.php?view=activity';
@@ -4628,8 +4628,8 @@
             return out;
         }
 
-        /* The page navigation lives in the History header, next to the filters:
-           "Showing 1-10 of 24" + previous / numbers / next. With one page only the count shows. */
+        /* The page navigation sits at the bottom of the History card (its footer):
+           "Showing 1-15 of 40" + previous / numbers / next. With one page only the count shows. */
         function renderPager(matched) {
             var pages = Math.max(1, Math.ceil(matched / PER_PAGE));
             var ctl = pager.querySelector('.fact-pager-ctl');
