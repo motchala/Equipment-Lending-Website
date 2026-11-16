@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Nov 14, 2026 at 12:04 PM
+-- Generation Time: Nov 16, 2026 at 09:30 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -38,17 +38,18 @@ CREATE TABLE `tbl_accounts` (
   `last_login` datetime DEFAULT NULL,
   `dormant_until` bigint(20) UNSIGNED DEFAULT NULL,
   `session_epoch` bigint(20) UNSIGNED NOT NULL DEFAULT 0,
-  `last_password_change` datetime DEFAULT NULL
+  `last_password_change` datetime DEFAULT NULL,
+  `backup_email` varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `tbl_accounts`
 --
 
-INSERT INTO `tbl_accounts` (`id`, `fullName`, `email`, `password`, `role`, `admin_no`, `created_at`, `last_login`, `dormant_until`, `session_epoch`, `last_password_change`) VALUES
-(1, 'Redg Abelida', 'main@admin.edu', '$2y$10$dLNCtd5IGqTMf7VUHFYyEOPI00YWyd9h9n4uj6dTptlcKwFNcw57e', 'Super Admin', 1, '2026-01-01 00:00:00', '2026-11-14 17:07:46', NULL, 0, NULL),
-(2, 'Chico Ramos', 'chico@admin.edu', '$2y$10$w.G7jIE6r6iSsVyn/T/G2OAhoqpyxgu4kkWKbHIhOky/CJk94xLGC', 'Admin', 2, '2026-10-02 11:05:03', '2026-11-09 23:25:05', NULL, 0, NULL),
-(3, 'Jell Alagon', 'jell@admin.edu', '$2y$10$Q2ZyDvxioT548b/LuPKdEe7XYwf3bh3t//5dN/mX2bNIKEQ3buhf6', 'Admin', 3, '2026-11-10 06:01:18', NULL, NULL, 0, NULL);
+INSERT INTO `tbl_accounts` (`id`, `fullName`, `email`, `password`, `role`, `admin_no`, `created_at`, `last_login`, `dormant_until`, `session_epoch`, `last_password_change`, `backup_email`) VALUES
+(1, 'Redg Abelida', 'main@admin.edu', '$2y$10$dLNCtd5IGqTMf7VUHFYyEOPI00YWyd9h9n4uj6dTptlcKwFNcw57e', 'Super Admin', 1, '2026-01-01 00:00:00', '2026-11-15 17:35:39', NULL, 0, NULL, ''),
+(2, 'Chico Ramos', 'chico@admin.edu', '$2y$10$w.G7jIE6r6iSsVyn/T/G2OAhoqpyxgu4kkWKbHIhOky/CJk94xLGC', 'Admin', 2, '2026-10-02 11:05:03', '2026-11-09 23:25:05', NULL, 0, NULL, NULL),
+(3, 'Jell Alagon', 'jell@admin.edu', '$2y$10$Q2ZyDvxioT548b/LuPKdEe7XYwf3bh3t//5dN/mX2bNIKEQ3buhf6', 'Admin', 3, '2026-11-10 06:01:18', NULL, NULL, 0, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -218,7 +219,60 @@ INSERT INTO `tbl_admin_activity` (`id`, `admin_id`, `admin_name`, `category`, `a
 (142, 1, 'Redg Abelida', 'faculty', NULL, 'Created faculty account for Arvin Nuñez (8 weekly class meetings added to their schedule)', NULL, NULL, NULL, '2026-11-14 01:53:53'),
 (143, 1, 'Redg Abelida', 'login', NULL, 'Signed in', NULL, NULL, NULL, '2026-11-14 17:07:46'),
 (144, 1, 'Redg Abelida', 'faculty', NULL, 'Deleted faculty account of Arvin Nuñez', NULL, NULL, NULL, '2026-11-14 17:08:09'),
-(145, 1, 'Redg Abelida', 'faculty', NULL, 'Created faculty account for Arvin Nuñez (8 weekly class meetings added to their schedule)', NULL, NULL, NULL, '2026-11-14 17:08:53');
+(145, 1, 'Redg Abelida', 'faculty', NULL, 'Created faculty account for Arvin Nuñez (8 weekly class meetings added to their schedule)', NULL, NULL, NULL, '2026-11-14 17:08:53'),
+(146, 1, 'Redg Abelida', 'login', NULL, 'Signed in', NULL, NULL, NULL, '2026-11-14 19:45:31'),
+(147, 1, 'Redg Abelida', 'settings', 'settings', 'Updated arbitration rules: current semester, semester dates, extensions per loan, booking hours, booking ahead limit, same-day grace, cancellation cutoff, booking lengths', NULL, NULL, NULL, '2026-11-14 19:45:57'),
+(148, 1, 'Redg Abelida', 'settings', 'settings', 'Updated arbitration rules: semester dates', NULL, NULL, NULL, '2026-11-14 19:46:04'),
+(149, 1, 'Redg Abelida', 'login', NULL, 'Signed in', NULL, NULL, NULL, '2026-11-15 10:17:37'),
+(150, 1, 'Redg Abelida', 'equipment', NULL, 'Saved the Google Sheets link for the Equipment Inventory import', NULL, NULL, NULL, '2026-11-15 14:42:49'),
+(151, 1, 'Redg Abelida', 'equipment', NULL, 'Synced the equipment inventory from Google Sheets (0 added, 270 updated, 0 archived)', NULL, NULL, NULL, '2026-11-15 14:48:05'),
+(152, 1, 'Redg Abelida', 'equipment', NULL, 'Saved the Google Sheets link for the Equipment Inventory import', NULL, NULL, NULL, '2026-11-15 15:17:36'),
+(153, 1, 'Redg Abelida', 'equipment', NULL, 'Saved the Google Sheets link for the Equipment Inventory import', NULL, NULL, NULL, '2026-11-15 15:28:52'),
+(154, 1, 'Redg Abelida', 'login', NULL, 'Signed in', NULL, NULL, NULL, '2026-11-15 16:31:40'),
+(155, 1, 'Redg Abelida', 'equipment', NULL, 'Saved the Google Sheets link for the Equipment Inventory import', NULL, NULL, NULL, '2026-11-15 16:32:16'),
+(156, 1, 'Redg Abelida', 'login', NULL, 'Signed in', NULL, NULL, NULL, '2026-11-15 16:37:34'),
+(157, 1, 'Redg Abelida', 'equipment', NULL, 'Saved the Google Sheets link for the Equipment Inventory import', NULL, NULL, NULL, '2026-11-15 16:37:54'),
+(158, 1, 'Redg Abelida', 'login', NULL, 'Signed in', NULL, NULL, NULL, '2026-11-15 17:03:52'),
+(159, 1, 'Redg Abelida', 'equipment', NULL, 'Saved the Google Sheets link for the Equipment Inventory import', NULL, NULL, NULL, '2026-11-15 17:04:14'),
+(160, 1, 'Redg Abelida', 'login', NULL, 'Signed in', NULL, NULL, NULL, '2026-11-15 17:12:37'),
+(161, 1, 'Redg Abelida', 'equipment', NULL, 'Saved the Google Sheets link for the Equipment Inventory import', NULL, NULL, NULL, '2026-11-15 17:13:20'),
+(162, 1, 'Redg Abelida', 'login', NULL, 'Signed in', NULL, NULL, NULL, '2026-11-15 17:16:35'),
+(163, 1, 'Redg Abelida', 'equipment', NULL, 'Disconnected the Google Sheets integration.', NULL, NULL, NULL, '2026-11-15 17:26:37'),
+(164, 1, 'Redg Abelida', 'equipment', NULL, 'Saved the Google Sheets link for the Equipment Inventory import', NULL, NULL, NULL, '2026-11-15 17:26:56'),
+(165, 1, 'Redg Abelida', 'login', NULL, 'Signed in', NULL, NULL, NULL, '2026-11-15 17:27:42'),
+(166, 1, 'Redg Abelida', 'equipment', NULL, 'Disconnected the Google Sheets integration.', NULL, NULL, NULL, '2026-11-15 17:28:23'),
+(167, 1, 'Redg Abelida', 'equipment', NULL, 'Saved the Google Sheets link for the Equipment Inventory import', NULL, NULL, NULL, '2026-11-15 17:29:43'),
+(168, 1, 'Redg Abelida', 'login', NULL, 'Signed in', NULL, NULL, NULL, '2026-11-15 17:35:38'),
+(169, 1, 'Redg Abelida', 'equipment', NULL, 'Disconnected the Google Sheets integration.', NULL, NULL, NULL, '2026-11-15 17:36:04'),
+(170, 1, 'Redg Abelida', 'equipment', NULL, 'Saved the Google Sheets link for the Equipment Inventory import', NULL, NULL, NULL, '2026-11-15 17:36:26'),
+(171, 1, 'Redg Abelida', 'equipment', NULL, 'Added the equipment category \"Chem Lab\"', NULL, NULL, NULL, '2026-11-15 17:43:29'),
+(172, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Alcohol Lamp', NULL, NULL, NULL, '2026-11-15 17:44:26'),
+(173, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Alcohol Lamp', NULL, NULL, NULL, '2026-11-15 18:09:40'),
+(174, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Alcohol Lamp', NULL, NULL, NULL, '2026-11-15 18:20:21'),
+(175, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Alcohol Lamp', NULL, NULL, NULL, '2026-11-15 18:31:04'),
+(176, 1, 'Redg Abelida', 'equipment', NULL, 'Saved the Google Sheets link for the Equipment Inventory import', NULL, NULL, NULL, '2026-11-15 19:04:25'),
+(177, 1, 'Redg Abelida', 'equipment', NULL, 'Synced the equipment inventory from Google Sheets (0 added, 270 updated, 0 archived)', NULL, NULL, NULL, '2026-11-15 19:04:37'),
+(178, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Alcohol Lamp', NULL, NULL, NULL, '2026-11-15 19:06:13'),
+(179, 1, 'Redg Abelida', 'equipment', NULL, 'Synced the equipment inventory from Google Sheets (1 added, 269 updated, 1 archived)', NULL, NULL, NULL, '2026-11-15 20:45:13'),
+(180, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Alcohol Lamp', NULL, NULL, NULL, '2026-11-15 20:47:54'),
+(181, 1, 'Redg Abelida', 'equipment', NULL, 'Synced the equipment inventory from Google Sheets (0 added, 270 updated, 0 archived)', NULL, NULL, NULL, '2026-11-15 21:54:28'),
+(182, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Alcohol Lamp', NULL, NULL, NULL, '2026-11-15 21:55:41'),
+(183, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Alcohol Lamp', NULL, NULL, NULL, '2026-11-15 21:57:02'),
+(184, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Smart TV (Touch Screen)', NULL, NULL, NULL, '2026-11-15 22:04:33'),
+(185, 1, 'Redg Abelida', 'equipment', NULL, 'Synced the equipment inventory from Google Sheets (0 added, 270 updated, 0 archived)', NULL, NULL, NULL, '2026-11-15 22:36:17'),
+(186, 1, 'Redg Abelida', 'equipment', NULL, 'Added equipment: Toothbrush', NULL, NULL, NULL, '2026-11-15 22:55:16'),
+(187, 1, 'Redg Abelida', 'equipment', NULL, 'Synced the equipment inventory from Google Sheets (0 added, 271 updated, 0 archived)', NULL, NULL, NULL, '2026-11-15 23:18:22'),
+(188, 1, 'Redg Abelida', 'equipment', NULL, 'Synced the equipment inventory from Google Sheets (0 added, 271 updated, 0 archived)', NULL, NULL, NULL, '2026-11-15 23:22:45'),
+(189, 1, 'Redg Abelida', 'equipment', NULL, 'Added the equipment category \"Computer Laboratories\"', NULL, NULL, NULL, '2026-11-15 23:23:48'),
+(190, 1, 'Redg Abelida', 'equipment', NULL, 'Added the equipment category \"Audio-Visual Equipment\"', NULL, NULL, NULL, '2026-11-15 23:23:58'),
+(191, 1, 'Redg Abelida', 'equipment', NULL, 'Added the equipment category \"Ventilation\"', NULL, NULL, NULL, '2026-11-15 23:24:07'),
+(192, 1, 'Redg Abelida', 'equipment', NULL, 'Added the equipment category \"Fire Extinguisher\"', NULL, NULL, NULL, '2026-11-15 23:24:16'),
+(193, 1, 'Redg Abelida', 'equipment', NULL, 'Deleted the equipment category \"Fire Extinguisher\"', NULL, NULL, NULL, '2026-11-15 23:24:29'),
+(194, 1, 'Redg Abelida', 'equipment', NULL, 'Added the equipment category \"Software List\"', NULL, NULL, NULL, '2026-11-15 23:24:34'),
+(195, 1, 'Redg Abelida', 'equipment', NULL, 'Added the equipment category \"Offices Inventory\"', NULL, NULL, NULL, '2026-11-15 23:24:44'),
+(196, 1, 'Redg Abelida', 'equipment', NULL, 'Synced the equipment inventory from Google Sheets (0 added, 271 updated, 0 archived)', NULL, NULL, NULL, '2026-11-15 23:25:05'),
+(197, 1, 'Redg Abelida', 'equipment', NULL, 'Restored equipment: AC Remote', NULL, NULL, NULL, '2026-11-16 09:43:51'),
+(198, 1, 'Redg Abelida', 'request', 'request_declined', 'Declined request #75: Air Compressor for Stephen Perez', 'request', 75, NULL, '2026-11-16 10:20:45');
 
 -- --------------------------------------------------------
 
@@ -272,10 +326,20 @@ INSERT INTO `tbl_arbitration_config` (`id`, `config_key`, `config_value`, `updat
 (6, 'rule_overdue_block_enabled', '0', '2026-11-09 10:20:53'),
 (7, 'rule_duplicate_block_enabled', '0', '2026-11-09 10:20:53'),
 (8, 'rule_missing_doc_block_enabled', '0', '2026-11-09 10:20:53'),
-(10, 'max_borrow_days', '3', '2026-11-09 10:20:53'),
+(10, 'max_borrow_days', '1', '2026-11-09 10:20:53'),
 (11, 'max_items_per_borrower', '3', '2026-11-09 10:20:53'),
 (12, 'low_stock_threshold', '2', '2026-11-09 10:20:53'),
-(13, 'auto_approve_timeout_minutes', '1', '2026-11-09 10:20:53');
+(13, 'auto_approve_timeout_minutes', '1', '2026-11-09 10:20:53'),
+(24, 'semester_name', 'first', '2026-11-14 19:45:57'),
+(25, 'semester_start', '2026-09-01', '2026-11-14 19:45:57'),
+(26, 'semester_end', '2027-12-17', '2026-11-14 19:46:04'),
+(27, 'max_extensions', '2', '2026-11-14 19:45:57'),
+(28, 'equip_day_start', '07:00', '2026-11-14 19:45:57'),
+(29, 'equip_day_end', '21:00', '2026-11-14 19:45:57'),
+(30, 'equip_max_advance_days', '14', '2026-11-14 19:45:57'),
+(31, 'equip_immediate_grace_min', '15', '2026-11-14 19:45:57'),
+(32, 'equip_cancel_cutoff_min', '60', '2026-11-14 19:45:57'),
+(33, 'equip_durations', '1,2,3,6', '2026-11-14 19:45:57');
 
 -- --------------------------------------------------------
 
@@ -321,7 +385,13 @@ INSERT INTO `tbl_arbitration_log` (`id`, `request_id`, `borrower_id`, `borrower_
 (61, 67, 'FA0011BN2026', 'Stephen Perez', 'Active Speakers', 'Returned', 'manual_return', 'Equipment returned manually by an administrator.', 'Redg Abelida', 1, 'Condition: Good', NULL, '2026-11-13 05:52:37'),
 (70, 68, 'FA0011BN2026', 'Stephen Perez', 'Active Speakers', 'Returned', 'manual_return', 'Equipment returned manually by an administrator.', 'Redg Abelida', 1, 'Condition: Good', NULL, '2026-11-13 06:03:35'),
 (73, 69, 'FA0011BN2026', 'Stephen Perez', 'Unterrupted Power Supply', 'Returned', 'manual_return', 'Equipment returned manually by an administrator.', 'Redg Abelida', 1, 'Condition: Good', NULL, '2026-11-13 06:33:15'),
-(76, 70, 'FA0011BN2026', 'Stephen Perez', 'Unterrupted Power Supply', 'Returned', 'manual_return', 'Equipment returned manually by an administrator.', 'Redg Abelida', 1, 'Condition: Good', NULL, '2026-11-13 06:35:32');
+(76, 70, 'FA0011BN2026', 'Stephen Perez', 'Unterrupted Power Supply', 'Returned', 'manual_return', 'Equipment returned manually by an administrator.', 'Redg Abelida', 1, 'Condition: Good', NULL, '2026-11-13 06:35:32'),
+(79, 76, 'FA0011BN2026', 'Stephen Perez', 'Ammeter (30A)', 'Approved', 'rule_1_fifo', 'Approved: the equipment is free for the requested schedule.', NULL, NULL, NULL, NULL, '2026-11-16 05:01:17'),
+(80, 73, 'FA0011BN2026', 'Stephen Perez', 'Acer System Unit', 'Declined', 'rule_expired_unreviewed', 'Not reviewed before the borrow start time – automatically declined.', NULL, NULL, NULL, NULL, '2026-11-16 07:00:06'),
+(81, 74, 'FA0011BN2026', 'Stephen Perez', 'Active Speakers', 'Declined', 'rule_expired_unreviewed', 'Not reviewed before the borrow start time – automatically declined.', NULL, NULL, NULL, NULL, '2026-11-16 07:00:06'),
+(82, 77, 'FA0011BN2026', 'Stephen Perez', 'Adaptor', 'Approved', 'rule_1_fifo', 'Approved: the equipment is free for the requested schedule.', NULL, NULL, NULL, NULL, '2026-11-16 10:20:06'),
+(83, 78, 'FA0011BN2026', 'Stephen Perez', 'Ammeter (0-5A)', 'Approved', 'rule_1_fifo', 'Approved: the equipment is free for the requested schedule.', NULL, NULL, NULL, NULL, '2026-11-16 10:20:06'),
+(84, 75, 'FA0011BN2026', 'Stephen Perez', 'Air Compressor', 'Declined', 'override', 'sorry', 'Redg Abelida', 1, 'sorry', NULL, '2026-11-16 10:20:45');
 
 -- --------------------------------------------------------
 
@@ -1154,23 +1224,13 @@ CREATE TABLE `tbl_equipment_categories` (
 --
 
 INSERT INTO `tbl_equipment_categories` (`category_id`, `campus_id`, `name`, `sort_order`, `created_at`) VALUES
-(1, 1, 'Electronics and Accessories', 1, '2026-11-08 14:26:35'),
-(2, 1, 'Audio/Visual', 2, '2026-11-08 14:26:35'),
-(3, 1, 'Power', 3, '2026-11-08 14:26:35'),
-(4, 1, 'Others', 99, '2026-11-08 14:26:35'),
-(5, 2, 'Audio/Visual', 1, '2026-11-08 14:26:35'),
-(6, 2, 'Cables & Connectors', 2, '2026-11-08 14:26:35'),
-(8, 2, 'Lab Equipment', 4, '2026-11-08 14:26:35'),
-(9, 2, 'Networking', 5, '2026-11-08 14:26:35'),
-(10, 2, 'Power', 6, '2026-11-08 14:26:35'),
-(11, 2, 'Test & Measurement', 7, '2026-11-08 14:26:35'),
-(12, 2, 'Tools', 8, '2026-11-08 14:26:35'),
-(13, 2, 'Others', 99, '2026-11-08 14:26:35'),
-(14, 2, 'Robotics', 0, '2026-11-08 15:02:51'),
 (15, 2, 'Computer Laboratories', 0, '2026-11-08 16:22:55'),
 (16, 2, 'Dispensing Room', 0, '2026-11-08 16:22:56'),
 (17, 2, 'Chem Lab', 0, '2026-11-08 16:22:58'),
-(18, 2, 'Audio-Visual Equipment', 0, '2026-11-08 16:22:58');
+(18, 2, 'Audio-Visual Equipment', 0, '2026-11-08 16:22:58'),
+(1342, 1, 'Chem Lab', 0, '2026-11-15 17:43:29'),
+(1403, 1, 'Computer Laboratories', 0, '2026-11-15 23:23:48'),
+(1404, 1, 'Audio-Visual Equipment', 0, '2026-11-15 23:23:58');
 
 -- --------------------------------------------------------
 
@@ -1224,7 +1284,8 @@ CREATE TABLE `tbl_faculty_codes` (
 
 INSERT INTO `tbl_faculty_codes` (`id`, `faculty_id`, `faculty_name`, `code`, `is_used`, `used_by_name`, `used_by_id`, `created_at`, `used_at`) VALUES
 (13, 'FA0005BN2016', 'Michael Anjelo Miguel', '9e3-n6c-xb2', 1, 'Frederick Rosales', '', '2026-11-09 22:54:26', '2026-11-10 02:01:39'),
-(15, 'FA0143MN2016', 'Archie Arevalo', 'nua-jcp-npm', 0, NULL, NULL, '2026-11-10 22:45:08', NULL);
+(15, 'FA0143MN2016', 'Archie Arevalo', 'nua-jcp-npm', 0, NULL, NULL, '2026-11-10 22:45:08', NULL),
+(19, 'FA0011BN2026', 'Stephen Perez', 'xw4-c4m-6ns', 0, NULL, NULL, '2026-11-16 11:40:21', NULL);
 
 -- --------------------------------------------------------
 
@@ -1255,7 +1316,9 @@ INSERT INTO `tbl_faculty_item_codes` (`id`, `faculty_id`, `faculty_name`, `item_
 (27, 'FA0143MN2016', 'Archie Arevalo', 'Beaker (250ml)', 161, 'p6cCLWdpYbPs', 0, NULL, NULL, NULL, '2026-11-10 23:11:24'),
 (28, 'FA0005BN2016', 'Michael Anjelo Miguel', 'Active Speakers', 251, 'FqANGSEHB5Lk', 0, NULL, NULL, NULL, '2026-11-11 08:58:25'),
 (29, 'FA0005BN2016', 'Michael Anjelo Miguel', 'AC Remote', 9, 'd5qnH6BqHkNJ', 0, NULL, NULL, NULL, '2026-11-12 16:25:16'),
-(30, 'FA0005BN2016', 'Michael Anjelo Miguel', 'Acer System Unit', 79, '3V6MGFx44REx', 0, NULL, NULL, NULL, '2026-11-12 16:25:27');
+(30, 'FA0005BN2016', 'Michael Anjelo Miguel', 'Acer System Unit', 79, '3V6MGFx44REx', 0, NULL, NULL, NULL, '2026-11-12 16:25:27'),
+(31, 'FA0011BN2026', 'Stephen Perez', 'Active Speakers', 251, '5fAGrkdSajP3', 0, NULL, NULL, NULL, '2026-11-16 06:33:12'),
+(32, 'FA0011BN2026', 'Stephen Perez', 'AC Remote', 9, 'j3RuzegyMEcE', 0, NULL, NULL, NULL, '2026-11-16 11:14:37');
 
 -- --------------------------------------------------------
 
@@ -1279,7 +1342,10 @@ CREATE TABLE `tbl_faculty_notif_state` (
 INSERT INTO `tbl_faculty_notif_state` (`id`, `faculty_id`, `notif_key`, `is_read`, `is_deleted`, `updated_at`) VALUES
 (8, 'FA0011BN2026', 'reqpending-67', 1, 0, '2026-11-10 15:30:16'),
 (9, 'FA0011BN2026', 'adminnotice-3', 1, 0, '2026-11-13 05:51:29'),
-(10, 'FA0011BN2026', 'adminnotice-5', 1, 0, '2026-11-13 05:52:10');
+(10, 'FA0011BN2026', 'adminnotice-5', 1, 0, '2026-11-13 05:52:10'),
+(11, 'FA0011BN2026', 'adminnotice-2', 1, 0, '2026-11-16 11:16:41'),
+(12, 'FA0011BN2026', 'sysnotice-1', 1, 0, '2026-11-16 11:17:15'),
+(13, 'FA0011BN2026', 'sysnotice-2', 1, 0, '2026-11-16 11:17:22');
 
 -- --------------------------------------------------------
 
@@ -1452,12 +1518,12 @@ CREATE TABLE `tbl_inventory` (
 --
 
 INSERT INTO `tbl_inventory` (`item_id`, `campus_id`, `synced_from_sheet`, `item_name`, `category`, `quantity`, `condition`, `description`, `image_path`, `created_at`, `is_archived`, `is_high_value`) VALUES
-(8, 1, 0, 'HDMI Cable', 'Electronics and Accessories', 5, 'Good', NULL, 'uploads/1768426958_item_hdmicable.webp', '2026-01-15 05:42:38', 0, 0),
+(8, 1, 0, 'HDMI Cable', 'Electronics and Accessories', 5, 'Good', NULL, 'uploads/1768426958_item_hdmicable.webp', '2026-01-15 05:42:38', 1, 0),
 (9, 1, 0, 'AC Remote', 'Electronics and Accessories', 4, 'Good', NULL, 'uploads/1768427004_item_remoteAc.jpg', '2026-01-15 05:43:24', 0, 0),
-(10, 1, 0, 'Extension', 'Electronics and Accessories', 6, 'Good', NULL, 'uploads/1768427033_item_extension.webp', '2026-01-15 05:43:53', 0, 0),
-(30, 1, 0, 'Table', 'Others', 4, 'Good', NULL, 'uploads/1790901156_item_table2.jpg', '2026-10-02 08:32:36', 0, 0),
-(31, 1, 0, 'Projector', 'Audio/Visual', 3, 'Good', NULL, 'uploads/1790901270_images.jpg', '2026-10-02 08:34:30', 0, 0),
-(32, 1, 0, 'Double A Batter', 'Power', 16, 'Fair', NULL, 'uploads/1790910199_batteryAA.jpg', '2026-10-02 11:03:19', 0, 0),
+(10, 1, 0, 'Extension', 'Electronics and Accessories', 6, 'Good', NULL, 'uploads/1768427033_item_extension.webp', '2026-01-15 05:43:53', 1, 0),
+(30, 1, 0, 'Table', 'Others', 4, 'Good', NULL, 'uploads/1790901156_item_table2.jpg', '2026-10-02 08:32:36', 1, 0),
+(31, 1, 0, 'Projector', 'Audio/Visual', 3, 'Good', NULL, 'uploads/1790901270_images.jpg', '2026-10-02 08:34:30', 1, 0),
+(32, 1, 0, 'Double A Batter', 'Power', 16, 'Fair', NULL, 'uploads/1790910199_batteryAA.jpg', '2026-10-02 11:03:19', 1, 0),
 (33, 2, 1, 'Unterrupted Power Supply', 'Computer Laboratories', 30, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:55', 0, 0),
 (34, 2, 1, 'Automatic Voltage Regulator', 'Computer Laboratories', 30, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:55', 0, 0),
 (35, 2, 1, 'Data Comm Cabinet', 'Computer Laboratories', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:55', 0, 0),
@@ -1476,7 +1542,7 @@ INSERT INTO `tbl_inventory` (`item_id`, `campus_id`, `synced_from_sheet`, `item_
 (48, 2, 1, 'Camsco Ammeter (5A)', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
 (49, 2, 1, 'Ammeter (15A)', 'Dispensing Room', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
 (50, 2, 1, 'Ammeter (20A)', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
-(51, 2, 1, 'Ammeter (30A)', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(51, 2, 1, 'Ammeter (30A)', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
 (52, 2, 1, 'Nikko Denki Ammeter (30A)', 'Dispensing Room', 20, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
 (53, 2, 1, 'EDM Voltmeter (3V)', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
 (54, 2, 1, 'Voltmeter (10V)', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
@@ -1611,7 +1677,7 @@ INSERT INTO `tbl_inventory` (`item_id`, `campus_id`, `synced_from_sheet`, `item_
 (183, 2, 1, 'VE terminals', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
 (184, 2, 1, 'Tap and Die Set', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
 (185, 2, 1, 'Prism', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
-(186, 2, 1, 'Ammeter (0-100mA)', 'Dispensing Room', 4, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(186, 2, 1, 'Ammeter (0-100mA)', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
 (187, 2, 1, 'Test Tube Rack', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
 (188, 2, 1, 'L-Square', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
 (189, 2, 1, 'Saw', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
@@ -1673,7 +1739,7 @@ INSERT INTO `tbl_inventory` (`item_id`, `campus_id`, `synced_from_sheet`, `item_
 (245, 2, 1, 'Double Beam Balance', 'Chem Lab', 7, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
 (246, 2, 1, 'Fume Hood', 'Chem Lab', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
 (247, 2, 1, 'Smart TV', 'Audio-Visual Equipment', 17, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
-(248, 2, 1, 'Smart TV (Touch Screen)', 'Audio-Visual Equipment', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(248, 1, 1, 'Smart TV (Touch Screen)', 'Audio-Visual Equipment', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 1, 0),
 (249, 2, 1, 'LCD Projector', 'Audio-Visual Equipment', 6, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
 (250, 2, 1, 'Analog Audio Mixer', 'Audio-Visual Equipment', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
 (251, 2, 1, 'Active Speakers', 'Audio-Visual Equipment', 4, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
@@ -1698,7 +1764,14 @@ INSERT INTO `tbl_inventory` (`item_id`, `campus_id`, `synced_from_sheet`, `item_
 (270, 2, 1, 'pizza', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-09 09:52:52', 1, 0),
 (271, 2, 1, 'hotdog', 'Dispensing Room', 0, 'For Repair', NULL, NULL, '2026-11-09 12:58:29', 1, 0),
 (272, 2, 1, 'hotdog', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-09 13:04:40', 1, 0),
-(273, 2, 1, 'Alcohol Lamp', 'Chem Lab', 0, 'For Repair', NULL, 'uploads/default.png', '2026-11-14 18:42:13', 0, 0);
+(273, 1, 1, 'Alcohol Lamp', 'Lab Equipment', 3, 'Good', NULL, 'uploads/default.png', '2026-11-14 18:42:13', 1, 0),
+(274, 1, 1, 'Alcohol Lamp', 'Chem Lab', 3, 'Good', NULL, 'uploads/default.png', '2026-11-15 19:04:30', 1, 0),
+(275, 1, 1, 'Alcohol Lamp', 'Chem Lab', 1, 'Good', NULL, 'uploads/default.png', '2026-11-15 20:45:12', 1, 0),
+(276, 1, 1, 'Alcohol Lamp', 'Chem Lab', 3, 'Good', NULL, 'uploads/default.png', '2026-11-15 20:48:08', 1, 0),
+(277, 1, 1, 'Alcohol Lamp', 'Chem Lab', 0, 'For Repair', NULL, 'uploads/default.png', '2026-11-15 21:55:47', 1, 0),
+(278, 2, 1, 'Alcohol Lamp', 'Chem Lab', 0, 'For Repair', NULL, 'uploads/default.png', '2026-11-15 21:58:49', 0, 0),
+(279, 2, 1, 'Smart TV (Touch Screen)', 'Audio-Visual Equipment', 3, 'Good', NULL, 'uploads/default.png', '2026-11-15 22:04:40', 0, 0),
+(280, 2, 1, 'Toothbrush', 'Chem Lab', 3, 'Good', NULL, 'uploads/default.png', '2026-11-15 22:55:15', 0, 0);
 
 -- --------------------------------------------------------
 
@@ -1719,8 +1792,8 @@ CREATE TABLE `tbl_ip_login_attempts` (
 --
 
 INSERT INTO `tbl_ip_login_attempts` (`id`, `ip_address`, `fail_count`, `window_start`, `locked_until`) VALUES
-(1, '::1', 2, '2026-11-14 17:07:39', NULL),
-(19, '127.0.0.1', 1, '2026-11-09 15:36:32', NULL);
+(1, '::1', 0, '2026-11-16 12:16:02', NULL),
+(19, '127.0.0.1', 0, '2026-11-15 17:27:29', NULL);
 
 -- --------------------------------------------------------
 
@@ -1893,7 +1966,13 @@ INSERT INTO `tbl_requests` (`id`, `faculty_name`, `faculty_id`, `equipment_name`
 (67, 'Stephen Perez', 'FA0011BN2026', 'Active Speakers', 'Stephen Perez', 'Room 203Building A (Old) · 2nd Floor', '2026-11-10', '2026-11-10', NULL, NULL, '2026-11-13 05:52:37', NULL, 'Returned', '2026-11-10 15:29:13', 'Auto-approved: no admin action within the buffer time.', NULL, 'auto_approve_timeout', '', '', 'personal', '9c3fa87e-ba96-4960-aaf8-d3fc071d6372', '5a193f9913356a6330038f68408348967bf7e92ae106d2fe779017325e7bec9a', '16:00:00', '19:00:00', 1, 9, '0', 0, 0, NULL, NULL, 0, NULL),
 (68, 'Stephen Perez', 'FA0011BN2026', 'Active Speakers', 'Stephen Perez', 'Outside', '2026-11-13', '2026-11-13', NULL, NULL, '2026-11-13 06:03:35', '2026-11-13 05:58:09', 'Returned', '2026-11-13 05:53:58', 'Approved: the equipment is free for the requested schedule.', NULL, 'rule_1_fifo', '', '', 'personal', NULL, NULL, '07:00:00', '09:00:00', 1, NULL, 'today', 1, 0, NULL, NULL, 0, NULL),
 (69, 'Stephen Perez', 'FA0011BN2026', 'Unterrupted Power Supply', 'Stephen Perez', 'Room 203 · Building B (New) · 2nd Floor', '2026-11-13', '2026-11-13', NULL, NULL, '2026-11-13 06:33:15', '2026-11-13 06:33:03', 'Returned', '2026-11-13 06:32:31', 'Approved: the equipment is free for the requested schedule.', NULL, 'rule_1_fifo', '', '', 'personal', NULL, NULL, '07:00:00', '08:00:00', 3, 30, 'today', 1, 0, NULL, NULL, 0, NULL),
-(70, 'Stephen Perez', 'FA0011BN2026', 'Unterrupted Power Supply', 'Stephen Perez', 'Audio Visual Room 2 · Building A (Old) · 1st Floor', '2026-11-13', '2026-11-13', NULL, NULL, '2026-11-13 06:35:32', '2026-11-13 06:35:23', 'Returned', '2026-11-13 06:34:52', 'Approved: the equipment is free for the requested schedule.', NULL, 'rule_1_fifo', '', '', 'personal', NULL, NULL, '07:00:00', '08:00:00', 2, 99, 'today', 1, 0, NULL, NULL, 0, NULL);
+(70, 'Stephen Perez', 'FA0011BN2026', 'Unterrupted Power Supply', 'Stephen Perez', 'Audio Visual Room 2 · Building A (Old) · 1st Floor', '2026-11-13', '2026-11-13', NULL, NULL, '2026-11-13 06:35:32', '2026-11-13 06:35:23', 'Returned', '2026-11-13 06:34:52', 'Approved: the equipment is free for the requested schedule.', NULL, 'rule_1_fifo', '', '', 'personal', NULL, NULL, '07:00:00', '08:00:00', 2, 99, 'today', 1, 0, NULL, NULL, 0, NULL),
+(73, 'Stephen Perez', 'FA0011BN2026', 'Acer System Unit', 'Stephen Perez', 'Room 301 · Building C (CITE) · 3rd Floor', '2026-11-16', '2026-11-16', NULL, NULL, NULL, NULL, 'Declined', '2026-11-16 04:58:46', 'Not reviewed before the borrow start time – automatically declined.', NULL, 'rule_expired_unreviewed', '', '', 'personal', 'c4ed8a8c-6736-4e7d-a658-8cb1f9aed8cd', NULL, '07:00:00', '10:00:00', 1, 82, 'today', 0, 0, NULL, NULL, 0, NULL),
+(74, 'Stephen Perez', 'FA0011BN2026', 'Active Speakers', 'Stephen Perez', 'Room 301 · Building C (CITE) · 3rd Floor', '2026-11-16', '2026-11-16', NULL, NULL, NULL, NULL, 'Declined', '2026-11-16 04:58:46', 'Not reviewed before the borrow start time – automatically declined.', NULL, 'rule_expired_unreviewed', '', '', 'personal', 'c4ed8a8c-6736-4e7d-a658-8cb1f9aed8cd', NULL, '07:00:00', '10:00:00', 2, 82, 'today', 0, 0, NULL, NULL, 0, NULL),
+(75, 'Stephen Perez', 'FA0011BN2026', 'Air Compressor', 'Stephen Perez', 'Room 202 · Building B (New) · 2nd Floor', '2026-11-17', '2026-11-17', NULL, NULL, NULL, NULL, 'Declined', '2026-11-16 05:00:13', 'Waiting for an admin to review it. If nobody decides, it is declined automatically at 12:01 AM on the borrow date.', NULL, 'override', '', '', 'personal', NULL, NULL, '12:00:00', '15:00:00', 1, 29, 'future', 0, 0, NULL, NULL, 0, NULL),
+(76, 'Stephen Perez', 'FA0011BN2026', 'Ammeter (30A)', 'Stephen Perez', 'Room 201 · Building A (Old) · 2nd Floor', '2026-11-16', '2026-11-16', '9ce2ab7a87c607451b9003452c18e7b141be4fdd561008a063046ccfacf62fcb', '601bdcfdf6a836ad57cbef9f993308330f03bca2ce9ace9859283c0abbe9223c', NULL, NULL, 'Approved', '2026-11-16 05:01:17', 'Approved: the equipment is free for the requested schedule.', NULL, 'rule_1_fifo', '', '', 'personal', NULL, NULL, '14:00:00', '17:00:00', 1, 7, 'today', 1, 0, NULL, NULL, 0, NULL),
+(77, 'Stephen Perez', 'FA0011BN2026', 'Adaptor', 'Stephen Perez', 'Audio Visual Room 2 · Building A (Old) · 1st Floor', '2026-11-16', '2026-11-16', '6943ae5dd78a63a4e4e68bf1b4a8962a360dec3d54e657d3d23b9f389061b0e1', NULL, NULL, NULL, 'Cancelled', '2026-11-16 10:20:06', 'Not collected – the borrow period ended before it was picked up.', NULL, 'rule_no_show', '', '', 'personal', 'faaa5039-8046-4dc6-a8cd-46e0a0dc374c', '56b397ebadf990d9f6768457a2f0c035b9d3c643c8d4064a13e3531d5773e90d', '11:00:00', '13:00:00', 1, 99, 'today', 0, 0, NULL, NULL, 0, NULL),
+(78, 'Stephen Perez', 'FA0011BN2026', 'Ammeter (0-5A)', 'Stephen Perez', 'Audio Visual Room 2 · Building A (Old) · 1st Floor', '2026-11-16', '2026-11-16', '4286e475c29b4463c1d81df7a5284e719a5efc9ede8727065ee04c3bdadb9c9a', NULL, NULL, NULL, 'Cancelled', '2026-11-16 10:20:06', 'Not collected – the borrow period ended before it was picked up.', NULL, 'rule_no_show', '', '', 'personal', 'faaa5039-8046-4dc6-a8cd-46e0a0dc374c', '56b397ebadf990d9f6768457a2f0c035b9d3c643c8d4064a13e3531d5773e90d', '11:00:00', '13:00:00', 2, 99, 'today', 0, 0, NULL, NULL, 0, NULL);
 
 -- --------------------------------------------------------
 
@@ -2124,7 +2203,8 @@ INSERT INTO `tbl_room_arbitration_log` (`id`, `reservation_id`, `room_id`, `room
 (12, 12, 76, 'Room 210', 'NOTSET-275A970376E5', 'Edmundo Dela Cruz', 'Approved', 'rule_1_fifo', 'Room reservation approved — no time conflict.', '2026-10-19 08:52:51'),
 (13, 13, 76, 'Room 210', 'NOTSET-275A970376E5', 'Edmundo Dela Cruz', 'Approved', 'rule_1_fifo', 'Room reservation approved — no time conflict.', '2026-10-19 10:13:49'),
 (14, 14, 88, 'Room 308', 'NOTSET-275A970376E5', 'Edmundo Dela Cruz', 'Approved', 'rule_1_fifo', 'Facility reservation approved — no time conflict.', '2026-10-25 09:57:21'),
-(15, 15, 9, 'Room 203', 'FA0011BN2026', 'Stephen Perez', 'Approved', 'rule_1_fifo', 'Facility reservation approved — no time conflict.', '2026-11-10 15:28:39');
+(15, 15, 9, 'Room 203', 'FA0011BN2026', 'Stephen Perez', 'Approved', 'rule_1_fifo', 'Facility reservation approved — no time conflict.', '2026-11-10 15:28:39'),
+(16, 16, 99, 'Audio Visual Room 2', 'FA0011BN2026', 'Stephen Perez', 'Approved', 'rule_1_fifo', 'Facility reservation approved — no time conflict.', '2026-11-16 05:56:25');
 
 -- --------------------------------------------------------
 
@@ -2190,7 +2270,8 @@ INSERT INTO `tbl_room_reservations` (`id`, `room_id`, `faculty_id`, `faculty_nam
 (12, 76, 'NOTSET-275A970376E5', 'Edmundo Dela Cruz', 'personal', NULL, NULL, 'Lecture', 1, '2026-10-19', '10:00:00', '12:00:00', NULL, NULL, 'Cancelled', 'Room reservation approved — no time conflict.', '2026-10-19 08:52:50', '2026-10-19 08:53:21'),
 (13, 76, 'NOTSET-275A970376E5', 'Edmundo Dela Cruz', 'personal', NULL, NULL, 'Lecture', 1, '2026-10-19', '14:00:00', '17:00:00', NULL, NULL, 'Approved', 'Room reservation approved — no time conflict.', '2026-10-19 10:13:48', NULL),
 (14, 88, 'NOTSET-275A970376E5', 'Edmundo Dela Cruz', 'personal', NULL, NULL, 'Lecture', 1, '2026-10-26', '14:00:00', '17:00:00', NULL, NULL, 'Cancelled', 'Facility reservation approved — no time conflict.', '2026-10-25 09:57:21', '2026-10-25 10:43:50'),
-(15, 9, 'FA0011BN2026', 'Stephen Perez', 'personal', NULL, NULL, 'Lecture', 1, '2026-11-10', '16:00:00', '19:00:00', NULL, NULL, 'Approved', 'Facility reservation approved — no time conflict.', '2026-11-10 15:28:39', NULL);
+(15, 9, 'FA0011BN2026', 'Stephen Perez', 'personal', NULL, NULL, 'Lecture', 1, '2026-11-10', '16:00:00', '19:00:00', NULL, NULL, 'Approved', 'Facility reservation approved — no time conflict.', '2026-11-10 15:28:39', NULL),
+(16, 99, 'FA0011BN2026', 'Stephen Perez', 'personal', NULL, NULL, 'Seminar', 1, '2026-11-16', '07:00:00', '13:00:00', NULL, NULL, 'Approved', 'Facility reservation approved — no time conflict.', '2026-11-16 05:56:25', NULL);
 
 -- --------------------------------------------------------
 
@@ -2254,7 +2335,8 @@ INSERT INTO `tbl_service_survey_completions` (`source_type`, `transaction_key`, 
 ('equipment', 'request:68', 1, '2026-11-13 06:23:23'),
 ('equipment', 'request:69', 1, '2026-11-13 06:33:22'),
 ('equipment', 'request:70', 1, '2026-11-13 06:35:53'),
-('room', '15', 0, '2026-11-13 06:30:49');
+('room', '15', 0, '2026-11-13 06:30:49'),
+('room', '16', 0, '2026-11-16 13:08:11');
 
 -- --------------------------------------------------------
 
@@ -2310,7 +2392,41 @@ INSERT INTO `tbl_service_survey_periods` (`id`, `semester_start`, `semester_end`
 (7, '2026-09-01', '2027-01-08', '2026-11-24', '2026-12-07', 0, 0, 0, '2026-11-13 07:10:45'),
 (8, '2026-09-01', '2027-01-08', '2026-12-08', '2026-12-21', 0, 0, 0, '2026-11-13 07:10:45'),
 (9, '2026-09-01', '2027-01-08', '2026-12-22', '2027-01-04', 0, 0, 0, '2026-11-13 07:10:45'),
-(10, '2026-09-01', '2027-01-08', '2027-01-05', '2027-01-08', 0, 0, 0, '2026-11-13 07:10:45');
+(10, '2026-09-01', '2027-01-08', '2027-01-05', '2027-01-08', 0, 0, 0, '2026-11-13 07:10:45'),
+(161, '2026-09-01', '2027-12-17', '2026-09-01', '2026-09-14', 0, 0, 0, '2026-11-16 15:10:00'),
+(162, '2026-09-01', '2027-12-17', '2026-09-15', '2026-09-28', 0, 0, 0, '2026-11-16 15:10:01'),
+(163, '2026-09-01', '2027-12-17', '2026-09-29', '2026-10-12', 0, 0, 0, '2026-11-16 15:10:01'),
+(164, '2026-09-01', '2027-12-17', '2026-10-13', '2026-10-26', 0, 0, 0, '2026-11-16 15:10:01'),
+(165, '2026-09-01', '2027-12-17', '2026-10-27', '2026-11-09', 0, 0, 0, '2026-11-16 15:10:01'),
+(166, '2026-09-01', '2027-12-17', '2026-11-10', '2026-11-23', 0, 0, 0, '2026-11-16 15:10:01'),
+(167, '2026-09-01', '2027-12-17', '2026-11-24', '2026-12-07', 0, 0, 0, '2026-11-16 15:10:01'),
+(168, '2026-09-01', '2027-12-17', '2026-12-08', '2026-12-21', 0, 0, 0, '2026-11-16 15:10:01'),
+(169, '2026-09-01', '2027-12-17', '2026-12-22', '2027-01-04', 0, 0, 0, '2026-11-16 15:10:01'),
+(170, '2026-09-01', '2027-12-17', '2027-01-05', '2027-01-18', 0, 0, 0, '2026-11-16 15:10:01'),
+(171, '2026-09-01', '2027-12-17', '2027-01-19', '2027-02-01', 0, 0, 0, '2026-11-16 15:10:01'),
+(172, '2026-09-01', '2027-12-17', '2027-02-02', '2027-02-15', 0, 0, 0, '2026-11-16 15:10:01'),
+(173, '2026-09-01', '2027-12-17', '2027-02-16', '2027-03-01', 0, 0, 0, '2026-11-16 15:10:01'),
+(174, '2026-09-01', '2027-12-17', '2027-03-02', '2027-03-15', 0, 0, 0, '2026-11-16 15:10:01'),
+(175, '2026-09-01', '2027-12-17', '2027-03-16', '2027-03-29', 0, 0, 0, '2026-11-16 15:10:01'),
+(176, '2026-09-01', '2027-12-17', '2027-03-30', '2027-04-12', 0, 0, 0, '2026-11-16 15:10:01'),
+(177, '2026-09-01', '2027-12-17', '2027-04-13', '2027-04-26', 0, 0, 0, '2026-11-16 15:10:01'),
+(178, '2026-09-01', '2027-12-17', '2027-04-27', '2027-05-10', 0, 0, 0, '2026-11-16 15:10:01'),
+(179, '2026-09-01', '2027-12-17', '2027-05-11', '2027-05-24', 0, 0, 0, '2026-11-16 15:10:01'),
+(180, '2026-09-01', '2027-12-17', '2027-05-25', '2027-06-07', 0, 0, 0, '2026-11-16 15:10:01'),
+(181, '2026-09-01', '2027-12-17', '2027-06-08', '2027-06-21', 0, 0, 0, '2026-11-16 15:10:01'),
+(182, '2026-09-01', '2027-12-17', '2027-06-22', '2027-07-05', 0, 0, 0, '2026-11-16 15:10:01'),
+(183, '2026-09-01', '2027-12-17', '2027-07-06', '2027-07-19', 0, 0, 0, '2026-11-16 15:10:01'),
+(184, '2026-09-01', '2027-12-17', '2027-07-20', '2027-08-02', 0, 0, 0, '2026-11-16 15:10:01'),
+(185, '2026-09-01', '2027-12-17', '2027-08-03', '2027-08-16', 0, 0, 0, '2026-11-16 15:10:01'),
+(186, '2026-09-01', '2027-12-17', '2027-08-17', '2027-08-30', 0, 0, 0, '2026-11-16 15:10:01'),
+(187, '2026-09-01', '2027-12-17', '2027-08-31', '2027-09-13', 0, 0, 0, '2026-11-16 15:10:01'),
+(188, '2026-09-01', '2027-12-17', '2027-09-14', '2027-09-27', 0, 0, 0, '2026-11-16 15:10:01'),
+(189, '2026-09-01', '2027-12-17', '2027-09-28', '2027-10-11', 0, 0, 0, '2026-11-16 15:10:01'),
+(190, '2026-09-01', '2027-12-17', '2027-10-12', '2027-10-25', 0, 0, 0, '2026-11-16 15:10:01'),
+(191, '2026-09-01', '2027-12-17', '2027-10-26', '2027-11-08', 0, 0, 0, '2026-11-16 15:10:01'),
+(192, '2026-09-01', '2027-12-17', '2027-11-09', '2027-11-22', 0, 0, 0, '2026-11-16 15:10:01'),
+(193, '2026-09-01', '2027-12-17', '2027-11-23', '2027-12-06', 0, 0, 0, '2026-11-16 15:10:01'),
+(194, '2026-09-01', '2027-12-17', '2027-12-07', '2027-12-17', 0, 0, 0, '2026-11-16 15:10:01');
 
 -- --------------------------------------------------------
 
@@ -2381,10 +2497,10 @@ CREATE TABLE `tbl_sync_config` (
 --
 
 INSERT INTO `tbl_sync_config` (`config_key`, `value`, `updated_at`) VALUES
-('gsheet_last_modified', '2026-11-09T05:10:03.032Z', '2026-11-09 13:10:08'),
-('gsheet_last_sync', '2026-11-14 12:04:12', '2026-11-14 19:04:12'),
+('gsheet_last_modified', '2026-11-15T14:55:18.998Z', '2026-11-15 22:55:21'),
+('gsheet_last_sync', '2026-11-15 16:25:05', '2026-11-15 23:25:05'),
 ('gsheet_sync_enabled', '0', '2026-11-08 16:09:50'),
-('gsheet_url', 'https://docs.google.com/spreadsheets/d/1Dw6HiLwXKIS8hZI0VVFOh4awDzPi4KEy/edit?gid=1579991349#gid=1579991349', '2026-11-11 15:48:41');
+('gsheet_url', 'https://docs.google.com/spreadsheets/d/1EYyWGgDsMwYSQIGQG_dZD5cwsWn0daJTLCItmkMvpBs/edit?gid=1579991349#gid=1579991349', '2026-11-15 19:04:24');
 
 -- --------------------------------------------------------
 
@@ -2410,6 +2526,7 @@ CREATE TABLE `tbl_users` (
   `fullname` varchar(255) NOT NULL,
   `faculty_id` varchar(255) NOT NULL,
   `email` varchar(255) NOT NULL,
+  `backup_email` varchar(255) DEFAULT NULL,
   `password` varchar(255) NOT NULL,
   `last_password_change` datetime DEFAULT NULL,
   `profile_picture` varchar(255) DEFAULT NULL,
@@ -2422,14 +2539,14 @@ CREATE TABLE `tbl_users` (
 -- Dumping data for table `tbl_users`
 --
 
-INSERT INTO `tbl_users` (`fullname`, `faculty_id`, `email`, `password`, `last_password_change`, `profile_picture`, `department`, `role`, `must_change_password`) VALUES
-('Indaleen Quinsayas', 'FA0002BN2016', 'indaleen.quinsayas@pupsync.edu', '$2y$10$oUbLCC9dtNYPFxcvkvcbtOrmsdae1iiw1IGenLcfrWZo5CSyvlf1C', NULL, NULL, NULL, 'Regular Faculty', 0),
-('Michael Anjelo Miguel', 'FA0005BN2016', 'michael.miguel@pupsync.edu', '$2y$10$cDg6QolF.l2mGo3v43go3e/fpglvD0WfWTxv3ifoAJ95wtEH4FGpC', NULL, NULL, NULL, 'Regular Faculty', 0),
-('Arvin Nuñez', 'FA0005BN2026', 'arvin.nunez@pupsync.edu', '$2y$10$sU.v4llfJcWRZcx8QvFSYuOx3lJJH51TrkJ1TLNB/ID0IXCZaPmPO', '2026-11-14 17:09:34', NULL, 'Department of Information Technology/Computing', 'Regular Faculty', 0),
-('Aaron Atienza', 'FA0006BN2024', 'aaron.atienza@pupsync.edu', '$2y$10$jhe4/CMvTgDYHbnB1XKaC.6NVO.di7gcuIk8cyQ8osmDIV.9uNs1.', NULL, NULL, NULL, 'Regular Faculty', 0),
-('Edmundo Dela Cruz', 'FA0008BN2023', 'edmundo.delacruz@pupsync.edu', '$2y$10$XdcZ7CBLZ6CvgSQtQ.oh0.S9VH91QWzR08IJLQexx4SMvgR5Bzl3S', NULL, NULL, NULL, 'Regular Faculty', 0),
-('Stephen Perez', 'FA0011BN2026', 'stephen.perez@pupsync.edu', '$2y$10$YjDFkqM4Ap0nQguCXFhcAOcUmLbEiEVLxE18CItSQEiBolMyVTunK', NULL, NULL, NULL, 'Regular Faculty', 0),
-('Archie Arevalo', 'FA0143MN2016', 'archie.arevalo@pupsync.edu', '$2y$10$uvhw5DCm0BaZaRQkO9nR2ezH.IsY7uXqGUqcWALfSpDf3eSobffcq', '2026-11-10 22:25:09', NULL, 'Department of General Education & Social Sciences', 'Regular Faculty', 0);
+INSERT INTO `tbl_users` (`fullname`, `faculty_id`, `email`, `backup_email`, `password`, `last_password_change`, `profile_picture`, `department`, `role`, `must_change_password`) VALUES
+('Indaleen Quinsayas', 'FA0002BN2016', 'indaleen.quinsayas@pupsync.edu', NULL, '$2y$10$oUbLCC9dtNYPFxcvkvcbtOrmsdae1iiw1IGenLcfrWZo5CSyvlf1C', NULL, NULL, NULL, 'Regular Faculty', 0),
+('Michael Anjelo Miguel', 'FA0005BN2016', 'michael.miguel@pupsync.edu', NULL, '$2y$10$cDg6QolF.l2mGo3v43go3e/fpglvD0WfWTxv3ifoAJ95wtEH4FGpC', NULL, NULL, NULL, 'Regular Faculty', 0),
+('Arvin Nuñez', 'FA0005BN2026', 'arvin.nunez@pupsync.edu', NULL, '$2y$10$sU.v4llfJcWRZcx8QvFSYuOx3lJJH51TrkJ1TLNB/ID0IXCZaPmPO', '2026-11-14 17:09:34', NULL, 'Department of Information Technology/Computing', 'Regular Faculty', 0),
+('Aaron Atienza', 'FA0006BN2024', 'aaron.atienza@pupsync.edu', NULL, '$2y$10$jhe4/CMvTgDYHbnB1XKaC.6NVO.di7gcuIk8cyQ8osmDIV.9uNs1.', NULL, NULL, NULL, 'Regular Faculty', 0),
+('Edmundo Dela Cruz', 'FA0008BN2023', 'edmundo.delacruz@pupsync.edu', NULL, '$2y$10$XdcZ7CBLZ6CvgSQtQ.oh0.S9VH91QWzR08IJLQexx4SMvgR5Bzl3S', NULL, NULL, NULL, 'Regular Faculty', 0),
+('Stephen Perez', 'FA0011BN2026', 'stephen.perez@pupsync.edu', NULL, '$2y$10$YjDFkqM4Ap0nQguCXFhcAOcUmLbEiEVLxE18CItSQEiBolMyVTunK', NULL, NULL, 'Department of Information Technology/Computing; Department of Engineering Technology / Technical Programs', 'Regular Faculty', 0),
+('Archie Arevalo', 'FA0143MN2016', 'archie.arevalo@pupsync.edu', 'archiearevalo@gmail.com', '$2y$10$uvhw5DCm0BaZaRQkO9nR2ezH.IsY7uXqGUqcWALfSpDf3eSobffcq', '2026-11-10 22:25:09', NULL, 'Department of General Education & Social Sciences', 'Regular Faculty', 0);
 
 --
 -- Indexes for dumped tables
@@ -2748,7 +2865,7 @@ ALTER TABLE `tbl_accounts`
 -- AUTO_INCREMENT for table `tbl_admin_activity`
 --
 ALTER TABLE `tbl_admin_activity`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=146;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=199;
 
 --
 -- AUTO_INCREMENT for table `tbl_ai_chat_log`
@@ -2760,13 +2877,13 @@ ALTER TABLE `tbl_ai_chat_log`
 -- AUTO_INCREMENT for table `tbl_arbitration_config`
 --
 ALTER TABLE `tbl_arbitration_config`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=24;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=34;
 
 --
 -- AUTO_INCREMENT for table `tbl_arbitration_log`
 --
 ALTER TABLE `tbl_arbitration_log`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=79;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=85;
 
 --
 -- AUTO_INCREMENT for table `tbl_buildings`
@@ -2790,7 +2907,7 @@ ALTER TABLE `tbl_class_schedule`
 -- AUTO_INCREMENT for table `tbl_equipment_categories`
 --
 ALTER TABLE `tbl_equipment_categories`
-  MODIFY `category_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=942;
+  MODIFY `category_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1413;
 
 --
 -- AUTO_INCREMENT for table `tbl_faculty_admin_notice`
@@ -2802,19 +2919,19 @@ ALTER TABLE `tbl_faculty_admin_notice`
 -- AUTO_INCREMENT for table `tbl_faculty_codes`
 --
 ALTER TABLE `tbl_faculty_codes`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
 
 --
 -- AUTO_INCREMENT for table `tbl_faculty_item_codes`
 --
 ALTER TABLE `tbl_faculty_item_codes`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=31;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=33;
 
 --
 -- AUTO_INCREMENT for table `tbl_faculty_notif_state`
 --
 ALTER TABLE `tbl_faculty_notif_state`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
 
 --
 -- AUTO_INCREMENT for table `tbl_faculty_registry`
@@ -2832,7 +2949,7 @@ ALTER TABLE `tbl_faculty_registry_files`
 -- AUTO_INCREMENT for table `tbl_inventory`
 --
 ALTER TABLE `tbl_inventory`
-  MODIFY `item_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=274;
+  MODIFY `item_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=281;
 
 --
 -- AUTO_INCREMENT for table `tbl_ip_login_attempts`
@@ -2868,7 +2985,7 @@ ALTER TABLE `tbl_notif_state`
 -- AUTO_INCREMENT for table `tbl_requests`
 --
 ALTER TABLE `tbl_requests`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=71;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=79;
 
 --
 -- AUTO_INCREMENT for table `tbl_request_events`
@@ -2892,7 +3009,7 @@ ALTER TABLE `tbl_rooms_import_files`
 -- AUTO_INCREMENT for table `tbl_room_arbitration_log`
 --
 ALTER TABLE `tbl_room_arbitration_log`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
 
 --
 -- AUTO_INCREMENT for table `tbl_room_issues`
@@ -2904,7 +3021,7 @@ ALTER TABLE `tbl_room_issues`
 -- AUTO_INCREMENT for table `tbl_room_reservations`
 --
 ALTER TABLE `tbl_room_reservations`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
 
 --
 -- AUTO_INCREMENT for table `tbl_room_waitlist`
@@ -2922,7 +3039,7 @@ ALTER TABLE `tbl_service_survey_comments`
 -- AUTO_INCREMENT for table `tbl_service_survey_periods`
 --
 ALTER TABLE `tbl_service_survey_periods`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=31;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=229;
 
 --
 -- AUTO_INCREMENT for table `tbl_service_survey_questions`
