@@ -16,9 +16,9 @@
     var DISMISS_KEY  = 'ps_push_dismissed';
     var DISMISS_DAYS = 7;
 
-    var _oneSignal   = null;   // set once the SDK resolves
+    var _oneSignal = null;
 
-    // Wait for DOM before doing anything
+    // Wait for DOM before wiring buttons
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', onReady);
     } else {
@@ -26,7 +26,7 @@
     }
 
     function onReady() {
-        // Wire up "Maybe later" immediately — no SDK needed
+        // Wire up "Maybe later" — no SDK needed
         var later = document.getElementById('psPushLater');
         if (later) {
             later.addEventListener('click', function () {
@@ -35,7 +35,7 @@
             });
         }
 
-        // Wire up "Allow" immediately — calls SDK when clicked
+        // Wire up "Allow" — calls SDK when clicked
         var allow = document.getElementById('psPushAllow');
         if (allow) {
             allow.addEventListener('click', function () {
@@ -43,13 +43,12 @@
                 if (_oneSignal) {
                     doSubscribe(_oneSignal);
                 } else {
-                    // SDK not ready yet — wait for it
                     window._psPushPendingAllow = true;
                 }
             });
         }
 
-        // Check if we should show the modal at all
+        // Decide whether to show the modal
         var permission = (typeof Notification !== 'undefined') ? Notification.permission : 'denied';
         if (permission === 'denied') {
             removeSub();
@@ -62,40 +61,32 @@
             showModal();
         }
 
-        // Only load the SDK if push is supported
+        // SDK is already loaded via <script> tag in HTML — initialise it
         if (!('serviceWorker' in navigator) || !('PushManager' in window) || !APP_ID) return;
 
-        var script   = document.createElement('script');
-        script.src   = 'https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js';
-        script.async = true;
-        script.onload = function () {
-            window.OneSignalDeferred = window.OneSignalDeferred || [];
-            window.OneSignalDeferred.push(function (OneSignal) {
-                OneSignal.init({
-                    appId: APP_ID,
-                    serviceWorkerParam: { scope: '/' },
-                    notifyButton:  { enable: false },
-                    promptOptions: { slidedown: { enabled: false } },
-                }).then(function () {
-                    _oneSignal = OneSignal;
+        window.OneSignalDeferred = window.OneSignalDeferred || [];
+        window.OneSignalDeferred.push(function (OneSignal) {
+            OneSignal.init({
+                appId: APP_ID,
+                serviceWorkerParam: { scope: '/' },
+                notifyButton:  { enable: false },
+                promptOptions: { slidedown: { enabled: false } },
+            }).then(function () {
+                _oneSignal = OneSignal;
 
-                    // If the user already clicked Allow before the SDK loaded
-                    if (window._psPushPendingAllow) {
-                        window._psPushPendingAllow = false;
-                        doSubscribe(OneSignal);
-                        return;
-                    }
+                if (window._psPushPendingAllow) {
+                    window._psPushPendingAllow = false;
+                    doSubscribe(OneSignal);
+                    return;
+                }
 
-                    // If already granted, subscribe silently
-                    if (Notification.permission === 'granted') {
-                        doSubscribe(OneSignal);
-                    }
-                }).catch(function (e) {
-                    console.error('[PUPSync push] Init error:', e);
-                });
+                if (Notification.permission === 'granted') {
+                    doSubscribe(OneSignal);
+                }
+            }).catch(function (e) {
+                console.error('[PUPSync push] Init error:', e);
             });
-        };
-        document.head.appendChild(script);
+        });
     }
 
     function showModal() {

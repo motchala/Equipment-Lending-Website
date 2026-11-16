@@ -19,6 +19,9 @@
         window.PS_PUSH_APP_ID = '<?php echo htmlspecialchars(trim((string)($_ENV['ONESIGNAL_APP_ID'] ?? '')), ENT_QUOTES); ?>';
         window.PS_CSRF_TOKEN  = '<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES); ?>';
     </script>
+    <?php if (!empty(trim((string)($_ENV['ONESIGNAL_APP_ID'] ?? '')))): ?>
+    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" nonce="<?php echo $csp_nonce; ?>"></script>
+    <?php endif; ?>
     <script src="shared/assets/js/push-init.js?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/js/push-init.js'); ?>"></script>
 
 
