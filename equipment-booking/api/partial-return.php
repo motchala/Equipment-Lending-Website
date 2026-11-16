@@ -14,8 +14,12 @@ if (empty($_SESSION['admin']) || $_SESSION['admin'] !== true) {
 require_once __DIR__ . '/../../config/csrf.php';
 $csrf = $_POST['csrf_token'] ?? '';
 if (!isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $csrf)) {
-    die('Invalid session token. Please go back and try again.');
+    header('Content-Type: application/json');
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'Invalid session token. Please refresh the page and try again.']);
+    exit;
 }
+
 
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../shared/core/activity-logger.php';
@@ -34,7 +38,10 @@ $item_tokens = (array)($_POST['item_token'] ?? []);  // [request_id => return_to
 const VALID_CONDITIONS = ['Good', 'Fair', 'Damaged', 'Missing'];
 
 if ($token === '') {
-    die('No token provided.');
+    header('Content-Type: application/json');
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'No token provided.']);
+    exit;
 }
 
 $returned = 0;
