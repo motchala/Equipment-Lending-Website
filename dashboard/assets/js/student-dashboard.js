@@ -37,6 +37,9 @@
     var ROOM_END_MIN = 20 * 60;               /* rooms close at 8:00 PM */
     var ROOM_STEP_MIN = 30;                   /* start times every 30 minutes */
     var ROOM_DURATIONS = [60, 120, 180, 360]; /* 1 / 2 / 3 / 6 hours */
+    var TL_START_MIN = 7 * 60;                /* availability bar runs 7 AM ... */
+    var TL_END_MIN = 20 * 60;                 /* ... to 8 PM (same as the faculty form) */
+    var TL_TICKS = [[7, '7 AM'], [10, '10 AM'], [13, '1 PM'], [16, '4 PM'], [20, '8 PM']];
     var DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     var QR_SRC = 'https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js';
     var RECEIPT_KEY = 'pup_last_receipt';
@@ -49,7 +52,8 @@
         borrowRules: 'equipment-booking/api/borrow-rules.php',
         borrow: 'equipment-booking/api/submit-student-borrow.php',
         itemBorrow: 'equipment-booking/api/submit-item-borrow.php',
-        reserve: 'room-reservation/api/submit-student-reserve.php'
+        reserve: 'room-reservation/api/submit-student-reserve.php',
+        roomSchedule: 'room-reservation/api/student-room-schedule.php'
     };
 
     /* ── Small helpers ───────────────────────────────────────── */
@@ -1140,6 +1144,8 @@
     /* ── Reservation inputs (same fields and rules as the faculty reservation form) ──
        Date: Today / Tomorrow chips + date picker (Sundays skipped) · Start time: every 30 min ·
        Duration 1/2/3/6 h, or the gear for a custom whole-hour End time · Purpose: chips + "Other" */
+    var resDay = { key: '', blocks: null, state: 'loading' };   /* the room's blocked time for the chosen date */
+    var resDayCache = {};                                       /* 'roomId|date' -> { at, blocks } (kept for a minute) */
     var resState = null;   /* { date, start, end (minutes; start is null when no time is left today), custom, other, purpose } */
 
     function isClosedDay(d) { return d.getDay() === 0; }
@@ -1159,6 +1165,92 @@
         Array.prototype.forEach.call(box.querySelectorAll('.st-chip'), function (c) {
             c.setAttribute('aria-pressed', test(c) ? 'true' : 'false');
         });
+    }
+
+    /* ── Availability bar (thin version of the faculty form's "Room schedule" timeline) ──
+       Open time is green, classes and approved reservations are hatched, the chosen time is the outlined box. */
+    function tlPct(m) { return Math.max(0, Math.min(100, (m - TL_START_MIN) / (TL_END_MIN - TL_START_MIN) * 100)); }
+
+    function tlHTML() {
+        return '<div class="st-tl" id="reserveTl">' +
+            '<div class="st-tl-head"><span>Room availability &middot; <strong id="reserveTlDay"></strong></span>' +
+            '<span class="st-tl-legend"><i class="st-tl-key is-free"></i>Free<i class="st-tl-key is-busy"></i>Booked<i class="st-tl-key is-pick"></i>Yours</span></div>' +
+            '<div class="st-tl-bar" role="img" aria-label="Room availability for the chosen day">' +
+            '<div class="st-tl-track" id="reserveTlTrack"></div><div class="st-tl-pick" id="reserveTlPick" hidden></div></div>' +
+            '<div class="st-tl-ticks" aria-hidden="true">' +
+            TL_TICKS.map(function (t) { return '<span data-pos="' + tlPct(t[0] * 60) + '">' + t[1] + '</span>'; }).join('') + '</div>' +
+            '<p class="st-tl-note" id="reserveTlNote" aria-live="polite"></p></div>';
+    }
+
+    function tlPlaceTicks() {
+        Array.prototype.forEach.call(document.querySelectorAll('#reserveTl .st-tl-ticks span'), function (el) {
+            el.style.left = el.getAttribute('data-pos') + '%';
+        });
+    }
+
+    function tlNote(kind, iconName, text) {
+        var n = $('reserveTlNote');
+        n.className = 'st-tl-note' + (kind ? ' is-' + kind : '');
+        n.innerHTML = iconName ? icon(iconName) + '<span>' + esc(text) + '</span>' : '';
+    }
+
+    function tlRange(b) { return minToLabel(hhmmToMin(b.start)) + ' \u2013 ' + minToLabel(hhmmToMin(b.end)); }
+
+    /* Draws the blocked time, the chosen time and a one-line verdict from resState + resDay */
+    function resTimeline() {
+        var s = resState, track = $('reserveTlTrack'), pick = $('reserveTlPick');
+        if (!s || !track || !pick) return;
+        $('reserveTlDay').textContent = DAY_NAMES[parseYmd(s.date).getDay()];
+
+        Array.prototype.forEach.call(track.querySelectorAll('.st-tl-block'), function (n) { n.remove(); });
+        var blocks = resDay.state === 'ok' ? resDay.blocks : [];
+        blocks.forEach(function (b) {
+            var a = tlPct(hhmmToMin(b.start)), e = tlPct(hhmmToMin(b.end));
+            var el = document.createElement('div');
+            el.className = 'st-tl-block' + (b.kind === 'class' ? ' is-class' : '');
+            el.style.left = a + '%';
+            el.style.width = Math.max(0, e - a) + '%';
+            el.title = tlRange(b) + ' \u00b7 ' + (b.title || 'Reserved');
+            track.appendChild(el);
+        });
+
+        if (s.start == null) { pick.hidden = true; tlNote('', '', ''); return; }
+        pick.hidden = false;
+        pick.style.left = tlPct(s.start) + '%';
+        pick.style.width = Math.max(0, tlPct(s.end) - tlPct(s.start)) + '%';
+
+        var clash = blocks.filter(function (b) { return hhmmToMin(b.start) < s.end && hhmmToMin(b.end) > s.start; });
+        pick.classList.toggle('is-clash', clash.length > 0);
+        if (resDay.state === 'loading') tlNote('wait', 'schedule', 'Checking the schedule\u2026');
+        else if (resDay.state === 'error') tlNote('wait', 'info', 'Could not load the schedule. It is checked again when you submit.');
+        else if (clash.length) {
+            tlNote('clash', 'warning', clash[0].kind === 'class'
+                ? 'This room has a class, ' + clash[0].title + ', ' + tlRange(clash[0]) + '. Pick another time.'
+                : 'Already reserved ' + tlRange(clash[0]) + '. Pick another time.');
+        } else tlNote('', 'check_circle', 'This time is free.');
+    }
+
+    function resLoadDay() {
+        var s = resState, room = st.fac && st.fac.room;
+        if (!s || !room) return;
+        var key = room.room_id + '|' + s.date;
+        var hit = resDayCache[key];
+        if (hit && Date.now() - hit.at < 60000) {
+            resDay = { key: key, blocks: hit.blocks, state: 'ok' };
+            return resTimeline();
+        }
+        resDay = { key: key, blocks: null, state: 'loading' };
+        resTimeline();
+        fetch(URLS.roomSchedule + '?room_id=' + encodeURIComponent(room.room_id) + '&date=' + encodeURIComponent(s.date), { credentials: 'same-origin' })
+            .then(readReply)
+            .then(function (d) {
+                if (!d || d.error || !Array.isArray(d.blocks)) throw new Error('schedule');
+                resDayCache[key] = { at: Date.now(), blocks: d.blocks };
+                if (resDay.key === key) { resDay = { key: key, blocks: d.blocks, state: 'ok' }; resTimeline(); }
+            })
+            .catch(function () {
+                if (resDay.key === key) { resDay = { key: key, blocks: null, state: 'error' }; resTimeline(); }
+            });
     }
 
     /* Redraws every reservation control from resState */
@@ -1221,6 +1313,10 @@
             return v === 'Other' ? s.other : (!s.other && v === s.purpose);
         });
         $('reservePurpose').hidden = !s.other;
+
+        var room = st.fac && st.fac.room;
+        if (room && resDay.key !== room.room_id + '|' + s.date) resLoadDay();   /* new date: fetch that day */
+        else resTimeline();
     }
 
     function resOnChange(t) {
@@ -1290,6 +1386,7 @@
             return '<button type="button" class="st-chip" aria-pressed="false" data-action="res-day" data-day="' + o + '">' + label + '</button>';
         }).join('');
         var seats = r.seating_capacity != null && toInt(r.seating_capacity) > 0 ? ' &middot; ' + plural(toInt(r.seating_capacity), 'seat') : '';
+        resDay = { key: '', blocks: null, state: 'loading' };
 
         flow(
             '<div class="st-pagehead st-narrow"><button type="button" class="st-link" data-action="back-rooms">' + icon('arrow_back') + 'Back to rooms</button>' +
@@ -1305,6 +1402,7 @@
             '<div class="st-chiprow" id="reserveDateChips">' + dateChips +
             '<input type="date" class="st-input" id="reserveDate" aria-label="Pick a date" min="' + firstOpenStr + '" max="' + roomMaxDate() + '" value="' + resState.date + '">' +
             '</div></div>' +
+            tlHTML() +
             '<div class="st-row">' +
             '<div class="st-field"><label for="reserveStart">Start time <span class="st-star">*</span></label>' +
             '<select class="st-input" id="reserveStart"></select></div>' +
@@ -1326,6 +1424,7 @@
             '<button type="button" class="st-btn st-btn-ghost" data-action="back-rooms">Back</button>' +
             '<button type="submit" class="st-btn st-btn-primary" id="btnSubmitRoom">' + icon('event_available') + 'Reserve room</button>' +
             '</div></form>', 2);
+        tlPlaceTicks();
         resSync();
     }
 
@@ -1376,6 +1475,7 @@
                so the student can simply pick another slot with the same code. */
             if (d.error) return showAlert('flowError', d.error);
             st.verified = null; st.vKey = '';
+            resDayCache = {};
             showRoomResult(d, form);
         });
     }
