@@ -4690,49 +4690,136 @@
             alertBox.style.display = 'none';
         }
 
-        document.addEventListener('click', function (e) {
-            var trigger = e.target.closest('[data-action="eq-open-bundle-approve"]');
-            if (!trigger) return;
-            e.preventDefault();
-            e.stopPropagation();
-            batchInput.value = trigger.dataset.batchId || '';
+        // Opens the "Approve Bundle" screen for one cart. autoOk = the whole cart meets the automatic-approval
+        // rules (no reason needed). show = false prepares it without displaying it (used for the one-click approve).
+        function openBundleModal(batchId, autoOk, show) {
+            batchInput.value = batchId || '';
             reasonInput.value = '';
-            bundleAutoOk = trigger.dataset.autoOk === '1';   // whole cart meets the automatic-approval rules: no reason needed
+            bundleAutoOk = !!autoOk;
             setBundleReasonHidden(bundleAutoOk);
             confirmButton.disabled = true;
             clearError();
             itemsBox.textContent = '';
-            pendingRows = Array.prototype.filter.call(
-                document.querySelectorAll('#eq-loan-table tbody tr.eq-loan-row'),
-                function (row) {
-                    return row.dataset.batchId === batchInput.value && row.dataset.loanState === 'waiting';
-                }
-            );
+            pendingRows = waitingRowsOf(batchInput.value);
             pendingRows.forEach(function (row) {
                 var line = document.createElement('div');
                 line.className = 'ps-req-sum-row';
                 var name = document.createElement('span');
                 name.className = 'ps-rsl';
                 name.textContent = row.dataset.equipment || 'Equipment';
-                var number = document.createElement('span');
-                number.className = 'ps-rsv';
-                number.textContent = '#' + String(row.dataset.id || '').padStart(4, '0');
+                var qty = document.createElement('span');
+                qty.className = 'ps-rsv';
+                qty.textContent = '\u00d7 ' + (row.dataset.qty || '1');
                 line.appendChild(name);
-                line.appendChild(number);
+                line.appendChild(qty);
                 itemsBox.appendChild(line);
             });
             if (pendingRows.length < 2) {
                 showError('At least two requests in this bundle must still be pending.');
             }
             confirmButton.disabled = !bundleAutoOk || pendingRows.length < 2;
-            if (typeof psOpenModal === 'function') psOpenModal('eq-bundle-approve-modal');
-        });
+            if (show !== false && typeof psOpenModal === 'function') psOpenModal('eq-bundle-approve-modal');
+        }
+
+        function waitingRowsOf(batchId) {
+            return Array.prototype.filter.call(
+                document.querySelectorAll('#eq-loan-table tbody tr.eq-loan-row'),
+                function (row) {
+                    return row.dataset.batchId === batchId && row.dataset.loanState === 'waiting';
+                }
+            );
+        }
+
+        // ── Clicking Approve on one item of a multi-item request first asks whether to approve all of them ──
+        // "No, approve individually" is remembered for the rest of this browser session (per request), so
+        // the admin is not asked again for that request's other items.
+        var SKIP_KEY = 'eqBundleApproveIndividually';
+        function skippedBundles() {
+            try { return JSON.parse(sessionStorage.getItem(SKIP_KEY) || '[]'); } catch (_) { return []; }
+        }
+        function rememberSkip(batchId) {
+            try {
+                var list = skippedBundles();
+                if (list.indexOf(batchId) === -1) list.push(batchId);
+                sessionStorage.setItem(SKIP_KEY, JSON.stringify(list));
+            } catch (_) { }
+        }
+
+        var choiceModal = document.getElementById('eq-bundle-choice-modal');
+        var choiceItems = document.getElementById('eq-bundle-choice-items');
+        var choiceYes = document.getElementById('eq-bundle-choice-yes');
+        var choiceNo = document.getElementById('eq-bundle-choice-no');
+        var choice = { batchId: '', autoOk: false, trigger: null };
+
+        if (choiceModal && choiceItems && choiceYes && choiceNo) {
+            // Registered on window (capture) so it runs before the normal Approve handling
+            window.addEventListener('click', function (e) {
+                var trigger = e.target.closest ? e.target.closest('button[data-modal="ps-approve-modal"]') : null;
+                if (!trigger) return;
+                var row = trigger.closest('tr.eq-loan-row');
+                if (!row) {
+                    // the request detail screen's own Approve button: use the request it is showing
+                    var shown = document.getElementById('detail-request-id');
+                    row = shown && shown.value
+                        ? document.querySelector('#eq-loan-table tr.eq-loan-row[data-id="' + shown.value + '"]')
+                        : null;
+                }
+                if (!row) return;
+                var batchId = row.dataset.batchId || '';
+                if (!batchId || row.dataset.loanState !== 'waiting') return;
+                if (skippedBundles().indexOf(batchId) !== -1) return;
+                var items = waitingRowsOf(batchId);
+                if (items.length < 2) return;
+
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                choice = { batchId: batchId, autoOk: row.dataset.autoOk === '1', trigger: trigger };
+                choiceItems.textContent = '';
+                items.forEach(function (item) {
+                    var line = document.createElement('div');
+                    line.className = 'ps-req-sum-row';
+                    var name = document.createElement('span');
+                    name.className = 'ps-rsl';
+                    name.textContent = item.dataset.equipment || 'Equipment';
+                    var qty = document.createElement('span');
+                    qty.className = 'ps-rsv';
+                    qty.textContent = '\u00d7 ' + (item.dataset.qty || '1');
+                    line.appendChild(name);
+                    line.appendChild(qty);
+                    choiceItems.appendChild(line);
+                });
+                if (typeof psOpenModal === 'function') psOpenModal('eq-bundle-choice-modal');
+            }, true);
+
+            choiceNo.addEventListener('click', function () {
+                rememberSkip(choice.batchId);
+                if (typeof psCloseModal === 'function') psCloseModal('eq-bundle-choice-modal');
+                // carry on with the normal single-item Approve screen (no more questions for this request)
+                if (choice.trigger) choice.trigger.click();
+            });
+
+            choiceYes.addEventListener('click', function () {
+                if (typeof psCloseModal === 'function') {
+                    psCloseModal('eq-bundle-choice-modal');
+                    psCloseModal('ps-req-detail-modal');
+                }
+                if (choice.autoOk) {
+                    // every item already meets the automatic-approval rules: approve straight away, no reason needed
+                    openBundleModal(choice.batchId, true, false);
+                    submitBundle(true);
+                } else {
+                    openBundleModal(choice.batchId, false, true);   // asks for the approval reason
+                }
+            });
+        }
 
         reasonInput.addEventListener('input', function () {
             confirmButton.disabled = this.value.trim().length < 5 || pendingRows.length < 2;
         });
 
-        confirmButton.addEventListener('click', function () {
+        confirmButton.addEventListener('click', function () { submitBundle(false); });
+
+        function submitBundle(modalIsHidden) {
             var reason = bundleAutoOk ? '' : reasonInput.value.trim();
             if ((!bundleAutoOk && reason.length < 5) || pendingRows.length < 2) {
                 showError('Enter an approval reason of at least 5 characters.');
@@ -4793,12 +4880,14 @@
                         setBundleReasonHidden(false);
                     }
                     showError(error.message || 'Network error. Please try again.');
+                    // approved in one click without the screen showing: show it now so the problem can be read / fixed
+                    if (modalIsHidden && typeof psOpenModal === 'function') psOpenModal('eq-bundle-approve-modal');
                 })
                 .finally(function () {
                     confirmButton.disabled = (!bundleAutoOk && reasonInput.value.trim().length < 5) || pendingRows.length < 2;
                     confirmButton.innerHTML = confirmButton.dataset.originalText || '<span class="material-symbols-outlined">done_all</span> Approve Bundle';
                 });
-        });
+        }
     })();
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
@@ -6640,41 +6729,6 @@ function psSelectFmt(btn) {
         window.psRefreshEquipmentLoans = function (keepPage) {
             rows = Array.prototype.slice.call(table.querySelectorAll('tbody tr.eq-loan-row'));
             orderRowsTogether();
-            var pendingByBatch = {};
-            var pendingRowsByBatch = {};
-            rows.forEach(function (row) {
-                var batchId = row.dataset.batchId || '';
-                if (batchId && row.dataset.loanState === 'waiting') {
-                    pendingByBatch[batchId] = (pendingByBatch[batchId] || 0) + 1;
-                    if (!pendingRowsByBatch[batchId]) pendingRowsByBatch[batchId] = [];
-                    pendingRowsByBatch[batchId].push(row);
-                }
-            });
-            rows.forEach(function (row) {
-                var batchId = row.dataset.batchId || '';
-                var actionCell = row.querySelector('td:last-child > div');
-                if (!actionCell) return;
-                actionCell.querySelectorAll('[data-action="eq-open-bundle-approve"]').forEach(function (button) {
-                    button.remove();
-                });
-                actionCell.classList.remove('has-bundle-approve');
-                if (!batchId || row.dataset.loanState !== 'waiting' || pendingByBatch[batchId] < 2) return;
-                var bundlePendingRows = pendingRowsByBatch[batchId];
-                var middlePendingRow = bundlePendingRows[Math.floor((bundlePendingRows.length - 1) / 2)];
-                if (middlePendingRow !== row) return;
-                var button = document.createElement('button');
-                button.type = 'button';
-                button.className = 'ps-btn ps-btn--outline ps-btn--sm';
-                button.dataset.action = 'eq-open-bundle-approve';
-                button.dataset.batchId = batchId;
-                var icon = document.createElement('span');
-                icon.className = 'material-symbols-outlined';
-                icon.textContent = 'done_all';
-                button.appendChild(icon);
-                button.appendChild(document.createTextNode(' Approve all'));
-                actionCell.appendChild(button);
-                actionCell.classList.add('has-bundle-approve');
-            });
             if (!keepPage) page = 1;
             render();
         };

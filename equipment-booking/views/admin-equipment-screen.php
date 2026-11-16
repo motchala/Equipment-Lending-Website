@@ -803,7 +803,6 @@
                                             <div class="eq-act-wrap">
                                                 <?php if ($lst === 'waiting'): ?>
                                                     <button type="button" class="ps-btn ps-btn--success ps-btn--sm" data-action="ps-open-modal" data-modal="ps-approve-modal"><span class="material-symbols-outlined">check</span> Approve</button>
-                                                    <?php if ($lbundle !== '' && ($eq_wait_bundle_counts[$lbundle] ?? 0) > 1 && empty($eq_bundle_approve_shown[$lbundle])): $eq_bundle_approve_shown[$lbundle] = true; ?><button type="button" class="ps-btn ps-btn--outline ps-btn--sm" data-action="eq-open-bundle-approve" data-batch-id="<?php echo htmlspecialchars($lbundle, ENT_QUOTES); ?>" data-auto-ok="<?php echo equipment_cart_meets_auto_rules($conn, $lbundle) ? '1' : '0'; ?>"><span class="material-symbols-outlined">done_all</span> All</button><?php endif; ?>
                                                     <button type="button" class="ps-btn ps-btn--danger ps-btn--sm" data-action="ps-open-modal" data-modal="ps-decline-modal"><span class="material-symbols-outlined">close</span> Decline</button>
                                                 <?php elseif ($lst === 'scheduled'): ?>
                                                     <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-action="eq-open-loan-detail">View</button>
