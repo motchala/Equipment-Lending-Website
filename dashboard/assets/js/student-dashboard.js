@@ -2,7 +2,7 @@
    PUPSYNC — STUDENT PORTAL  (student-dashboard.js)
 
    Flow (one page, with a building/floor/room picker for equipment):
-     Home ─ pick a service
+     Home ─ pick a service   (a refresh keeps you on the same screen: see "KEEP THE SCREEN ON REFRESH")
        └─ Details ─ faculty code + name + student ID + course   (verify)
             ├─ Borrow, faculty code → photo grid → room picker → submit → receipt + QR
             ├─ Borrow, item code    → item, qty / time, room picker → submit → receipt + QR
@@ -40,6 +40,7 @@
     var DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     var QR_SRC = 'https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js';
     var RECEIPT_KEY = 'pup_last_receipt';
+    var SNAP_KEY = 'pup_student_view';   /* sessionStorage: the screen + entries to bring back after a refresh */
     var URLS = {
         verifyFaculty: 'equipment-booking/api/verify-faculty-code.php',
         verifyItem: 'equipment-booking/api/verify-item-code.php',
@@ -90,8 +91,8 @@
         return 'Choose today or a non-Sunday date within the next ' + BORROW_ADVANCE_DAYS + ' days.';
     }
     function loadBorrowRules() {
-        if (!window.fetch) return;
-        fetch(URLS.borrowRules, { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (j) {
+        if (!window.fetch) return Promise.resolve();
+        return fetch(URLS.borrowRules, { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (j) {
             if (!j || !j.ok || !j.rules) return;
             var r = j.rules;
             BORROW_OPEN_MIN = hhmmToMin(r.dayStart);
@@ -313,6 +314,7 @@
        STATE
     ══════════════════════════════════════════════════════════ */
     var st = fresh();
+    var nav = { screen: 'home' };   /* which screen is showing (+ what it needs to be redrawn); saved for refresh */
 
     function fresh() {
         return {
@@ -352,11 +354,14 @@
     }
 
     function show(name, step) {
+        if (name !== 'flow') nav = { screen: name };
         VIEWS.forEach(function (v) { $('view-' + v).hidden = (v !== name); });
         setStep(step || 0);
         window.scrollTo(0, 0);
         var h = $('view-' + name).querySelector('h1, h2');
         if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); }
+        if (name !== 'home') pushFlowEntry();
+        schedulePersist();
     }
 
     function flow(html, step) {
@@ -364,12 +369,13 @@
         show('flow', step);
     }
 
-    function goHome() {
+    function goHome(fromBrowserBack) {
         st = fresh();
         $('detailsForm').reset();
         hideAlert('detailsError');
         show('home', 0);
         loadReceiptBanner();
+        if (!fromBrowserBack) popFlowEntry();
     }
 
     /* ══════════════════════════════════════════════════════════
@@ -378,6 +384,14 @@
     function startService(service) {
         st = fresh();
         st.service = service;
+        applyService(service);
+        hideAlert('detailsError');
+        show('details', 1);
+        var code = $('facultyCode');
+        if (code) setTimeout(function () { code.focus({ preventScroll: true }); }, 60);
+    }
+
+    function applyService(service) {
         var borrow = service === 'borrow';
         $('detailsTitle').textContent = borrow ? 'Borrow equipment' : 'Reserve a facility';
         $('detailsIcon').textContent = borrow ? 'inventory_2' : 'meeting_room';
@@ -386,10 +400,6 @@
             ? 'Ask your faculty for their one-time code (faculty code or item code).'
             : 'Ask your faculty for their one-time code.';
         $('stepChooseLabel').textContent = borrow ? 'Equipment' : 'Facility';
-        hideAlert('detailsError');
-        show('details', 1);
-        var code = $('facultyCode');
-        if (code) setTimeout(function () { code.focus({ preventScroll: true }); }, 60);
     }
 
     function onVerify(e) {
@@ -441,6 +451,7 @@
        BORROW — faculty code → photo grid
     ══════════════════════════════════════════════════════════ */
     function renderBorrow() {
+        nav = { screen: 'borrow' };
         var v = st.verified;
         st.inv = Array.isArray(v.inventory) ? v.inventory : [];
         st.invMap = {};
@@ -782,6 +793,7 @@
        BORROW — item code (one item, chosen by the faculty)
     ══════════════════════════════════════════════════════════ */
     function renderItem() {
+        nav = { screen: 'item' };
         var v = st.verified;
         var avail = toInt(v.quantity);
         flow(
@@ -924,6 +936,7 @@
     }
 
     function renderBuildings() {
+        nav = { screen: 'buildings' };
         var v = st.verified;
         var bs = st.fac.buildings;
         var total = bs.reduce(function (s, b) { return s + b.rooms; }, 0);
@@ -971,6 +984,7 @@
     function renderRooms() {
         var b = currentBuilding();
         if (!b) return renderBuildings();
+        nav = { screen: 'rooms' };
         var floor = b.floorList[st.fac.floor] || b.floorList[0];
         var src = safeImg(b.image);
         var single = st.fac.buildings.length === 1;
@@ -1253,6 +1267,7 @@
     function renderReserve(roomId) {
         var hit = findRoom(roomId);
         if (!hit) return renderRooms();
+        nav = { screen: 'reserve', roomId: roomId };
         var b = currentBuilding();
         st.fac.room = hit.room;
         var r = hit.room;
@@ -1366,6 +1381,7 @@
     }
 
     function showRoomResult(res, f) {
+        nav = { screen: 'roomResult', res: res, f: f };
         var approved = res.status === 'Approved';
         var waiting = res.status === 'Waiting';   /* a later date waits for an admin's decision */
         var title = approved ? 'Reservation approved' : (waiting ? 'Request sent — pending admin review' : 'Reservation ' + esc(res.status || 'received'));
@@ -1439,6 +1455,7 @@
     function returnUrl(token) { return new URL('equipment-booking/return_confirm.php?token=' + encodeURIComponent(token), window.location.href).href; }
 
     function showReceipt(r) {
+        nav = { screen: 'receipt', r: r };
         var many = r.items.length > 1;
         var reqs = r.items.map(function (it) {
             var qrs = '';
@@ -1508,6 +1525,189 @@
     }
 
     /* ══════════════════════════════════════════════════════════
+       KEEP THE SCREEN ON REFRESH
+       The current screen and what was typed/chosen are kept in sessionStorage (one browser tab only),
+       so a reload lands back on the same screen. Closing the tab clears it; so do the Back buttons:
+       the on-screen Back / Done / Cancel, "Back to Portal", and the browser's Back button (which
+       returns to the first screen, "What do you need today?"). Attached letter files cannot be kept.
+    ══════════════════════════════════════════════════════════ */
+    var SNAP_MAX_AGE = 12 * 60 * 60 * 1000;   /* ignore a saved screen older than this */
+    var FIELD_IDS = ['facultyCode', 'studentName', 'studentCourse', 'borrowRoomId', 'borrowRoom', 'itemQty', 'itemRoomId', 'itemRoom', 'reservePurpose'];
+    var persistTimer = 0, restoring = false, leaving = false;
+
+    /* One extra history entry while inside a service, so the browser's Back button returns to the first screen */
+    function pushFlowEntry() {
+        try { if (!(history.state && history.state.psFlow)) history.pushState({ psFlow: 1 }, '', window.location.href); } catch (e) { }
+    }
+    function popFlowEntry() {
+        try { if (history.state && history.state.psFlow) history.back(); } catch (e) { }
+    }
+
+    function collectFields() {
+        var f = {};
+        FIELD_IDS.forEach(function (id) { var el = $(id); if (el && 'value' in el) f[id] = el.value; });
+        ['borrow', 'item'].forEach(function (p) {
+            ['Date', 'StartTime', 'Duration'].forEach(function (k) { var el = $(p + k); if (el) f[p + k] = el.value; });
+            var label = $(p + 'RoomLabel');
+            if (label) f[p + 'RoomLabel'] = label.textContent;
+        });
+        return f;
+    }
+
+    function persistNow() {
+        window.clearTimeout(persistTimer);
+        persistTimer = 0;
+        if (restoring || leaving) return;
+        try {
+            if (nav.screen === 'home') { sessionStorage.removeItem(SNAP_KEY); return; }
+            sessionStorage.setItem(SNAP_KEY, JSON.stringify({
+                v: 1, at: Date.now(), nav: nav, fields: collectFields(),
+                scroll: window.pageYOffset || 0,
+                res: nav.screen === 'reserve' ? resState : null,
+                st: {
+                    service: st.service, kind: st.kind, verified: st.verified, vKey: st.vKey,
+                    cart: st.cart, eqPage: st.eqPage, query: st.query, cat: st.cat,
+                    done: st.done, where: st.where, receipt: st.receipt,
+                    fac: { bid: st.fac.bid, floor: st.fac.floor }
+                }
+            }));
+        } catch (e) { /* storage full or blocked: the portal still works, it just will not remember */ }
+    }
+
+    function schedulePersist() {
+        if (restoring || leaving) return;
+        window.clearTimeout(persistTimer);
+        persistTimer = window.setTimeout(persistNow, 150);
+    }
+
+    function clearSnap() {
+        try { sessionStorage.removeItem(SNAP_KEY); } catch (e) { }
+    }
+
+    function readSnap() {
+        try {
+            var s = JSON.parse(sessionStorage.getItem(SNAP_KEY) || 'null');
+            if (!s || s.v !== 1 || !s.nav || !s.nav.screen || s.nav.screen === 'home') return null;
+            if (Date.now() - (s.at || 0) > SNAP_MAX_AGE) { clearSnap(); return null; }
+            return s;
+        } catch (e) { return null; }
+    }
+
+    function setSelect(sel, v) {
+        if (!sel || v == null || v === '') return;
+        for (var i = 0; i < sel.options.length; i++) {
+            if (sel.options[i].value === v && !sel.options[i].disabled) { sel.value = v; return; }
+        }
+    }
+
+    function restoreSchedule(prefix, f) {
+        if (!$(prefix + 'Date')) return;
+        setSelect($(prefix + 'Date'), f[prefix + 'Date']);
+        refreshStudentSchedule(prefix);
+        setSelect($(prefix + 'StartTime'), f[prefix + 'StartTime']);
+        refreshStudentSchedule(prefix);
+        setSelect($(prefix + 'Duration'), f[prefix + 'Duration']);
+        syncStudentSchedule(prefix);
+        if (prefix === 'borrow') syncLetter('borrowLetter', $('borrowDate').value);
+    }
+
+    function restoreRoom(prefix, f) {
+        if (!f[prefix + 'RoomId'] || !$(prefix + 'RoomId')) return;
+        $(prefix + 'RoomId').value = f[prefix + 'RoomId'];
+        $(prefix + 'Room').value = f[prefix + 'Room'] || '';
+        if ($(prefix + 'RoomLabel') && f[prefix + 'RoomLabel']) $(prefix + 'RoomLabel').textContent = f[prefix + 'RoomLabel'];
+    }
+
+    function rebuildFacility(bid, floor) {
+        var rooms = st.verified && Array.isArray(st.verified.rooms) ? st.verified.rooms : [];
+        st.fac = { buildings: buildBuildings(rooms), bid: bid || null, floor: floor || 0, room: null };
+    }
+
+    /* Redraws the saved screen exactly as it was. Anything that cannot be restored falls back to the first screen. */
+    function restoreView(snap) {
+        var s = snap.st || {}, n = snap.nav, f = snap.fields || {};
+        restoring = true;
+        try {
+            st = fresh();
+            ['service', 'kind', 'verified', 'vKey', 'where', 'receipt'].forEach(function (k) {
+                if (s[k] !== undefined && s[k] !== null) st[k] = s[k];
+            });
+            st.cart = s.cart && typeof s.cart === 'object' ? s.cart : {};
+            st.done = Array.isArray(s.done) ? s.done : [];
+            var fac = s.fac || {};
+
+            if (n.screen === 'details') {
+                if (!st.service) throw new Error('no service');
+                applyService(st.service);
+                ['facultyCode', 'studentName', 'studentCourse'].forEach(function (id) {
+                    if ($(id) && f[id] != null) $(id).value = f[id];
+                });
+                show('details', 1);
+            } else if (n.screen === 'receipt') {
+                var r = normReceipt(n.r);
+                if (!r) throw new Error('no receipt');
+                showReceipt(r);
+            } else if (n.screen === 'roomResult') {
+                if (!n.res || !n.f) throw new Error('no result');
+                showRoomResult(n.res, n.f);
+            } else {
+                if (!st.verified) throw new Error('not verified');
+                if (n.screen === 'borrow') {
+                    renderBorrow();
+                    st.query = s.query || '';
+                    st.cat = s.cat || '';
+                    st.eqPage = s.eqPage || 1;
+                    if ($('eqSearch')) $('eqSearch').value = st.query;
+                    Array.prototype.forEach.call(document.querySelectorAll('#eqCats .st-chip'), function (c) {
+                        c.setAttribute('aria-pressed', (c.getAttribute('data-cat') || '') === st.cat ? 'true' : 'false');
+                    });
+                    renderEqGrid();
+                    updateSummary();
+                    restoreRoom('borrow', f);
+                    restoreSchedule('borrow', f);
+                    if (st.where) lockWhere(true);
+                } else if (n.screen === 'item') {
+                    renderItem();
+                    if ($('itemQty') && f.itemQty) $('itemQty').value = f.itemQty;
+                    restoreRoom('item', f);
+                    restoreSchedule('item', f);
+                } else if (n.screen === 'buildings') {
+                    rebuildFacility();
+                    renderBuildings();
+                } else if (n.screen === 'rooms') {
+                    rebuildFacility(fac.bid, fac.floor);
+                    renderRooms();
+                } else if (n.screen === 'reserve') {
+                    rebuildFacility(fac.bid, fac.floor);
+                    renderReserve(toInt(n.roomId));
+                    var rs = snap.res;
+                    if (nav.screen === 'reserve' && resState && rs && typeof rs.end === 'number' &&
+                        rs.date >= ymd(nextOpenDay(new Date())) && rs.date <= roomMaxDate() && !isClosedDay(parseYmd(rs.date))) {
+                        resState.date = rs.date;
+                        resState.start = typeof rs.start === 'number' ? rs.start : resState.start;
+                        resState.end = rs.end;
+                        resState.custom = !!rs.custom;
+                        resState.other = !!rs.other;
+                        resState.purpose = String(rs.purpose || '');
+                        if (resState.other && $('reservePurpose')) $('reservePurpose').value = resState.purpose;
+                        resSync();
+                    }
+                } else {
+                    throw new Error('unknown screen');
+                }
+            }
+            window.setTimeout(function () { window.scrollTo(0, snap.scroll || 0); }, 0);
+        } catch (err) {
+            restoring = false;
+            clearSnap();
+            goHome();
+            return;
+        }
+        restoring = false;
+        schedulePersist();
+    }
+
+    /* ══════════════════════════════════════════════════════════
        EVENTS
     ══════════════════════════════════════════════════════════ */
     function nameOfCard(el) {
@@ -1517,6 +1717,12 @@
 
     function onClick(e) {
         if (e.target.id === 'studentRoomPicker') return closeStudentRoomPicker();
+        if (e.target.closest && e.target.closest('.st-back-link')) {
+            leaving = true;
+            clearSnap();
+            window.setTimeout(function () { leaving = false; }, 4000);
+            return;
+        }
         var t = e.target.closest('[data-action]');
         if (!t) return;
         var a = t.getAttribute('data-action');
@@ -1648,7 +1854,9 @@
        INIT
     ══════════════════════════════════════════════════════════ */
     function init() {
-        loadBorrowRules();
+        var snap = readSnap();
+        if (snap) $('view-home').hidden = true;   /* no flash of the first screen while the saved one is redrawn */
+        var rules = loadBorrowRules();
         var course = $('studentCourse');
         COURSES.forEach(function (c) {
             var o = document.createElement('option');
@@ -1675,6 +1883,23 @@
         }, true);
 
         loadReceiptBanner();
+
+        /* Keep the current screen across a refresh (see KEEP THE SCREEN ON REFRESH) */
+        ['click', 'input', 'change'].forEach(function (ev) { document.addEventListener(ev, schedulePersist); });
+        window.addEventListener('pagehide', persistNow);
+        window.addEventListener('beforeunload', persistNow);
+        document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') persistNow(); });
+        window.addEventListener('pageshow', function (e) { if (e.persisted) leaving = false; });
+        window.addEventListener('popstate', function () {     /* the browser's Back button → first screen */
+            if (nav.screen === 'home') return;
+            document.body.classList.remove('st-room-picker-open');
+            goHome(true);
+        });
+        if (snap) {
+            var restore = function () { restoreView(snap); };
+            /* wait briefly for the booking window so the date/time lists match, then redraw */
+            Promise.race([rules, new Promise(function (resolve) { window.setTimeout(resolve, 2500); })]).then(restore, restore);
+        }
     }
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
