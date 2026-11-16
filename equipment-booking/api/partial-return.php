@@ -24,6 +24,8 @@ if (!isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $cs
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../shared/core/activity-logger.php';
 require_once __DIR__ . '/../core/booking-schedule.php';
+require_once __DIR__ . '/../../notifications/core/preferences.php';
+require_once __DIR__ . '/../../notifications/core/push.php';
 
 $conn = getDB();
 BookingSchedule::ensureSchema($conn);
@@ -173,6 +175,17 @@ foreach ($conditions as $req_id_raw => $condition_raw) {
             null,
             ['action' => 'request_returned', 'ref_type' => 'request', 'ref_id' => $req_id]
         );
+
+        // Push notification for Damaged / Missing condition flag
+        if (in_array($condition, ['Damaged', 'Missing'], true)) {
+            ps_push_send(
+                $conn, 'faculty', (string)$row['faculty_id'], 'equipment',
+                ($condition === 'Missing' ? 'Missing Item Reported' : 'Damaged Item Reported'),
+                $eq_name . ' was recorded as ' . strtolower($condition) . ' on return.',
+                'faculty-dashboard.php?tab=activity'
+            );
+        }
+
     } catch (Throwable $e) {
         $conn->rollback();
         error_log('[partial-return] id=' . $req_id . ': ' . $e->getMessage());

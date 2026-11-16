@@ -22,6 +22,8 @@ if (!isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $cs
 
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../shared/core/activity-logger.php';
+require_once __DIR__ . '/../../notifications/core/preferences.php';
+require_once __DIR__ . '/../../notifications/core/push.php';
 
 $conn = getDB();
 admin_activity_bootstrap($conn);
@@ -284,6 +286,16 @@ foreach ($items as $item) {
                 'ref_id'   => $req_id,
             ]
         );
+
+        // Push notification — mirrors the in-app withheld notice
+        if ($give > 0 && $keep_qty > 0) {
+            ps_push_send(
+                $conn, 'faculty', $faculty_id, 'equipment',
+                'Pickup Update',
+                $keep_qty . ' unit(s) of ' . $eq_name . ' could not be handed over.',
+                'faculty-dashboard.php?tab=activity'
+            );
+        }
 
     } catch (Throwable $e) {
         $conn->rollback();
