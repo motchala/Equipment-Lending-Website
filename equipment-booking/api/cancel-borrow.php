@@ -6,7 +6,8 @@
  * Faculty cancels an equipment request that has not started yet (My Activity > Upcoming).
  * Rules and side effects: core/borrow-cancellation.php (BorrowCancellation).
  *
- *   POST  id=<request id>  csrf_token=<token>
+ *   POST  id=<request id>  [scope=bundle]  csrf_token=<token>
+ *         scope=bundle cancels every item of that request's bundle that can still be cancelled.
  *         -> { ok: true, message }   |   { ok: false, error }
  *
  * Faculty only, and only for the signed-in faculty member's own requests.
@@ -50,14 +51,21 @@ $conn = getDB();
 // A request that just ran out of time is declined/started by housekeeping, so cancel the real state
 fact_eq_housekeeping($conn);
 
-$result = BorrowCancellation::cancel($conn, $id, (string)$_SESSION['faculty_id']);
+$whole  = (string)($_POST['scope'] ?? '') === 'bundle';
+$result = $whole
+    ? BorrowCancellation::cancelBundle($conn, $id, (string)$_SESSION['faculty_id'])
+    : BorrowCancellation::cancel($conn, $id, (string)$_SESSION['faculty_id']);
 $conn->close();
 
 if ($result['success']) {
-    echo json_encode([
-        'ok'      => true,
-        'message' => 'Your request for ' . $result['item'] . ' was cancelled.',
-    ], JSON_INVALID_UTF8_SUBSTITUTE);
+    $count = (int)($result['count'] ?? 1);
+    if ($count > 1) {
+        $message = 'Cancelled ' . $count . ' items from your bundle.'
+            . ((int)($result['skipped'] ?? 0) > 0 ? ' ' . (int)$result['skipped'] . ' could not be cancelled.' : '');
+    } else {
+        $message = 'Your request for ' . $result['item'] . ' was cancelled.';
+    }
+    echo json_encode(['ok' => true, 'message' => $message], JSON_INVALID_UTF8_SUBSTITUTE);
 } else {
     echo json_encode(['ok' => false, 'error' => $result['error']], JSON_INVALID_UTF8_SUBSTITUTE);
 }

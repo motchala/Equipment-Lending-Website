@@ -29,15 +29,16 @@
  *                      above (overdue, due today, ready to collect, waiting for a decision).
  *   Overdue            blocks new BORROW requests (arbitration "overdue borrower" rule),
  *                      never room reservations.
- *   Cancel             offered on Upcoming requests that have not started (Pending, or Approved more than
- *                      1 hour before the start). Rules and side effects: core/borrow-cancellation.php.
- *                      A cancelled request moves to History as "Cancelled".
- *   Extend             offered on loans whose return moment has been reached (Overdue, or Approved and
- *                      due), up to BorrowExtension::maxExtensions() times per loan (Settings → Arbitration). Rules and availability
- *                      check: core/borrow-extension.php. A granted extension moves the return moment, puts an
- *                      Overdue loan back to Approved and shows as "Extended once / N times, originally due ..."
- *                      on the row. Lateness is judged against the ORIGINAL return moment, so extending never
- *                      makes a late loan look on time (history says "Returned late").
+ *   Cancel             offered on any request that has not been collected yet: Pending (any time), Approved
+ *                      same-day bookings (any time until collected) and Approved later-date bookings (until
+ *                      the cancellation cutoff before the start). The first row of a bundle offers "Cancel all".
+ *                      Rules and side effects: core/borrow-cancellation.php. A cancelled request moves to
+ *                      History as "Cancelled".
+ *   Extend             offered once per loan, when the item is Overdue or within 15 minutes of its return
+ *                      time. Overdue: until the next open day (Monday if tomorrow is Sunday). Rules and
+ *                      availability check: core/borrow-extension.php. A granted extension REPLACES the return
+ *                      moment and puts the loan back to On Loan (active) whatever it was before; the earlier
+ *                      overdue is not carried over, and the loan is judged against the new time.
  *   Student requests   requests a student filed with this faculty member's code are the
  *                      faculty member's responsibility, so they are listed here (and count)
  *                      like everywhere else, and are marked with the student's name.
@@ -150,7 +151,7 @@ function fact_eq_load(mysqli $conn, string $faculty_id): array
             : '0 AS extension_count, NULL AS original_return_date, NULL AS original_return_time';
         $images = fact_eq_image_map($conn);
 
-        $cols = "r.id, r.equipment_name, r.borrow_qty, r.room, r.room_id, r.batch_id, r.bundle_claim_token, r.borrow_date, r.borrow_time, $extCol,
+        $cols = "r.id, r.equipment_name, r.borrow_qty, r.room, r.room_id, r.batch_id, r.bundle_claim_token, r.booking_mode, r.borrow_date, r.borrow_time, $extCol,
                  r.return_date, r.return_time, r.returned_at, r.status, r.reason, r.arbitration_rule,
                  r.request_date, r.return_token, r.claim_token, r.submitted_as, r.submitted_by_name, r.submitted_by_id,
                  rm.room_name, b.building_key, b.name AS building_name,
@@ -212,9 +213,9 @@ function fact_eq_load(mysqli $conn, string $faculty_id): array
                     'due_ts'      => $due->getTimestamp(),
                     'returned_ts' => $returnedAt !== '' ? (int)strtotime($returnedAt) : 0,
                     'extensions'  => max(0, fact_i($row, 'extension_count')),
-                    // Return moment reached while the item is still out: it can be extended, until the limit
-                    'can_extend'  => BorrowExtension::isDue($row, $now) && !BorrowExtension::atLimit($row),
-                    'extend_limit' => BorrowExtension::isDue($row, $now) && BorrowExtension::atLimit($row),
+                    // Overdue, or still out but within 15 minutes of its return time: it can be extended once
+                    'can_extend'  => BorrowExtension::isExtendable($row, $now) && !BorrowExtension::atLimit($row),
+                    'extend_limit' => BorrowExtension::isExtendable($row, $now) && BorrowExtension::atLimit($row),
                     // When it was really due, before any extension moved it (0 / '' when never extended)
                     'late_base_ts'   => $due->getTimestamp(),
                     'orig_due_label' => '',
@@ -301,10 +302,11 @@ function fact_eq_load(mysqli $conn, string $faculty_id): array
         }
         unset($rg);
 
+        // A bundle's size counts the items that are still part of it: a cancelled or declined item left it
         $batchCounts = [];
         foreach (['live', 'upcoming', 'history'] as $bucket) {
             foreach ($out[$bucket] as $item) {
-                if ($item['batch_id'] !== '') {
+                if ($item['batch_id'] !== '' && !in_array($item['status'], ['Cancelled', 'Declined'], true)) {
                     $batchCounts[$item['batch_id']] = ($batchCounts[$item['batch_id']] ?? 0) + 1;
                 }
             }
@@ -318,6 +320,7 @@ function fact_eq_load(mysqli $conn, string $faculty_id): array
                 "SELECT batch_id, COUNT(*) AS item_count
                    FROM tbl_requests
                   WHERE faculty_id = '{$facultyIdSql}' AND batch_id IN ({$batchList})
+                    AND status NOT IN ('Cancelled', 'Declined')
                   GROUP BY batch_id"
             );
             if ($batchCountResult) {
@@ -338,7 +341,8 @@ function fact_eq_load(mysqli $conn, string $faculty_id): array
         foreach (['live', 'upcoming', 'history'] as $bucket) {
             foreach ($out[$bucket] as &$item) {
                 $batchId = $item['batch_id'];
-                $item['bundle_count'] = $batchId !== '' ? ($batchCounts[$batchId] ?? 0) : 0;
+                $item['bundle_count'] = ($batchId !== '' && !in_array($item['status'], ['Cancelled', 'Declined'], true))
+                    ? ($batchCounts[$batchId] ?? 0) : 0;
                 $token = $item['bundle_claim_token'];
                 $claimGroup = $token !== '' ? ($claimGroups[$token] ?? null) : null;
                 $item['bundle_claim_leader'] = $claimGroup !== null
@@ -350,6 +354,24 @@ function fact_eq_load(mysqli $conn, string $faculty_id): array
                 $rg = $batchId !== '' ? ($returnGroups[$batchId] ?? null) : null;
                 $item['bundle_return_leader'] = $rg !== null && (int)$item['id'] === $rg['leader_id'];
                 $item['bundle_return_token']  = $rg !== null ? $rg['leader_token'] : '';
+            }
+            unset($item);
+        }
+
+        // "Cancel all": the first cancellable row of a bundle (with at least one more cancellable row) cancels the whole bundle
+        $cancelGroups = [];
+        foreach (['live', 'upcoming'] as $bucket) {
+            foreach ($out[$bucket] as $item) {
+                if ($item['batch_id'] !== '' && !empty($item['can_cancel'])) {
+                    $cancelGroups[$item['batch_id']][] = (int)$item['id'];
+                }
+            }
+        }
+        foreach (['live', 'upcoming'] as $bucket) {
+            foreach ($out[$bucket] as &$item) {
+                $ids = $item['batch_id'] !== '' ? ($cancelGroups[$item['batch_id']] ?? []) : [];
+                $item['bundle_cancel_leader'] = count($ids) > 1 && (int)$item['id'] === min($ids);
+                $item['bundle_cancel_count']  = count($ids);
             }
             unset($item);
         }
@@ -517,8 +539,9 @@ function fact_eq_render_item(array $it, string $kind, string $rootUrl, DateTimeI
  * in core/room-quota.php): left = Claim QR or Return QR, middle = Extend, right = Cancel.
  *   claim   Claim QR    the request is Approved and the item has not been handed over yet
  *   return  Return QR   the item is out (or about to be): shown while there is a return code
- *   extend  Extend      the return time has been reached (greyed out at the extension limit)
- *   end     Cancel      Upcoming requests only (greyed out within 1 hour of the start)
+ *   extend  Extend      overdue, or within 15 minutes of the return time (greyed out once extended: one per loan)
+ *   end     Cancel      anything not collected yet; "Cancel all" on the first row of a bundle
+ *                       (greyed out only for a later-date booking inside the cancellation cutoff)
  *
  * @param array<string, mixed> $it
  * @return array{claim: string, return: string, extend: string, end: string}
@@ -571,20 +594,27 @@ function fact_eq_action_slots(array $it, string $kind, string $status): array
             ], ['title' => 'Ask for more time']);
         } elseif (!empty($it['extend_limit'])) {
             $slots['extend'] = fact_action_btn('Extend', 'lock', [], [
-                'disabled' => true, 'title' => 'This loan has been extended the most times allowed',
+                'disabled' => true, 'title' => 'Already extended once',
             ]);
         }
     }
 
-    if ($kind === 'upcoming') {
+    // Cancel: anything that has not been collected yet (Pending, or Approved: upcoming or waiting to be picked up)
+    if (in_array($status, ['Waiting', 'Approved'], true)) {
         if (!empty($it['can_cancel'])) {
-            $slots['end'] = fact_action_btn('Cancel', 'close', [
-                'action' => 'cancel-borrow', 'request-id' => fact_i($it, 'id'), 'equipment' => fact_s($it, 'name'),
-            ], ['danger' => true, 'title' => 'Cancel this request']);
+            $all  = !empty($it['bundle_cancel_leader']);
+            $data = ['action' => 'cancel-borrow', 'request-id' => fact_i($it, 'id'), 'equipment' => fact_s($it, 'name')];
+            if ($all) {
+                $data['scope'] = 'bundle';
+                $data['count'] = fact_i($it, 'bundle_cancel_count');
+            }
+            $slots['end'] = fact_action_btn($all ? 'Cancel all' : 'Cancel', 'close', $data, [
+                'danger' => true, 'title' => $all ? 'Cancel every item in this bundle' : 'Cancel this request',
+            ]);
         } elseif (fact_s($it, 'cancel_note') !== '') {
             $slots['end'] = fact_action_btn('Cancel', 'lock', [], [
                 'danger' => true, 'disabled' => true,
-                'title'  => 'Requests can\'t be cancelled within ' . BorrowCancellation::cutoffLabel() . ' of the start time',
+                'title'  => 'Later-date requests can\'t be cancelled within ' . BorrowCancellation::cutoffLabel() . ' of the start time',
             ]);
         }
     }

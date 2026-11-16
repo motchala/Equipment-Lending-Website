@@ -8,17 +8,19 @@ declare(strict_types=1);
  * "Extend" for a borrowed item that has reached its return time (faculty My Activity).
  *
  * WHO CAN EXTEND
- *   The faculty member who holds the loan, once its return moment has been reached:
- *   status On Loan (collected) with the return moment behind us, or Overdue. An Approved booking
- *   that was never collected cannot be extended: nothing is out, and it ends as a no-show.
- *   (return moment = return_date + return_time, end of that day when no time was set.)
+ *   The faculty member who holds the loan, ONCE per loan, in either of these two situations:
+ *     - NEAR DUE: the loan is On Loan (collected) and its return moment is at most
+ *       EXTEND_WINDOW_SECONDS (15 minutes) away, so asking in time is never recorded as late;
+ *     - OVERDUE: the loan is Overdue (or On Loan with the return moment already behind us).
+ *   An Approved booking that was never collected cannot be extended: nothing is out (it can be
+ *   cancelled instead). (return moment = return_date + return_time, end of that day when no time was set.)
  *
  * HOW LONG
- *   Extension choices are independent of new booking durations and are counted from NOW
- *   (see mode(): counter loans made with a faculty item code are hourly too):
- *     hourly ("today") loans   +1 / 2 / 3 / 5 hours, rounded up to
- *                              the next 5 minutes, never past closing time (BookingSchedule::dayEnd())
- *     day loans                +1 / 2 / 3 days, keeping the original return time of day
+ *   - OVERDUE loan: one choice, until the next open day at the loan's usual return time of day
+ *     (tomorrow, or Monday when tomorrow is a Sunday; the office is closed on Sundays).
+ *   - NEAR-DUE hourly ("today") loan: +1 / 2 / 3 / 5 hours counted from the return moment, rounded up
+ *     to the next 5 minutes, never past closing time (BookingSchedule::dayEnd()).
+ *   - NEAR-DUE day loan: +1 / 2 / 3 days from the return date, keeping the return time of day.
  *
  * AVAILABILITY (the same ledger the Borrow form and the arbitration engine use)
  *   The units already in the faculty member's hands stay theirs; what must hold is that no
@@ -31,32 +33,28 @@ declare(strict_types=1);
  *   also blocks the extension (same rule as the Borrow form: BookingSchedule::roomConflictMessage()).
  *
  * LIMIT
- *   At most MAX_EXTENSIONS extensions per loan. After that the item has to be returned.
- *   (Without a limit, availability would be the only brake and a loan nobody else wants could be
- *   extended forever.)
+ *   ONE extension per loan, always (MAX_EXTENSIONS). The admin setting "Extensions per loan" can only
+ *   turn extensions off (0); it can never allow more than one. After that the item has to be returned.
  *
  * WHEN IT IS ALLOWED
- *   The request row keeps its stock (nothing is returned or re-taken), gets the new return moment,
- *   goes back to Approved (so an Overdue item stops blocking new borrow requests), and
- *   extension_count goes up by one. The decision is made inside a transaction that locks the item's
- *   inventory row, like every other stock decision, so two people can never be given the same units.
- *
- * LATENESS IS KEPT, NOT ERASED
- *   An extension can only be granted after the return moment has passed, so the loan WAS late. Moving the
- *   return date must not make it look on time, so the first extension stores the original return moment
- *   and every extension adds how long the loan had already been overdue. "Returned late" (My Activity,
- *   notifications) is judged against the ORIGINAL return moment, and the admin sees "Extended xN".
+ *   The request row keeps its stock (nothing is returned or re-taken), gets the NEW return date and
+ *   time and goes (back) to On Loan, whatever it was before (near due or Overdue): the earlier due time,
+ *   and any overdue status that came with it, is REPLACED, not kept. From then on the loan is judged
+ *   against the new return moment: it is active again, no longer blocks new borrowing, and only counts
+ *   as late if it is not returned by the new time. extension_count goes up to 1. The decision is made
+ *   inside a transaction that locks the item's inventory row, like every other stock decision, so two
+ *   people can never be given the same units.
  *
  * ADMIN TRAIL
- *   Every granted extension writes one row to tbl_request_events (who, what, until when, how overdue it
- *   already was). The admin Activity feed reads that table. (tbl_arbitration_log keeps one row per request,
- *   so it cannot hold a history of several extensions without losing the approval record.)
+ *   Every granted extension writes one row to tbl_request_events (who, until when, whether it was
+ *   already overdue and what the previous return time was). The admin Activity feed reads that table.
+ *   (The trail is a log; it does not change how the loan is judged.)
  *
- * New tbl_requests columns and table (added automatically by ensureSchema()):
+ * tbl_requests columns and table (added automatically by ensureSchema()):
  *   extension_count         INT NOT NULL DEFAULT 0
- *   original_return_date    DATE NULL      return date before the first extension
- *   original_return_time    TIME NULL      return time before the first extension
- *   extension_late_seconds  INT UNSIGNED NOT NULL DEFAULT 0   overdue time accumulated across extensions
+ *   original_return_date    DATE NULL      only on loans extended under the older rule (kept for them)
+ *   original_return_time    TIME NULL      only on loans extended under the older rule (kept for them)
+ *   extension_late_seconds  INT UNSIGNED NOT NULL DEFAULT 0   only on loans extended under the older rule
  *   tbl_request_events      one row per granted extension
  */
 
@@ -65,8 +63,12 @@ require_once __DIR__ . '/../../room-reservation/core/room-quota.php';   // fact_
 
 final class BorrowExtension
 {
-    /** Extensions allowed per loan. */
-    public const MAX_EXTENSIONS = 2;
+    /** Extensions allowed per loan: one, always. */
+    public const MAX_EXTENSIONS = 1;
+    /** How long before the return time a loan can already be extended (so asking in time is never "late"). */
+    public const EXTEND_WINDOW_SECONDS = 900;
+    /** The one choice an overdue loan gets ("until tomorrow"); not one of the hour / day lengths below. */
+    public const OVERDUE_CHOICE = 24;
     private const EXTENSION_DAY_START = '07:00';
     private const EXTENSION_HOURS = [1, 2, 3, 5];
     private const EXTENSION_DAYS = [1, 2, 3];
@@ -139,10 +141,10 @@ final class BorrowExtension
         return self::$ready;
     }
 
-    /** Extensions allowed per loan (Settings → Arbitration → Extensions per loan; 0 = off). */
+    /** Extensions allowed per loan: 1, or 0 when the admin turned extensions off (Settings → Arbitration). */
     public static function maxExtensions(): int
     {
-        return BookingSchedule::maxExtensions();
+        return min(self::MAX_EXTENSIONS, BookingSchedule::maxExtensions());
     }
 
     /** True when this loan has used up its extensions (always true when extensions are turned off). */
@@ -153,11 +155,10 @@ final class BorrowExtension
 
     private static function limitMessage(): string
     {
-        $max = self::maxExtensions();
-        if ($max === 0) {
+        if (self::maxExtensions() === 0) {
             return 'Extensions are turned off. Please return the item to the Admin Office.';
         }
-        return 'This item has already been extended ' . $max . ($max === 1 ? ' time' : ' times') . ', which is the limit. Please return it to the Admin Office.';
+        return 'This item has already been extended once, which is the limit. Please return it to the Admin Office.';
     }
 
     /** "3 hours" / "1 day" — how long a loan had been overdue. */
@@ -210,19 +211,48 @@ final class BorrowExtension
         return ($from !== '' && $from === (string)($row['return_date'] ?? '')) ? 'today' : 'future';
     }
 
-    /** True when this loan can be extended right now (return moment reached, loan still out). */
-    public static function isDue(array $row, DateTimeImmutable $now): bool
+    /** True when the loan is out and its return moment has passed (Overdue, or On Loan not yet flagged). */
+    public static function isLate(array $row, DateTimeImmutable $now): bool
     {
         $status = (string)($row['status'] ?? '');
-        if ($status === 'Overdue') {
-            return true;
-        }
-        return $status === 'On Loan' && self::dueAt($row) <= $now;
+        return $status === 'Overdue' || ($status === 'On Loan' && self::dueAt($row) <= $now);
     }
 
     /**
-     * The extension lengths this loan may choose from, each with its new return moment.
-     * May be empty (for example hourly loans when it is too late in the day).
+     * True when this loan can be extended right now: it is overdue, or still active but within
+     * EXTEND_WINDOW_SECONDS of its return moment. (The one-extension limit is checked separately.)
+     */
+    public static function isExtendable(array $row, DateTimeImmutable $now): bool
+    {
+        if (self::isLate($row, $now)) {
+            return true;
+        }
+        return (string)($row['status'] ?? '') === 'On Loan'
+            && $now >= self::dueAt($row)->modify('-' . self::EXTEND_WINDOW_SECONDS . ' seconds');
+    }
+
+    /** True when the next open day after $now is a Monday because tomorrow is a Sunday. */
+    private static function skipsSunday(DateTimeImmutable $now): bool
+    {
+        return (int)$now->modify('+1 day')->format('w') === 0;
+    }
+
+    /** The new return moment for an overdue loan: the next open day, at the loan's usual return time of day. */
+    public static function nextOpenDue(array $row, DateTimeImmutable $now): DateTimeImmutable
+    {
+        $day = $now->modify(self::skipsSunday($now) ? '+2 days' : '+1 day');
+        $time = substr(trim((string)($row['return_time'] ?? '')), 0, 5);
+        if ($time === '') {
+            $time = BookingSchedule::dayEnd();
+        }
+        $time = max(self::EXTENSION_DAY_START, min(BookingSchedule::dayEnd(), $time));
+        return new DateTimeImmutable($day->format('Y-m-d') . ' ' . $time . ':00', $now->getTimezone());
+    }
+
+    /**
+     * The extension choices this loan has, each with its new return moment.
+     * Overdue: exactly one (until the next open day). Near due: hours (hourly loans) or days (day loans),
+     * counted from the return moment. May be empty (for example hourly loans when it is too late in the day).
      *
      * @return list<array{length:int, unit:string, label:string, due:DateTimeImmutable}>
      */
@@ -231,12 +261,25 @@ final class BorrowExtension
         $tz  = $now->getTimezone();
         $out = [];
 
+        if (self::isLate($row, $now)) {
+            return [[
+                'length' => self::OVERDUE_CHOICE,
+                'unit'   => 'tomorrow',
+                'label'  => self::skipsSunday($now) ? 'Until Monday' : 'Until tomorrow',
+                'due'    => self::nextOpenDue($row, $now),
+            ]];
+        }
+
+        // Still active, near its return time: counted from the return moment (never earlier than now)
+        $dueAt = self::dueAt($row);
+        $from  = $dueAt > $now ? $dueAt : $now;
+
         if (self::mode($row) === 'today') {
-            // Hourly loan: more hours today, counted from now (office hours only)
-            $day   = $now->format('Y-m-d');
+            // Hourly loan: more hours today (office hours only)
+            $day   = $from->format('Y-m-d');
             $open  = new DateTimeImmutable($day . ' ' . self::EXTENSION_DAY_START . ':00', $tz);
             $close = new DateTimeImmutable($day . ' ' . BookingSchedule::dayEnd() . ':00', $tz);
-            $base  = $now < $open ? $open : $now;
+            $base  = $from < $open ? $open : $from;
             $base  = (new DateTimeImmutable('@' . (int)(ceil($base->getTimestamp() / 300) * 300)))->setTimezone($tz);
 
             foreach (self::EXTENSION_HOURS as $hours) {
@@ -259,7 +302,7 @@ final class BorrowExtension
 
         foreach (self::EXTENSION_DAYS as $days) {
             $days  = (int)$days;
-            $due   = new DateTimeImmutable($now->modify('+' . $days . ' days')->format('Y-m-d') . ' ' . $time . ':00', $tz);
+            $due   = new DateTimeImmutable($from->modify('+' . $days . ' days')->format('Y-m-d') . ' ' . $time . ':00', $tz);
             $out[] = ['length' => $days, 'unit' => 'days', 'label' => '+' . $days . ($days === 1 ? ' day' : ' days'), 'due' => $due];
         }
         return $out;
@@ -337,7 +380,7 @@ final class BorrowExtension
     private static function notDueMessage(array $row): string
     {
         return match ((string)$row['status']) {
-            'On Loan'  => 'You can extend this item once its return time has arrived.',
+            'On Loan'  => 'You can extend this item during the last ' . intdiv(self::EXTEND_WINDOW_SECONDS, 60) . ' minutes before it is due, or after.',
             'Approved' => 'This item has not been collected yet, so there is nothing to extend.',
             'Returned' => 'This item has already been returned.',
             default    => 'This item is not currently on loan, so it cannot be extended.',
@@ -358,13 +401,15 @@ final class BorrowExtension
         if (!$row) {
             return ['ok' => false, 'error' => 'We could not find that borrowed item.'];
         }
-        if (!self::isDue($row, $now)) {
-            return ['ok' => false, 'error' => self::notDueMessage($row)];
-        }
-        if (self::atLimit($row)) {
+        // An item that is still out and was already extended says so (rather than "come back near the due time")
+        if (in_array((string)$row['status'], ['On Loan', 'Overdue'], true) && self::atLimit($row)) {
             return ['ok' => false, 'error' => self::limitMessage()];
         }
+        if (!self::isExtendable($row, $now)) {
+            return ['ok' => false, 'error' => self::notDueMessage($row)];
+        }
 
+        $late    = self::isLate($row, $now);
         $due     = self::dueAt($row);
         $options = [];
         foreach (self::options($row, $now) as $o) {
@@ -388,6 +433,10 @@ final class BorrowExtension
             'extended'  => (int)($row['extension_count'] ?? 0),
             'used'      => (int)($row['extension_count'] ?? 0),
             'max'       => self::maxExtensions(),
+            'kind'      => $late ? 'overdue' : 'soon',
+            'hint'      => $late
+                ? 'You can extend once. It is checked against other bookings first, and the loan is no longer overdue once extended.'
+                : 'You can extend once. It is counted from the return time and checked against other bookings first.',
             'options'   => $options,
         ];
         if (!$options) {
@@ -432,13 +481,13 @@ final class BorrowExtension
                 $conn->rollback();
                 return ['ok' => false, 'error' => 'We could not find that borrowed item.'];
             }
-            if (!self::isDue($row, $now)) {
-                $conn->rollback();
-                return ['ok' => false, 'error' => self::notDueMessage($row)];
-            }
-            if (self::atLimit($row)) {
+            if (in_array((string)$row['status'], ['On Loan', 'Overdue'], true) && self::atLimit($row)) {
                 $conn->rollback();
                 return ['ok' => false, 'error' => self::limitMessage()];
+            }
+            if (!self::isExtendable($row, $now)) {
+                $conn->rollback();
+                return ['ok' => false, 'error' => self::notDueMessage($row)];
             }
 
             $chosen = null;
@@ -464,28 +513,21 @@ final class BorrowExtension
             $newDate = $chosen['due']->format('Y-m-d');
             $newTime = $chosen['due']->format('H:i:s');
 
-            // The first extension remembers when the loan was really due; later ones keep it
-            $hadOriginal = (string)($row['original_return_date'] ?? '') !== '';
-            $origDate    = $hadOriginal ? (string)$row['original_return_date'] : (string)$row['return_date'];
-            $origTime    = $hadOriginal
-                ? ((string)($row['original_return_time'] ?? '') !== '' ? (string)$row['original_return_time'] : null)
-                : ((string)($row['return_time'] ?? '') !== '' ? (string)$row['return_time'] : null);
-            // How long the loan had already been overdue when this extension was granted
+            // The new return moment REPLACES the old one (and any overdue status that came with it)
+            $wasLate = self::isLate($row, $now);
             $lateNow = max(0, $now->getTimestamp() - self::dueAt($row)->getTimestamp());
             $nth     = (int)($row['extension_count'] ?? 0) + 1;
 
             $upd = $conn->prepare(
                 "UPDATE tbl_requests
                     SET return_date = ?, return_time = ?, status = 'On Loan',
-                        extension_count = extension_count + 1, reason = ?,
-                        original_return_date = ?, original_return_time = ?,
-                        extension_late_seconds = extension_late_seconds + ?
+                        extension_count = extension_count + 1, reason = ?
                   WHERE id = ? AND faculty_id = ? AND status IN ('Overdue','On Loan')"
             );
             if (!$upd) {
                 throw new \RuntimeException('prepare update failed: ' . $conn->error);
             }
-            $upd->bind_param('sssssiis', $newDate, $newTime, $note, $origDate, $origTime, $lateNow, $requestId, $facultyId);
+            $upd->bind_param('sssis', $newDate, $newTime, $note, $requestId, $facultyId);
             $upd->execute();
             $changed = $upd->affected_rows > 0;
             $upd->close();
@@ -495,9 +537,10 @@ final class BorrowExtension
             }
 
             // Admin trail (same transaction: it exists if and only if the extension does)
-            $origLabel = (new DateTimeImmutable($origDate . ' ' . ($origTime ?? '23:59:59'), self::tz()))->format($origTime !== null ? 'M j, g:i A' : 'M j');
-            $detail = 'Until ' . $chosen['due']->format('M j, g:i A') . ' (' . $chosen['label'] . ', extension ' . $nth . ' of ' . self::MAX_EXTENSIONS . '). '
-                . 'Was overdue by ' . self::duration($lateNow) . '; originally due ' . $origLabel . '.';
+            $previous = self::dueAt($row)->format('M j, g:i A');
+            $detail = 'Until ' . $chosen['due']->format('M j, g:i A') . ' (' . $chosen['label'] . ', extension ' . $nth . ' of ' . self::maxExtensions() . '). '
+                . ($wasLate ? 'Was overdue by ' . self::duration($lateNow) . '; ' : 'Asked before it was due; ')
+                . 'previous return ' . $previous . '.';
             $ev = $conn->prepare(
                 "INSERT INTO tbl_request_events (request_id, borrower_id, borrower_name, equipment_name, `event`, detail, created_at)
                  VALUES (?, ?, ?, ?, 'extended', ?, NOW())"

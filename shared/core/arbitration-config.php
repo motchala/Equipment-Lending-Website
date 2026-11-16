@@ -30,7 +30,7 @@ final class ArbitrationConfig
         'rule_missing_doc_block_enabled' => ['type' => 'bool', 'default' => false],
         'max_items_per_borrower'         => ['type' => 'int', 'default' => 3,  'min' => 1, 'max' => 20],
         'max_borrow_days'                => ['type' => 'int', 'default' => 3,  'min' => 1, 'max' => 3],
-        'max_extensions'                 => ['type' => 'int', 'default' => 2,  'min' => 0, 'max' => 5],
+        'max_extensions'                 => ['type' => 'int', 'default' => 1,  'min' => 0, 'max' => 1],
         'low_stock_threshold'            => ['type' => 'int', 'default' => 2,  'min' => 0, 'max' => 20],
 
         // ── Equipment: booking window ───────────────────────────────────────
