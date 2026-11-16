@@ -2011,6 +2011,25 @@ html.rx-mobile #panel-lending .eq-item-card--in-cart .bf-tick {
     left: 32px !important;
 }
 
+/* The Add button, the arrow and the photo share one vertical centre. The button used to sit in
+   the first text row only, so it looked pushed up compared with the arrow and the photo. */
+html.rx-mobile #panel-lending .eq-item-card:not(.eq-item-card--in-cart) {
+    align-content: center !important;
+}
+
+html.rx-mobile #panel-lending .eq-item-card:not(.eq-item-card--in-cart) .bf-slot {
+    grid-area: act !important;
+    align-self: center !important;
+}
+
+html.rx-mobile #panel-lending .eq-item-card:not(.eq-item-card--in-cart) .eq-item-img {
+    align-self: center !important;
+}
+
+html.rx-mobile #panel-lending .eq-item-card .eq-ic-btn {
+    align-self: center !important;
+}
+
 html.rx-mobile #panel-lending .eq-item-cat {
     display: none !important;
 }
