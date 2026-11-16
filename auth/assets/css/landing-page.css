@@ -712,16 +712,16 @@ body {
     transition: opacity 0.15s;
 }
 
-.remember-option input:checked + span::before {
+.remember-option input:checked+span::before {
     border-color: var(--maroon);
     background: var(--maroon);
 }
 
-.remember-option input:checked + span::after {
+.remember-option input:checked+span::after {
     opacity: 1;
 }
 
-.remember-option input:focus-visible + span::before {
+.remember-option input:focus-visible+span::before {
     box-shadow: 0 0 0 3px rgba(96, 3, 2, 0.16);
 }
 
@@ -1212,5 +1212,165 @@ body {
 
     .panel-bottom {
         padding-top: 0.5rem;
+    }
+}
+
+/* ================================================================
+   PHONE POLISH — portrait phones (575.98px and below)
+   Compact hero + toned-down logo, fields and buttons so the whole
+   sign-in form fits on one small screen without scrolling. Layout
+   is unchanged. Inputs keep 16px text so iOS does not zoom on focus.
+   To undo: delete this whole block.
+================================================================ */
+@media (max-width: 575.98px) and (orientation: portrait) {
+
+    /* Hero: takes whatever height the form leaves free (never under 184px, never over half the
+       screen). Uses the small viewport height so the hero does not jump when the address bar hides. */
+    .gateway-visual {
+        flex: 0 0 auto;
+        height: clamp(184px, calc(100vh - 33.5rem), 52vh);
+        min-height: 0;
+    }
+
+    @supports (height: 1svh) {
+        .gateway-visual {
+            height: clamp(184px, calc(100svh - 33.5rem), 52svh);
+        }
+    }
+
+    .visual-brand {
+        top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
+        left: 1.1rem;
+        min-height: 36px;
+        padding: 0 13px 0 10px;
+        font-size: 0.72rem;
+    }
+
+    .visual-content {
+        left: 1.4rem;
+        right: 1.4rem;
+        bottom: 1rem;
+        padding-left: 0.9rem;
+    }
+
+    .visual-heading {
+        font-size: clamp(1.7rem, 7.2vw, 2rem);
+        line-height: 1.08;
+    }
+
+    .visual-sub {
+        margin-top: 0.45rem;
+        font-size: 0.78rem;
+        line-height: 1.5;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+    }
+
+    /* Panel */
+    .gateway-panel {
+        gap: 1rem;
+        padding-top: 1.15rem !important;
+        padding-bottom: max(1rem, env(safe-area-inset-bottom));
+    }
+
+    .panel-logo {
+        gap: 0.75rem;
+    }
+
+    .panel-logo-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 13px;
+    }
+
+    .panel-logo-icon svg {
+        width: 23px;
+        height: 23px;
+    }
+
+    .panel-logo-name {
+        font-size: 1.5rem;
+    }
+
+    .panel-logo-sub {
+        font-size: 0.66rem;
+        letter-spacing: 1.2px;
+    }
+
+    .panel-stage {
+        padding-top: 0.9rem;
+    }
+
+    .auth-head {
+        margin-bottom: 0.9rem;
+    }
+
+    .pane-title {
+        font-size: 1.4rem;
+    }
+
+    /* Form */
+    .form-group {
+        margin-bottom: 0.65rem;
+    }
+
+    .form-group label {
+        margin-bottom: 4px;
+    }
+
+    .form-field {
+        min-height: 46px;
+        padding: 10px 46px 10px 38px;
+        border-radius: 11px;
+    }
+
+    .eye-toggle {
+        width: 42px;
+        height: 42px;
+    }
+
+    .remember-option {
+        margin: 0 0 0.2rem;
+    }
+
+    .btn-auth,
+    .btn-auth:disabled {
+        min-height: 48px;
+        padding: 12px 11px;
+        margin-top: 0.4rem;
+        font-size: 0.95rem;
+        border-radius: 11px;
+    }
+
+    .auth-alert {
+        padding: 0.55rem 0.8rem;
+        margin-bottom: 0.65rem;
+    }
+
+    /* Bottom links */
+    .panel-bottom {
+        gap: 0.2rem 1rem;
+        padding-top: 0.75rem;
+    }
+
+    .panel-links a {
+        min-height: 40px;
+    }
+
+    .panel-badges span {
+        padding: 4px 10px 4px 8px;
+    }
+}
+
+/* Phones: centre the "Secure Auth" / "Encrypted" tags, like the "Continue as Student" link above them.
+   Tablets and desktop keep their own alignment. */
+@media (max-width: 575.98px) {
+    .panel-bottom {
+        justify-content: center;
+    }
+
+    .panel-badges {
+        width: 100%;
+        justify-content: center;
     }
 }
