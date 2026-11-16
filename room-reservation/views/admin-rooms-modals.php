@@ -108,7 +108,7 @@
                 <!-- Shown for Waiting requests. Open the attached request letter (if any) above, then decide. -->
                 <section class="ps-drawer-sec" id="ps-rr-review-sec" hidden>
                     <h4>Your decision</h4>
-                    <label class="ps-drawer-muted" for="ps-rr-review-reason">Reason (at least 5 characters). It is saved with the decision.</label>
+                    <label class="ps-drawer-muted" for="ps-rr-review-reason">Reason for approving (at least 5 characters). It is saved with the decision. To decline, use the Decline button and pick a reason.</label>
                     <textarea class="ps-rr-reason" id="ps-rr-review-reason" rows="3" maxlength="500"></textarea>
                     <div class="ps-rr-review-err" id="ps-rr-review-err" role="alert" hidden></div>
                 </section>
@@ -129,6 +129,52 @@
                 </button>
             </div>
         </aside>
+    </div>
+
+    <!-- MODAL: DECLINE RESERVATION (opened by Decline in the reservation drawer). Same form as the equipment
+         "Decline Request" modal: summary of the request, then one tap on a reason. -->
+    <div class="ps-modal-backdrop" id="ps-rr-decline-modal" style="z-index:660;">
+        <div class="ps-modal ps-modal--sm">
+            <div class="ps-modal-head">
+                <div class="ps-modal-head-icon ps-mhi--danger">
+                    <span class="material-symbols-outlined">cancel</span>
+                </div>
+                <h3>Decline Reservation</h3>
+                <button class="ps-modal-close" type="button" data-action="ps-close-modal" data-modal="ps-rr-decline-modal" aria-label="Close">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="ps-modal-body">
+                <div id="ps-rr-decline-alert" role="alert" hidden style="margin-bottom:.85rem;padding:.6rem .8rem;border-radius:8px;font-size:12.5px;background:#ffeaea;color:var(--danger)"></div>
+                <div class="ps-req-summary">
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Reservation</span><span class="ps-rsv" id="ps-rr-decline-no" style="font-weight:600;color:var(--accent-maroon)">#0</span></div>
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Requested by</span><span class="ps-rsv" id="ps-rr-decline-who">&mdash;</span></div>
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Facility</span><span class="ps-rsv" id="ps-rr-decline-room">&mdash;</span></div>
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Date &amp; Time</span><span class="ps-rsv" id="ps-rr-decline-when">&mdash;</span></div>
+                </div>
+                <div class="ps-form-group">
+                    <?php
+                    $picker_id      = 'rr-decline-reason-picker';
+                    $picker_label   = 'Reason for declining';
+                    $picker_reasons = [
+                        ['Facility unavailable', 'The facility is not available at the requested time.'],
+                        ['Schedule conflict',    'The request conflicts with another reservation or a class schedule.'],
+                        ['Under maintenance',    'The facility is under maintenance or closed.'],
+                        ['Over capacity',        'The number of attendees is more than the facility can hold.'],
+                        ['Letter missing',       'The request letter or supporting document is missing or not valid.'],
+                        ['Purpose not allowed',  'The purpose of the reservation is not allowed for this facility.'],
+                    ];
+                    require __DIR__ . '/../../shared/views/decline-reason-picker.php';
+                    ?>
+                </div>
+            </div>
+            <div class="ps-modal-foot">
+                <button class="ps-btn ps-btn--ghost" type="button" data-action="ps-close-modal" data-modal="ps-rr-decline-modal">Cancel</button>
+                <button class="ps-btn ps-btn--danger" type="button" id="ps-rr-decline-confirm" disabled>
+                    <span class="material-symbols-outlined">close</span> Decline Reservation
+                </button>
+            </div>
+        </div>
     </div>
 
 <?php if ($is_super_admin): ?>

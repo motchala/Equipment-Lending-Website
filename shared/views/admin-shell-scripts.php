@@ -1,4 +1,5 @@
     <script src="shared/assets/js/logout-modal.js?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/js/logout-modal.js'); ?>"></script>
+    <script src="shared/assets/js/admin-decline-reasons.js?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/js/admin-decline-reasons.js'); ?>"></script>
     <script src="dashboard/assets/js/admin-dashboard.js?v=<?php echo @filemtime(PS_ROOT . '/dashboard/assets/js/admin-dashboard.js'); ?>"></script>
     <script src="shared/assets/js/admin-archived-pager.js?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/js/admin-archived-pager.js'); ?>"></script>
     <script src="notifications/assets/js/notif-prefs.js?v=<?php echo @filemtime(PS_ROOT . '/notifications/assets/js/notif-prefs.js'); ?>"></script>
