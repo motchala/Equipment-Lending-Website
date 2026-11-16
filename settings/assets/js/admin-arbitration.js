@@ -83,7 +83,8 @@
         root.querySelectorAll('.arb-row.has-error').forEach(function (r) { r.classList.remove('has-error'); });
     }
     function markError(key) {
-        var el = document.getElementById('arb-' + (key === 'equip_durations' ? 'equip_dur_1' : key));
+        var alias = { equip_durations: 'equip_dur_1', room_open_days: 'room_day_mon' };
+        var el = document.getElementById('arb-' + (alias[key] || key));
         var row = el ? el.closest('.arb-row') : null;
         if (row) { row.classList.add('has-error'); }
         return row;
@@ -341,10 +342,17 @@
         if (ms) saveTimer = setTimeout(function () { resetBarText(); hideBar(); }, ms);
     }
 
+    /* the open-day chips are separate fields; the server stores them as one list of ISO weekdays */
+    var ROOM_DAY_ISO = { room_day_mon: 1, room_day_tue: 2, room_day_wed: 3, room_day_thu: 4, room_day_fri: 5, room_day_sat: 6, room_day_sun: 7 };
+
     function collectLive() {
-        var settings = {}, durations = [];
+        var settings = {}, durations = [], openDays = [];
         liveFields().forEach(function (el) {
             var k = el.dataset.arbKey;
+            if (ROOM_DAY_ISO[k]) {
+                if (el.checked) openDays.push(ROOM_DAY_ISO[k]);
+                return;
+            }
             if (k.indexOf('equip_dur_') === 0) {
                 if (el.checked) durations.push(parseInt(k.slice(10), 10));
                 return;
@@ -354,6 +362,7 @@
             else settings[k] = el.value;
         });
         settings.equip_durations = durations;
+        settings.room_open_days = openDays;
         return settings;
     }
 
@@ -363,6 +372,8 @@
         Object.keys(values).forEach(function (k) {
             if (k === 'equip_durations') {
                 [1, 2, 3, 4, 5, 6].forEach(function (n) { map['equip_dur_' + n] = values.equip_durations.indexOf(n) !== -1; });
+            } else if (k === 'room_open_days') {
+                Object.keys(ROOM_DAY_ISO).forEach(function (key) { map[key] = values.room_open_days.indexOf(ROOM_DAY_ISO[key]) !== -1; });
             } else {
                 map[k] = values[k];
             }
@@ -400,7 +411,7 @@
                     applySaved(j.values || {});
                     var msg = '<span class="material-symbols-outlined">check_circle</span> ' +
                         (j.changed && j.changed.length ? 'Saved. New requests use these rules now.' : 'Nothing changed.');
-                    if (otherEdits) msg += ' Room schedule, role and priority edits are not connected yet, so they were not saved.';
+                    if (otherEdits) msg += ' Role weights and priority edits are not connected yet, so they were not saved.';
                     say(msg, otherEdits ? 7000 : 3500);
                     return;
                 }

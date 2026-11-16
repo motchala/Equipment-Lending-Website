@@ -6,9 +6,9 @@
  * Included from settings/views/admin-screen.php as a direct child of #panel-settings,
  * so the existing Settings sub-tab switcher can show and hide it.
  *
- * LIVE cards (marked data-arb-live): "Current semester", "Borrowing rules", "Booking window" and "Reservation rules". They load their
+ * LIVE cards (marked data-arb-live): "Current semester", "Borrowing rules", "Booking window", "Reservation rules" and "Room schedule". They load their
  * values through ArbitrationConfig and save through settings/api/save-arbitration.php.
- * The other cards (room schedule, role weights, priority faculty) are still UI only
+ * The other cards (role weights, priority faculty) are still UI only
  * and carry a "Not connected yet" badge.
  *
  * Styles : settings/assets/css/admin-arbitration.css  (all classes are arb-*)
@@ -276,17 +276,18 @@ $arb_date = static function (string $key, string $title, string $sub, string $va
             </div>
         </div>
 
-        <div class="sett-card arb-card">
+        <div class="sett-card arb-card" data-arb-live>
             <div class="sett-card-head">
                 <span class="material-symbols-outlined">calendar_month</span>
                 <h3>Room schedule</h3>
-                <span class="arb-badge">Not connected yet</span>
             </div>
             <div class="sett-card-body">
                 <?php
-                $arb_time('Reservation hours', 'Earliest start and latest end of a reservation.', 'room_day_start', '07:00', 'room_day_end', '20:00');
-                $arb_chips('room_day', 'Days rooms can be reserved', 'Unticked days are closed to new reservations.', ['mon' => 'Mon', 'tue' => 'Tue', 'wed' => 'Wed', 'thu' => 'Thu', 'fri' => 'Fri', 'sat' => 'Sat', 'sun' => 'Sun'], ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']);
-                $arb_stepper('room_max_hours', 'Longest single reservation', 'Longest a room can be held in one reservation.', $arb_num('room_max_hours', 13), 1, 13, 1, 'hours');
+                $arb_room_day_keys = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];   // ISO weekday 1..7
+                $arb_room_open = array_map(static function ($n) use ($arb_room_day_keys) { return $arb_room_day_keys[(int)$n - 1]; }, (array)$arb_live['room_open_days']);
+                $arb_time('Reservation hours', 'Earliest start and latest end of a reservation. Times are on the hour.', 'room_day_start', (string)$arb_live['room_day_start'], 'room_day_end', (string)$arb_live['room_day_end']);
+                $arb_chips('room_day', 'Days rooms can be reserved', 'Unticked days are closed to new reservations. At least one day must stay open.', ['mon' => 'Mon', 'tue' => 'Tue', 'wed' => 'Wed', 'thu' => 'Thu', 'fri' => 'Fri', 'sat' => 'Sat', 'sun' => 'Sun'], $arb_room_open);
+                $arb_stepper('room_max_hours', 'Longest single reservation', 'Longest a room can be held in one reservation.', (int)$arb_live['room_max_hours'], 1, 16, 1, 'hours');
                 ?>
             </div>
         </div>

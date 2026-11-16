@@ -25,6 +25,10 @@ try {
     RoomRules::load($conn);
     $rules = BookingSchedule::metaRules();
     $rules['roomMaxAdvanceDays'] = RoomRules::maxAdvanceDays();   // how far ahead a room can be reserved
+    $rules['roomDayStart']       = RoomRules::dayStart();         // room reservation hours
+    $rules['roomDayEnd']         = RoomRules::dayEnd();
+    $rules['roomOpenDays']       = RoomRules::openDays();         // ISO weekdays rooms can be reserved on (1 = Monday … 7 = Sunday)
+    $rules['roomMaxHours']       = RoomRules::maxHours();         // longest single reservation
     echo json_encode(['ok' => true, 'rules' => $rules]);
 } catch (Throwable $e) {
     error_log('[borrow-rules] ' . $e->getMessage());
