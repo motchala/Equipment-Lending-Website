@@ -206,6 +206,13 @@
                     <span class="rq-chip-count<?php echo $eq_loan_overdue > 0 ? '' : ' rq-chip-count--ok'; ?>" id="eqLoanChipCount"><?php echo $eq_loan_total; ?></span>
                 <?php endif; ?>
             </button>
+            <!-- Archived: a tab pushed to the right (same as Facilities > Archived). Count hidden when 0. -->
+            <?php $eq_archive_count = (int)mysqli_num_rows($archive_result); ?>
+            <button type="button" class="rq-filter-chip eq-tab-archived" data-eq-panel="eq-archived"
+                title="Equipment hidden from the borrowing catalog">
+                <span class="material-symbols-outlined eq-tab-ico" aria-hidden="true">inventory_2</span> Archived
+                <span class="rq-chip-count rq-chip-count--muted" id="eqArchivedChipCount"<?php echo $eq_archive_count > 0 ? '' : ' hidden'; ?>><?php echo $eq_archive_count; ?></span>
+            </button>
         </div>
 
         <!-- ── CATALOG (existing form + list + archived, wrapped as-is) ── -->
@@ -477,88 +484,77 @@
 
             </div><!-- /faculty-layout inv-layout -->
 
-            <!-- Archived Items -->
-            <div class="inv-archived-wrap">
-                <div class="history-toggle-wrap inv-arch-toggle" id="registry-toggle-wrap">
-                    <button class="history-toggle-btn" data-history-tab="reg-archived">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                            stroke-linejoin="round" width="14" height="14">
-                            <polyline points="21 8 21 21 3 21 3 8" />
-                            <rect x="1" y="3" width="22" height="5" />
-                            <line x1="10" y1="12" x2="14" y2="12" />
-                        </svg>
-                        Archived Items
-                    </button>
-                </div>
-                <div class="history-panel" id="history-reg-archived">
-                    <div class="eq-card">
-                        <div class="tbl-wrap">
-                            <table class="admin-table">
-                                <thead>
-                                    <tr>
-                                        <th>Image</th>
-                                        <th>Item Name</th>
-                                        <th>Category</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="inv-archive-body">
-                                    <?php if (mysqli_num_rows($archive_result) === 0): ?>
-                                        <tr>
-                                            <td colspan="4" class="text-muted"
-                                                style="text-align:center;padding:2.5rem;">
-                                                No archived items.
-                                            </td>
-                                        </tr>
-                                        <?php else: while ($item = mysqli_fetch_assoc($archive_result)): ?>
-                                            <tr>
-                                                <td>
-                                                    <img src="<?php echo $root_url . htmlspecialchars($item['image_path']); ?>"
-                                                        class="item-img"
-                                                        onerror="this.src='../uploads/default.png'">
-                                                </td>
-                                                <td class="fw-bold"><?php echo htmlspecialchars($item['item_name']); ?></td>
-                                                <td><?php echo htmlspecialchars($item['category']); ?></td>
-                                                <td class="action-cell">
-                                                    <div class="action-btns">
-                                                        <a href="admin-dashboard.php?restore_item=<?php echo $item['item_id']; ?>"
-                                                            class="btn-action btn-restore" title="Restore">
-                                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                                                                fill="none" stroke="currentColor" stroke-width="2"
-                                                                stroke-linecap="round" stroke-linejoin="round"
-                                                                width="14" height="14">
-                                                                <polyline points="1 4 1 10 7 10" />
-                                                                <path d="M3.51 15a9 9 0 1 0 .49-3.51" />
-                                                            </svg>
-                                                        </a>
-                                                        <a href="admin-dashboard.php?force_delete=<?php echo $item['item_id']; ?>"
-                                                            class="btn-action btn-force-del" title="Delete permanently"
-                                                            onclick="return confirm('Permanently delete? This cannot be undone.')">
-                                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                                                                fill="none" stroke="currentColor" stroke-width="2"
-                                                                stroke-linecap="round" stroke-linejoin="round"
-                                                                width="14" height="14">
-                                                                <polyline points="3 6 5 6 21 6" />
-                                                                <path d="M19 6l-1 14H6L5 6" />
-                                                                <path d="M10 11v6" />
-                                                                <path d="M14 11v6" />
-                                                                <path d="M9 6V4h6v2" />
-                                                            </svg>
-                                                        </a>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                    <?php endwhile;
-                                    endif; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div><!-- /history-reg-archived -->
-            </div><!-- /inv-archived-wrap -->
-
         </div><!-- /eq-catalog -->
+
+        <!-- ── ARCHIVED (a tab, like Facilities > Archived) ── -->
+        <div class="eq-sub-panel" id="eq-archived">
+            <div class="eq-card">
+                <div class="eq-card-header">
+                    <h2><span class="material-symbols-outlined inv-head-icon">inventory_2</span> Archived Equipment</h2>
+                </div>
+                <div class="inv-arch-note">
+                    Archived equipment is hidden from the borrowing catalog &mdash; it cannot be browsed or borrowed.
+                    It can be restored at any time, or deleted permanently.
+                </div>
+                <div class="tbl-wrap">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Image</th>
+                                <th>Item Name</th>
+                                <th>Category</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inv-archive-body">
+                            <?php if (mysqli_num_rows($archive_result) === 0): ?>
+                                <tr>
+                                    <td colspan="4" class="text-muted"
+                                        style="text-align:center;padding:2.5rem;">
+                                        No archived items.
+                                    </td>
+                                </tr>
+                                <?php else: while ($item = mysqli_fetch_assoc($archive_result)): ?>
+                                    <tr>
+                                        <td>
+                                            <img src="<?php echo $root_url . htmlspecialchars($item['image_path']); ?>"
+                                                class="item-img"
+                                                onerror="this.src='../uploads/default.png'">
+                                        </td>
+                                        <td class="fw-bold"><?php echo htmlspecialchars($item['item_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($item['category']); ?></td>
+                                        <td>
+                                            <div class="rm-actions">
+                                                <a href="admin-dashboard.php?restore_item=<?php echo $item['item_id']; ?>" class="pr-tbl-btn restore">
+                                                    <span class="material-symbols-outlined" style="font-size:14px;">unarchive</span>
+                                                    Restore
+                                                </a>
+                                                <a href="admin-dashboard.php?force_delete=<?php echo $item['item_id']; ?>" class="pr-tbl-btn danger">
+                                                    <span class="material-symbols-outlined" style="font-size:14px;">delete_forever</span>
+                                                    Delete permanently
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                            <?php endwhile;
+                            endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="inv-pager" data-arch-pager="inv-archive-body" hidden>
+                    <span class="inv-pager-info"></span>
+                    <div class="inv-pager-ctl" role="navigation" aria-label="Archived equipment pages">
+                        <button type="button" class="inv-pager-btn" data-pg="prev" aria-label="Previous page">
+                            <span class="material-symbols-outlined">chevron_left</span>
+                        </button>
+                        <div class="inv-pager-nums"></div>
+                        <button type="button" class="inv-pager-btn" data-pg="next" aria-label="Next page">
+                            <span class="material-symbols-outlined">chevron_right</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div><!-- /eq-archived -->
 
         <!-- ── ON LOAN (equipment currently out: Approved + Overdue) ───────────── -->
         <div class="eq-sub-panel" id="eq-onloan">

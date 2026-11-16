@@ -21,6 +21,13 @@
                 var badge = document.getElementById('inv-count-badge');
                 if (badge) badge.textContent = '(' + json.active_count + ')';
 
+                /* Archived tab count (hidden when there is nothing archived) */
+                var archBadge = document.getElementById('eqArchivedChipCount');
+                if (archBadge && typeof json.archive_count !== 'undefined') {
+                    archBadge.textContent = json.archive_count;
+                    archBadge.hidden = !(json.archive_count > 0);
+                }
+
                 // Re-wire pagination/search since rows are brand new DOM nodes
                 if (typeof window._setupInventoryListFn === 'function') {
                     window._setupInventoryListFn();

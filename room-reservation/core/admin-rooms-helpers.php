@@ -299,7 +299,7 @@ function ps_render_archived_tbody(array $rooms_archived, bool $can_delete): stri
     ob_start();
     if (empty($rooms_archived)): ?>
         <tr>
-            <td colspan="2" class="rm-empty-cell">No archived facilities.</td>
+            <td colspan="3" class="rm-empty-cell">No archived facilities.</td>
         </tr>
         <?php else: foreach ($rooms_archived as $ar):
             $ar_floor = !empty($ar['floor_label']) ? $ar['floor_label'] : $ar['floor_number'] . 'F';
@@ -307,8 +307,8 @@ function ps_render_archived_tbody(array $rooms_archived, bool $can_delete): stri
             <tr>
                 <td>
                     <div class="rm-main"><?php echo htmlspecialchars($ar['room_name']); ?></div>
-                    <div class="rm-subline"><?php echo htmlspecialchars($ar_floor . ', ' . $ar['building_name']); ?></div>
                 </td>
+                <td><?php echo htmlspecialchars($ar_floor . ', ' . $ar['building_name']); ?></td>
                 <td>
                     <div class="rm-actions">
                         <a href="admin-dashboard.php?restore_room=<?php echo (int)$ar['room_id']; ?>" class="pr-tbl-btn restore">

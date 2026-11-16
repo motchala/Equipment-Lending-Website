@@ -6636,7 +6636,8 @@ input[type="range"] {
 }
 
 /* ── Table action buttons ─────────────────────────────────── */
-#panel-rooms .pr-tbl-btn {
+#panel-rooms .pr-tbl-btn,
+#eq-archived .pr-tbl-btn {
     display: inline-flex;
     align-items: center;
     gap: 5px;
@@ -6653,27 +6654,32 @@ input[type="range"] {
     text-decoration: none;
 }
 
-#panel-rooms .pr-tbl-btn:hover {
+#panel-rooms .pr-tbl-btn:hover,
+#eq-archived .pr-tbl-btn:hover {
     border-color: var(--accent-maroon);
     color: var(--accent-maroon);
     background: var(--hover-bg);
 }
 
-#panel-rooms .pr-tbl-btn.restore {
+#panel-rooms .pr-tbl-btn.restore,
+#eq-archived .pr-tbl-btn.restore {
     color: #27ae60;
     border-color: #a9dfbf;
 }
 
-#panel-rooms .pr-tbl-btn.restore:hover {
+#panel-rooms .pr-tbl-btn.restore:hover,
+#eq-archived .pr-tbl-btn.restore:hover {
     background: var(--hover-bg);
 }
 
-#panel-rooms .pr-tbl-btn.danger {
+#panel-rooms .pr-tbl-btn.danger,
+#eq-archived .pr-tbl-btn.danger {
     color: var(--danger);
     border-color: #e6b0aa;
 }
 
-#panel-rooms .pr-tbl-btn.danger:hover {
+#panel-rooms .pr-tbl-btn.danger:hover,
+#eq-archived .pr-tbl-btn.danger:hover {
     background: #fdecea;
     border-color: var(--danger);
     color: var(--danger);
@@ -12508,7 +12514,8 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     font-size: 16px;
 }
 
-#panel-rooms .rm-actions {
+#panel-rooms .rm-actions,
+#eq-archived .rm-actions {
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-end;
@@ -13078,6 +13085,71 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
 #eqTabs .rq-chip-count {
     font-size: 10.5px;
     min-width: 19px;
+}
+
+/* Archived tab: pushed to the right of the tab row, grey count (same look as Facilities > Archived) */
+#eqTabs .eq-tab-archived {
+    margin-left: auto;
+}
+
+#eqTabs .rq-chip-count--muted {
+    background: var(--text-light);
+    color: #fff;
+}
+
+#eqTabs .rq-filter-chip.active .rq-chip-count--muted {
+    background: rgba(255, 255, 255, 0.28);
+}
+
+.inv-arch-note {
+    padding: .75rem 1.25rem;
+    font-size: .82rem;
+    color: var(--text-light);
+    border-bottom: 1px solid var(--khaki-border);
+}
+
+/* Archived tables (Equipment + Facilities): Restore / Delete permanently side by side on one line,
+   sitting under the "Actions" header. */
+#eq-archived .rm-actions,
+#roomsArchivedTable .rm-actions {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+}
+
+#eq-archived .pr-tbl-btn,
+#roomsArchivedTable .pr-tbl-btn {
+    white-space: nowrap;
+}
+
+/* Archived equipment: the first and last columns line up with the card title and the note above the table
+   (20px), instead of the table's default 14px that pushed the headers too far left. */
+#eq-archived .admin-table thead th:first-child,
+#eq-archived .admin-table tbody td:first-child {
+    padding-left: 1.25rem;
+}
+
+#eq-archived .admin-table thead th:last-child,
+#eq-archived .admin-table tbody td:last-child {
+    padding-right: 1.25rem;
+}
+
+@media (max-width: 640px) {
+
+    /* phones: let the two buttons wrap again instead of forcing a sideways scroll */
+    #eq-archived .rm-actions,
+    #roomsArchivedTable .rm-actions {
+        flex-wrap: wrap;
+    }
+
+    #eq-archived .admin-table thead th:first-child,
+    #eq-archived .admin-table tbody td:first-child {
+        padding-left: 1rem;
+    }
+
+    #eq-archived .admin-table thead th:last-child,
+    #eq-archived .admin-table tbody td:last-child {
+        padding-right: 1rem;
+    }
 }
 
 @media (max-width: 700px) {

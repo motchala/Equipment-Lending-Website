@@ -98,24 +98,15 @@ if (($_GET['fragment'] ?? '') === 'inventory-tbody') {
                 <td><img src="<?php echo $root_url . htmlspecialchars($item['image_path']); ?>" class="item-img" onerror="this.src='../uploads/default.png'"></td>
                 <td class="fw-bold"><?php echo htmlspecialchars($item['item_name']); ?></td>
                 <td><?php echo htmlspecialchars($item['category']); ?></td>
-                <td class="action-cell">
-                    <div class="action-btns">
-                        <a href="admin-dashboard.php?restore_item=<?php echo $item['item_id']; ?>"
-                            class="btn-action btn-restore" title="Restore">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
-                                <polyline points="1 4 1 10 7 10" />
-                                <path d="M3.51 15a9 9 0 1 0 .49-3.51" />
-                            </svg>
+                <td>
+                    <div class="rm-actions">
+                        <a href="admin-dashboard.php?restore_item=<?php echo $item['item_id']; ?>" class="pr-tbl-btn restore">
+                            <span class="material-symbols-outlined" style="font-size:14px;">unarchive</span>
+                            Restore
                         </a>
-                        <a href="admin-dashboard.php?force_delete=<?php echo $item['item_id']; ?>"
-                            class="btn-action btn-force-del" title="Delete permanently">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
-                                <polyline points="3 6 5 6 21 6" />
-                                <path d="M19 6l-1 14H6L5 6" />
-                                <path d="M10 11v6" />
-                                <path d="M14 11v6" />
-                                <path d="M9 6V4h6v2" />
-                            </svg>
+                        <a href="admin-dashboard.php?force_delete=<?php echo $item['item_id']; ?>" class="pr-tbl-btn danger">
+                            <span class="material-symbols-outlined" style="font-size:14px;">delete_forever</span>
+                            Delete permanently
                         </a>
                     </div>
                 </td>
