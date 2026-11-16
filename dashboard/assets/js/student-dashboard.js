@@ -33,6 +33,11 @@
        window from Settings → Arbitration, so the pickers match what the server accepts. */
     var EQ_PAGE_SIZE = 20;
     var PURPOSES = ['Lecture', 'Lab session', 'Meeting', 'Exam', 'Seminar'];
+    /* Room reservation inputs follow the faculty reservation form (room-reservation/assets/js/fcty-facilities.js) */
+    var ROOM_END_MIN = 20 * 60;               /* rooms close at 8:00 PM */
+    var ROOM_STEP_MIN = 30;                   /* start times every 30 minutes */
+    var ROOM_DURATIONS = [60, 120, 180, 360]; /* 1 / 2 / 3 / 6 hours */
+    var DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     var QR_SRC = 'https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js';
     var RECEIPT_KEY = 'pup_last_receipt';
     var URLS = {
@@ -1118,23 +1123,131 @@
         if (trigger) trigger.focus();
     }
 
-    function startOptions(dateStr) {
-        var isToday = dateStr === todayStr();
-        var cut = nowMin();
-        var html = '<option value="" selected disabled>Select</option>';
-        for (var m = OPEN_MIN; m <= CLOSE_MIN - STEP_MIN; m += STEP_MIN) {
-            html += '<option value="' + minToHHMM(m) + '"' + (isToday && m <= cut ? ' disabled' : '') + '>' + minToLabel(m) + '</option>';
-        }
-        return html;
+    /* ── Reservation inputs (same fields and rules as the faculty reservation form) ──
+       Date: Today / Tomorrow chips + date picker (Sundays skipped) · Start time: every 30 min ·
+       Duration 1/2/3/6 h, or the gear for a custom whole-hour End time · Purpose: chips + "Other" */
+    var resState = null;   /* { date, start, end (minutes; start is null when no time is left today), custom, other, purpose } */
+
+    function isClosedDay(d) { return d.getDay() === 0; }
+    function nextOpenDay(d) { while (isClosedDay(d)) d = addDays(d, 1); return d; }
+    function durLabel(mins) {
+        var h = Math.floor(mins / 60), m = mins % 60;
+        if (!h) return m + ' min';
+        return h + (h === 1 ? ' hour' : ' hours') + (m ? ' ' + m + ' min' : '');
     }
-    function endOptions(startVal, selected) {
-        var s = startVal ? hhmmToMin(startVal) : null;
-        var html = '<option value=""' + (selected ? '' : ' selected') + ' disabled>Select</option>';
-        if (s == null) return html;
-        for (var m = s + STEP_MIN; m <= CLOSE_MIN; m += STEP_MIN) {
-            html += '<option value="' + minToHHMM(m) + '"' + (minToHHMM(m) === selected ? ' selected' : '') + '>' + minToLabel(m) + '</option>';
+    function resEarliestStart(dateStr) {
+        if (dateStr !== todayStr()) return OPEN_MIN;
+        return Math.max(OPEN_MIN, Math.ceil((nowMin() + 1) / ROOM_STEP_MIN) * ROOM_STEP_MIN);
+    }
+    function resSetPressed(containerId, test) {
+        var box = $(containerId);
+        if (!box) return;
+        Array.prototype.forEach.call(box.querySelectorAll('.st-chip'), function (c) {
+            c.setAttribute('aria-pressed', test(c) ? 'true' : 'false');
+        });
+    }
+
+    /* Redraws every reservation control from resState */
+    function resSync() {
+        var s = resState;
+        if (!s || !$('reserveStart')) return;
+        var lastStart = ROOM_END_MIN - ROOM_STEP_MIN;
+        var earliest = resEarliestStart(s.date);
+        var wasNone = s.start == null;
+
+        if (earliest > lastStart) s.start = null;                          /* nothing left today */
+        else if (s.start == null || s.start < earliest) s.start = earliest;
+        if (s.start != null) {
+            if (wasNone || s.end <= s.start) s.end = Math.min(ROOM_END_MIN, s.start + 60);
+            /* a custom end time is whole hours only: pull a half-hour end back to the o'clock */
+            if (s.custom && s.end % 60) {
+                var dn = Math.floor(s.end / 60) * 60;
+                s.end = dn > s.start ? dn : Math.min(ROOM_END_MIN, Math.ceil(s.end / 60) * 60);
+            }
         }
-        return html;
+
+        var startHtml = s.start == null ? '<option value="" selected disabled>No times left today</option>' : '';
+        for (var m = OPEN_MIN; m <= lastStart; m += ROOM_STEP_MIN) {
+            startHtml += '<option value="' + minToHHMM(m) + '"' + (m === s.start ? ' selected' : '') +
+                (m < earliest ? ' disabled' : '') + '>' + minToLabel(m) + '</option>';
+        }
+        $('reserveStart').innerHTML = startHtml;
+
+        var durHtml = '', endHtml = '';
+        if (s.start != null) {
+            var cur = s.end - s.start, list = ROOM_DURATIONS.slice();
+            if (list.indexOf(cur) === -1) { list.push(cur); list.sort(function (x, y) { return x - y; }); }
+            durHtml = list.map(function (d) {
+                var off = ROOM_DURATIONS.indexOf(d) !== -1 && s.start + d > ROOM_END_MIN;
+                return '<option value="' + d + '"' + (d === cur ? ' selected' : '') + (off ? ' disabled' : '') + '>' + durLabel(d) + '</option>';
+            }).join('');
+            for (var e = Math.floor(s.start / 60) * 60 + 60; e <= ROOM_END_MIN; e += 60) {
+                endHtml += '<option value="' + minToHHMM(e) + '"' + (e === s.end ? ' selected' : '') + '>' + minToLabel(e) + '</option>';
+            }
+        }
+        $('reserveDuration').innerHTML = durHtml;
+        $('reserveEnd').innerHTML = endHtml;
+
+        /* the gear swaps the second field between Duration and End time */
+        $('reserveDuration').hidden = s.custom;
+        $('reserveEnd').hidden = !s.custom;
+        $('reserveEndText').textContent = s.custom ? 'End time' : 'Duration';
+        $('reserveEndLabel').setAttribute('for', s.custom ? 'reserveEnd' : 'reserveDuration');
+        var gear = $('reserveGear'), tip = s.custom ? 'Back to choosing a duration' : 'Pick a custom end time';
+        gear.setAttribute('aria-pressed', s.custom ? 'true' : 'false');
+        gear.setAttribute('title', tip);
+        gear.setAttribute('aria-label', tip);
+
+        $('reserveDate').value = s.date;
+        resSetPressed('reserveDateChips', function (c) {
+            return c.getAttribute('data-day') != null && s.date === ymd(addDays(new Date(), +c.getAttribute('data-day')));
+        });
+        resSetPressed('reservePurposeChips', function (c) {
+            var v = c.getAttribute('data-v');
+            return v === 'Other' ? s.other : (!s.other && v === s.purpose);
+        });
+        $('reservePurpose').hidden = !s.other;
+    }
+
+    function resOnChange(t) {
+        var s = resState;
+        if (!s) return;
+        hideAlert('flowError');
+        var note = '';
+        if (t.id === 'reserveDate') {
+            if (!t.value) return;
+            var firstOpen = ymd(nextOpenDay(new Date())), maxDate = roomMaxDate();
+            var picked = t.value < firstOpen ? firstOpen : t.value;
+            var tooFar = picked > maxDate;
+            if (tooFar) picked = maxDate;
+            var closed = isClosedDay(parseYmd(picked));
+            if (closed) {                                   /* Sunday → next open day (or the one before if that is past the limit) */
+                var nd = ymd(nextOpenDay(parseYmd(picked)));
+                if (nd > maxDate) { var back = parseYmd(picked); while (isClosedDay(back)) back = addDays(back, -1); nd = ymd(back); }
+                picked = nd;
+            }
+            s.date = picked;
+            if (tooFar) note = roomAdvanceMsg() + ' We moved you to ' + niceDate(s.date) + '.';
+            else if (closed) note = 'Reservations are not available on Sundays. We moved you to ' + niceDate(s.date) + '.';
+        } else if (t.id === 'reserveStart') {
+            var keep = s.end - s.start;
+            s.start = hhmmToMin(t.value);
+            if (s.custom) {
+                if (s.end <= s.start) s.end = Math.min(ROOM_END_MIN, Math.floor(s.start / 60) * 60 + 60);   /* keep the chosen end */
+            } else {
+                s.end = Math.min(ROOM_END_MIN, s.start + Math.max(30, keep));                                /* keep the same length */
+            }
+        } else if (t.id === 'reserveDuration') {
+            var d = parseInt(t.value, 10);
+            if (!d) return;
+            s.end = Math.min(ROOM_END_MIN, s.start + d);
+        } else if (t.id === 'reserveEnd') {
+            var v = hhmmToMin(t.value);
+            if (isNaN(v)) return;
+            s.end = v;
+        }
+        resSync();
+        if (note) showAlert('flowError', note);
     }
 
     function renderReserve(roomId) {
@@ -1143,7 +1256,24 @@
         var b = currentBuilding();
         st.fac.room = hit.room;
         var r = hit.room;
-        var t0 = todayStr();
+        /* Smart defaults (same as the faculty form): next half-hour today, or 8 AM on the next open day */
+        var nowD = new Date(), nowM = nowD.getHours() * 60 + nowD.getMinutes();
+        resState = { date: ymd(nowD), start: 0, end: 0, custom: false, other: false, purpose: '' };
+        if (isClosedDay(nowD) || nowM >= ROOM_END_MIN - 60) {
+            resState.date = ymd(nextOpenDay(addDays(nowD, 1)));
+            resState.start = OPEN_MIN + 60;
+        } else {
+            resState.start = Math.max(OPEN_MIN, Math.ceil((nowM + 1) / ROOM_STEP_MIN) * ROOM_STEP_MIN);
+        }
+        resState.end = Math.min(ROOM_END_MIN, resState.start + 60);
+        var firstOpenStr = ymd(nextOpenDay(nowD));
+        /* Quick date chips: the next two open days (Sundays are skipped) */
+        var chipOffsets = [], off = 0;
+        while (chipOffsets.length < 2) { if (!isClosedDay(addDays(nowD, off))) chipOffsets.push(off); off++; }
+        var dateChips = chipOffsets.map(function (o) {
+            var label = o === 0 ? 'Today' : (o === 1 ? 'Tomorrow' : DAY_NAMES[addDays(nowD, o).getDay()]);
+            return '<button type="button" class="st-chip" aria-pressed="false" data-action="res-day" data-day="' + o + '">' + label + '</button>';
+        }).join('');
         var seats = r.seating_capacity != null && toInt(r.seating_capacity) > 0 ? ' &middot; ' + plural(toInt(r.seating_capacity), 'seat') : '';
 
         flow(
@@ -1156,53 +1286,32 @@
             '<p class="st-picked-sub">' + esc(b.name) + ' &middot; ' + esc(hit.floor.label) + seats + '</p></div>' +
             '<button type="button" class="st-btn st-btn-ghost st-btn-sm" data-action="back-rooms">Change</button></div>' +
             '<div class="st-alert is-error" id="flowError" role="alert" hidden></div>' +
-            '<div class="st-field"><label for="reserveDate">Date <span class="st-star">*</span></label>' +
-            '<input type="date" class="st-input" id="reserveDate" min="' + t0 + '" max="' + roomMaxDate() + '" value="' + t0 + '"></div>' +
+            '<div class="st-field"><span class="st-label">Date <span class="st-star">*</span></span>' +
+            '<div class="st-chiprow" id="reserveDateChips">' + dateChips +
+            '<input type="date" class="st-input" id="reserveDate" aria-label="Pick a date" min="' + firstOpenStr + '" max="' + roomMaxDate() + '" value="' + resState.date + '">' +
+            '</div></div>' +
             '<div class="st-row">' +
             '<div class="st-field"><label for="reserveStart">Start time <span class="st-star">*</span></label>' +
-            '<select class="st-input" id="reserveStart">' + startOptions(t0) + '</select></div>' +
-            '<div class="st-field"><label for="reserveEnd">End time <span class="st-star">*</span></label>' +
-            '<select class="st-input" id="reserveEnd">' + endOptions('', '') + '</select></div>' +
+            '<select class="st-input" id="reserveStart"></select></div>' +
+            '<div class="st-field"><label id="reserveEndLabel" for="reserveDuration"><span id="reserveEndText">Duration</span> <span class="st-star">*</span></label>' +
+            '<div class="st-dur-row">' +
+            '<select class="st-input" id="reserveDuration"></select>' +
+            '<select class="st-input" id="reserveEnd" aria-label="End time" hidden></select>' +
+            '<button type="button" class="st-gear" id="reserveGear" data-action="res-gear" aria-pressed="false" aria-label="Pick a custom end time" title="Pick a custom end time">' + icon('settings') + '</button>' +
+            '</div></div>' +
             '</div>' +
             '<p class="st-hint" style="margin:-8px 0 16px">Open 7:00 AM &ndash; 8:00 PM, Monday to Saturday.</p>' +
-            '<div class="st-field"><label for="reservePurpose">Purpose <span class="st-star">*</span></label>' +
-            '<input type="text" class="st-input" id="reservePurpose" placeholder="e.g. Club meeting, review session" autocomplete="off" maxlength="200">' +
-            '<div class="st-quick">' + PURPOSES.map(function (p) {
-                return '<button type="button" class="st-chip" data-action="purpose" data-v="' + esc(p) + '">' + esc(p) + '</button>';
-            }).join('') + '</div></div>' +
-            '<div class="st-field" style="max-width:200px"><label for="reserveAttendees">Attendees</label>' +
-            '<input type="number" class="st-input" id="reserveAttendees" value="1" min="1" inputmode="numeric">' +
-            (r.seating_capacity != null && toInt(r.seating_capacity) > 0 ? '<p class="st-hint">This room seats ' + toInt(r.seating_capacity) + '.</p>' : '') + '</div>' +
+            '<div class="st-field"><span class="st-label">Purpose <span class="st-star">*</span></span>' +
+            '<div class="st-chiprow" id="reservePurposeChips">' + PURPOSES.concat(['Other']).map(function (p) {
+                return '<button type="button" class="st-chip" aria-pressed="false" data-action="res-purpose" data-v="' + esc(p) + '">' + esc(p) + '</button>';
+            }).join('') + '</div>' +
+            '<input type="text" class="st-input" id="reservePurpose" placeholder="What is the room for?" maxlength="200" aria-label="Purpose" autocomplete="off" hidden></div>' +
             LETTER_HTML('reserveLetter', 'Optional. You can still submit without one.', true) +
             '<div class="st-actions">' +
             '<button type="button" class="st-btn st-btn-ghost" data-action="back-rooms">Back</button>' +
             '<button type="submit" class="st-btn st-btn-primary" id="btnSubmitRoom">' + icon('event_available') + 'Reserve room</button>' +
             '</div></form>', 2);
-    }
-
-    function onReserveFieldChange(target) {
-        if (target.id === 'reserveDate') {
-            var tooFar = !!target.value && target.value > roomMaxDate();
-            if (tooFar) target.value = roomMaxDate();
-            var cur = $('reserveStart').value, curEnd = $('reserveEnd').value;
-            $('reserveStart').innerHTML = startOptions(target.value);
-            var keep = cur && $('reserveStart').querySelector('option[value="' + cur + '"]:not([disabled])');
-            if (keep) $('reserveStart').value = cur;
-            var startNow = $('reserveStart').value;
-            var endOk = startNow && curEnd && hhmmToMin(curEnd) > hhmmToMin(startNow);
-            $('reserveEnd').innerHTML = endOptions(startNow, endOk ? curEnd : '');
-            syncLetter('reserveLetter', target.value);
-            var d = target.value ? parseYmd(target.value) : null;
-            if (tooFar) showAlert('flowError', roomAdvanceMsg() + ' We moved you to ' + target.value + '.');
-            else if (d && d.getDay() === 0) showAlert('flowError', 'Reservations are not available on Sundays. Please choose another day.');
-            else hideAlert('flowError');
-        } else if (target.id === 'reserveStart') {
-            var prevEnd = $('reserveEnd').value;
-            var startM = hhmmToMin(target.value);
-            /* keep the old end if it is still after the new start, otherwise default to one hour */
-            var want = prevEnd && hhmmToMin(prevEnd) > startM ? prevEnd : (startM + 60 <= CLOSE_MIN ? minToHHMM(startM + 60) : minToHHMM(startM + STEP_MIN));
-            $('reserveEnd').innerHTML = endOptions(target.value, want);
-        }
+        resSync();
     }
 
     function submitReserve() {
@@ -1210,19 +1319,19 @@
         var v = st.verified, room = st.fac.room;
         if (!v || !room) return showAlert('flowError', 'Session expired. Please go back and verify again.');
 
-        var date = $('reserveDate').value.trim();
-        var start = $('reserveStart').value.trim();
-        var end = $('reserveEnd').value.trim();
-        var purpose = $('reservePurpose').value.trim();
-        var attendees = Math.max(1, toInt($('reserveAttendees').value, 1));
+        var s = resState;
+        if (!s) return showAlert('flowError', 'Session expired. Please go back and verify again.');
+        var date = s.date;
+        var start = s.start == null ? '' : minToHHMM(s.start);
+        var end = minToHHMM(s.end);
+        var purpose = (s.other ? $('reservePurpose').value : s.purpose).trim();
 
         if (!date) return showAlert('flowError', 'Please select a date.');
         if (date < todayStr()) return showAlert('flowError', 'Reservation date and time cannot be in the past.');
         if (parseYmd(date).getDay() === 0) return showAlert('flowError', 'Reservations are not available on Sundays. Please choose another day.');
-        if (!start) return showAlert('flowError', 'Please select a start time.');
-        if (!end) return showAlert('flowError', 'Please select an end time.');
+        if (!start) return showAlert('flowError', date === todayStr() ? 'No start times are left today. Please choose another date.' : 'Please select a start time.');
         if (end <= start) return showAlert('flowError', 'End time must be after start time.');
-        if (!purpose) return showAlert('flowError', 'Please enter the purpose.');
+        if (!purpose) return showAlert('flowError', 'Please choose or enter the purpose.');
         var letter = pickLetter('reserveLetter', date);
         if (letter.error) return showAlert('flowError', letter.error);
 
@@ -1245,8 +1354,7 @@
             reservation_date: date,
             start_time: start,
             end_time: end,
-            purpose: purpose,
-            attendees: attendees
+            purpose: purpose
         }, letter.file).then(function (d) {
             setBusy(btn, false);
             /* A conflict (room taken, past time, …) comes back as an error and the code is NOT used,
@@ -1470,9 +1578,31 @@
             case 'floor': st.fac.floor = toInt(t.getAttribute('data-i')); return renderRooms();
             case 'room': return renderReserve(toInt(t.getAttribute('data-id')));
             case 'back-rooms': return renderRooms();
-            case 'purpose':
-                $('reservePurpose').value = t.getAttribute('data-v');
-                $('reservePurpose').focus();
+            case 'res-day':
+                if (!resState) return;
+                hideAlert('flowError');
+                resState.date = ymd(addDays(new Date(), toInt(t.getAttribute('data-day'))));
+                return resSync();
+            case 'res-gear':
+                if (!resState) return;
+                hideAlert('flowError');
+                resState.custom = !resState.custom;
+                resSync();
+                $(resState.custom ? 'reserveEnd' : 'reserveDuration').focus();
+                return;
+            case 'res-purpose':
+                if (!resState) return;
+                hideAlert('flowError');
+                if (t.getAttribute('data-v') === 'Other') {
+                    resState.other = true;
+                    resState.purpose = $('reservePurpose').value;
+                } else {
+                    resState.other = false;
+                    resState.purpose = t.getAttribute('data-v');
+                    $('reservePurpose').value = '';
+                }
+                resSync();
+                if (resState.other) $('reservePurpose').focus();
                 return;
         }
     }
@@ -1480,6 +1610,7 @@
     function onInput(e) {
         var t = e.target;
         if (t.id === 'eqSearch') { st.query = t.value; st.eqPage = 1; renderEqGrid(); }
+        else if (t.id === 'reservePurpose' && resState) resState.purpose = t.value;
     }
 
     function onChange(e) {
@@ -1494,8 +1625,8 @@
             syncStudentSchedule('borrow');
         } else if (t.id === 'itemDate' || t.id === 'itemStartTime' || t.id === 'itemDuration') {
             syncStudentSchedule('item');
-        } else if (t.id === 'reserveDate' || t.id === 'reserveStart') {
-            onReserveFieldChange(t);
+        } else if (t.id === 'reserveDate' || t.id === 'reserveStart' || t.id === 'reserveDuration' || t.id === 'reserveEnd') {
+            resOnChange(t);
         }
     }
 
