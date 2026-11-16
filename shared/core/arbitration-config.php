@@ -16,6 +16,7 @@ declare(strict_types=1);
  *   time      'HH:00' (booking times are on the hour)
  *   int_list  comma list such as '1,2,3,6', every number from the allowed set
  *   enum      one of the allowed words
+ *   id_list   comma list of faculty IDs, at most 'max' of them
  *   date      'YYYY-MM-DD', or '' when not set
  *
  * A missing or invalid row falls back to the default, so a fresh database behaves exactly as
@@ -54,6 +55,14 @@ final class ArbitrationConfig
         'room_day_end'                   => ['type' => 'time', 'default' => '20:00'],
         'room_open_days'                 => ['type' => 'int_list', 'default' => [1, 2, 3, 4, 5, 6], 'allowed' => [1, 2, 3, 4, 5, 6, 7]],
         'room_max_hours'                 => ['type' => 'int', 'default' => 13, 'min' => 1, 'max' => 16],
+
+        // ── When requests compete: role weights and the priority faculty (read by ArbitrationEngine) ──
+        // "Priority" replaces the old "Director" weight; until it is saved it starts from the old
+        // role_priority_director row (see all()), so nothing changes by itself.
+        'role_priority_student'          => ['type' => 'int', 'default' => 1, 'min' => 1, 'max' => 10],
+        'role_priority_faculty'          => ['type' => 'int', 'default' => 2, 'min' => 1, 'max' => 10],
+        'role_priority_priority'         => ['type' => 'int', 'default' => 4, 'min' => 1, 'max' => 10],
+        'priority_faculty'               => ['type' => 'id_list', 'default' => [], 'max' => 10],
 
         // ── Semester (shown as a small tag on every dashboard; the dates also anchor the service-survey
         //    reporting windows). Never saved yet? all() falls back to the dates already in the survey settings. ──
@@ -123,6 +132,10 @@ final class ArbitrationConfig
         // Keep the combination sane even if a row was edited by hand.
         $out = self::repairHours($out);
         $out = self::legacySemester($conn, $raw, $out);
+        // The Priority weight used to be the Director weight: keep its value until the Super Admin saves a new one.
+        if (!array_key_exists('role_priority_priority', $raw) && isset($raw['role_priority_director']) && is_numeric($raw['role_priority_director'])) {
+            $out['role_priority_priority'] = max(1, min(10, (int)$raw['role_priority_director']));
+        }
         return self::$cache = $out;
     }
 
@@ -215,6 +228,34 @@ final class ArbitrationConfig
                         break;
                     }
                     $clean[$key] = $value;   // '' = not set
+                    break;
+
+                case 'id_list':
+                    if (!is_array($value)) {
+                        $errors[$key] = 'Invalid list.';
+                        break;
+                    }
+                    $ids = [];
+                    $bad = false;
+                    foreach ($value as $v) {
+                        $v = is_string($v) ? trim($v) : '';
+                        if ($v === '' || !preg_match('/^[A-Za-z0-9._-]{1,50}$/', $v)) {
+                            $bad = true;
+                            break;
+                        }
+                        if (!in_array($v, $ids, true)) {
+                            $ids[] = $v;
+                        }
+                    }
+                    if ($bad) {
+                        $errors[$key] = 'Contains an invalid faculty ID.';
+                        break;
+                    }
+                    if (count($ids) > (int)$def['max']) {
+                        $errors[$key] = 'You can mark at most ' . $def['max'] . ' faculty as priority.';
+                        break;
+                    }
+                    $clean[$key] = $ids;
                     break;
 
                 case 'int_list':
@@ -351,6 +392,9 @@ final class ArbitrationConfig
         if ($type === 'int_list') {
             return implode(',', array_map('intval', (array)$value));
         }
+        if ($type === 'id_list') {
+            return implode(',', array_map('strval', (array)$value));
+        }
         return (string)$value;
     }
 
@@ -374,6 +418,15 @@ final class ArbitrationConfig
                 return in_array($raw, $def['allowed'], true) ? $raw : $def['default'];
             case 'date':
                 return self::isDate($raw) ? $raw : $def['default'];
+            case 'id_list':
+                $ids = [];
+                foreach (explode(',', $raw) as $p) {
+                    $p = trim($p);
+                    if ($p !== '' && preg_match('/^[A-Za-z0-9._-]{1,50}$/', $p) && !in_array($p, $ids, true)) {
+                        $ids[] = $p;
+                    }
+                }
+                return array_slice($ids, 0, (int)$def['max']);
             case 'int_list':
                 $nums = [];
                 foreach (explode(',', $raw) as $p) {

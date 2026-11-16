@@ -87,6 +87,24 @@ if (!$errors) {
     $merged = array_merge(ArbitrationConfig::all($conn, true), $clean);
     $errors = ArbitrationConfig::crossCheck($merged);
 }
+// Priority faculty must be real faculty accounts (the picker only offers those)
+if (!$errors && !empty($clean['priority_faculty'])) {
+    $want = $clean['priority_faculty'];
+    $st = $conn->prepare('SELECT faculty_id FROM tbl_users WHERE faculty_id IN (' . implode(',', array_fill(0, count($want), '?')) . ')');
+    $found = [];
+    if ($st) {
+        $st->bind_param(str_repeat('s', count($want)), ...$want);
+        $st->execute();
+        $res = $st->get_result();
+        while ($res && ($row = $res->fetch_assoc())) {
+            $found[] = (string)$row['faculty_id'];
+        }
+        $st->close();
+    }
+    if (count(array_intersect($want, $found)) !== count($want)) {
+        $errors['priority_faculty'] = 'Some of the selected faculty could not be found. Refresh the page and try again.';
+    }
+}
 if ($errors) {
     sa_fail(422, (string)reset($errors), $errors);
 }
@@ -123,6 +141,10 @@ if ($changed) {
         'room_day_end'                   => 'room reservation hours',
         'room_open_days'                 => 'room open days',
         'room_max_hours'                 => 'longest room reservation',
+        'role_priority_student'          => 'student weight',
+        'role_priority_faculty'          => 'faculty weight',
+        'role_priority_priority'         => 'priority weight',
+        'priority_faculty'               => 'priority faculty',
         'semester_name'                  => 'current semester',
         'semester_start'                 => 'semester dates',
         'semester_end'                   => 'semester dates',

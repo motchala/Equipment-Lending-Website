@@ -735,15 +735,32 @@ class ArbitrationEngine
         // Primary path: use submitted_as when it is present (non-NULL).
         // Fallback path: use the legacy u.role switch for Legacy_Request rows
         // (submitted_as = NULL) so their behaviour is entirely unchanged.
+        //
+        // Weights come from Settings → Arbitration → Role weights:
+        //   Priority            the faculty the Super Admin marked (up to 10, setting priority_faculty),
+        //                       whichever way their request came in
+        //   Regular faculty     a faculty member's own request
+        //   Student representative  a request a student filed with a faculty code
+        // "Priority" replaces the old Director weight (role_priority_director is still read as its fallback).
+        $w_student  = (int)($config['role_priority_student'] ?? 1);
+        $w_faculty  = (int)($config['role_priority_faculty'] ?? 2);
+        $w_priority = (int)($config['role_priority_priority'] ?? ($config['role_priority_director'] ?? 4));
+        $priority_ids = array_filter(array_map('trim', explode(',', (string)($config['priority_faculty'] ?? ''))), 'strlen');
+        $req_faculty  = trim((string)($request['faculty_id'] ?? ''));
+
         $submitted_as = isset($request['submitted_as']) ? (string)$request['submitted_as'] : null;
 
-        if ($submitted_as !== null) {
+        if ($req_faculty !== '' && in_array($req_faculty, $priority_ids, true)) {
+            $role = $w_priority;
+        } elseif ($submitted_as !== null) {
             // submitted_as-first branch (Requirements 6.1, 6.2, 6.4, 6.6)
-            if ($submitted_as === 'personal' || $submitted_as === 'student') {
-                $role = (int)($config['role_priority_faculty'] ?? 2);
+            if ($submitted_as === 'personal') {
+                $role = $w_faculty;
+            } elseif ($submitted_as === 'student') {
+                $role = $w_student;
             } else {
                 // Unknown value — treat as personal and log for investigation.
-                $role = (int)($config['role_priority_faculty'] ?? 2);
+                $role = $w_faculty;
                 error_log('ArbitrationEngine: unknown submitted_as value: ' . $submitted_as . ' for request_id=' . $request['id']);
             }
         } else {
@@ -753,13 +770,13 @@ class ArbitrationEngine
 
             switch ($role_name) {
                 case 'Director':
-                    $role = (int)($config['role_priority_director'] ?? 4);
+                    $role = $w_priority;
                     break;
                 case 'Regular Faculty':
-                    $role = (int)($config['role_priority_faculty'] ?? 2);
+                    $role = $w_faculty;
                     break;
                 case 'Student Representative':
-                    $role = (int)($config['role_priority_student'] ?? 1);
+                    $role = $w_student;
                     break;
                 default:
                     $role = 1; // lowest priority for any unknown/null role
