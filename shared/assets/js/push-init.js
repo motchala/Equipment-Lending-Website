@@ -72,26 +72,35 @@
         showCustomModal(OneSignal);
     }
 
+    // Attach "Maybe later" immediately so it always works
+    // regardless of whether the SDK has finished loading.
+    var modal = document.getElementById('psPushModal');
+    var later = document.getElementById('psPushLater');
+    if (modal && later) {
+        later.addEventListener('click', function () {
+            localStorage.setItem(DISMISS_KEY, Date.now().toString());
+            hideModal(modal);
+        });
+    }
+
     function showCustomModal(OneSignal) {
         var modal = document.getElementById('psPushModal');
         var allow = document.getElementById('psPushAllow');
-        var later = document.getElementById('psPushLater');
-        if (!modal || !allow || !later) return;
+        if (!modal || !allow) return;
 
         modal.hidden = false;
 
-        allow.addEventListener('click', function () {
+        // Replace button to clear any stale listeners then reattach
+        var freshAllow = allow.cloneNode(true);
+        allow.parentNode.replaceChild(freshAllow, allow);
+
+        freshAllow.addEventListener('click', function () {
             hideModal(modal);
             OneSignal.Notifications.requestPermission().then(function (granted) {
                 if (granted) subscribeAndSave(OneSignal);
             }).catch(function (e) {
                 console.error('[PUPSync push] Permission request error:', e);
             });
-        });
-
-        later.addEventListener('click', function () {
-            localStorage.setItem(DISMISS_KEY, Date.now().toString());
-            hideModal(modal);
         });
     }
 
