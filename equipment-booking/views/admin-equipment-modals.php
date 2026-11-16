@@ -71,8 +71,20 @@
                     <div class="ps-req-sum-row"><span class="ps-rsl">Equipment</span><span class="ps-rsv" id="decline-equipment">—</span></div>
                 </div>
                 <div class="ps-form-group">
-                    <label class="ps-form-label">Reason for Declining <span style="font-size:11px;color:var(--text-light)">(required, min. 5 characters)</span></label>
-                    <textarea class="ps-form-control" id="decline-reason" rows="3" placeholder="e.g. Item is currently in use by another borrower..."></textarea>
+                    <?php
+                    // One tap on a reason; the sentence is what the borrower sees (what each module declines for)
+                    $picker_id      = 'decline-reason-picker';
+                    $picker_label   = 'Reason for declining';
+                    $picker_reasons = [
+                        ['Out of stock',       'The item is out of stock.'],
+                        ['Already reserved',   'The item is already reserved for that time.'],
+                        ['Not enough units',   'There are not enough units for the quantity requested.'],
+                        ['Under maintenance',  'The item is under maintenance or not in good condition.'],
+                        ['Schedule not possible', 'The requested borrowing schedule is not possible.'],
+                        ['Against policy',     'The request does not meet the equipment borrowing policy.'],
+                    ];
+                    require __DIR__ . '/../../shared/views/decline-reason-picker.php';
+                    ?>
                 </div>
             </div>
             <div class="ps-modal-foot">

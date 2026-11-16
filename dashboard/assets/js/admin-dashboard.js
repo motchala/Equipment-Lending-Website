@@ -4393,7 +4393,7 @@
         const approveConfirmBtn = document.getElementById('ps-approve-confirm-btn');
         const declineConfirmBtn = document.getElementById('ps-decline-confirm-btn');
         const approveReasonInput = document.getElementById('approve-reason');
-        const declineReasonInput = document.getElementById('decline-reason');
+        const declinePicker = document.getElementById('decline-reason-picker');   // one-tap reasons (shared/assets/js/admin-decline-reasons.js)
 
         function rowCtx(el) {
             const tr = el.closest('tr[data-id]');
@@ -4459,7 +4459,7 @@
             document.getElementById('decline-borrower').textContent =
                 ctx.submittedAs === 'student' && ctx.studentName ? ctx.studentName : (ctx.borrower || '—');
             document.getElementById('decline-equipment').textContent = ctx.equipment || '—';
-            if (declineReasonInput) declineReasonInput.value = '';
+            if (declinePicker && window.PSReasonPicker) window.PSReasonPicker.reset(declinePicker);
             if (declineConfirmBtn) declineConfirmBtn.disabled = true;
             clearAlert('ps-decline-alert');
         }
@@ -4547,9 +4547,9 @@
                 approveConfirmBtn.disabled = this.value.trim().length < 5;
             });
         }
-        if (declineReasonInput && declineConfirmBtn) {
-            declineReasonInput.addEventListener('input', function () {
-                declineConfirmBtn.disabled = this.value.trim().length < 5;
+        if (declinePicker && declineConfirmBtn) {
+            declinePicker.addEventListener('psreason:change', function (e) {
+                declineConfirmBtn.disabled = !e.detail.ok;
             });
         }
 
@@ -4654,12 +4654,12 @@
         if (declineConfirmBtn) {
             declineConfirmBtn.addEventListener('click', function () {
                 const id = document.getElementById('decline-request-id').value;
-                const reason = (declineReasonInput.value || '').trim();
-                if (reason.length < 5) {
-                    showAlert('ps-decline-alert', 'Please enter a reason (min. 5 characters).');
+                const pick = window.PSReasonPicker ? window.PSReasonPicker.read(declinePicker) : { ok: false, error: 'Please pick a reason.' };
+                if (!pick.ok) {
+                    showAlert('ps-decline-alert', pick.error || 'Please pick a reason.');
                     return;
                 }
-                submitDecision(id, 'Declined', reason, 'ps-decline-alert', declineConfirmBtn, 'Declining…');
+                submitDecision(id, 'Declined', pick.reason, 'ps-decline-alert', declineConfirmBtn, 'Declining…');
             });
         }
     })();
@@ -5751,22 +5751,10 @@ function psSelectFmt(btn) {
         document.dispatchEvent(new CustomEvent('rr:rows-changed'));
     }
 
-    function submitDecision(decision, btn) {
-        if (!currentRow) return;
-        var row = currentRow;
-        var reason = reasonBox ? reasonBox.value.trim() : '';
-        if (reason.length < 5) {
-            showReviewError('Please enter a reason of at least 5 characters.');
-            if (reasonBox) reasonBox.focus();
-            return;
-        }
+    // Sends one decision to the server; resolves with the server's answer or rejects with a readable error.
+    function postDecision(row, decision, reason) {
         var tokenEl = document.querySelector('input[name="csrf_token"]');
-        var idleHtml = btn.innerHTML;
-        if (reviewErr) reviewErr.hidden = true;
-        decideBtns.forEach(function (b) { b.disabled = true; });
-        btn.textContent = decision === 'Approved' ? 'Approving\u2026' : 'Declining\u2026';
-
-        fetch('room-reservation/api/review-room-reservation.php', {
+        return fetch('room-reservation/api/review-room-reservation.php', {
             method: 'POST',
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
@@ -5786,15 +5774,94 @@ function psSelectFmt(btn) {
                     err.fromServer = true;
                     throw err;
                 }
+                return res.j;
+            });
+    }
+
+    // Approve: reason typed in the drawer
+    function submitDecision(decision, btn) {
+        if (!currentRow) return;
+        var row = currentRow;
+        var reason = reasonBox ? reasonBox.value.trim() : '';
+        if (reason.length < 5) {
+            showReviewError('Please enter a reason of at least 5 characters.');
+            if (reasonBox) reasonBox.focus();
+            return;
+        }
+        var idleHtml = btn.innerHTML;
+        if (reviewErr) reviewErr.hidden = true;
+        decideBtns.forEach(function (b) { b.disabled = true; });
+        btn.textContent = decision === 'Approved' ? 'Approving\u2026' : 'Declining\u2026';
+
+        postDecision(row, decision, reason)
+            .then(function (j) {
                 applyDecision(row, decision, reason);
                 if (typeof psCloseModal === 'function') psCloseModal('ps-room-drawer');
-                if (typeof window.showToast === 'function') window.showToast(res.j.message || (decision === 'Approved' ? 'Reservation approved.' : 'Reservation declined.'));
+                if (typeof window.showToast === 'function') window.showToast(j.message || (decision === 'Approved' ? 'Reservation approved.' : 'Reservation declined.'));
             })
             .catch(function (err) {
                 showReviewError(err && err.fromServer ? err.message : 'Network error. Please try again.');
                 decideBtns.forEach(function (b) { b.disabled = false; });
                 btn.innerHTML = idleHtml;
             });
+    }
+
+    // Decline: its own small form (same layout as the equipment "Decline Request" modal) with one-tap reasons
+    var declineModal = el('ps-rr-decline-modal');
+    var declinePicker = el('rr-decline-reason-picker');
+    var declineConfirm = el('ps-rr-decline-confirm');
+    var declineAlert = el('ps-rr-decline-alert');
+
+    function setDeclineError(msg) {
+        if (!declineAlert) return;
+        declineAlert.textContent = msg || '';
+        declineAlert.hidden = !msg;
+    }
+
+    function openDecline() {
+        if (!currentRow || !declineModal) return;
+        var d = currentRow.dataset;
+        txt('ps-rr-decline-no', '#' + d.rrId);
+        txt('ps-rr-decline-who', d.who);
+        txt('ps-rr-decline-room', d.room);
+        txt('ps-rr-decline-when', [d.date, d.time].filter(Boolean).join(' \u00b7 '));
+        if (declinePicker && window.PSReasonPicker) window.PSReasonPicker.reset(declinePicker);
+        if (declineConfirm) declineConfirm.disabled = true;
+        setDeclineError('');
+        if (typeof psOpenModal === 'function') psOpenModal('ps-rr-decline-modal');
+    }
+
+    if (declinePicker && declineConfirm) {
+        declinePicker.addEventListener('psreason:change', function (e) {
+            declineConfirm.disabled = !e.detail.ok;
+        });
+        declineConfirm.addEventListener('click', function () {
+            if (!currentRow || !window.PSReasonPicker) return;
+            var pick = window.PSReasonPicker.read(declinePicker);
+            if (!pick.ok) {
+                setDeclineError(pick.error || 'Please pick a reason.');
+                return;
+            }
+            var row = currentRow;
+            var idleHtml = declineConfirm.innerHTML;
+            setDeclineError('');
+            declineConfirm.disabled = true;
+            declineConfirm.textContent = 'Declining\u2026';
+            postDecision(row, 'Declined', pick.reason)
+                .then(function (j) {
+                    applyDecision(row, 'Declined', pick.reason);
+                    if (typeof psCloseModal === 'function') {
+                        psCloseModal('ps-rr-decline-modal');
+                        psCloseModal('ps-room-drawer');
+                    }
+                    if (typeof window.showToast === 'function') window.showToast(j.message || 'Reservation declined.');
+                })
+                .catch(function (err) {
+                    setDeclineError(err && err.fromServer ? err.message : 'Network error. Please try again.');
+                    declineConfirm.disabled = false;
+                    declineConfirm.innerHTML = idleHtml;
+                });
+        });
     }
 
     document.addEventListener('click', function (e) {
@@ -5809,7 +5876,8 @@ function psSelectFmt(btn) {
     drawer.addEventListener('click', function (e) {
         var decideBtn = e.target.closest('[data-rr-decide]');
         if (decideBtn) {
-            submitDecision(decideBtn.getAttribute('data-rr-decide'), decideBtn);
+            if (decideBtn.getAttribute('data-rr-decide') === 'Declined') openDecline();
+            else submitDecision('Approved', decideBtn);
             return;
         }
         if (e.target.closest('[data-rr-reschedule]') && currentRow) {
@@ -5828,9 +5896,12 @@ function psSelectFmt(btn) {
     });
 
     document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape' && drawer.classList.contains('ps-modal-open') && typeof psCloseModal === 'function') {
-            psCloseModal('ps-room-drawer');
+        if (e.key !== 'Escape' || typeof psCloseModal !== 'function') return;
+        if (declineModal && declineModal.classList.contains('ps-modal-open')) {
+            psCloseModal('ps-rr-decline-modal');
+            return;
         }
+        if (drawer.classList.contains('ps-modal-open')) psCloseModal('ps-room-drawer');
     });
 })();
 
