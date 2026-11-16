@@ -1,33 +1,36 @@
 name: Deploy PUPSync to InfinityFree
-
 on:
   push:
     branches:
       - main
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
       - name: Deploy via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_HOST }}
           username: ${{ secrets.FTP_USER }}
           password: ${{ secrets.FTP_PASS }}
+          protocol: ftp
+          port: 21
+          timeout: 180000
+          log-level: verbose
           server-dir: /htdocs/
           dangerous-clean-slate: false
           exclude: |
             **/.git*
             **/.git*/**
+            .vscode/**
             .env
-            **/config/db.php 
+            .env.example
+            **/config/db.php
             database/**
             docs/**
             z-README.md
-            .env.example
             **/node_modules/**
+            uploads/**
+            !uploads/.htaccess
