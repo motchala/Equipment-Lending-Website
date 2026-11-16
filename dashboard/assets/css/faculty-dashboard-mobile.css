@@ -1881,7 +1881,6 @@ html.rx-mobile #panel-home .dash-code-card:has(.fcc-no-code) .dash-code-active-b
 html.rx-mobile #panel-activity .fact-todo-card .fact-card-sub,
 html.rx-mobile #panel-activity #factRooms .fact-card-sub,
 html.rx-mobile #panel-activity .fact-empty-sub,
-html.rx-mobile #panel-activity .fact-pager-info,
 html.rx-mobile #panel-activity .fact-search {
     display: none !important;
 }
@@ -1889,6 +1888,52 @@ html.rx-mobile #panel-activity .fact-search {
 html.rx-mobile #panel-activity .fact-live .fact-card-foot:not(:has(button)),
 html.rx-mobile #panel-activity #factHistFoot:not(:has(button)) {
     display: none !important;
+}
+
+/* Page navigation — the same as the Equipment screen: "Showing 1–15 of 55" centred over the
+   page buttons, under a thin divider. With a single page there is nothing to page through, so
+   nothing is drawn (no "7 records" line, no empty strip). */
+html.rx-mobile #panel-activity .fact-pager:not(:has(.fact-pager-ctl:not([hidden]))),
+html.rx-mobile #panel-activity .fact-card-foot:not(:has(.fact-pager-ctl:not([hidden]))) {
+    display: none !important;
+}
+
+html.rx-mobile #panel-activity .fact-card-foot:has(.fact-pager-ctl:not([hidden])) {
+    justify-content: center !important;
+    margin-top: 6px !important;
+    padding: 16px 0 0 !important;
+    border-top: 1px solid var(--color-outline-variant, #ddbdbd) !important;
+}
+
+html.rx-mobile #panel-activity .fact-pager {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 12px !important;
+    width: 100% !important;
+}
+
+html.rx-mobile #panel-activity .fact-pager-info {
+    display: block !important;
+    font-size: .78rem !important;
+    color: var(--rxm-muted) !important;
+}
+
+html.rx-mobile #panel-activity .fact-pager-ctl {
+    justify-content: center !important;
+    gap: 6px !important;
+}
+
+html.rx-mobile #panel-activity .fact-pager-btn {
+    min-width: 36px !important;
+    height: 34px !important;
+    border-radius: 8px !important;
+}
+
+html.rx-mobile #panel-activity .fact-pager-btn:not(.is-active):not(:disabled) {
+    background: #fff !important;
+    border: 1px solid var(--color-outline-variant, #ddbdbd) !important;
 }
 
 html.rx-mobile #panel-activity .fact-empty {
