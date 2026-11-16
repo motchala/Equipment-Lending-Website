@@ -2,7 +2,7 @@
    PUPSYNC — STUDENT PORTAL  (student-dashboard.js)
 
    Flow (one page, with a building/floor/room picker for equipment):
-     Home ─ pick a service
+     Home ─ pick a service   (a refresh keeps you on the same screen: see "KEEP THE SCREEN ON REFRESH")
        └─ Details ─ faculty code + name + student ID + course   (verify)
             ├─ Borrow, faculty code → photo grid → room picker → submit → receipt + QR
             ├─ Borrow, item code    → item, qty / time, room picker → submit → receipt + QR
@@ -33,8 +33,17 @@
        window from Settings → Arbitration, so the pickers match what the server accepts. */
     var EQ_PAGE_SIZE = 20;
     var PURPOSES = ['Lecture', 'Lab session', 'Meeting', 'Exam', 'Seminar'];
+    /* Room reservation inputs follow the faculty reservation form (room-reservation/assets/js/fcty-facilities.js) */
+    var ROOM_END_MIN = 20 * 60;               /* rooms close at 8:00 PM */
+    var ROOM_STEP_MIN = 30;                   /* start times every 30 minutes */
+    var ROOM_DURATIONS = [60, 120, 180, 360]; /* 1 / 2 / 3 / 6 hours */
+    var TL_START_MIN = 7 * 60;                /* availability bar runs 7 AM ... */
+    var TL_END_MIN = 20 * 60;                 /* ... to 8 PM (same as the faculty form) */
+    var TL_TICKS = [[7, '7 AM'], [10, '10 AM'], [13, '1 PM'], [16, '4 PM'], [20, '8 PM']];
+    var DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     var QR_SRC = 'https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js';
     var RECEIPT_KEY = 'pup_last_receipt';
+    var SNAP_KEY = 'pup_student_view';   /* sessionStorage: the screen + entries to bring back after a refresh */
     var URLS = {
         verifyFaculty: 'equipment-booking/api/verify-faculty-code.php',
         verifyItem: 'equipment-booking/api/verify-item-code.php',
@@ -43,7 +52,8 @@
         borrowRules: 'equipment-booking/api/borrow-rules.php',
         borrow: 'equipment-booking/api/submit-student-borrow.php',
         itemBorrow: 'equipment-booking/api/submit-item-borrow.php',
-        reserve: 'room-reservation/api/submit-student-reserve.php'
+        reserve: 'room-reservation/api/submit-student-reserve.php',
+        roomSchedule: 'room-reservation/api/student-room-schedule.php'
     };
 
     /* ── Small helpers ───────────────────────────────────────── */
@@ -85,8 +95,8 @@
         return 'Choose today or a non-Sunday date within the next ' + BORROW_ADVANCE_DAYS + ' days.';
     }
     function loadBorrowRules() {
-        if (!window.fetch) return;
-        fetch(URLS.borrowRules, { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (j) {
+        if (!window.fetch) return Promise.resolve();
+        return fetch(URLS.borrowRules, { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (j) {
             if (!j || !j.ok || !j.rules) return;
             var r = j.rules;
             BORROW_OPEN_MIN = hhmmToMin(r.dayStart);
@@ -254,23 +264,25 @@
     }
 
     /* Request letter: optional, recommended only for a later date. Returns { file, error }. */
-    var LETTER_HTML = function (id, text) {
-        return '<div class="st-field" id="' + id + 'Wrap" hidden>' +
-            '<label for="' + id + '">Request letter <span class="st-hint" style="display:inline">(recommended)</span></label>' +
+    var LETTER_HTML = function (id, text, always) {
+        /* always = shown for every date (the room reservation form); otherwise only for a later date */
+        return '<div class="st-field" id="' + id + 'Wrap"' + (always ? ' data-always="1"' : ' hidden') + '>' +
+            '<label for="' + id + '">Request letter <span class="st-hint" style="display:inline">(' + (always ? 'optional' : 'recommended') + ')</span></label>' +
             '<input type="file" class="st-input" id="' + id + '" accept=".pdf,.jpg,.jpeg,.png,.webp">' +
             '<button type="button" class="pslc-trigger" data-letter-camera="' + id + '"><span class="material-symbols-outlined" aria-hidden="true">photo_camera</span> Take a photo of the letter</button>' +
             '<p class="st-hint">' + text + ' PDF, JPG, PNG or WEBP, up to 5 MB.</p></div>';
     };
     function syncLetter(id, dateStr) {
         var wrap = $(id + 'Wrap'), input = $(id);
-        if (!wrap) return;
+        if (!wrap || wrap.hasAttribute('data-always')) return;
         var later = !!dateStr && dateStr > todayStr();
         wrap.hidden = !later;
         if (!later && input) input.value = '';   /* a same-day request never carries a letter */
     }
     function pickLetter(id, dateStr) {
         var input = $(id);
-        if (!input || !input.files || !input.files[0] || !(dateStr > todayStr())) return { file: null, error: '' };
+        var wrapEl = $(id + 'Wrap'), always = !!(wrapEl && wrapEl.hasAttribute('data-always'));
+        if (!input || !input.files || !input.files[0] || (!always && !(dateStr > todayStr()))) return { file: null, error: '' };
         var f = input.files[0];
         if (!/\.(pdf|jpe?g|png|webp)$/i.test(f.name)) return { file: null, error: 'The request letter must be a PDF, JPG, PNG or WEBP file.' };
         if (f.size > 5 * 1024 * 1024) return { file: null, error: 'The request letter is too large. Maximum size is 5 MB.' };
@@ -306,6 +318,7 @@
        STATE
     ══════════════════════════════════════════════════════════ */
     var st = fresh();
+    var nav = { screen: 'home' };   /* which screen is showing (+ what it needs to be redrawn); saved for refresh */
 
     function fresh() {
         return {
@@ -345,11 +358,14 @@
     }
 
     function show(name, step) {
+        if (name !== 'flow') nav = { screen: name };
         VIEWS.forEach(function (v) { $('view-' + v).hidden = (v !== name); });
         setStep(step || 0);
         window.scrollTo(0, 0);
         var h = $('view-' + name).querySelector('h1, h2');
         if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); }
+        if (name !== 'home') pushFlowEntry();
+        schedulePersist();
     }
 
     function flow(html, step) {
@@ -357,12 +373,13 @@
         show('flow', step);
     }
 
-    function goHome() {
+    function goHome(fromBrowserBack) {
         st = fresh();
         $('detailsForm').reset();
         hideAlert('detailsError');
         show('home', 0);
         loadReceiptBanner();
+        if (!fromBrowserBack) popFlowEntry();
     }
 
     /* ══════════════════════════════════════════════════════════
@@ -371,6 +388,14 @@
     function startService(service) {
         st = fresh();
         st.service = service;
+        applyService(service);
+        hideAlert('detailsError');
+        show('details', 1);
+        var code = $('facultyCode');
+        if (code) setTimeout(function () { code.focus({ preventScroll: true }); }, 60);
+    }
+
+    function applyService(service) {
         var borrow = service === 'borrow';
         $('detailsTitle').textContent = borrow ? 'Borrow equipment' : 'Reserve a facility';
         $('detailsIcon').textContent = borrow ? 'inventory_2' : 'meeting_room';
@@ -379,10 +404,6 @@
             ? 'Ask your faculty for their one-time code (faculty code or item code).'
             : 'Ask your faculty for their one-time code.';
         $('stepChooseLabel').textContent = borrow ? 'Equipment' : 'Facility';
-        hideAlert('detailsError');
-        show('details', 1);
-        var code = $('facultyCode');
-        if (code) setTimeout(function () { code.focus({ preventScroll: true }); }, 60);
     }
 
     function onVerify(e) {
@@ -434,6 +455,7 @@
        BORROW — faculty code → photo grid
     ══════════════════════════════════════════════════════════ */
     function renderBorrow() {
+        nav = { screen: 'borrow' };
         var v = st.verified;
         st.inv = Array.isArray(v.inventory) ? v.inventory : [];
         st.invMap = {};
@@ -775,6 +797,7 @@
        BORROW — item code (one item, chosen by the faculty)
     ══════════════════════════════════════════════════════════ */
     function renderItem() {
+        nav = { screen: 'item' };
         var v = st.verified;
         var avail = toInt(v.quantity);
         flow(
@@ -917,6 +940,7 @@
     }
 
     function renderBuildings() {
+        nav = { screen: 'buildings' };
         var v = st.verified;
         var bs = st.fac.buildings;
         var total = bs.reduce(function (s, b) { return s + b.rooms; }, 0);
@@ -964,6 +988,7 @@
     function renderRooms() {
         var b = currentBuilding();
         if (!b) return renderBuildings();
+        nav = { screen: 'rooms' };
         var floor = b.floorList[st.fac.floor] || b.floorList[0];
         var src = safeImg(b.image);
         var single = st.fac.buildings.length === 1;
@@ -1116,33 +1141,252 @@
         if (trigger) trigger.focus();
     }
 
-    function startOptions(dateStr) {
-        var isToday = dateStr === todayStr();
-        var cut = nowMin();
-        var html = '<option value="" selected disabled>Select</option>';
-        for (var m = OPEN_MIN; m <= CLOSE_MIN - STEP_MIN; m += STEP_MIN) {
-            html += '<option value="' + minToHHMM(m) + '"' + (isToday && m <= cut ? ' disabled' : '') + '>' + minToLabel(m) + '</option>';
-        }
-        return html;
+    /* ── Reservation inputs (same fields and rules as the faculty reservation form) ──
+       Date: Today / Tomorrow chips + date picker (Sundays skipped) · Start time: every 30 min ·
+       Duration 1/2/3/6 h, or the gear for a custom whole-hour End time · Purpose: chips + "Other" */
+    var resDay = { key: '', blocks: null, state: 'loading' };   /* the room's blocked time for the chosen date */
+    var resDayCache = {};                                       /* 'roomId|date' -> { at, blocks } (kept for a minute) */
+    var resState = null;   /* { date, start, end (minutes; start is null when no time is left today), custom, other, purpose } */
+
+    function isClosedDay(d) { return d.getDay() === 0; }
+    function nextOpenDay(d) { while (isClosedDay(d)) d = addDays(d, 1); return d; }
+    function durLabel(mins) {
+        var h = Math.floor(mins / 60), m = mins % 60;
+        if (!h) return m + ' min';
+        return h + (h === 1 ? ' hour' : ' hours') + (m ? ' ' + m + ' min' : '');
     }
-    function endOptions(startVal, selected) {
-        var s = startVal ? hhmmToMin(startVal) : null;
-        var html = '<option value=""' + (selected ? '' : ' selected') + ' disabled>Select</option>';
-        if (s == null) return html;
-        for (var m = s + STEP_MIN; m <= CLOSE_MIN; m += STEP_MIN) {
-            html += '<option value="' + minToHHMM(m) + '"' + (minToHHMM(m) === selected ? ' selected' : '') + '>' + minToLabel(m) + '</option>';
+    function resEarliestStart(dateStr) {
+        if (dateStr !== todayStr()) return OPEN_MIN;
+        return Math.max(OPEN_MIN, Math.ceil((nowMin() + 1) / ROOM_STEP_MIN) * ROOM_STEP_MIN);
+    }
+    function resSetPressed(containerId, test) {
+        var box = $(containerId);
+        if (!box) return;
+        Array.prototype.forEach.call(box.querySelectorAll('.st-chip'), function (c) {
+            c.setAttribute('aria-pressed', test(c) ? 'true' : 'false');
+        });
+    }
+
+    /* ── Availability bar (thin version of the faculty form's "Room schedule" timeline) ──
+       Open time is green, classes and approved reservations are hatched, the chosen time is the outlined box. */
+    function tlPct(m) { return Math.max(0, Math.min(100, (m - TL_START_MIN) / (TL_END_MIN - TL_START_MIN) * 100)); }
+
+    function tlHTML() {
+        return '<div class="st-tl" id="reserveTl">' +
+            '<div class="st-tl-head"><span>Room availability &middot; <strong id="reserveTlDay"></strong></span>' +
+            '<span class="st-tl-legend"><i class="st-tl-key is-free"></i>Free<i class="st-tl-key is-busy"></i>Booked<i class="st-tl-key is-pick"></i>Yours</span></div>' +
+            '<div class="st-tl-bar" role="img" aria-label="Room availability for the chosen day">' +
+            '<div class="st-tl-track" id="reserveTlTrack"></div><div class="st-tl-pick" id="reserveTlPick" hidden></div></div>' +
+            '<div class="st-tl-ticks" aria-hidden="true">' +
+            TL_TICKS.map(function (t) { return '<span data-pos="' + tlPct(t[0] * 60) + '">' + t[1] + '</span>'; }).join('') + '</div>' +
+            '<p class="st-tl-note" id="reserveTlNote" aria-live="polite"></p></div>';
+    }
+
+    function tlPlaceTicks() {
+        Array.prototype.forEach.call(document.querySelectorAll('#reserveTl .st-tl-ticks span'), function (el) {
+            el.style.left = el.getAttribute('data-pos') + '%';
+        });
+    }
+
+    function tlNote(kind, iconName, text) {
+        var n = $('reserveTlNote');
+        n.className = 'st-tl-note' + (kind ? ' is-' + kind : '');
+        n.innerHTML = iconName ? icon(iconName) + '<span>' + esc(text) + '</span>' : '';
+    }
+
+    function tlRange(b) { return minToLabel(hhmmToMin(b.start)) + ' \u2013 ' + minToLabel(hhmmToMin(b.end)); }
+
+    /* Draws the blocked time, the chosen time and a one-line verdict from resState + resDay */
+    function resTimeline() {
+        var s = resState, track = $('reserveTlTrack'), pick = $('reserveTlPick');
+        if (!s || !track || !pick) return;
+        $('reserveTlDay').textContent = DAY_NAMES[parseYmd(s.date).getDay()];
+
+        Array.prototype.forEach.call(track.querySelectorAll('.st-tl-block'), function (n) { n.remove(); });
+        var blocks = resDay.state === 'ok' ? resDay.blocks : [];
+        blocks.forEach(function (b) {
+            var a = tlPct(hhmmToMin(b.start)), e = tlPct(hhmmToMin(b.end));
+            var el = document.createElement('div');
+            el.className = 'st-tl-block' + (b.kind === 'class' ? ' is-class' : '');
+            el.style.left = a + '%';
+            el.style.width = Math.max(0, e - a) + '%';
+            el.title = tlRange(b) + ' \u00b7 ' + (b.title || 'Reserved');
+            track.appendChild(el);
+        });
+
+        if (s.start == null) { pick.hidden = true; tlNote('', '', ''); return; }
+        pick.hidden = false;
+        pick.style.left = tlPct(s.start) + '%';
+        pick.style.width = Math.max(0, tlPct(s.end) - tlPct(s.start)) + '%';
+
+        var clash = blocks.filter(function (b) { return hhmmToMin(b.start) < s.end && hhmmToMin(b.end) > s.start; });
+        pick.classList.toggle('is-clash', clash.length > 0);
+        if (resDay.state === 'loading') tlNote('wait', 'schedule', 'Checking the schedule\u2026');
+        else if (resDay.state === 'error') tlNote('wait', 'info', 'Could not load the schedule. It is checked again when you submit.');
+        else if (clash.length) {
+            tlNote('clash', 'warning', clash[0].kind === 'class'
+                ? 'This room has a class, ' + clash[0].title + ', ' + tlRange(clash[0]) + '. Pick another time.'
+                : 'Already reserved ' + tlRange(clash[0]) + '. Pick another time.');
+        } else tlNote('', 'check_circle', 'This time is free.');
+    }
+
+    function resLoadDay() {
+        var s = resState, room = st.fac && st.fac.room;
+        if (!s || !room) return;
+        var key = room.room_id + '|' + s.date;
+        var hit = resDayCache[key];
+        if (hit && Date.now() - hit.at < 60000) {
+            resDay = { key: key, blocks: hit.blocks, state: 'ok' };
+            return resTimeline();
         }
-        return html;
+        resDay = { key: key, blocks: null, state: 'loading' };
+        resTimeline();
+        fetch(URLS.roomSchedule + '?room_id=' + encodeURIComponent(room.room_id) + '&date=' + encodeURIComponent(s.date), { credentials: 'same-origin' })
+            .then(readReply)
+            .then(function (d) {
+                if (!d || d.error || !Array.isArray(d.blocks)) throw new Error('schedule');
+                resDayCache[key] = { at: Date.now(), blocks: d.blocks };
+                if (resDay.key === key) { resDay = { key: key, blocks: d.blocks, state: 'ok' }; resTimeline(); }
+            })
+            .catch(function () {
+                if (resDay.key === key) { resDay = { key: key, blocks: null, state: 'error' }; resTimeline(); }
+            });
+    }
+
+    /* Redraws every reservation control from resState */
+    function resSync() {
+        var s = resState;
+        if (!s || !$('reserveStart')) return;
+        var lastStart = ROOM_END_MIN - ROOM_STEP_MIN;
+        var earliest = resEarliestStart(s.date);
+        var wasNone = s.start == null;
+
+        if (earliest > lastStart) s.start = null;                          /* nothing left today */
+        else if (s.start == null || s.start < earliest) s.start = earliest;
+        if (s.start != null) {
+            if (wasNone || s.end <= s.start) s.end = Math.min(ROOM_END_MIN, s.start + 60);
+            /* a custom end time is whole hours only: pull a half-hour end back to the o'clock */
+            if (s.custom && s.end % 60) {
+                var dn = Math.floor(s.end / 60) * 60;
+                s.end = dn > s.start ? dn : Math.min(ROOM_END_MIN, Math.ceil(s.end / 60) * 60);
+            }
+        }
+
+        var startHtml = s.start == null ? '<option value="" selected disabled>No times left today</option>' : '';
+        for (var m = OPEN_MIN; m <= lastStart; m += ROOM_STEP_MIN) {
+            startHtml += '<option value="' + minToHHMM(m) + '"' + (m === s.start ? ' selected' : '') +
+                (m < earliest ? ' disabled' : '') + '>' + minToLabel(m) + '</option>';
+        }
+        $('reserveStart').innerHTML = startHtml;
+
+        var durHtml = '', endHtml = '';
+        if (s.start != null) {
+            var cur = s.end - s.start, list = ROOM_DURATIONS.slice();
+            if (list.indexOf(cur) === -1) { list.push(cur); list.sort(function (x, y) { return x - y; }); }
+            durHtml = list.map(function (d) {
+                var off = ROOM_DURATIONS.indexOf(d) !== -1 && s.start + d > ROOM_END_MIN;
+                return '<option value="' + d + '"' + (d === cur ? ' selected' : '') + (off ? ' disabled' : '') + '>' + durLabel(d) + '</option>';
+            }).join('');
+            for (var e = Math.floor(s.start / 60) * 60 + 60; e <= ROOM_END_MIN; e += 60) {
+                endHtml += '<option value="' + minToHHMM(e) + '"' + (e === s.end ? ' selected' : '') + '>' + minToLabel(e) + '</option>';
+            }
+        }
+        $('reserveDuration').innerHTML = durHtml;
+        $('reserveEnd').innerHTML = endHtml;
+
+        /* the gear swaps the second field between Duration and End time */
+        $('reserveDuration').hidden = s.custom;
+        $('reserveEnd').hidden = !s.custom;
+        $('reserveEndText').textContent = s.custom ? 'End time' : 'Duration';
+        $('reserveEndLabel').setAttribute('for', s.custom ? 'reserveEnd' : 'reserveDuration');
+        var gear = $('reserveGear'), tip = s.custom ? 'Back to choosing a duration' : 'Pick a custom end time';
+        gear.setAttribute('aria-pressed', s.custom ? 'true' : 'false');
+        gear.setAttribute('title', tip);
+        gear.setAttribute('aria-label', tip);
+
+        $('reserveDate').value = s.date;
+        resSetPressed('reserveDateChips', function (c) {
+            return c.getAttribute('data-day') != null && s.date === ymd(addDays(new Date(), +c.getAttribute('data-day')));
+        });
+        resSetPressed('reservePurposeChips', function (c) {
+            var v = c.getAttribute('data-v');
+            return v === 'Other' ? s.other : (!s.other && v === s.purpose);
+        });
+        $('reservePurpose').hidden = !s.other;
+
+        var room = st.fac && st.fac.room;
+        if (room && resDay.key !== room.room_id + '|' + s.date) resLoadDay();   /* new date: fetch that day */
+        else resTimeline();
+    }
+
+    function resOnChange(t) {
+        var s = resState;
+        if (!s) return;
+        hideAlert('flowError');
+        var note = '';
+        if (t.id === 'reserveDate') {
+            if (!t.value) return;
+            var firstOpen = ymd(nextOpenDay(new Date())), maxDate = roomMaxDate();
+            var picked = t.value < firstOpen ? firstOpen : t.value;
+            var tooFar = picked > maxDate;
+            if (tooFar) picked = maxDate;
+            var closed = isClosedDay(parseYmd(picked));
+            if (closed) {                                   /* Sunday → next open day (or the one before if that is past the limit) */
+                var nd = ymd(nextOpenDay(parseYmd(picked)));
+                if (nd > maxDate) { var back = parseYmd(picked); while (isClosedDay(back)) back = addDays(back, -1); nd = ymd(back); }
+                picked = nd;
+            }
+            s.date = picked;
+            if (tooFar) note = roomAdvanceMsg() + ' We moved you to ' + niceDate(s.date) + '.';
+            else if (closed) note = 'Reservations are not available on Sundays. We moved you to ' + niceDate(s.date) + '.';
+        } else if (t.id === 'reserveStart') {
+            var keep = s.end - s.start;
+            s.start = hhmmToMin(t.value);
+            if (s.custom) {
+                if (s.end <= s.start) s.end = Math.min(ROOM_END_MIN, Math.floor(s.start / 60) * 60 + 60);   /* keep the chosen end */
+            } else {
+                s.end = Math.min(ROOM_END_MIN, s.start + Math.max(30, keep));                                /* keep the same length */
+            }
+        } else if (t.id === 'reserveDuration') {
+            var d = parseInt(t.value, 10);
+            if (!d) return;
+            s.end = Math.min(ROOM_END_MIN, s.start + d);
+        } else if (t.id === 'reserveEnd') {
+            var v = hhmmToMin(t.value);
+            if (isNaN(v)) return;
+            s.end = v;
+        }
+        resSync();
+        if (note) showAlert('flowError', note);
     }
 
     function renderReserve(roomId) {
         var hit = findRoom(roomId);
         if (!hit) return renderRooms();
+        nav = { screen: 'reserve', roomId: roomId };
         var b = currentBuilding();
         st.fac.room = hit.room;
         var r = hit.room;
-        var t0 = todayStr();
+        /* Smart defaults (same as the faculty form): next half-hour today, or 8 AM on the next open day */
+        var nowD = new Date(), nowM = nowD.getHours() * 60 + nowD.getMinutes();
+        resState = { date: ymd(nowD), start: 0, end: 0, custom: false, other: false, purpose: '' };
+        if (isClosedDay(nowD) || nowM >= ROOM_END_MIN - 60) {
+            resState.date = ymd(nextOpenDay(addDays(nowD, 1)));
+            resState.start = OPEN_MIN + 60;
+        } else {
+            resState.start = Math.max(OPEN_MIN, Math.ceil((nowM + 1) / ROOM_STEP_MIN) * ROOM_STEP_MIN);
+        }
+        resState.end = Math.min(ROOM_END_MIN, resState.start + 60);
+        var firstOpenStr = ymd(nextOpenDay(nowD));
+        /* Quick date chips: the next two open days (Sundays are skipped) */
+        var chipOffsets = [], off = 0;
+        while (chipOffsets.length < 2) { if (!isClosedDay(addDays(nowD, off))) chipOffsets.push(off); off++; }
+        var dateChips = chipOffsets.map(function (o) {
+            var label = o === 0 ? 'Today' : (o === 1 ? 'Tomorrow' : DAY_NAMES[addDays(nowD, o).getDay()]);
+            return '<button type="button" class="st-chip" aria-pressed="false" data-action="res-day" data-day="' + o + '">' + label + '</button>';
+        }).join('');
         var seats = r.seating_capacity != null && toInt(r.seating_capacity) > 0 ? ' &middot; ' + plural(toInt(r.seating_capacity), 'seat') : '';
+        resDay = { key: '', blocks: null, state: 'loading' };
 
         flow(
             '<div class="st-pagehead st-narrow"><button type="button" class="st-link" data-action="back-rooms">' + icon('arrow_back') + 'Back to rooms</button>' +
@@ -1154,53 +1398,34 @@
             '<p class="st-picked-sub">' + esc(b.name) + ' &middot; ' + esc(hit.floor.label) + seats + '</p></div>' +
             '<button type="button" class="st-btn st-btn-ghost st-btn-sm" data-action="back-rooms">Change</button></div>' +
             '<div class="st-alert is-error" id="flowError" role="alert" hidden></div>' +
-            '<div class="st-field"><label for="reserveDate">Date <span class="st-star">*</span></label>' +
-            '<input type="date" class="st-input" id="reserveDate" min="' + t0 + '" max="' + roomMaxDate() + '" value="' + t0 + '"></div>' +
+            '<div class="st-field"><span class="st-label">Date <span class="st-star">*</span></span>' +
+            '<div class="st-chiprow" id="reserveDateChips">' + dateChips +
+            '<input type="date" class="st-input" id="reserveDate" aria-label="Pick a date" min="' + firstOpenStr + '" max="' + roomMaxDate() + '" value="' + resState.date + '">' +
+            '</div></div>' +
+            tlHTML() +
             '<div class="st-row">' +
             '<div class="st-field"><label for="reserveStart">Start time <span class="st-star">*</span></label>' +
-            '<select class="st-input" id="reserveStart">' + startOptions(t0) + '</select></div>' +
-            '<div class="st-field"><label for="reserveEnd">End time <span class="st-star">*</span></label>' +
-            '<select class="st-input" id="reserveEnd">' + endOptions('', '') + '</select></div>' +
+            '<select class="st-input" id="reserveStart"></select></div>' +
+            '<div class="st-field"><label id="reserveEndLabel" for="reserveDuration"><span id="reserveEndText">Duration</span> <span class="st-star">*</span></label>' +
+            '<div class="st-dur-row">' +
+            '<select class="st-input" id="reserveDuration"></select>' +
+            '<select class="st-input" id="reserveEnd" aria-label="End time" hidden></select>' +
+            '<button type="button" class="st-gear" id="reserveGear" data-action="res-gear" aria-pressed="false" aria-label="Pick a custom end time" title="Pick a custom end time">' + icon('settings') + '</button>' +
+            '</div></div>' +
             '</div>' +
             '<p class="st-hint" style="margin:-8px 0 16px">Open 7:00 AM &ndash; 8:00 PM, Monday to Saturday.</p>' +
-            '<div class="st-field"><label for="reservePurpose">Purpose <span class="st-star">*</span></label>' +
-            '<input type="text" class="st-input" id="reservePurpose" placeholder="e.g. Club meeting, review session" autocomplete="off" maxlength="200">' +
-            '<div class="st-quick">' + PURPOSES.map(function (p) {
-                return '<button type="button" class="st-chip" data-action="purpose" data-v="' + esc(p) + '">' + esc(p) + '</button>';
-            }).join('') + '</div></div>' +
-            '<div class="st-field" style="max-width:200px"><label for="reserveAttendees">Attendees</label>' +
-            '<input type="number" class="st-input" id="reserveAttendees" value="1" min="1" inputmode="numeric">' +
-            (r.seating_capacity != null && toInt(r.seating_capacity) > 0 ? '<p class="st-hint">This room seats ' + toInt(r.seating_capacity) + '.</p>' : '') + '</div>' +
-            LETTER_HTML('reserveLetter', 'Recommended for reservations on a later date. You can still submit without one.') +
+            '<div class="st-field"><span class="st-label">Purpose <span class="st-star">*</span></span>' +
+            '<div class="st-chiprow" id="reservePurposeChips">' + PURPOSES.concat(['Other']).map(function (p) {
+                return '<button type="button" class="st-chip" aria-pressed="false" data-action="res-purpose" data-v="' + esc(p) + '">' + esc(p) + '</button>';
+            }).join('') + '</div>' +
+            '<input type="text" class="st-input" id="reservePurpose" placeholder="What is the room for?" maxlength="200" aria-label="Purpose" autocomplete="off" hidden></div>' +
+            LETTER_HTML('reserveLetter', 'Optional. You can still submit without one.', true) +
             '<div class="st-actions">' +
             '<button type="button" class="st-btn st-btn-ghost" data-action="back-rooms">Back</button>' +
             '<button type="submit" class="st-btn st-btn-primary" id="btnSubmitRoom">' + icon('event_available') + 'Reserve room</button>' +
             '</div></form>', 2);
-    }
-
-    function onReserveFieldChange(target) {
-        if (target.id === 'reserveDate') {
-            var tooFar = !!target.value && target.value > roomMaxDate();
-            if (tooFar) target.value = roomMaxDate();
-            var cur = $('reserveStart').value, curEnd = $('reserveEnd').value;
-            $('reserveStart').innerHTML = startOptions(target.value);
-            var keep = cur && $('reserveStart').querySelector('option[value="' + cur + '"]:not([disabled])');
-            if (keep) $('reserveStart').value = cur;
-            var startNow = $('reserveStart').value;
-            var endOk = startNow && curEnd && hhmmToMin(curEnd) > hhmmToMin(startNow);
-            $('reserveEnd').innerHTML = endOptions(startNow, endOk ? curEnd : '');
-            syncLetter('reserveLetter', target.value);
-            var d = target.value ? parseYmd(target.value) : null;
-            if (tooFar) showAlert('flowError', roomAdvanceMsg() + ' We moved you to ' + target.value + '.');
-            else if (d && d.getDay() === 0) showAlert('flowError', 'Reservations are not available on Sundays. Please choose another day.');
-            else hideAlert('flowError');
-        } else if (target.id === 'reserveStart') {
-            var prevEnd = $('reserveEnd').value;
-            var startM = hhmmToMin(target.value);
-            /* keep the old end if it is still after the new start, otherwise default to one hour */
-            var want = prevEnd && hhmmToMin(prevEnd) > startM ? prevEnd : (startM + 60 <= CLOSE_MIN ? minToHHMM(startM + 60) : minToHHMM(startM + STEP_MIN));
-            $('reserveEnd').innerHTML = endOptions(target.value, want);
-        }
+        tlPlaceTicks();
+        resSync();
     }
 
     function submitReserve() {
@@ -1208,19 +1433,19 @@
         var v = st.verified, room = st.fac.room;
         if (!v || !room) return showAlert('flowError', 'Session expired. Please go back and verify again.');
 
-        var date = $('reserveDate').value.trim();
-        var start = $('reserveStart').value.trim();
-        var end = $('reserveEnd').value.trim();
-        var purpose = $('reservePurpose').value.trim();
-        var attendees = Math.max(1, toInt($('reserveAttendees').value, 1));
+        var s = resState;
+        if (!s) return showAlert('flowError', 'Session expired. Please go back and verify again.');
+        var date = s.date;
+        var start = s.start == null ? '' : minToHHMM(s.start);
+        var end = minToHHMM(s.end);
+        var purpose = (s.other ? $('reservePurpose').value : s.purpose).trim();
 
         if (!date) return showAlert('flowError', 'Please select a date.');
         if (date < todayStr()) return showAlert('flowError', 'Reservation date and time cannot be in the past.');
         if (parseYmd(date).getDay() === 0) return showAlert('flowError', 'Reservations are not available on Sundays. Please choose another day.');
-        if (!start) return showAlert('flowError', 'Please select a start time.');
-        if (!end) return showAlert('flowError', 'Please select an end time.');
+        if (!start) return showAlert('flowError', date === todayStr() ? 'No start times are left today. Please choose another date.' : 'Please select a start time.');
         if (end <= start) return showAlert('flowError', 'End time must be after start time.');
-        if (!purpose) return showAlert('flowError', 'Please enter the purpose.');
+        if (!purpose) return showAlert('flowError', 'Please choose or enter the purpose.');
         var letter = pickLetter('reserveLetter', date);
         if (letter.error) return showAlert('flowError', letter.error);
 
@@ -1243,19 +1468,20 @@
             reservation_date: date,
             start_time: start,
             end_time: end,
-            purpose: purpose,
-            attendees: attendees
+            purpose: purpose
         }, letter.file).then(function (d) {
             setBusy(btn, false);
             /* A conflict (room taken, past time, …) comes back as an error and the code is NOT used,
                so the student can simply pick another slot with the same code. */
             if (d.error) return showAlert('flowError', d.error);
             st.verified = null; st.vKey = '';
+            resDayCache = {};
             showRoomResult(d, form);
         });
     }
 
     function showRoomResult(res, f) {
+        nav = { screen: 'roomResult', res: res, f: f };
         var approved = res.status === 'Approved';
         var waiting = res.status === 'Waiting';   /* a later date waits for an admin's decision */
         var title = approved ? 'Reservation approved' : (waiting ? 'Request sent — pending admin review' : 'Reservation ' + esc(res.status || 'received'));
@@ -1329,6 +1555,7 @@
     function returnUrl(token) { return new URL('equipment-booking/return_confirm.php?token=' + encodeURIComponent(token), window.location.href).href; }
 
     function showReceipt(r) {
+        nav = { screen: 'receipt', r: r };
         var many = r.items.length > 1;
         var reqs = r.items.map(function (it) {
             var qrs = '';
@@ -1398,6 +1625,189 @@
     }
 
     /* ══════════════════════════════════════════════════════════
+       KEEP THE SCREEN ON REFRESH
+       The current screen and what was typed/chosen are kept in sessionStorage (one browser tab only),
+       so a reload lands back on the same screen. Closing the tab clears it; so do the Back buttons:
+       the on-screen Back / Done / Cancel, "Back to Portal", and the browser's Back button (which
+       returns to the first screen, "What do you need today?"). Attached letter files cannot be kept.
+    ══════════════════════════════════════════════════════════ */
+    var SNAP_MAX_AGE = 12 * 60 * 60 * 1000;   /* ignore a saved screen older than this */
+    var FIELD_IDS = ['facultyCode', 'studentName', 'studentCourse', 'borrowRoomId', 'borrowRoom', 'itemQty', 'itemRoomId', 'itemRoom', 'reservePurpose'];
+    var persistTimer = 0, restoring = false, leaving = false;
+
+    /* One extra history entry while inside a service, so the browser's Back button returns to the first screen */
+    function pushFlowEntry() {
+        try { if (!(history.state && history.state.psFlow)) history.pushState({ psFlow: 1 }, '', window.location.href); } catch (e) { }
+    }
+    function popFlowEntry() {
+        try { if (history.state && history.state.psFlow) history.back(); } catch (e) { }
+    }
+
+    function collectFields() {
+        var f = {};
+        FIELD_IDS.forEach(function (id) { var el = $(id); if (el && 'value' in el) f[id] = el.value; });
+        ['borrow', 'item'].forEach(function (p) {
+            ['Date', 'StartTime', 'Duration'].forEach(function (k) { var el = $(p + k); if (el) f[p + k] = el.value; });
+            var label = $(p + 'RoomLabel');
+            if (label) f[p + 'RoomLabel'] = label.textContent;
+        });
+        return f;
+    }
+
+    function persistNow() {
+        window.clearTimeout(persistTimer);
+        persistTimer = 0;
+        if (restoring || leaving) return;
+        try {
+            if (nav.screen === 'home') { sessionStorage.removeItem(SNAP_KEY); return; }
+            sessionStorage.setItem(SNAP_KEY, JSON.stringify({
+                v: 1, at: Date.now(), nav: nav, fields: collectFields(),
+                scroll: window.pageYOffset || 0,
+                res: nav.screen === 'reserve' ? resState : null,
+                st: {
+                    service: st.service, kind: st.kind, verified: st.verified, vKey: st.vKey,
+                    cart: st.cart, eqPage: st.eqPage, query: st.query, cat: st.cat,
+                    done: st.done, where: st.where, receipt: st.receipt,
+                    fac: { bid: st.fac.bid, floor: st.fac.floor }
+                }
+            }));
+        } catch (e) { /* storage full or blocked: the portal still works, it just will not remember */ }
+    }
+
+    function schedulePersist() {
+        if (restoring || leaving) return;
+        window.clearTimeout(persistTimer);
+        persistTimer = window.setTimeout(persistNow, 150);
+    }
+
+    function clearSnap() {
+        try { sessionStorage.removeItem(SNAP_KEY); } catch (e) { }
+    }
+
+    function readSnap() {
+        try {
+            var s = JSON.parse(sessionStorage.getItem(SNAP_KEY) || 'null');
+            if (!s || s.v !== 1 || !s.nav || !s.nav.screen || s.nav.screen === 'home') return null;
+            if (Date.now() - (s.at || 0) > SNAP_MAX_AGE) { clearSnap(); return null; }
+            return s;
+        } catch (e) { return null; }
+    }
+
+    function setSelect(sel, v) {
+        if (!sel || v == null || v === '') return;
+        for (var i = 0; i < sel.options.length; i++) {
+            if (sel.options[i].value === v && !sel.options[i].disabled) { sel.value = v; return; }
+        }
+    }
+
+    function restoreSchedule(prefix, f) {
+        if (!$(prefix + 'Date')) return;
+        setSelect($(prefix + 'Date'), f[prefix + 'Date']);
+        refreshStudentSchedule(prefix);
+        setSelect($(prefix + 'StartTime'), f[prefix + 'StartTime']);
+        refreshStudentSchedule(prefix);
+        setSelect($(prefix + 'Duration'), f[prefix + 'Duration']);
+        syncStudentSchedule(prefix);
+        if (prefix === 'borrow') syncLetter('borrowLetter', $('borrowDate').value);
+    }
+
+    function restoreRoom(prefix, f) {
+        if (!f[prefix + 'RoomId'] || !$(prefix + 'RoomId')) return;
+        $(prefix + 'RoomId').value = f[prefix + 'RoomId'];
+        $(prefix + 'Room').value = f[prefix + 'Room'] || '';
+        if ($(prefix + 'RoomLabel') && f[prefix + 'RoomLabel']) $(prefix + 'RoomLabel').textContent = f[prefix + 'RoomLabel'];
+    }
+
+    function rebuildFacility(bid, floor) {
+        var rooms = st.verified && Array.isArray(st.verified.rooms) ? st.verified.rooms : [];
+        st.fac = { buildings: buildBuildings(rooms), bid: bid || null, floor: floor || 0, room: null };
+    }
+
+    /* Redraws the saved screen exactly as it was. Anything that cannot be restored falls back to the first screen. */
+    function restoreView(snap) {
+        var s = snap.st || {}, n = snap.nav, f = snap.fields || {};
+        restoring = true;
+        try {
+            st = fresh();
+            ['service', 'kind', 'verified', 'vKey', 'where', 'receipt'].forEach(function (k) {
+                if (s[k] !== undefined && s[k] !== null) st[k] = s[k];
+            });
+            st.cart = s.cart && typeof s.cart === 'object' ? s.cart : {};
+            st.done = Array.isArray(s.done) ? s.done : [];
+            var fac = s.fac || {};
+
+            if (n.screen === 'details') {
+                if (!st.service) throw new Error('no service');
+                applyService(st.service);
+                ['facultyCode', 'studentName', 'studentCourse'].forEach(function (id) {
+                    if ($(id) && f[id] != null) $(id).value = f[id];
+                });
+                show('details', 1);
+            } else if (n.screen === 'receipt') {
+                var r = normReceipt(n.r);
+                if (!r) throw new Error('no receipt');
+                showReceipt(r);
+            } else if (n.screen === 'roomResult') {
+                if (!n.res || !n.f) throw new Error('no result');
+                showRoomResult(n.res, n.f);
+            } else {
+                if (!st.verified) throw new Error('not verified');
+                if (n.screen === 'borrow') {
+                    renderBorrow();
+                    st.query = s.query || '';
+                    st.cat = s.cat || '';
+                    st.eqPage = s.eqPage || 1;
+                    if ($('eqSearch')) $('eqSearch').value = st.query;
+                    Array.prototype.forEach.call(document.querySelectorAll('#eqCats .st-chip'), function (c) {
+                        c.setAttribute('aria-pressed', (c.getAttribute('data-cat') || '') === st.cat ? 'true' : 'false');
+                    });
+                    renderEqGrid();
+                    updateSummary();
+                    restoreRoom('borrow', f);
+                    restoreSchedule('borrow', f);
+                    if (st.where) lockWhere(true);
+                } else if (n.screen === 'item') {
+                    renderItem();
+                    if ($('itemQty') && f.itemQty) $('itemQty').value = f.itemQty;
+                    restoreRoom('item', f);
+                    restoreSchedule('item', f);
+                } else if (n.screen === 'buildings') {
+                    rebuildFacility();
+                    renderBuildings();
+                } else if (n.screen === 'rooms') {
+                    rebuildFacility(fac.bid, fac.floor);
+                    renderRooms();
+                } else if (n.screen === 'reserve') {
+                    rebuildFacility(fac.bid, fac.floor);
+                    renderReserve(toInt(n.roomId));
+                    var rs = snap.res;
+                    if (nav.screen === 'reserve' && resState && rs && typeof rs.end === 'number' &&
+                        rs.date >= ymd(nextOpenDay(new Date())) && rs.date <= roomMaxDate() && !isClosedDay(parseYmd(rs.date))) {
+                        resState.date = rs.date;
+                        resState.start = typeof rs.start === 'number' ? rs.start : resState.start;
+                        resState.end = rs.end;
+                        resState.custom = !!rs.custom;
+                        resState.other = !!rs.other;
+                        resState.purpose = String(rs.purpose || '');
+                        if (resState.other && $('reservePurpose')) $('reservePurpose').value = resState.purpose;
+                        resSync();
+                    }
+                } else {
+                    throw new Error('unknown screen');
+                }
+            }
+            window.setTimeout(function () { window.scrollTo(0, snap.scroll || 0); }, 0);
+        } catch (err) {
+            restoring = false;
+            clearSnap();
+            goHome();
+            return;
+        }
+        restoring = false;
+        schedulePersist();
+    }
+
+    /* ══════════════════════════════════════════════════════════
        EVENTS
     ══════════════════════════════════════════════════════════ */
     function nameOfCard(el) {
@@ -1407,6 +1817,12 @@
 
     function onClick(e) {
         if (e.target.id === 'studentRoomPicker') return closeStudentRoomPicker();
+        if (e.target.closest && e.target.closest('.st-back-link')) {
+            leaving = true;
+            clearSnap();
+            window.setTimeout(function () { leaving = false; }, 4000);
+            return;
+        }
         var t = e.target.closest('[data-action]');
         if (!t) return;
         var a = t.getAttribute('data-action');
@@ -1468,9 +1884,31 @@
             case 'floor': st.fac.floor = toInt(t.getAttribute('data-i')); return renderRooms();
             case 'room': return renderReserve(toInt(t.getAttribute('data-id')));
             case 'back-rooms': return renderRooms();
-            case 'purpose':
-                $('reservePurpose').value = t.getAttribute('data-v');
-                $('reservePurpose').focus();
+            case 'res-day':
+                if (!resState) return;
+                hideAlert('flowError');
+                resState.date = ymd(addDays(new Date(), toInt(t.getAttribute('data-day'))));
+                return resSync();
+            case 'res-gear':
+                if (!resState) return;
+                hideAlert('flowError');
+                resState.custom = !resState.custom;
+                resSync();
+                $(resState.custom ? 'reserveEnd' : 'reserveDuration').focus();
+                return;
+            case 'res-purpose':
+                if (!resState) return;
+                hideAlert('flowError');
+                if (t.getAttribute('data-v') === 'Other') {
+                    resState.other = true;
+                    resState.purpose = $('reservePurpose').value;
+                } else {
+                    resState.other = false;
+                    resState.purpose = t.getAttribute('data-v');
+                    $('reservePurpose').value = '';
+                }
+                resSync();
+                if (resState.other) $('reservePurpose').focus();
                 return;
         }
     }
@@ -1478,6 +1916,7 @@
     function onInput(e) {
         var t = e.target;
         if (t.id === 'eqSearch') { st.query = t.value; st.eqPage = 1; renderEqGrid(); }
+        else if (t.id === 'reservePurpose' && resState) resState.purpose = t.value;
     }
 
     function onChange(e) {
@@ -1492,8 +1931,8 @@
             syncStudentSchedule('borrow');
         } else if (t.id === 'itemDate' || t.id === 'itemStartTime' || t.id === 'itemDuration') {
             syncStudentSchedule('item');
-        } else if (t.id === 'reserveDate' || t.id === 'reserveStart') {
-            onReserveFieldChange(t);
+        } else if (t.id === 'reserveDate' || t.id === 'reserveStart' || t.id === 'reserveDuration' || t.id === 'reserveEnd') {
+            resOnChange(t);
         }
     }
 
@@ -1515,7 +1954,9 @@
        INIT
     ══════════════════════════════════════════════════════════ */
     function init() {
-        loadBorrowRules();
+        var snap = readSnap();
+        if (snap) $('view-home').hidden = true;   /* no flash of the first screen while the saved one is redrawn */
+        var rules = loadBorrowRules();
         var course = $('studentCourse');
         COURSES.forEach(function (c) {
             var o = document.createElement('option');
@@ -1542,6 +1983,23 @@
         }, true);
 
         loadReceiptBanner();
+
+        /* Keep the current screen across a refresh (see KEEP THE SCREEN ON REFRESH) */
+        ['click', 'input', 'change'].forEach(function (ev) { document.addEventListener(ev, schedulePersist); });
+        window.addEventListener('pagehide', persistNow);
+        window.addEventListener('beforeunload', persistNow);
+        document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') persistNow(); });
+        window.addEventListener('pageshow', function (e) { if (e.persisted) leaving = false; });
+        window.addEventListener('popstate', function () {     /* the browser's Back button → first screen */
+            if (nav.screen === 'home') return;
+            document.body.classList.remove('st-room-picker-open');
+            goHome(true);
+        });
+        if (snap) {
+            var restore = function () { restoreView(snap); };
+            /* wait briefly for the booking window so the date/time lists match, then redraw */
+            Promise.race([rules, new Promise(function (resolve) { window.setTimeout(resolve, 2500); })]).then(restore, restore);
+        }
     }
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

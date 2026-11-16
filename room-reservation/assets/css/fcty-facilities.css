@@ -1491,12 +1491,13 @@ textarea.fcty-input {
 .fcty-res-side::before {
     content: '';
     position: absolute;
-    top: -80px;
-    right: -80px;
-    width: 220px;
-    height: 220px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(255, 255, 255, .18), transparent 70%);
+    top: 0;
+    right: 0;
+    width: 140px;
+    height: 140px;
+    /* Same glow as before, but drawn inside the panel: a circle that poked 80px past the edge made the
+       panel (and, on small screens, the whole form) scroll sideways. */
+    background: radial-gradient(circle 109px at 110px 30px, rgba(255, 255, 255, .18), transparent);
     pointer-events: none;
 }
 
@@ -3891,29 +3892,10 @@ button.fcty-open-chip {
 }
 
 /* request letter: one tidy row that opens when needed */
-.fcty-doc > summary {
+.fcty-doc > .fcty-doc-label {
     display: flex;
     align-items: center;
     gap: 6px;
-    margin-top: 12px;
-    cursor: pointer;
-    list-style: none;
-}
-
-.fcty-doc > summary::-webkit-details-marker {
-    display: none;
-}
-
-.fcty-doc > summary::after {
-    content: 'expand_more';
-    margin-left: auto;
-    font-family: 'Material Symbols Outlined';
-    font-size: 20px;
-    line-height: 1;
-}
-
-.fcty-doc[open] > summary::after {
-    content: 'expand_less';
 }
 
 .fcty-doc-state {
@@ -3921,9 +3903,6 @@ button.fcty-open-chip {
     font-weight: 700;
 }
 
-.fcty-doc[open] > summary {
-    margin-bottom: 8px;
-}
 
 /* Duration dropdown + gear: the gear swaps Duration for an End time list (whole hours only) */
 .fcty-dur-row {

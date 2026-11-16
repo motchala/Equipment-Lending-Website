@@ -26,6 +26,7 @@
 
     <script src="shared/assets/js/logout-modal.js?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/js/logout-modal.js'); ?>"></script>
     <script src="shared/assets/js/letter-camera.js?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/js/letter-camera.js'); ?>"></script>
+    <script src="shared/assets/js/dept-multiselect.js?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/js/dept-multiselect.js'); ?>"></script>
     <script src="dashboard/assets/js/faculty-dashboard.js?v=<?php echo @filemtime(PS_ROOT . '/dashboard/assets/js/faculty-dashboard.js'); ?>"></script>
     <script src="notifications/assets/js/notif-prefs.js?v=<?php echo @filemtime(PS_ROOT . '/notifications/assets/js/notif-prefs.js'); ?>"></script>
     <script src="equipment-booking/assets/js/faculty-borrow-flow.js?v=<?php echo @filemtime(PS_ROOT . '/equipment-booking/assets/js/faculty-borrow-flow.js'); ?>"></script>

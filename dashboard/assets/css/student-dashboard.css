@@ -1570,7 +1570,7 @@ select.st-input option:disabled {
     border-color: var(--st-maroon);
 }
 
-.st-room-choice > span:nth-child(2) {
+.st-room-choice>span:nth-child(2) {
     flex: 1;
     font-weight: 600;
 }
@@ -1698,6 +1698,213 @@ select.st-input option:disabled {
 .st-quick .st-chip {
     padding: 5px 12px;
     font-size: .78rem;
+}
+
+/* ── Facility: reservation inputs (date chips, duration / end time) ── */
+.st-chiprow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.st-chiprow .st-input {
+    flex: 1 1 150px;
+    width: auto;
+    min-width: 0;
+}
+
+.st-chiprow+.st-input {
+    margin-top: 8px;
+}
+
+.st-dur-row {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+}
+
+.st-dur-row .st-input {
+    flex: 1;
+    min-width: 0;
+}
+
+.st-gear {
+    flex-shrink: 0;
+    width: 46px;
+    min-height: 46px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    background: var(--st-cream);
+    border: 1px solid var(--st-line-strong);
+    border-radius: var(--st-r-md);
+    color: var(--st-muted);
+    transition: background .2s, border-color .2s, color .2s;
+}
+
+.st-gear:hover {
+    border-color: var(--st-maroon);
+    color: var(--st-maroon);
+}
+
+.st-gear[aria-pressed="true"] {
+    background: var(--st-maroon);
+    border-color: var(--st-maroon);
+    color: #fff;
+}
+
+/* ── Facility: availability bar (thin timeline under the date) ──
+   Bar height is about 40% of a dropdown field (46px -> 18px; 42px -> 17px on phones). */
+.st-tl {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-bottom: 16px;
+}
+
+.st-tl-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2px 12px;
+    font-size: .78rem;
+    font-weight: 600;
+    color: var(--st-muted);
+}
+
+.st-tl-head strong {
+    color: var(--st-ink);
+    font-weight: 700;
+}
+
+.st-tl-legend {
+    display: inline-flex;
+    align-items: center;
+    font-size: .72rem;
+    font-weight: 500;
+}
+
+.st-tl-key {
+    display: inline-block;
+    width: 12px;
+    height: 8px;
+    margin: 0 4px 0 10px;
+    border-radius: 3px;
+}
+
+.st-tl-key:first-child {
+    margin-left: 0;
+}
+
+.st-tl-key.is-free {
+    background: #bfe8cb;
+    box-shadow: inset 0 0 0 1px rgba(22, 101, 52, .35);
+}
+
+.st-tl-key.is-busy {
+    background: repeating-linear-gradient(135deg, var(--st-maroon) 0 2px, #b64a4a 2px 4px);
+}
+
+.st-tl-key.is-pick {
+    background: #fff;
+    box-shadow: inset 0 0 0 2px var(--st-ink);
+}
+
+.st-tl-bar {
+    position: relative;
+    height: 18px;
+    margin: 3px 0;
+}
+
+.st-tl-track {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    border-radius: 6px;
+    background: #bfe8cb;
+    box-shadow: inset 0 0 0 1px rgba(22, 101, 52, .3);
+}
+
+.st-tl-block {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(135deg, var(--st-maroon) 0 4px, #b64a4a 4px 8px);
+}
+
+.st-tl-block.is-class {
+    background: repeating-linear-gradient(45deg, var(--st-maroon-deep) 0 4px, #8f3a3a 4px 8px);
+}
+
+.st-tl-pick {
+    position: absolute;
+    top: -3px;
+    bottom: -3px;
+    box-sizing: border-box;
+    border: 2px solid var(--st-ink);
+    border-radius: 5px;
+    background: rgba(255, 255, 255, .55);
+    box-shadow: 0 0 0 1px #fff;
+    transition: left .28s var(--st-ease), width .28s var(--st-ease), border-color .2s;
+}
+
+.st-tl-pick.is-clash {
+    border-color: var(--st-err);
+    background: rgba(255, 232, 230, .7);
+}
+
+.st-tl-ticks {
+    position: relative;
+    height: 13px;
+}
+
+.st-tl-ticks span {
+    position: absolute;
+    top: 0;
+    transform: translateX(-50%);
+    font-size: .66rem;
+    color: var(--st-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.st-tl-ticks span:first-child {
+    transform: none;
+}
+
+.st-tl-ticks span:last-child {
+    transform: translateX(-100%);
+}
+
+.st-tl-note {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 1.2em;
+    margin: 0;
+    font-size: .8rem;
+    font-weight: 600;
+    color: var(--st-ok);
+}
+
+.st-tl-note:empty {
+    display: none;
+}
+
+.st-tl-note.is-clash {
+    color: var(--st-err);
+}
+
+.st-tl-note.is-wait {
+    color: var(--st-muted);
+    font-weight: 500;
+}
+
+.st-tl-note .material-symbols-outlined {
+    flex-shrink: 0;
+    font-size: 17px;
 }
 
 /* ── Receipt / result ───────────────────────────────────────── */
@@ -1990,7 +2197,743 @@ select.st-input option:disabled {
     }
 }
 
-@media (max-width: 380px) {
+/* ── Phone polish (640px and below) ──────────────────────────
+   Toned-down sizes for phones: smaller cards, buttons, inputs,
+   headings and icons. Layout is unchanged. Inputs keep
+   font-size: 16px so iOS does not zoom the page on focus.
+   To undo: delete this whole block and set the 330px query
+   below back to 380px.
+──────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+    body {
+        font-size: 14px;
+    }
+
+    .material-symbols-outlined {
+        font-size: 18px;
+    }
+
+    .st-borrow-info {
+        font-size: 15px;
+    }
+
+    /* Top bar */
+    .st-top-in {
+        padding: 8px 12px;
+        min-height: 54px;
+    }
+
+    .st-brand {
+        gap: 10px;
+    }
+
+    .st-brand-mark {
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+    }
+
+    .st-brand-mark svg {
+        width: 19px;
+        height: 19px;
+    }
+
+    .st-brand-name {
+        font-size: 1rem;
+    }
+
+    .st-brand-sub {
+        font-size: .66rem;
+    }
+
+    .st-back-link {
+        padding: 6px 9px;
+    }
+
+    .st-back-link .material-symbols-outlined {
+        font-size: 17px;
+    }
+
+    /* Page frame */
+    .st-main {
+        padding: 14px 12px 24px;
+    }
+
+    .st-foot {
+        padding: 12px 14px 18px;
+        font-size: .7rem;
+    }
+
+    /* Progress steps */
+    .st-steps {
+        margin-bottom: 12px;
+    }
+
+    .st-step {
+        gap: 4px;
+    }
+
+    .st-step+.st-step::before {
+        top: 12px;
+    }
+
+    .st-step-dot {
+        width: 26px;
+        height: 26px;
+        font-size: .72rem;
+    }
+
+    .st-step-label {
+        font-size: .68rem;
+    }
+
+    .st-step.is-active .st-step-dot {
+        box-shadow: 0 0 0 3px rgba(220, 184, 98, .3);
+    }
+
+    /* Home */
+    .st-hero {
+        padding: 6px 0 16px;
+    }
+
+    .st-hero h1 {
+        font-size: 1.4rem;
+    }
+
+    .st-hero p {
+        margin-top: 6px;
+        font-size: .88rem;
+    }
+
+    .st-services {
+        gap: 10px;
+    }
+
+    .st-service {
+        gap: 12px;
+        padding: 14px;
+        padding-right: 54px;
+        border-radius: var(--st-r-lg);
+    }
+
+    .st-service-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+    }
+
+    .st-service-icon .material-symbols-outlined {
+        font-size: 23px;
+    }
+
+    .st-service-title {
+        font-size: 1.05rem;
+    }
+
+    .st-service-text {
+        font-size: .8rem;
+    }
+
+    .st-service-go {
+        right: 12px;
+        width: 32px;
+        height: 32px;
+        margin-top: -16px;
+    }
+
+    .st-banner {
+        gap: 10px;
+        padding: 10px 12px;
+        margin-bottom: 12px;
+    }
+
+    .st-banner .material-symbols-outlined {
+        font-size: 21px;
+    }
+
+    .st-banner-text {
+        font-size: .74rem;
+    }
+
+    .st-banner-text strong {
+        font-size: .84rem;
+    }
+
+    .st-info {
+        margin-top: 18px;
+        gap: 6px 16px;
+        font-size: .76rem;
+    }
+
+    .st-info .material-symbols-outlined {
+        font-size: 16px;
+    }
+
+    /* Cards & forms */
+    .st-card {
+        padding: 18px 14px 14px;
+    }
+
+    .st-card-head {
+        gap: 10px;
+        margin-bottom: 14px;
+    }
+
+    .st-tile {
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+    }
+
+    .st-tile .material-symbols-outlined {
+        font-size: 21px;
+    }
+
+    .st-h2 {
+        font-size: 1.1rem;
+    }
+
+    .st-sub {
+        font-size: .8rem;
+    }
+
+    .st-field {
+        margin-bottom: 12px;
+    }
+
+    .st-field>label,
+    .st-label {
+        margin-bottom: 5px;
+        font-size: .8rem;
+    }
+
+    .st-input {
+        min-height: 42px;
+        padding: 8px 12px;
+    }
+
+    .st-input-icon .st-input {
+        padding-left: 40px;
+    }
+
+    .st-input-icon .material-symbols-outlined {
+        left: 12px;
+    }
+
+    select.st-input {
+        padding-right: 34px;
+        background-position: right 12px center;
+    }
+
+    .st-hint {
+        margin-top: 4px;
+        font-size: .74rem;
+    }
+
+    .st-actions {
+        gap: 8px;
+        margin-top: 16px;
+    }
+
+    .st-alert {
+        gap: 8px;
+        margin-bottom: 12px;
+        padding: 9px 12px;
+        font-size: .8rem;
+    }
+
+    .st-alert .material-symbols-outlined {
+        font-size: 16px;
+    }
+
+    /* Buttons */
+    .st-btn {
+        gap: 6px;
+        min-height: 42px;
+        padding: 8px 16px;
+        font-size: .88rem;
+    }
+
+    .st-btn .material-symbols-outlined {
+        font-size: 17px;
+    }
+
+    .st-btn-sm {
+        min-height: 34px;
+        padding: 5px 12px;
+        font-size: .8rem;
+    }
+
+    .st-link {
+        padding: 5px 8px 5px 4px;
+        font-size: .82rem;
+    }
+
+    .st-link .material-symbols-outlined {
+        font-size: 17px;
+    }
+
+    .st-icon-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 9px;
+    }
+
+    .st-spin {
+        width: 14px;
+        height: 14px;
+    }
+
+    /* Page headers, search, chips */
+    .st-pagehead,
+    .st-pagehead.st-narrow {
+        margin-bottom: 12px;
+    }
+
+    .st-pagehead .st-h2 {
+        margin-top: 2px;
+        font-size: 1.2rem;
+    }
+
+    .st-pill {
+        padding: 4px 10px;
+        font-size: .74rem;
+    }
+
+    .st-tools {
+        gap: 10px;
+        margin-bottom: 12px;
+    }
+
+    .st-search input {
+        min-height: 42px;
+        padding: 8px 12px 8px 40px;
+    }
+
+    .st-search .material-symbols-outlined {
+        left: 12px;
+    }
+
+    .st-chips {
+        gap: 6px;
+    }
+
+    .st-chip {
+        padding: 6px 12px;
+        font-size: .78rem;
+    }
+
+    /* Equipment cards */
+    .st-eq-grid {
+        gap: 10px;
+        margin-bottom: 16px;
+    }
+
+    .st-eq-img {
+        aspect-ratio: 3 / 2;
+    }
+
+    .st-ph .material-symbols-outlined {
+        font-size: 34px;
+    }
+
+    .st-eq-stock {
+        top: 6px;
+        left: 6px;
+        gap: 4px;
+        padding: 2px 7px;
+        font-size: .66rem;
+    }
+
+    .st-eq-tick {
+        top: 6px;
+        right: 6px;
+        width: 22px;
+        height: 22px;
+    }
+
+    .st-eq-tick .material-symbols-outlined {
+        font-size: 15px;
+    }
+
+    .st-eq-body {
+        padding: 8px 10px 2px;
+    }
+
+    .st-eq-name {
+        font-size: .86rem;
+    }
+
+    .st-eq-cat {
+        font-size: .72rem;
+    }
+
+    .st-eq-foot {
+        gap: 6px;
+        padding: 6px 10px 10px;
+    }
+
+    .st-eq-done {
+        min-height: 32px;
+        font-size: .8rem;
+    }
+
+    .st-stepper {
+        border-radius: 9px;
+    }
+
+    .st-step-btn {
+        width: 32px;
+        height: 32px;
+        font-size: 1.05rem;
+    }
+
+    .st-step-input {
+        height: 32px;
+    }
+
+    .st-empty {
+        padding: 26px 14px;
+    }
+
+    .st-empty .material-symbols-outlined {
+        font-size: 30px;
+    }
+
+    /* Pagination */
+    .st-pagination {
+        gap: 10px;
+        margin-bottom: 16px;
+        padding-top: 12px;
+    }
+
+    .st-pagination-info {
+        font-size: .76rem;
+    }
+
+    .st-pagination-controls,
+    .st-pagination-numbers {
+        gap: 4px;
+    }
+
+    .st-pagination-btn,
+    .st-pagination-number {
+        min-width: 32px;
+        height: 32px;
+        padding: 0 7px;
+        font-size: .78rem;
+    }
+
+    /* Sticky submit bar (side/bottom margins match .st-main padding) */
+    .st-submitbar {
+        gap: 10px;
+        margin: 14px -12px -24px;
+        padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .st-submit-sum {
+        font-size: .74rem;
+    }
+
+    .st-submit-sum strong {
+        font-size: .86rem;
+    }
+
+    /* Item-code (locked item) */
+    .st-item {
+        flex-direction: row;
+        align-items: center;
+        gap: 12px;
+        padding: 10px;
+        margin-bottom: 14px;
+    }
+
+    .st-item>div:last-child {
+        min-width: 0;
+    }
+
+    .st-item .st-eq-img {
+        width: 72px;
+        aspect-ratio: 1 / 1;
+        border-radius: 10px;
+    }
+
+    .st-item-name {
+        font-size: 1rem;
+    }
+
+    .st-item-meta {
+        font-size: .76rem;
+    }
+
+    /* Facility: buildings, floors, rooms */
+    .st-panels {
+        gap: 10px;
+    }
+
+    .st-panel {
+        min-height: 128px;
+        border-radius: var(--st-r-lg);
+    }
+
+    .st-panel-letter {
+        top: 6px;
+        right: 14px;
+        font-size: 3rem;
+    }
+
+    .st-panel-info {
+        padding: 12px 14px 14px;
+    }
+
+    .st-panel-name {
+        gap: 6px;
+        font-size: 1.1rem;
+    }
+
+    .st-panel-meta {
+        font-size: .76rem;
+    }
+
+    .st-panel-go {
+        right: 12px;
+        bottom: 14px;
+        width: 32px;
+        height: 32px;
+    }
+
+    .st-tag {
+        padding: 2px 8px;
+        font-size: .64rem;
+    }
+
+    .st-crumbs {
+        margin-bottom: 10px;
+        font-size: .8rem;
+    }
+
+    .st-crumbs .material-symbols-outlined {
+        font-size: 16px;
+    }
+
+    .st-hero-b {
+        min-height: 96px;
+        margin-bottom: 14px;
+        border-radius: var(--st-r-lg);
+    }
+
+    .st-hero-b-text {
+        padding: 12px 14px;
+    }
+
+    .st-hero-b h2 {
+        font-size: 1.2rem;
+    }
+
+    .st-hero-b p {
+        font-size: .78rem;
+    }
+
+    .st-floors {
+        gap: 6px;
+        margin-bottom: 10px;
+    }
+
+    .st-floor {
+        padding: 7px 14px;
+        font-size: .82rem;
+    }
+
+    .st-rooms {
+        gap: 10px;
+    }
+
+    .st-room {
+        gap: 6px;
+        min-height: 70px;
+        padding: 10px 12px;
+    }
+
+    .st-room-name {
+        font-size: .9rem;
+    }
+
+    .st-room-meta {
+        font-size: .72rem;
+    }
+
+    .st-room-choice {
+        gap: 8px;
+        min-height: 42px;
+        padding: 8px 12px;
+    }
+
+    /* Room picker pop-up */
+    .st-room-picker {
+        padding: 10px;
+    }
+
+    .st-room-picker-card {
+        max-height: min(760px, calc(100vh - 20px));
+        max-height: min(760px, calc(100dvh - 20px));
+        border-radius: var(--st-r-lg);
+    }
+
+    .st-room-picker-head {
+        gap: 10px;
+        padding: 14px 14px 10px;
+    }
+
+    .st-room-picker-head h2 {
+        font-size: 1.1rem;
+    }
+
+    .st-room-picker-content {
+        min-height: 120px;
+        padding: 12px 14px 16px;
+    }
+
+    .st-room-picker .st-panel {
+        min-height: 120px;
+    }
+
+    .st-room-picker-label {
+        margin-bottom: 8px;
+        font-size: .95rem;
+    }
+
+    .st-room-picker-status {
+        min-height: 120px;
+    }
+
+    /* Reserve form */
+    .st-picked {
+        gap: 10px;
+        padding: 10px 12px;
+        margin-bottom: 14px;
+    }
+
+    .st-picked-sub {
+        font-size: .76rem;
+    }
+
+    .st-quick {
+        margin-top: 6px;
+    }
+
+    .st-quick .st-chip {
+        padding: 4px 10px;
+        font-size: .74rem;
+    }
+
+    .st-chiprow {
+        gap: 6px;
+    }
+
+    .st-chiprow+.st-input {
+        margin-top: 6px;
+    }
+
+    .st-dur-row {
+        gap: 6px;
+    }
+
+    .st-gear {
+        width: 42px;
+        min-height: 42px;
+        border-radius: 10px;
+    }
+
+    .st-tl {
+        gap: 4px;
+        margin-bottom: 12px;
+    }
+
+    .st-tl-head {
+        font-size: .74rem;
+    }
+
+    .st-tl-legend {
+        font-size: .68rem;
+    }
+
+    .st-tl-bar {
+        height: 17px;
+    }
+
+    .st-tl-ticks span {
+        font-size: .62rem;
+    }
+
+    .st-tl-note {
+        font-size: .74rem;
+    }
+
+    .st-tl-note .material-symbols-outlined {
+        font-size: 16px;
+    }
+
+    /* Receipt / result (QR codes are left at full size so they scan) */
+    .st-result-top {
+        padding: 2px 0 12px;
+    }
+
+    .st-result-icon {
+        width: 54px;
+        height: 54px;
+        margin-bottom: 8px;
+    }
+
+    .st-result-icon .material-symbols-outlined {
+        font-size: 32px;
+    }
+
+    .st-result-top .st-h2 {
+        font-size: 1.25rem;
+    }
+
+    .st-result-top p {
+        font-size: .84rem;
+    }
+
+    .st-summary>div {
+        gap: 12px;
+        padding: 7px 0;
+        font-size: .82rem;
+    }
+
+    .st-req-list {
+        gap: 10px;
+        margin-top: 12px;
+    }
+
+    .st-req {
+        padding: 14px 14px 12px;
+    }
+
+    .st-req-head {
+        margin-bottom: 10px;
+    }
+
+    .st-req-name {
+        font-size: .98rem;
+    }
+
+    .st-req-id {
+        font-size: .72rem;
+    }
+
+    .st-qrs {
+        gap: 10px;
+    }
+
+    .st-qr-title {
+        margin-bottom: 6px;
+        font-size: .74rem;
+    }
+}
+
+@media (max-width: 330px) {
     .st-eq-grid {
         grid-template-columns: 1fr;
     }

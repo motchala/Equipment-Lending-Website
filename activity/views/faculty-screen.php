@@ -23,9 +23,9 @@
 
                    Where every button lives (so a button is only ever in one place):
                      page header                   title only (no buttons)
-                     row action bar (Equipment     only the buttons the row really has, packed left to right:
-                       and Room rows)                Claim QR · Return QR · Extend, then the way out
-                                                     (Cancel / Withdraw / Leave waitlist) at the far right
+                     row action bar (Equipment     three fixed places, same on every row:
+                       and Room rows)                left Claim QR / Return QR · middle Extend ·
+                                                     right Cancel / Withdraw / Leave
                      history table, last column    Action: Join waitlist
                      card / table footer           page navigation
 
@@ -36,7 +36,8 @@
                      rooms      room-reservation/core/room-quota.php  fact_*
                                 refreshed by api/poll-reservations.php?view=activity
 
-                   Status words and colours come from one place, fact_status_chip():
+                   Status words and colours come from one place, fact_status_chip(), drawn as plain
+                   coloured text with a dot (never a pill, so it can't look like a button):
                      Pending = amber · Approved = green · Overdue / Declined = red
                      Returned / Completed / Cancelled = grey
                 ─────────────────────────────────────────────────────────────── */
@@ -49,7 +50,7 @@
                 <header class="fact-head">
                     <div>
                         <h2 class="myact-title">My Activity</h2>
-                        <p class="fact-sub">Your equipment loans and room reservations, all in one place.</p>
+                        <p class="fact-sub">Your loans and reservations.</p>
                     </div>
                 </header>
 
@@ -58,7 +59,7 @@
                     <header class="fact-card-head">
                         <div class="fact-card-heading">
                             <h3 class="fact-card-title" id="factTodoTitle">Next steps</h3>
-                            <p class="fact-card-sub">What needs you right now, most urgent first.</p>
+                            <p class="fact-card-sub">Most urgent first.</p>
                         </div>
                     </header>
                     <ul class="fact-todo-list" id="factTodoList" data-max="<?php echo (int) FACT_TODO_MAX; ?>"<?php echo $act_todo ? '' : ' hidden'; ?>><?php echo fact_todo_render($act_todo); ?></ul>
@@ -70,8 +71,8 @@
                     <div class="fact-todo-clear" id="factTodoClear"<?php echo $act_todo ? ' hidden' : ''; ?>>
                         <span class="material-symbols-outlined" aria-hidden="true">task_alt</span>
                         <div class="fact-todo-clear-text">
-                            <p class="fact-empty-title">You're all caught up</p>
-                            <p class="fact-empty-sub">Nothing needs your action right now.</p>
+                            <p class="fact-empty-title">All caught up</p>
+                            <p class="fact-empty-sub">Nothing needs your action.</p>
                         </div>
                         <div class="fact-todo-clear-actions">
                             <button type="button" class="fact-btn fact-btn-ghost" data-icon="add_shopping_cart" data-action="go-tab" data-tab="lending" data-lending="browse">Borrow equipment</button>
@@ -161,7 +162,7 @@
                     <div class="fact-empty" id="factHistEmpty" hidden>
                         <span class="material-symbols-outlined" aria-hidden="true">history</span>
                         <p class="fact-empty-title">No history yet</p>
-                        <p class="fact-empty-sub">Returned equipment and past room reservations will show up here.</p>
+                        <p class="fact-empty-sub">Past activity shows up here.</p>
                     </div>
 
                 </section><!-- /factHistory -->

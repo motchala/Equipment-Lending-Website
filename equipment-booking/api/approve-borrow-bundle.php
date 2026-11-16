@@ -31,9 +31,7 @@ $reason = trim((string)($_POST['override_reason'] ?? ''));
 if (!preg_match('/^[a-f0-9-]{36}$/i', $batch_id)) {
     send_bundle_json(400, 'error', 'Invalid bundle.');
 }
-if (mb_strlen($reason) < 5) {
-    send_bundle_json(400, 'error', 'Approval reason must be at least 5 characters.');
-}
+$reason_missing = mb_strlen($reason) < 5;
 
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../core/booking-schedule.php';
@@ -42,6 +40,16 @@ require_once __DIR__ . '/../../shared/core/activity-logger.php';
 $conn = getDB();
 if (!BookingSchedule::ensureSchema($conn)) {
     send_bundle_json(500, 'error', 'Could not prepare bundle approval. Please try again.');
+}
+
+// A reason is required, unless every pending item in the cart already meets the automatic-approval rules
+if ($reason_missing) {
+    require_once __DIR__ . '/../core/request-decision.php';
+    if (equipment_cart_meets_auto_rules($conn, $batch_id)) {
+        $reason = EQ_AUTO_APPROVE_REASON;
+    } else {
+        send_bundle_json(400, 'error', 'Approval reason must be at least 5 characters.', ['needs_reason' => true]);
+    }
 }
 admin_activity_bootstrap($conn);
 $admin_name = (string)($_SESSION['admin_name'] ?? 'Admin');

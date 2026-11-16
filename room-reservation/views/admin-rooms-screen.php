@@ -547,13 +547,26 @@
                                 <thead>
                                     <tr>
                                         <th>Facility</th>
-                                        <th style="width:220px;">Actions</th>
+                                        <th>Category</th>
+                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody id="rooms-archived-body">
                                     <?php echo ps_render_archived_tbody($rooms_archived, $is_super_admin); ?>
                                 </tbody>
                             </table>
+                        </div>
+                        <div class="inv-pager" data-arch-pager="rooms-archived-body" hidden>
+                            <span class="inv-pager-info"></span>
+                            <div class="inv-pager-ctl" role="navigation" aria-label="Archived facilities pages">
+                                <button type="button" class="inv-pager-btn" data-pg="prev" aria-label="Previous page">
+                                    <span class="material-symbols-outlined">chevron_left</span>
+                                </button>
+                                <div class="inv-pager-nums"></div>
+                                <button type="button" class="inv-pager-btn" data-pg="next" aria-label="Next page">
+                                    <span class="material-symbols-outlined">chevron_right</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div><!-- /#rooms-archived-panel -->

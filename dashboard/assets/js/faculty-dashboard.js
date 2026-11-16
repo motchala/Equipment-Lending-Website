@@ -1330,6 +1330,7 @@
         if (!c) return;
         c.querySelectorAll('[data-error-for]').forEach(p => { p.hidden = true; p.textContent = ''; });
         c.querySelectorAll('.is-invalid').forEach(el => { el.classList.remove('is-invalid'); el.removeAttribute('aria-invalid'); });
+        c.querySelectorAll('.ps-multisel-trigger[aria-invalid]').forEach(el => el.removeAttribute('aria-invalid'));
     }
 
     function _sovShowError(field, msg) {
@@ -1338,7 +1339,11 @@
         const p = c.querySelector('[data-error-for="' + field + '"]');
         const el = c.querySelector('[data-edit-field="' + field + '"]');
         if (p) { p.textContent = msg; p.hidden = false; }
-        if (el) { el.classList.add('is-invalid'); el.setAttribute('aria-invalid', 'true'); el.focus(); }
+        if (el && el.type === 'hidden' && window.PSMultiSelect) {
+            // the department dropdown keeps its value in a hidden field: outline + focus the dropdown instead
+            PSMultiSelect.setInvalid(el, true);
+            PSMultiSelect.focus(el);
+        } else if (el) { el.classList.add('is-invalid'); el.setAttribute('aria-invalid', 'true'); el.focus(); }
     }
 
     function _sovIsDirty() {
@@ -1392,6 +1397,7 @@
         const c = _sovCard();
         if (!c || c.dataset.editing !== 'true') return;
         _sovFields().forEach(el => { el.value = el.dataset.original || ''; });
+        if (window.PSMultiSelect) PSMultiSelect.syncAll(c);   // the department dropdown re-reads its value
         _sovLeaveEdit();
         if (!silent) {
             const b = document.getElementById('sovEditBtn');
@@ -1429,21 +1435,30 @@
         const nameView = document.getElementById('sovFullNameView');
         if (nameView) nameView.textContent = d.fullname;
 
-        // department: once chosen it becomes a permanent, read-only value
+        // departments: once chosen they become a permanent, read-only list
         const deptSel = c.querySelector('[data-edit-field="department"]');
         const deptView = document.getElementById('sovDepartmentView');
         if (d.department && deptSel && deptView) {
-            deptView.textContent = d.department;
-            deptView.classList.remove('acct-row-static-muted');
+            const names = Array.isArray(d.departments) && d.departments.length ? d.departments : [d.department];
+            deptView.textContent = '';
+            names.forEach(n => {
+                const item = document.createElement('span');
+                item.className = 'acct-dept-item';
+                item.textContent = n;
+                deptView.appendChild(item);
+            });
+            deptView.classList.remove('acct-row-static-muted', 'acct-row-not-provided');
+            deptView.classList.add('acct-dept-list');
             deptView.removeAttribute('data-view');
             const row = deptSel.closest('.acct-row');
-            deptSel.remove();
-            const infoButton = row.querySelector('.sov-field-info');
+            const picker = deptSel.closest('.ps-multisel');
+            (picker || deptSel).remove();
+            const infoButton = row.querySelector('.sov-field-info, .acct-dept-hint');
             if (infoButton) infoButton.remove();
             if (row && !row.querySelector('.fid-lock')) {
                 const lock = document.createElement('span');
                 lock.className = 'material-symbols-outlined fid-lock';
-                lock.title = 'Your department is permanent once set';
+                lock.title = 'Your departments are permanent once set';
                 lock.textContent = 'lock';
                 row.appendChild(lock);
             }
@@ -1462,7 +1477,7 @@
         // banner line: "<department> · ID: …"
         const meta = document.querySelector('.acct-banner-meta');
         if (meta && meta.firstChild && meta.firstChild.nodeType === Node.TEXT_NODE) {
-            meta.firstChild.textContent = (d.department || 'PUPSync Faculty') + ' \u00B7 ID: ';
+            meta.firstChild.textContent = (d.department_summary || d.department || 'PUPSync Faculty') + ' \u00B7 ID: ';
         }
     }
 
@@ -1527,6 +1542,7 @@
             if (p) { p.hidden = true; p.textContent = ''; }
             f.classList.remove('is-invalid');
             f.removeAttribute('aria-invalid');
+            if (f.type === 'hidden' && window.PSMultiSelect) PSMultiSelect.setInvalid(f, false);
         }
         _sovSyncSave();
     });

@@ -11575,14 +11575,17 @@ body .side-nav .side-nav-user .side-nav-user-name {
     font-size: 13px;
 }
 
-/* The action bar: only the buttons this row really has, packed to the left in a fixed order
-   (Claim QR, Return QR, Extend). The way out (Cancel / Withdraw / Leave waitlist) is always last and
-   sits at the far right, so it is never next to the main action. No empty slots, no floating buttons. */
+/* The action bar: three fixed places, the same on every row, so a button is always where you expect it.
+     left    Claim QR / Return QR   (never both on one row)
+     middle  Extend
+     right   Cancel / Withdraw / Leave
+   A button that does not apply leaves its place empty; nothing shifts into another place. */
 #panel-activity .fact-item-actions {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     align-items: center;
     gap: 8px;
+    max-width: 360px;
     margin-top: 8px;
 }
 
@@ -11591,12 +11594,21 @@ body .side-nav .side-nav-user .side-nav-user-name {
     min-width: 0;
 }
 
+#panel-activity .fact-slot-qr {
+    grid-column: 1;
+}
+
+#panel-activity .fact-slot-extend {
+    grid-column: 2;
+}
+
 #panel-activity .fact-slot-end {
-    margin-left: auto;
+    grid-column: 3;
 }
 
 #panel-activity .fact-slot>.fact-btn {
-    min-width: 96px;
+    width: 100%;
+    min-width: 0;
 }
 
 /* Icon tile (equipment photo / room icon) */
@@ -11623,20 +11635,35 @@ body .side-nav .side-nav-user .side-nav-user-name {
     object-fit: contain;
 }
 
-/* ── Status pill: four tones, same as the Home tab ───────────── */
+/* ── Status: plain coloured text with a dot ─────────────────────
+   Deliberately NOT a pill (no fill, no border, no rounded box) so it can't be mistaken for a button.
+   Buttons have a border and an icon; a status is only a dot and a word. */
 #panel-activity .fact-chip {
     --tone: var(--color-secondary);
     display: inline-flex;
     align-items: center;
+    gap: 6px;
     flex-shrink: 0;
-    padding: 3px 10px;
-    border-radius: 999px;
-    font-size: 0.6875rem;
-    font-weight: 700;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    font-size: 0.75rem;
+    font-weight: 600;
     line-height: 1.4;
     white-space: nowrap;
     color: var(--tone);
-    background: color-mix(in srgb, var(--tone) 13%, transparent);
+    pointer-events: none;
+    user-select: none;
+}
+
+#panel-activity .fact-chip::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--tone);
 }
 
 #panel-activity .fact-chip.is-ok {
@@ -13448,10 +13475,12 @@ html:not(.rx-mobile) #panel-lending .eq-ic-panel {
 
     html:not(.rx-mobile) #panel-lending #featuredSection .feat-hero-title {
         -webkit-line-clamp: 2;
+        line-clamp: 2;
     }
 
     html:not(.rx-mobile) #panel-lending #featuredSection .feat-hero-desc {
         -webkit-line-clamp: 2;
+        line-clamp: 2;
         flex: 0 1 auto;
     }
 
@@ -13470,6 +13499,7 @@ html:not(.rx-mobile) #panel-lending .eq-ic-panel {
         line-height: 1.3;
         display: -webkit-box;
         -webkit-line-clamp: 2;
+        line-clamp: 2;
         -webkit-box-orient: vertical;
         overflow: hidden;
     }
@@ -13800,4 +13830,68 @@ html.rx-mobile body #settingsOverlay .sov-pagehead::after {
 .toggle-sw input:disabled+.toggle-track {
     opacity: 0.55;
     cursor: not-allowed;
+}
+
+/* ================================================================
+   SETTINGS > PERSONAL INFORMATION > Departments (check-mark dropdown)
+   Shown only while editing; the static "Not provided" text steps aside.
+   Colours follow the page tokens, so dark mode works too.
+   ================================================================ */
+.sov-edit-card .ps-multisel {
+    display: none;
+    --psms-bg: var(--color-surface-lowest);
+    --psms-text: var(--color-on-surface);
+    --psms-muted: var(--color-secondary);
+    --psms-border: var(--control-border, var(--color-outline-variant));
+    --psms-border-hover: var(--color-outline);
+    --psms-accent: var(--color-primary);
+    --psms-check-bg: var(--color-primary-container);
+    --psms-on-accent: #fff;
+    --psms-ring: color-mix(in srgb, var(--color-primary) 22%, transparent);
+    --psms-error: var(--color-error);
+    --psms-chip-bg: var(--color-surface-container);
+    --psms-chip-text: var(--color-on-surface);
+    --psms-panel-bg: var(--color-surface-lowest);
+    --psms-hover: var(--color-surface-container);
+    --psms-selected-bg: color-mix(in srgb, var(--color-primary) 9%, var(--color-surface-lowest));
+    --psms-soft-border: var(--color-outline-variant);
+    --psms-radius: var(--radius-sm);
+    --psms-font: var(--font-sans);
+    --psms-font-size: 0.875rem;
+    --psms-min-h: 36px;
+}
+
+.sov-edit-card[data-editing="true"] .acct-row--dept .ps-multisel {
+    display: block;
+}
+
+.sov-edit-card[data-editing="true"] .acct-row--dept .acct-row-value>[data-view="department"] {
+    display: none;
+}
+
+.acct-row--dept {
+    align-items: flex-start;
+}
+
+/* the chosen departments once they are locked: one per line */
+.acct-dept-list {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.acct-dept-item {
+    display: block;
+    line-height: 1.35;
+}
+
+.acct-dept-hint {
+    margin: 8px 0 0;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: var(--color-secondary);
+}
+
+.acct-dept-hint[hidden] {
+    display: none;
 }

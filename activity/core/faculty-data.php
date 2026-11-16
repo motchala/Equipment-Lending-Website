@@ -389,6 +389,21 @@ function fact_eq_stats(array $d): array
     ];
 }
 
+/** "3 hrs late" / "2 days late" (short form used on rows and in Next steps) */
+function fact_eq_late_short(int $seconds): string
+{
+    $minutes = intdiv(max(0, $seconds), 60);
+    if ($minutes < 60) {
+        return max(1, $minutes) . ' min late';
+    }
+    $hours = intdiv($minutes, 60);
+    if ($hours < 24) {
+        return $hours . ($hours === 1 ? ' hr' : ' hrs') . ' late';
+    }
+    $days = intdiv($hours, 24);
+    return $days . ($days === 1 ? ' day' : ' days') . ' late';
+}
+
 /** "Overdue by 3 hours" / "Overdue by 2 days" */
 function fact_eq_late_label(int $seconds): string
 {
@@ -406,8 +421,8 @@ function fact_eq_late_label(int $seconds): string
 }
 
 /**
- * "Extended once, originally due Oct 22, 5:00 PM" (empty when the loan was never extended).
- * The original date stays visible so an extension never hides that the loan was late.
+ * "Extended" / "Extended ×2" (empty when the loan was never extended). Whether a return was late is
+ * judged against the ORIGINAL due time in the history rows, so this label can stay short.
  */
 function fact_eq_extended_label(array $it): string
 {
@@ -415,8 +430,14 @@ function fact_eq_extended_label(array $it): string
     if ($n <= 0) {
         return '';
     }
-    $label = $n === 1 ? 'Extended once' : 'Extended ' . $n . ' times';
-    return fact_s($it, 'orig_due_label') !== '' ? $label . ', originally due ' . fact_s($it, 'orig_due_label') : $label;
+    return $n === 1 ? 'Extended' : 'Extended ×' . $n;
+}
+
+/** "Room 101 · Building A · 2nd Floor" -> "Room 101 · Building A" (the floor is in the reservation itself). */
+function fact_eq_where_short(string $where): string
+{
+    $parts = explode(' · ', $where);
+    return count($parts) >= 3 ? implode(' · ', array_slice($parts, 0, 2)) : $where;
 }
 
 /** Item name, plus "×2" when more than one unit was requested (same as the Home tab). */
@@ -455,7 +476,7 @@ function fact_eq_render_item(array $it, string $kind, string $rootUrl, DateTimeI
         $dueAbs = fact_day_label($now, $due, false)
             . (fact_s($it, 'due_time') !== '' ? ', ' . fact_time(fact_s($it, 'due_time')) : '');
         if ($isOverdue) {
-            $when = '<span class="fact-late">' . fact_h(fact_eq_late_label($now->getTimestamp() - fact_i($it, 'due_ts'))) . '</span>'
+            $when = '<span class="fact-late">' . fact_h(fact_eq_late_short($now->getTimestamp() - fact_i($it, 'due_ts'))) . '</span>'
                 . ' · Due ' . fact_h($dueAbs);
         } else {
             $day = fact_day_label($now, $due);
@@ -466,32 +487,18 @@ function fact_eq_render_item(array $it, string $kind, string $rootUrl, DateTimeI
         $when = fact_h(fact_range_label($now, $start, fact_s($it, 'start_time'), $due, fact_s($it, 'due_time')));
     }
 
+    // Detail line: short facts only (what it's part of, where, who for). Why a button is greyed out
+    // is on the button itself (hover), and the status pill already says Pending / Overdue.
     $sub = [];
     if (fact_i($it, 'bundle_count') > 1) {
-        $sub[] = 'Part of a bundle · ' . fact_i($it, 'bundle_count') . ' items';
+        $sub[] = 'Bundle · ' . fact_i($it, 'bundle_count') . ' items';
     }
-    $sub[] = fact_h(fact_s($it, 'where'));
+    $sub[] = fact_h(fact_eq_where_short(fact_s($it, 'where')));
     if (fact_s($it, 'student') !== '') {
-        $student = 'Student: ' . fact_s($it, 'student');
-        if (fact_s($it, 'student_id') !== '') {
-            $student .= ' (' . fact_s($it, 'student_id') . ')';
-        }
-        $sub[] = fact_h($student);
+        $sub[] = 'For ' . fact_h(fact_s($it, 'student'));
     }
     if (fact_eq_extended_label($it) !== '') {
         $sub[] = fact_h(fact_eq_extended_label($it));
-    }
-    if ($status === 'Waiting' && fact_s($it, 'reason') !== '') {
-        $sub[] = fact_h(fact_s($it, 'reason'));
-    }
-    // Why a button is greyed out is said here, in the detail line (and on hover over the button)
-    if ($kind === 'upcoming' && empty($it['can_cancel']) && fact_s($it, 'cancel_note') !== '') {
-        $sub[] = fact_h(fact_s($it, 'cancel_note'));
-    }
-    if ($kind === 'live' && !empty($it['extend_limit'])) {
-        $sub[] = BorrowExtension::maxExtensions() === 0
-            ? 'Extensions are turned off'
-            : 'Extension limit reached (' . BorrowExtension::maxExtensions() . ' of ' . BorrowExtension::maxExtensions() . ')';
     }
 
     $isBundle = fact_i($it, 'bundle_count') > 1;
@@ -506,8 +513,8 @@ function fact_eq_render_item(array $it, string $kind, string $rootUrl, DateTimeI
 }
 
 /**
- * The buttons an equipment row can have, each in its own slot (see "Where every button lives"
- * in core/room-quota.php):
+ * The buttons an equipment row can have, each with a fixed place (see "Where every button lives"
+ * in core/room-quota.php): left = Claim QR or Return QR, middle = Extend, right = Cancel.
  *   claim   Claim QR    the request is Approved and the item has not been handed over yet
  *   return  Return QR   the item is out (or about to be): shown while there is a return code
  *   extend  Extend      the return time has been reached (greyed out at the extension limit)
@@ -525,11 +532,11 @@ function fact_eq_action_slots(array $it, string $kind, string $status): array
         $slots['claim'] = fact_action_btn('Claim QR', 'qr_code_2', [
             'action' => 'show-claim-qr', 'token' => fact_s($it, 'bundle_claim_token'),
             'bundle-claim' => 1, 'equipment' => fact_s($it, 'bundle_claim_label'),
-        ], ['primary' => true, 'title' => 'Show the claim QR for the whole bundle', 'aria' => 'Claim bundle QR']);
+        ], ['primary' => true, 'title' => 'Claim QR for the bundle', 'aria' => 'Claim bundle QR']);
     } elseif ($status === 'Approved' && fact_s($it, 'claim_token') !== '') {
         $slots['claim'] = fact_action_btn('Claim QR', 'qr_code_2', [
             'action' => 'show-claim-qr', 'token' => fact_s($it, 'claim_token'), 'equipment' => fact_s($it, 'name'),
-        ], ['primary' => true, 'title' => 'Show the claim QR for this item']);
+        ], ['primary' => true, 'title' => 'Claim QR']);
     }
 
     if ($kind === 'live') {
@@ -546,14 +553,14 @@ function fact_eq_action_slots(array $it, string $kind, string $status): array
                     'token'         => fact_s($it, 'bundle_return_token'),
                     'equipment'     => 'Bundle (' . fact_i($it, 'bundle_count') . ' items)',
                     'bundle-return' => 1,
-                ], ['primary' => true, 'title' => 'Show the return QR for this bundle']);
+                ], ['primary' => true, 'title' => 'Return QR for the bundle']);
             } elseif (!$isBundleItem && fact_s($it, 'token') !== '') {
                 // Solo item: show its own Return QR
                 $slots['return'] = fact_action_btn('Return QR', 'qr_code_scanner', [
                     'action'    => 'show-return-qr',
                     'token'     => fact_s($it, 'token'),
                     'equipment' => fact_s($it, 'name'),
-                ], ['primary' => true, 'title' => 'Show the return QR for this item']);
+                ], ['primary' => true, 'title' => 'Return QR']);
             }
             // Non-leader bundle items: no Return QR button (leader covers them)
         }
@@ -597,8 +604,8 @@ function fact_eq_render_status(array $d): string
     $upcoming = is_array($d['upcoming'] ?? null) ? count($d['upcoming']) : 0;
 
     if (fact_eq_stats($d)['overdue'] > 0) {
-        return '<span class="fact-sub-alert" title="You have overdue equipment. Return it immediately before you can borrow again.">'
-            . fact_icon('block') . '<span>Borrowing blocked &middot; return your overdue equipment first</span></span>';
+        return '<span class="fact-sub-alert" title="Return your overdue equipment before you can borrow again.">'
+            . fact_icon('block') . '<span>Borrowing blocked &middot; overdue item</span></span>';
     }
     if ($live + $upcoming === 0) {
         return 'Nothing borrowed right now';
@@ -619,7 +626,7 @@ function fact_eq_render_body(array $d, string $rootUrl): string
     $html     = '';
 
     if (!$live && !$upcoming) {
-        return $html . fact_render_empty('inventory_2', 'No equipment right now', 'Borrow equipment for your class, lab session or event.');
+        return $html . fact_render_empty('inventory_2', 'No equipment right now', 'Nothing borrowed yet.');
     }
 
     foreach ([['In progress', 'live', $live], ['Upcoming', 'upcoming', $upcoming]] as [$label, $kind, $items]) {
@@ -677,27 +684,20 @@ function fact_eq_render_history_rows(array $d, string $rootUrl): string
             }
         }
 
-        $sub = ['Equipment · ' . fact_h(fact_s($it, 'where'))];
+        $sub = ['Equipment · ' . fact_h(fact_eq_where_short(fact_s($it, 'where')))];
         if (fact_i($it, 'bundle_count') > 1) {
             $sub[] = '<span class="fact-bundle-chip"><span class="material-symbols-outlined" aria-hidden="true">link</span>'
                 . 'Bundle · ' . fact_i($it, 'bundle_count') . ' items</span>';
         }
         if (fact_s($it, 'student') !== '') {
-            $student = 'Student: ' . fact_s($it, 'student');
-            if (fact_s($it, 'student_id') !== '') {
-                $student .= ' (' . fact_s($it, 'student_id') . ')';
-            }
-            $sub[0] .= ' · ' . fact_h($student);
-        }
-        if (fact_eq_extended_label($it) !== '') {
-            $sub[0] .= ' · ' . fact_h(fact_eq_extended_label($it));
+            $sub[0] .= ' · For ' . fact_h(fact_s($it, 'student'));
         }
 
         $html .= '<tr class="fact-row" data-kind="equipment" data-status="' . fact_h(strtolower($status)) . '" data-ts="' . fact_i($it, 'start_ts') . '">'
             . '<td data-label="Activity"><div class="fact-cell">' . fact_eq_tile($it, $rootUrl)
             . '<div class="fact-cell-text"><p class="fact-row-title">' . fact_eq_title($it) . '</p>'
             . '<p class="fact-row-sub">' . $sub[0] . '</p>'
-            . ($note !== '' ? '<p class="fact-row-sub">' . fact_h($note) . '</p>' : '')
+            . ($note !== '' ? '<p class="fact-row-sub" title="' . fact_h($note) . '">' . fact_h(fact_short($note, 48)) . '</p>' : '')
             . '</div></div></td>'
             . '<td data-label="When"><span class="fact-when">' . fact_h($range) . '</span>'
             . ($when2 !== '' ? '<span class="fact-row-sub">' . fact_h($when2) . '</span>' : '') . '</td>'
@@ -770,18 +770,10 @@ function fact_eq_todo(array $d): array
     // 1 · Overdue: the one thing that blocks new borrowing
     foreach ($overdue as $rows) {
         $late    = max(array_map(static fn(array $r): int => $nowTs - fact_i($r, 'due_ts'), $rows));
-        $canExt  = (bool)array_filter($rows, static fn(array $r): bool => !empty($r['can_extend']));
-        $atLimit = !$canExt && (bool)array_filter($rows, static fn(array $r): bool => !empty($r['extend_limit']));
-        $text    = [fact_eq_late_label($late), 'Still out · return it to the admin'];
-        if ($canExt) {
-            $text[] = 'You can also ask for more time';
-        } elseif ($atLimit) {
-            $text[] = 'Extension limit reached';
-        }
         $out[] = fact_todo_item(
             'equipment', 1, 'bad', 'schedule',
             'Return ' . $names($rows) . ' now',
-            implode(' · ', $text),
+            fact_eq_late_short($late),
             'eq:' . $leader($rows, 'bundle_return_leader'),
             min(array_map(static fn(array $r): int => fact_i($r, 'due_ts'), $rows))
         );
@@ -799,7 +791,7 @@ function fact_eq_todo(array $d): array
         $out[] = fact_todo_item(
             'equipment', 2, 'wait', 'assignment_return',
             'Return ' . $names($rows) . ($dueTime !== '' ? ' by ' . fact_time($dueTime) : ' today'),
-            'Due today · Show your Return QR to the admin when you hand it back',
+            'Due today · Show your Return QR',
             'eq:' . $leader($rows, 'bundle_return_leader'),
             $dueTs
         );
@@ -824,7 +816,7 @@ function fact_eq_todo(array $d): array
         $out[] = fact_todo_item(
             'equipment', 3, 'ok', 'qr_code_2',
             'Collect ' . $names($rows),
-            'Approved' . ($started ? ' and ready' : ' · ' . $when) . ' · Show your Claim QR to the admin',
+            ($started ? 'Ready' : ucfirst($when)) . ' · Show your Claim QR',
             'eq:' . $leader($rows, 'bundle_claim_leader'),
             $startTs
         );
@@ -836,16 +828,10 @@ function fact_eq_todo(array $d): array
         usort($groups, static fn(array $a, array $b): int => fact_i($a[0], 'start_ts') <=> fact_i($b[0], 'start_ts'));
         $n      = count($groups);
         $firstR = $groups[0][0];
-        // Real rule (core/request-decision.php): a later-date request waits for an admin and is declined
-        // automatically at 12:01 AM on its borrow date if nobody decides.
-        $startD = DateTimeImmutable::createFromFormat('Y-m-d', fact_s($firstR, 'start_date'), $tz);
-        $by     = $startD !== false && fact_s($firstR, 'start_date') > $today
-            ? 'before ' . fact_day_label($now, $startD, false)
-            : 'before it starts';
         $out[]  = fact_todo_item(
             'equipment', 4, 'wait', 'hourglass_top',
             $n === 1 ? $names($groups[0]) . ' is waiting for review' : $n . ' equipment requests are waiting for review',
-            'An admin has to decide ' . $by . ', otherwise ' . ($n === 1 ? 'it is' : 'they are') . ' declined automatically · You can cancel ' . ($n === 1 ? 'it' : 'them') . ' until ' . ($n === 1 ? 'it starts' : 'they start'),
+            'Waiting for an admin',
             'eq:' . fact_i($firstR, 'id'),
             fact_i($firstR, 'start_ts')
         );

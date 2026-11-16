@@ -31,6 +31,7 @@ declare(strict_types=1);
  */
 
 require_once __DIR__ . '/../../shared/core/faculty-id.php';
+require_once __DIR__ . '/../../shared/core/faculty-departments.php';
 
 const FR_ROW_LIMIT = 1000;   // per table; a note is printed when a faculty member has more than this
 
@@ -177,7 +178,8 @@ function fr_load_profile(mysqli $conn, string $faculty_id, ?string $employment):
     return [
         'name'       => $g('fullname'),
         'faculty_id' => faculty_id_display($faculty_id, 'Not set yet'),
-        'department' => $g('department'),
+        // header line only: the first department, "+N more" when there are others (the Department field lists them all)
+        'department' => faculty_departments_summary($g('department')),
         'photo'      => fr_profile_photo($g('profile_picture')),
         'fields'     => $fields,
     ];

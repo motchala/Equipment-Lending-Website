@@ -271,6 +271,31 @@
         </aside>
     </div>
 
+    <!-- MODAL: ASK WHETHER TO APPROVE EVERY ITEM OF A MULTI-ITEM REQUEST (opens when Approve is clicked on one of them) -->
+    <div class="ps-modal-backdrop" id="eq-bundle-choice-modal">
+        <div class="ps-modal ps-modal--sm">
+            <div class="ps-modal-head">
+                <div class="ps-modal-head-icon ps-mhi--success">
+                    <span class="material-symbols-outlined">done_all</span>
+                </div>
+                <h3>Approve all items?</h3>
+                <button class="ps-modal-close" type="button" data-action="ps-close-modal" data-modal="eq-bundle-choice-modal" aria-label="Close">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="ps-modal-body">
+                <p class="ps-form-hint" style="margin-top:0">This faculty member requested several items together. Do you want to approve all of the items below at once?</p>
+                <div class="ps-req-summary" id="eq-bundle-choice-items"></div>
+            </div>
+            <div class="ps-modal-foot">
+                <button class="ps-btn ps-btn--ghost" type="button" id="eq-bundle-choice-no">No, approve individually</button>
+                <button class="ps-btn ps-btn--success" type="button" id="eq-bundle-choice-yes">
+                    <span class="material-symbols-outlined">done_all</span> Yes, approve all
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL: APPROVE ALL PENDING ITEMS IN A BORROW BUNDLE -->
     <div class="ps-modal-backdrop" id="eq-bundle-approve-modal">
         <div class="ps-modal ps-modal--sm">

@@ -96,6 +96,7 @@ $asset = static function (string $rel): string {
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="<?php echo $h($asset('shared/assets/css/dept-multiselect.css')); ?>">
     <link rel="stylesheet" href="<?php echo $h($asset('account-management/assets/css/faculty-first-login.css')); ?>">
 </head>
 
@@ -237,23 +238,18 @@ $asset = static function (string $rel): string {
                         </div>
 
                         <div class="fs-field" data-field="department">
-                            <label class="fs-label" for="fsDepartment">Department <span class="fs-req">*</span></label>
+                            <label class="fs-label" for="<?php echo $dept_locked ? 'fsDepartment' : 'fsDepartmentBtn'; ?>">Department <span class="fs-req">*</span> <span class="fs-opt-note">Choose 1 to 3</span></label>
                             <?php if ($dept_locked): ?>
                                 <div class="fs-input-wrap">
                                     <input class="fs-input" id="fsDepartment" name="department" type="text" value="<?php echo $h($dept_value); ?>" readonly aria-readonly="true">
                                     <span class="material-symbols-outlined fs-input-icon" aria-hidden="true">lock</span>
                                 </div>
                             <?php else: ?>
-                                <div class="fs-select-wrap">
-                                    <select class="fs-input fs-select" id="fsDepartment" name="department" aria-describedby="fsDepartmentHint fsDepartmentErr">
-                                        <option value="">Select your department&hellip;</option>
-                                        <?php foreach (faculty_departments() as $dept): ?>
-                                            <option value="<?php echo $h($dept); ?>"><?php echo $h($dept); ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                    <span class="material-symbols-outlined fs-select-caret" aria-hidden="true">expand_more</span>
-                                </div>
-                                <p class="fs-hint" id="fsDepartmentHint"><span class="material-symbols-outlined" aria-hidden="true">info</span>You can choose this once. It can&rsquo;t be changed afterwards.</p>
+                                <?php echo faculty_department_multiselect('fsDepartment', 'department', [], [
+                                    'describedby' => 'fsDepartmentHint fsDepartmentErr',
+                                    'label'       => 'Departments',
+                                ]); ?>
+                                <p class="fs-hint" id="fsDepartmentHint"><span class="material-symbols-outlined" aria-hidden="true">info</span>Choose at least one. You can add up to two more, which are optional. You can choose these once; they can&rsquo;t be changed afterwards.</p>
                             <?php endif; ?>
                             <p class="fs-err" id="fsDepartmentErr" role="alert" hidden></p>
                         </div>
@@ -294,6 +290,7 @@ $asset = static function (string $rel): string {
         </main>
     </div>
 
+    <script nonce="<?php echo $h($csp_nonce); ?>" src="<?php echo $h($asset('shared/assets/js/dept-multiselect.js')); ?>"></script>
     <script nonce="<?php echo $h($csp_nonce); ?>" src="<?php echo $h($asset('account-management/assets/js/faculty-first-login.js')); ?>"></script>
 </body>
 
