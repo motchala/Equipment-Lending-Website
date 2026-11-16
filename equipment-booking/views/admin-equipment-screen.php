@@ -566,6 +566,10 @@
                     <h2 class="eq-loan-title" id="eqLoanTitle">All Loans</h2>
                     <div class="eq-loan-tools">
                         <input class="ps-form-control" style="width:230px" placeholder="Search borrower or item..." id="eq-loan-search" autocomplete="off">
+                        <?php /* "Delete All" button: removed from this screen for now, kept here so it can be reused somewhere else.
+                           Everything behind it is untouched: the password dialog (#eq-loan-wipe-modal in admin-equipment-modals-6.php),
+                           the handler (init() of the "Delete all loans" block in admin-dashboard.js, which does nothing while this
+                           button is missing) and equipment-booking/api/delete-all-loans.php. To bring it back, remove this comment wrapper.
                         <?php if ($is_super_admin): ?>
                             <!-- Super Admin only: deletes the whole list after a password check (see the modal near the bottom of this file) -->
                             <button type="button" class="ps-btn ps-btn--danger" id="eq-loan-wipe-btn"
@@ -573,6 +577,7 @@
                                 <span class="material-symbols-outlined">delete_forever</span> Delete All
                             </button>
                         <?php endif; ?>
+                        */ ?>
                     </div>
                 </div>
                 <!-- Status tabs + sort controls (mirrors the Reservations table layout) -->

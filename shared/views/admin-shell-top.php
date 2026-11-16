@@ -24,7 +24,7 @@ if (
             }
         } elseif ($ps_cookie_tab === 'settings') {
             $ps_cookie_sub = (string)($_COOKIE['ps_sub_settings'] ?? '');
-            if (in_array($ps_cookie_sub, ['sett-account', 'sett-prefs', 'sett-arbitration', 'sett-ratings', 'sett-help'], true)) {
+            if (in_array($ps_cookie_sub, ['sett-account', 'sett-prefs', 'sett-arbitration', 'sett-data', 'sett-ratings', 'sett-help'], true)) {
                 $ps_bridge_sub = $ps_cookie_sub;
             }
         }
@@ -57,6 +57,7 @@ if (
     <link rel="stylesheet" href="dashboard/assets/css/admin-dashboard-responsive.css?v=<?php echo @filemtime('dashboard/assets/css/admin-dashboard-responsive.css'); ?>">
     <link rel="stylesheet" href="settings/assets/css/admin-imports.css?v=<?php echo @filemtime('settings/assets/css/admin-imports.css'); ?>">
     <link rel="stylesheet" href="settings/assets/css/admin-arbitration.css?v=<?php echo @filemtime('settings/assets/css/admin-arbitration.css'); ?>">
+    <link rel="stylesheet" href="settings/assets/css/admin-clear-history.css?v=<?php echo @filemtime('settings/assets/css/admin-clear-history.css'); ?>">
     <link rel="stylesheet" href="reports/assets/css/reports.css?v=<?php echo @filemtime(PS_ROOT . '/reports/assets/css/reports.css'); ?>">
     <!-- Shared logout confirmation dialog + loading state -->
     <link rel="stylesheet" href="shared/assets/css/logout-modal.css?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/css/logout-modal.css'); ?>">

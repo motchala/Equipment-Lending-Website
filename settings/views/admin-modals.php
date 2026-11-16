@@ -163,3 +163,47 @@
             </div>
         </div>
     </div>
+
+<?php if (!empty($is_super_admin)): ?>
+    <!-- ================================================================
+         MODAL: CLEAR HISTORY  (Super Admin only)
+         Shows exactly what will go (counted by the server for the chosen scope), then asks for the
+         Super Admin's own password. Driven by settings/assets/js/admin-clear-history.js ->
+         settings/api/clear-history.php (which checks the role and the password again).
+        ================================================================ -->
+    <div class="ps-modal-backdrop" id="ch-modal">
+        <div class="ps-modal ps-modal--sm">
+            <div class="ps-modal-head">
+                <div class="ps-modal-head-icon ps-mhi--danger">
+                    <span class="material-symbols-outlined">delete_forever</span>
+                </div>
+                <h3 id="ch-title">Clear history?</h3>
+                <button type="button" class="ps-modal-close" id="ch-close" aria-label="Close">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="ps-modal-body">
+                <p class="fac-reg-auth-lead" id="ch-lead">These records will be permanently deleted. This cannot be undone.</p>
+                <ul class="eq-wipe-summary" id="ch-summary" aria-live="polite">
+                    <li class="eq-wipe-loading">Counting records&hellip;</li>
+                </ul>
+                <p class="eq-wipe-note hidden" id="ch-note"></p>
+                <label class="fac-del-pw-label" for="ch-pw">Your password</label>
+                <div class="fac-pw-wrap">
+                    <input type="password" id="ch-pw" class="form-control-custom"
+                        maxlength="128" autocomplete="current-password" placeholder="Enter your password to confirm">
+                    <button type="button" class="eq-wipe-pw-toggle" id="ch-pw-toggle" aria-label="Show or hide password">
+                        <span class="material-symbols-outlined ch-pw-eye">visibility</span>
+                    </button>
+                </div>
+                <p class="fac-del-error hidden" id="ch-error" role="alert"></p>
+            </div>
+            <div class="ps-modal-foot">
+                <button type="button" class="ps-btn ps-btn--ghost" id="ch-cancel">Cancel</button>
+                <button type="button" class="ps-btn ps-btn--danger" id="ch-confirm" disabled>
+                    <span class="material-symbols-outlined">delete_forever</span> Delete permanently
+                </button>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
