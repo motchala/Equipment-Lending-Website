@@ -333,5 +333,9 @@
     renderStrength();
     renderConfirmHint();
     goTo(1, false, false);
-    el.newPw.focus();
+    // Autofocus only where there is a physical pointer (desktop). On a phone/tablet it would pop the
+    // on-screen keyboard open the moment the page loads and cover the welcome banner and the form.
+    var touchOnly = false;
+    try { touchOnly = window.matchMedia('(hover: none) and (pointer: coarse)').matches; } catch (e) { /* older browsers */ }
+    if (!touchOnly) el.newPw.focus();
 })();
