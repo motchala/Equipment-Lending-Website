@@ -122,19 +122,26 @@ html.rx-mobile .rxm-bar.is-scrolled {
     border-bottom-color: var(--rxm-line);
 }
 
+/* Same logo mark as the desktop sidebar: maroon rounded square + white layers */
 .rxm-logo {
     display: grid;
     place-items: center;
     width: 34px;
     height: 34px;
     flex: 0 0 34px;
-    border-radius: 11px;
-    color: var(--rxm-on-primary);
-    background: var(--rxm-grad);
+    border-radius: 10px;
+    background: #800000;
 }
 
-.rxm-logo .material-symbols-outlined {
-    font-size: 20px;
+html[data-theme="dark"] .rxm-logo {
+    background: var(--color-primary-container, #800000);
+}
+
+.rxm-logo svg {
+    display: block;
+    width: 18px;
+    height: 18px;
+    stroke: #ffffff;
 }
 
 .rxm-bar.has-back .rxm-logo {
@@ -2192,8 +2199,30 @@ html.rx-mobile .fnotif-box .notif-section-label {
     font-size: .7rem !important;
 }
 
+/* phones scroll through notifications (more load as you reach the bottom) — no pager */
 html.rx-mobile .fnotif-box .fnotif-pagination {
-    justify-content: center !important;
+    display: none !important;
+}
+
+html.rx-mobile .fnotif-more {
+    display: flex;
+    justify-content: center;
+    padding: 14px 0 6px;
+}
+
+html.rx-mobile .fnotif-more-spin {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2.5px solid var(--rxm-line, rgba(0, 0, 0, .12));
+    border-top-color: var(--rxm-primary, #800000);
+    animation: rxm-ptr-spin .8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html.rx-mobile .fnotif-more-spin {
+        animation: none;
+    }
 }
 
 /* ===== SETTINGS ===== */
