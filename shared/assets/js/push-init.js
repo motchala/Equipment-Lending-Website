@@ -16,6 +16,15 @@
 
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
 
+    // Register the service worker first, then proceed
+    navigator.serviceWorker.register('/Equipment-Lending-Website/OneSignalSDKWorker.js', { scope: '/Equipment-Lending-Website/' })
+        .then(function (reg) {
+            console.log('[PUPSync push] SW registered, scope:', reg.scope);
+        })
+        .catch(function (e) {
+            console.error('[PUPSync push] SW registration failed:', e);
+        });
+
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', onReady);
     } else {
