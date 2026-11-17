@@ -33,7 +33,7 @@
 
 html.rx-mobile {
     --rxm-bar-h: 56px;
-    --rxm-tab-h: 64px;
+    --rxm-tab-h: 68px;
     --rxm-gutter: 16px;
     --rxm-st: env(safe-area-inset-top, 0px);
     --rxm-sb: env(safe-area-inset-bottom, 0px);
@@ -242,12 +242,12 @@ html.rx-mobile .rxm-tabbar {
     inset: auto 0 0 0;
     z-index: 210;
     height: calc(var(--rxm-tab-h) + var(--rxm-sb));
-    padding: 6px 6px var(--rxm-sb);
-    /* same maroon surface as the desktop sidebar (--nav-* tokens come from faculty-dashboard.css,
-       so light / dark / high-contrast themes follow the sidebar automatically) */
-    background: linear-gradient(180deg, var(--nav-bg-top, #4a0909) 0%, var(--nav-bg-bottom, #330505) 100%);
-    border-top: 1px solid var(--nav-line, rgba(255, 255, 255, .12));
-    box-shadow: 0 -6px 20px rgba(20, 0, 0, .28);
+    padding: 6px 6px calc(var(--rxm-sb) + 8px);
+    /* same soft off-white as the page itself, so it doesn't read as stark white or as red (follows the theme) */
+    background: var(--rxm-bg);
+    border-top: 1px solid var(--rxm-line);
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -6px 24px rgba(70, 12, 12, .16), 0 -1px 4px rgba(70, 12, 12, .10);
 }
 
 .rxm-tab {
@@ -260,8 +260,8 @@ html.rx-mobile .rxm-tabbar {
     padding: 0;
     border: 0;
     background: transparent;
-    color: var(--nav-text, rgba(255, 255, 255, .86));
-    font: 600 .68rem/1 var(--font-body, system-ui, sans-serif);
+    color: var(--rxm-muted);
+    font: 600 .66rem/1 var(--font-body, system-ui, sans-serif);
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     transition: color .2s;
@@ -271,14 +271,14 @@ html.rx-mobile .rxm-tabbar {
     position: relative;
     display: grid;
     place-items: center;
-    width: 58px;
-    height: 30px;
-    border-radius: 15px;
+    width: 62px;
+    height: 32px;
+    border-radius: 16px;
     transition: background .2s, transform .15s;
 }
 
 .rxm-tab .material-symbols-outlined {
-    font-size: 24px;
+    font-size: 22px;
     font-variation-settings: 'FILL' 0, 'wght' 400;
     transition: font-variation-settings .28s ease, color .2s;
 }
@@ -288,14 +288,19 @@ html.rx-mobile .rxm-tabbar {
 }
 
 .rxm-tab[aria-current="page"] {
-    color: var(--nav-active-bg, #dcb862);
+    color: var(--rxm-primary);
     font-weight: 800;
 }
 
-/* the desktop sidebar's gold highlight, with the dark-on-gold icon filling in */
+/* solid maroon highlight pill with a solid (filled) soft-white icon */
 .rxm-tab[aria-current="page"] .rxm-tab-pill {
-    background: var(--nav-active-bg, #dcb862);
-    color: var(--nav-on-active, #2b0000);
+    background: var(--rxm-primary);
+    color: #f6efef;
+}
+
+/* dark theme: primary is a light salmon, so the icon uses the dark on-primary tone */
+html.rx-mobile[data-theme="dark"] .rxm-tab[aria-current="page"] .rxm-tab-pill {
+    color: var(--rxm-on-primary);
 }
 
 .rxm-tab[aria-current="page"] .material-symbols-outlined {
@@ -310,7 +315,7 @@ html.rx-mobile .rxm-tabbar {
     height: 9px;
     border-radius: 50%;
     background: #ff5a5a;
-    box-shadow: 0 0 0 2px var(--nav-bg-bottom, #330505);
+    box-shadow: 0 0 0 2px var(--rxm-bg);
 }
 
 .rxm-tab-dot[hidden] {
@@ -1757,8 +1762,8 @@ html.rx-mobile #panel-rooms .fcty-room-foot {
     }
 
     .rxm-tab-pill {
-        width: 40px;
-        height: 28px;
+        width: 44px;
+        height: 30px;
     }
 
     html.rx-mobile .rxm-sheet-panel {
@@ -2368,7 +2373,7 @@ html.rx-mobile #panel-lending .eq-cart-bar-summary {
     line-height: 1.25;
 }
 
-html.rx-mobile #panel-lending .eq-cart-bar-summary > span:last-child {
+html.rx-mobile #panel-lending .eq-cart-bar-summary>span:last-child {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
