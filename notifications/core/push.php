@@ -329,9 +329,12 @@ if (!function_exists('ps_push_encrypt')) {
             $receiverKey = openssl_pkey_get_public($receiverPem);
             if (!$receiverKey) return null;
 
-            // ECDH shared secret
-            openssl_pkey_export($senderKey, $senderPrivPem);
-            openssl_dh_compute_key($sharedSecret, $receiverKey, openssl_pkey_get_private($senderPrivPem));
+            // ECDH shared secret using openssl_pkey_derive (PHP 8.1+)
+            $sharedSecret = openssl_pkey_derive($receiverKey, $senderKey);
+            if ($sharedSecret === false) {
+                error_log('[ps_push_encrypt] ECDH key derivation failed: ' . openssl_error_string());
+                return null;
+            }
 
             // Salt (16 random bytes)
             $salt = random_bytes(16);
