@@ -20,18 +20,26 @@
     // Determine the correct service worker path based on current location
     var swPath = '/OneSignalSDKWorker.js';
     var swScope = '/';
-    // On local development the app lives in a subfolder
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
         swPath = '/Equipment-Lending-Website/OneSignalSDKWorker.js';
         swScope = '/Equipment-Lending-Website/';
     }
-    navigator.serviceWorker.register(swPath, { scope: swScope })
-        .then(function (reg) {
-            console.log('[PUPSync push] SW registered, scope:', reg.scope);
-        })
-        .catch(function (e) {
-            console.error('[PUPSync push] SW registration failed:', e);
-        });
+    // Unregister any conflicting service worker first, then re-register cleanly
+    navigator.serviceWorker.getRegistrations().then(function (registrations) {
+        var unregPromises = [];
+        for (var i = 0; i < registrations.length; i++) {
+            if (registrations[i].scope !== window.location.origin + swScope) {
+                unregPromises.push(registrations[i].unregister());
+            }
+        }
+        return Promise.all(unregPromises);
+    }).then(function () {
+        return navigator.serviceWorker.register(swPath, { scope: swScope });
+    }).then(function (reg) {
+        console.log('[PUPSync push] SW registered, scope:', reg.scope);
+    }).catch(function (e) {
+        console.error('[PUPSync push] SW registration failed:', e);
+    });
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', onReady);
