@@ -622,14 +622,17 @@ function equipment_expire_unreviewed(mysqli $conn, ?DateTimeInterface $now = nul
     try {
         $sel = $conn->prepare(
             "SELECT id,
-                    (COALESCE(request_date, '1970-01-01 00:00:00')
-                        >= TIMESTAMP(borrow_date, '00:01:00')) AS submitted_on_the_day
+                    ((COALESCE(request_date, '1970-01-01 00:00:00')
+                        >= TIMESTAMP(borrow_date, '00:01:00'))
+                      OR COALESCE(booking_mode, '') <> 'future') AS submitted_on_the_day
                FROM tbl_requests
               WHERE status = 'Waiting' AND borrow_date IS NOT NULL
                 AND (
                       (COALESCE(request_date, '1970-01-01 00:00:00') <  TIMESTAMP(borrow_date, '00:01:00')
+                        AND COALESCE(booking_mode, '') = 'future'
                         AND ? >= TIMESTAMP(borrow_date, '00:01:00'))
-                   OR (COALESCE(request_date, '1970-01-01 00:00:00') >= TIMESTAMP(borrow_date, '00:01:00')
+                   OR ((COALESCE(request_date, '1970-01-01 00:00:00') >= TIMESTAMP(borrow_date, '00:01:00')
+                          OR COALESCE(booking_mode, '') <> 'future')
                         AND ? >= TIMESTAMP(borrow_date, COALESCE(borrow_time, '23:59:59'))
                         AND COALESCE(request_date, '1970-01-01 00:00:00') < ?)
                 )"
