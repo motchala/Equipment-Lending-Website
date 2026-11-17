@@ -167,11 +167,17 @@
         slot.setAttribute('data-sig', sig);
         slot.innerHTML = slotHTML(slot, name);
     }
+    function touchOnly() {
+        if (document.documentElement.classList.contains('rx-mobile')) return true;
+        try { return !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches); } catch (e) { return false; }
+    }
     function paintItem(name, focusSel) {
         var list = slotsFor(name);
         list.forEach(paintSlot);
         updateBar();
-        if (focusSel && list[0]) {
+        /* On phones/tablets, focusing the quantity box pops the keyboard up the moment "Add" is tapped.
+           Only a tap on the box itself should do that, so touch devices skip the auto-focus. */
+        if (focusSel && list[0] && !touchOnly()) {
             var f = list[0].querySelector(focusSel);
             if (f) f.focus({ preventScroll: true });
         }

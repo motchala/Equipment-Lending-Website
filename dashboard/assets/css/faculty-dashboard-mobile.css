@@ -243,10 +243,11 @@ html.rx-mobile .rxm-tabbar {
     z-index: 210;
     height: calc(var(--rxm-tab-h) + var(--rxm-sb));
     padding: 6px 6px var(--rxm-sb);
-    background: color-mix(in srgb, var(--rxm-card) 92%, transparent);
-    -webkit-backdrop-filter: blur(18px) saturate(1.5);
-    backdrop-filter: blur(18px) saturate(1.5);
-    border-top: 1px solid var(--rxm-line);
+    /* same maroon surface as the desktop sidebar (--nav-* tokens come from faculty-dashboard.css,
+       so light / dark / high-contrast themes follow the sidebar automatically) */
+    background: linear-gradient(180deg, var(--nav-bg-top, #4a0909) 0%, var(--nav-bg-bottom, #330505) 100%);
+    border-top: 1px solid var(--nav-line, rgba(255, 255, 255, .12));
+    box-shadow: 0 -6px 20px rgba(20, 0, 0, .28);
 }
 
 .rxm-tab {
@@ -259,9 +260,11 @@ html.rx-mobile .rxm-tabbar {
     padding: 0;
     border: 0;
     background: transparent;
-    color: var(--rxm-muted);
+    color: var(--nav-text, rgba(255, 255, 255, .86));
     font: 600 .68rem/1 var(--font-body, system-ui, sans-serif);
     cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: color .2s;
 }
 
 .rxm-tab-pill {
@@ -276,6 +279,8 @@ html.rx-mobile .rxm-tabbar {
 
 .rxm-tab .material-symbols-outlined {
     font-size: 24px;
+    font-variation-settings: 'FILL' 0, 'wght' 400;
+    transition: font-variation-settings .28s ease, color .2s;
 }
 
 .rxm-tab:active .rxm-tab-pill {
@@ -283,12 +288,14 @@ html.rx-mobile .rxm-tabbar {
 }
 
 .rxm-tab[aria-current="page"] {
-    color: var(--rxm-primary);
+    color: var(--nav-active-bg, #dcb862);
     font-weight: 800;
 }
 
+/* the desktop sidebar's gold highlight, with the dark-on-gold icon filling in */
 .rxm-tab[aria-current="page"] .rxm-tab-pill {
-    background: color-mix(in srgb, var(--rxm-primary) 14%, transparent);
+    background: var(--nav-active-bg, #dcb862);
+    color: var(--nav-on-active, #2b0000);
 }
 
 .rxm-tab[aria-current="page"] .material-symbols-outlined {
@@ -302,8 +309,8 @@ html.rx-mobile .rxm-tabbar {
     width: 9px;
     height: 9px;
     border-radius: 50%;
-    background: #d32f2f;
-    box-shadow: 0 0 0 2px var(--rxm-card);
+    background: #ff5a5a;
+    box-shadow: 0 0 0 2px var(--nav-bg-bottom, #330505);
 }
 
 .rxm-tab-dot[hidden] {
@@ -1783,7 +1790,8 @@ html.rx-mobile #panel-rooms .fcty-room-foot {
 
     .rxm-sheet-panel,
     .rxm-sheet-scrim,
-    .rxm-tab-pill {
+    .rxm-tab-pill,
+    .rxm-tab .material-symbols-outlined {
         transition: none;
     }
 }
@@ -2315,4 +2323,84 @@ html.rx-mobile [hidden].rxm-floorbtn,
 html.rx-mobile .rxm-badge[hidden],
 html.rx-mobile .rxm-tab-dot[hidden] {
     display: none !important;
+}
+
+/* ---------------------------------------------------------------
+   12. BORROW CART BAR — "N items selected · Clear · Continue"
+   Pinned to the screen right above the bottom tab bar (same reference as
+   the tab bar itself), whatever the length of the list. It lives inside the
+   Equipment panel, so it only ever shows on the Equipment screen, and
+   faculty-borrow-flow.js still shows/hides it (inline display).
+   position:fixed needs no transformed ancestor, so the Equipment panel's
+   slide-in animation (which leaves transform:translateX(0) behind) is
+   switched off on phones.
+--------------------------------------------------------------- */
+html.rx-mobile #panel-lending.tab-panel.active {
+    animation: none;
+}
+
+html.rx-mobile #panel-lending .eq-cart-bar {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: calc(var(--rxm-tab-h) + var(--rxm-sb) + 8px);
+    z-index: 60;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 10px 10px 10px 14px;
+    gap: 10px;
+    border-radius: 18px;
+    background: var(--rxm-grad);
+    color: var(--rxm-on-primary);
+    box-shadow: 0 6px 20px rgba(70, 12, 12, .28);
+}
+
+/* keep the last items clear of the bar while it is showing */
+html.rx-mobile #panel-lending:has(.eq-cart-bar:not([style*="none"])) #lending-browse {
+    padding-bottom: 76px;
+}
+
+html.rx-mobile #panel-lending .eq-cart-bar-summary {
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 8px;
+    font-size: 13px;
+    line-height: 1.25;
+}
+
+html.rx-mobile #panel-lending .eq-cart-bar-summary > span:last-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+html.rx-mobile #panel-lending .eq-cart-bar-summary small {
+    display: block;
+    font-weight: 500;
+    opacity: .85;
+}
+
+html.rx-mobile #panel-lending .eq-cart-bar-actions {
+    flex: 0 0 auto;
+    gap: 8px;
+}
+
+html.rx-mobile #panel-lending .eq-cart-bar-clear,
+html.rx-mobile #panel-lending .eq-cart-bar-submit {
+    min-height: 40px;
+    padding: 0 14px;
+    border-radius: 12px;
+    font-size: 13px;
+    -webkit-tap-highlight-color: transparent;
+}
+
+html.rx-mobile #panel-lending .eq-cart-bar-clear {
+    color: var(--rxm-on-primary);
+    border-color: color-mix(in srgb, var(--rxm-on-primary) 55%, transparent);
+}
+
+html.rx-mobile #panel-lending .eq-cart-bar-submit {
+    background: var(--rxm-on-primary);
+    color: var(--rxm-primary);
 }
