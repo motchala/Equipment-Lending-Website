@@ -34,6 +34,8 @@
         var allow = document.getElementById('psPushAllow');
         if (allow) {
             allow.addEventListener('click', function () {
+                // Mark as permanently handled so modal never reappears
+                localStorage.setItem(DISMISS_KEY, (Date.now() + 1000 * 60 * 60 * 24 * 365).toString());
                 hideModal();
                 requestAndSubscribe();
             });
@@ -70,24 +72,30 @@
 
     function silentSubscribe() {
         navigator.serviceWorker.ready.then(function (reg) {
+            console.log('[PUPSync push] SW ready, scope:', reg.scope);
             return reg.pushManager.getSubscription().then(function (existing) {
                 if (existing) {
+                    console.log('[PUPSync push] Existing subscription found, saving.');
                     saveSubscription(existing);
                     return;
                 }
-                // Get VAPID public key from our server
+                console.log('[PUPSync push] No existing subscription, fetching VAPID key.');
                 fetch('notifications/api/push-vapid-key.php', {
                     credentials: 'same-origin'
                 }).then(function (r) {
                     return r.json();
                 }).then(function (data) {
+                    console.log('[PUPSync push] VAPID key received:', data.key ? 'yes' : 'NO KEY');
                     if (!data.key) return;
                     return reg.pushManager.subscribe({
                         userVisibleOnly: true,
                         applicationServerKey: urlBase64ToUint8Array(data.key)
                     });
                 }).then(function (sub) {
-                    if (sub) saveSubscription(sub);
+                    if (sub) {
+                        console.log('[PUPSync push] Subscribed, endpoint:', sub.endpoint.substring(0, 40) + '...');
+                        saveSubscription(sub);
+                    }
                 }).catch(function (e) {
                     console.error('[PUPSync push] Subscribe error:', e);
                 });
@@ -98,10 +106,13 @@
     }
 
     function saveSubscription(sub) {
-        // Fetch CSRF token fresh from server — never rely on a cached page variable
         fetch(CSRF_EP, { credentials: 'same-origin' })
-            .then(function (r) { return r.json(); })
+            .then(function (r) {
+                console.log('[PUPSync push] CSRF status:', r.status);
+                return r.json();
+            })
             .then(function (data) {
+                console.log('[PUPSync push] CSRF token received:', data.token ? 'yes' : 'NO TOKEN');
                 if (!data.token) return;
                 return fetch(SUBSCRIBE_EP, {
                     method: 'POST',
@@ -112,6 +123,14 @@
                     }),
                     credentials: 'same-origin',
                 });
+            })
+            .then(function (r) {
+                if (!r) return;
+                console.log('[PUPSync push] Subscribe status:', r.status);
+                return r.json();
+            })
+            .then(function (data) {
+                if (data) console.log('[PUPSync push] Subscribe result:', JSON.stringify(data));
             })
             .catch(function (e) {
                 console.error('[PUPSync push] Save error:', e);
