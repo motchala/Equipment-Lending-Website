@@ -297,6 +297,17 @@
 
                     applyUpdate(data);
 
+                    // Equipment > Loans is built by the server, not by this script: re-read it whenever the
+                    // numbers move (a new request, an approval, a return), so new requests are listed at once.
+                    const sig = [curr.waiting, curr.approved, curr.overdue, curr.declined, curr.total_req, data.last_return || ''].join('|');
+                    if (window._adminLoansSig === undefined) {
+                        window._adminLoansSig = sig;                       // first poll: the page was just rendered
+                    } else if (sig !== window._adminLoansSig && !document.hidden
+                        && typeof window.psRefreshLoansTable === 'function') {
+                        window._adminLoansSig = sig;
+                        window.psRefreshLoansTable();
+                    }
+
                     if (prev.waiting !== undefined && curr.waiting > prev.waiting) {
                         showAdminToast('🔔 A new borrow request was submitted.');
                     }
