@@ -13,7 +13,7 @@ ini_set('log_errors', '1');
 // <script> or <style> blocks (only style="" attributes), so 'unsafe-inline' is included for
 // style-src to avoid breaking the 150+ inline style attributes already in use.
 $csp_nonce = base64_encode(random_bytes(16));
-header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$csp_nonce}' https://cdn.jsdelivr.net https://cdn.onesignal.com; script-src-elem 'self' 'nonce-{$csp_nonce}' https://cdn.jsdelivr.net https://cdn.onesignal.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob:; connect-src 'self' https://cdn.onesignal.com https://onesignal.com https://api.onesignal.com; frame-ancestors 'none'; form-action 'self'; base-uri 'self';");
+header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$csp_nonce}' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob:; connect-src 'self' https://fcm.googleapis.com https://updates.push.services.mozilla.com; frame-ancestors 'none'; form-action 'self'; base-uri 'self';");
 header("X-Frame-Options: DENY");
 
 // admin-dashboard-functions.php

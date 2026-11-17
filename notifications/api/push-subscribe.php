@@ -4,11 +4,14 @@ declare(strict_types=1);
 /**
  * notifications/api/push-subscribe.php
  *
- * Saves a OneSignal player ID for the signed-in user (faculty or admin).
+ * Saves a Web Push subscription for the signed-in user (faculty or admin).
  * Called by push-init.js after the user grants notification permission.
  *
- * POST JSON: { player_id: string, csrf_token: string }
+ * POST JSON: { subscription: { endpoint, keys: { auth, p256dh } }, csrf_token: string }
  * Response:  { success: true } or { success: false, error: string }
+ *
+ * The subscription endpoint + keys are stored in tbl_push_subscriptions.
+ * The push sender (notifications/core/push.php) reads them back when sending.
  */
 
 ini_set('display_errors', '0');
@@ -32,13 +35,28 @@ if ($csrf === '' || empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['cs
     exit;
 }
 
-// Determine audience and user_id from session
-$audience = '';
-$user_id  = '';
+$subscription = $body['subscription'] ?? null;
+if (
+    !is_array($subscription) ||
+    empty($subscription['endpoint']) ||
+    empty($subscription['keys']['auth']) ||
+    empty($subscription['keys']['p256dh'])
+) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'Invalid subscription.']);
+    exit;
+}
+
+$endpoint = trim((string)$subscription['endpoint']);
+$auth     = trim((string)$subscription['keys']['auth']);
+$p256dh   = trim((string)$subscription['keys']['p256dh']);
 
 require_once __DIR__ . '/../../config/db.php';
 $conn = getDB();
 $conn->set_charset('utf8mb4');
+
+$audience = '';
+$user_id  = '';
 
 if (!empty($_SESSION['faculty_id'])) {
     $audience = 'faculty';
@@ -68,25 +86,24 @@ if ($user_id === '') {
     exit;
 }
 
-$player_id = trim((string)($body['player_id'] ?? ''));
-if ($player_id === '' || strlen($player_id) > 64) {
-    $conn->close();
-    http_response_code(400);
-    echo json_encode(['success' => false, 'error' => 'Invalid subscription ID.']);
-    exit;
-}
-
 require_once __DIR__ . '/../core/push.php';
 ps_push_ensure_table($conn);
 
 try {
+    // Store endpoint + keys; reuse player_id column for endpoint, add auth+p256dh columns lazily
+    ps_push_ensure_columns($conn);
+
     $st = $conn->prepare(
-        'INSERT INTO tbl_push_subscriptions (audience, user_id, player_id)
-         VALUES (?, ?, ?)
-         ON DUPLICATE KEY UPDATE player_id = VALUES(player_id), created_at = NOW()'
+        'INSERT INTO tbl_push_subscriptions (audience, user_id, player_id, auth_key, p256dh_key)
+         VALUES (?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+             player_id  = VALUES(player_id),
+             auth_key   = VALUES(auth_key),
+             p256dh_key = VALUES(p256dh_key),
+             created_at = NOW()'
     );
     if (!$st) throw new RuntimeException('Prepare failed: ' . $conn->error);
-    $st->bind_param('sss', $audience, $user_id, $player_id);
+    $st->bind_param('sssss', $audience, $user_id, $endpoint, $auth, $p256dh);
     $st->execute();
     $st->close();
     $conn->close();

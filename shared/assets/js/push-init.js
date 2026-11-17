@@ -1,24 +1,21 @@
 /**
  * push-init.js
- * OneSignal Web Push initialisation for PUPSync.
- *
- * Loaded on faculty-dashboard.php and admin-dashboard.php.
- * Requires window.PS_PUSH_APP_ID and window.PS_CSRF_TOKEN set before this runs.
+ * PUPSync Web Push — no external SDK dependency.
+ * Uses the browser's native Push API directly.
+ * Requires window.PS_PUSH_APP_ID and window.PS_CSRF_TOKEN.
  */
-
 (function () {
     'use strict';
 
-    var APP_ID       = window.PS_PUSH_APP_ID || '';
     var CSRF_TOKEN   = window.PS_CSRF_TOKEN  || '';
     var SUBSCRIBE_EP = 'notifications/api/push-subscribe.php';
     var UNSUB_EP     = 'notifications/api/push-unsubscribe.php';
+    var VAPID_EP     = 'notifications/api/push-vapid-key.php';
     var DISMISS_KEY  = 'ps_push_dismissed';
     var DISMISS_DAYS = 7;
 
-    var _oneSignal = null;
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
 
-    // Wait for DOM before wiring buttons
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', onReady);
     } else {
@@ -26,7 +23,6 @@
     }
 
     function onReady() {
-        // Wire up "Maybe later" — no SDK needed
         var later = document.getElementById('psPushLater');
         if (later) {
             later.addEventListener('click', function () {
@@ -35,58 +31,94 @@
             });
         }
 
-        // Wire up "Allow" — calls SDK when clicked
         var allow = document.getElementById('psPushAllow');
         if (allow) {
             allow.addEventListener('click', function () {
                 hideModal();
-                if (_oneSignal) {
-                    doSubscribe(_oneSignal);
-                } else {
-                    window._psPushPendingAllow = true;
-                }
+                requestAndSubscribe();
             });
         }
 
-        // Decide whether to show the modal
         var permission = (typeof Notification !== 'undefined') ? Notification.permission : 'denied';
+
         if (permission === 'denied') {
             removeSub();
             return;
         }
-        if (permission === 'default') {
-            var dismissed = parseInt(localStorage.getItem(DISMISS_KEY) || '0', 10);
-            var daysSince = (Date.now() - dismissed) / (1000 * 60 * 60 * 24);
-            if (dismissed > 0 && daysSince < DISMISS_DAYS) return;
-            showModal();
+
+        if (permission === 'granted') {
+            silentSubscribe();
+            return;
         }
 
-        // SDK is already loaded via <script> tag in HTML — initialise it
-        if (!('serviceWorker' in navigator) || !('PushManager' in window) || !APP_ID) return;
+        // permission === 'default'
+        var dismissed = parseInt(localStorage.getItem(DISMISS_KEY) || '0', 10);
+        var daysSince = (Date.now() - dismissed) / (1000 * 60 * 60 * 24);
+        if (dismissed > 0 && daysSince < DISMISS_DAYS) return;
 
-        window.OneSignalDeferred = window.OneSignalDeferred || [];
-        window.OneSignalDeferred.push(function (OneSignal) {
-            OneSignal.init({
-                appId: APP_ID,
-                serviceWorkerParam: { scope: '/' },
-                notifyButton:  { enable: false },
-                promptOptions: { slidedown: { enabled: false } },
-            }).then(function () {
-                _oneSignal = OneSignal;
+        showModal();
+    }
 
-                if (window._psPushPendingAllow) {
-                    window._psPushPendingAllow = false;
-                    doSubscribe(OneSignal);
+    function requestAndSubscribe() {
+        Notification.requestPermission().then(function (permission) {
+            if (permission !== 'granted') return;
+            silentSubscribe();
+        }).catch(function (e) {
+            console.error('[PUPSync push] Permission error:', e);
+        });
+    }
+
+    function silentSubscribe() {
+        navigator.serviceWorker.ready.then(function (reg) {
+            return reg.pushManager.getSubscription().then(function (existing) {
+                if (existing) {
+                    saveSubscription(existing);
                     return;
                 }
-
-                if (Notification.permission === 'granted') {
-                    doSubscribe(OneSignal);
-                }
-            }).catch(function (e) {
-                console.error('[PUPSync push] Init error:', e);
+                // Get VAPID public key from our server
+                fetch('notifications/api/push-vapid-key.php', {
+                    credentials: 'same-origin'
+                }).then(function (r) {
+                    return r.json();
+                }).then(function (data) {
+                    if (!data.key) return;
+                    return reg.pushManager.subscribe({
+                        userVisibleOnly: true,
+                        applicationServerKey: urlBase64ToUint8Array(data.key)
+                    });
+                }).then(function (sub) {
+                    if (sub) saveSubscription(sub);
+                }).catch(function (e) {
+                    console.error('[PUPSync push] Subscribe error:', e);
+                });
             });
+        }).catch(function (e) {
+            console.error('[PUPSync push] SW ready error:', e);
         });
+    }
+
+    function saveSubscription(sub) {
+        fetch(SUBSCRIBE_EP, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                subscription: sub.toJSON(),
+                csrf_token: CSRF_TOKEN
+            }),
+            credentials: 'same-origin',
+        }).catch(function (e) {
+            console.error('[PUPSync push] Save error:', e);
+        });
+    }
+
+    function removeSub() {
+        if (!CSRF_TOKEN) return;
+        fetch(UNSUB_EP, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ csrf_token: CSRF_TOKEN }),
+            credentials: 'same-origin',
+        }).catch(function () {});
     }
 
     function showModal() {
@@ -107,36 +139,15 @@
         }, 160);
     }
 
-    function doSubscribe(OneSignal) {
-        OneSignal.Notifications.requestPermission().then(function (granted) {
-            if (!granted) return;
-            OneSignal.User.PushSubscription.optIn().then(function () {
-                var playerId = OneSignal.User.PushSubscription.id;
-                if (!playerId) return;
-                fetch(SUBSCRIBE_EP, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ player_id: playerId, csrf_token: CSRF_TOKEN }),
-                    credentials: 'same-origin',
-                }).catch(function (e) {
-                    console.error('[PUPSync push] Subscribe save error:', e);
-                });
-            }).catch(function (e) {
-                console.error('[PUPSync push] Opt-in error:', e);
-            });
-        }).catch(function (e) {
-            console.error('[PUPSync push] Permission request error:', e);
-        });
-    }
-
-    function removeSub() {
-        if (!CSRF_TOKEN) return;
-        fetch(UNSUB_EP, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ csrf_token: CSRF_TOKEN }),
-            credentials: 'same-origin',
-        }).catch(function () {});
+    function urlBase64ToUint8Array(base64String) {
+        var padding = '='.repeat((4 - base64String.length % 4) % 4);
+        var base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+        var rawData = window.atob(base64);
+        var outputArray = new Uint8Array(rawData.length);
+        for (var i = 0; i < rawData.length; i++) {
+            outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
     }
 
 }());
