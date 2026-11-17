@@ -1852,14 +1852,20 @@
     // null means no successful lookup yet — submit is blocked until set.
     let _facRegistryMatch = null;
 
-    function _showLookupAlert(msg, isError) {
+    let _facLookupAlertTimer = null;
+
+    // autoHideMs (optional): hide the message by itself after that many milliseconds.
+    function _showLookupAlert(msg, isError, autoHideMs) {
         if (!facLookupAlert) return;
+        clearTimeout(_facLookupAlertTimer);
         facLookupAlert.className = 'alert-banner ' + (isError ? 'alert-danger' : 'alert-success');
         facLookupAlert.textContent = msg;
         facLookupAlert.classList.remove('hidden');
+        if (autoHideMs > 0) _facLookupAlertTimer = setTimeout(_clearLookupAlert, autoHideMs);
     }
     function _clearLookupAlert() {
         if (!facLookupAlert) return;
+        clearTimeout(_facLookupAlertTimer);
         facLookupAlert.classList.add('hidden');
         facLookupAlert.textContent = '';
     }
@@ -1950,7 +1956,7 @@
                         return;
                     }
                     if (data.status === 'not_found') {
-                        let msg = firstName + ' ' + lastName + ' was not found in the faculty registry. ';
+                        let msg = firstName + ' ' + lastName + ' was not found in the registry. ';
                         const hints = Array.isArray(data.hints) ? data.hints : [];
                         if (hints.length) {
                             // e.g. "Cruz" typed for "Edmundo B. Dela Cruz": show how to enter it so it matches
@@ -1958,11 +1964,11 @@
                                 return '\u201C' + h.full_name + '\u201D (First name \u201C' + h.first + '\u201D, Last name \u201C' + h.last + '\u201D)';
                             }).join(' or ') + '?';
                         } else {
-                            msg += 'Check the spelling or upload an updated registry file. ' +
-                                'A surname of more than one word (like Dela Cruz) must be typed in full under Last name; ' +
-                                'if the registry shows no middle initial, only its last word counts as the last name.';
+                            msg += 'Check the spelling and type the full surname (e.g. Dela Cruz) under Last name.';
                         }
-                        _showLookupAlert(msg, true);
+                        // the short "not found" note fades away after 5 seconds; the "Did you mean" one stays,
+                        // because the admin needs it to correct the name
+                        _showLookupAlert(msg, true, hints.length ? 0 : 5000);
                         return;
                     }
                     if (data.status === 'found' && data.matches && data.matches.length === 1) {
@@ -2013,15 +2019,15 @@
 
     /* ── Auto-generate a strong temporary password ──────────────────────────
        The fac-password field is read-only; the admin never types in it.
-       We generate it on page load, and again when the regen button is clicked.
+       It is empty until the admin taps Generate (and again after an account is created).
        The password must pass the server's strength check (level >= 2 / "Fair"):
        ≥12 chars, upper + lower + digit + symbol, no trivial runs.          */
     function _facGeneratePassword() {
-        const upper  = 'ABCDEFGHJKLMNPQRSTUVWXYZ';   // no I/O to avoid confusion
-        const lower  = 'abcdefghjkmnpqrstuvwxyz';    // no i/l/o
+        const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';   // no I/O to avoid confusion
+        const lower = 'abcdefghjkmnpqrstuvwxyz';    // no i/l/o
         const digits = '23456789';                    // no 0/1
-        const syms   = '!@#$%^&*-_=+';
-        const all    = upper + lower + digits + syms;
+        const syms = '!@#$%^&*-_=+';
+        const all = upper + lower + digits + syms;
 
         // Use crypto.getRandomValues when available (all modern browsers + InfinityFree).
         function rand(max) {
@@ -2038,13 +2044,13 @@
         // server uses (level >= 2).  Typically succeeds on the first try.
         do {
             var chars = [
-                upper [rand(upper.length)],
-                upper [rand(upper.length)],
-                lower [rand(lower.length)],
-                lower [rand(lower.length)],
+                upper[rand(upper.length)],
+                upper[rand(upper.length)],
+                lower[rand(lower.length)],
+                lower[rand(lower.length)],
                 digits[rand(digits.length)],
                 digits[rand(digits.length)],
-                syms  [rand(syms.length)],
+                syms[rand(syms.length)],
             ];
             // Pad to 14 chars from the full alphabet
             while (chars.length < 14) {
@@ -2073,6 +2079,24 @@
         return true;
     }
 
+    /* The field starts empty. A password only appears when the admin taps Generate, and the field is
+       emptied again after an account is created. The Copy button and the Generate / Regenerate label
+       follow whether the field has a password. */
+    var facPwCopyBtn = document.getElementById('fac-pw-copy');
+    var facPwRegenText = document.getElementById('fac-pw-regen-text');
+
+    function _facSyncPasswordUi() {
+        const has = !!(facPasswordInput && facPasswordInput.value);
+        if (facPwCopyBtn) facPwCopyBtn.disabled = !has;
+        if (facPwRegenText) facPwRegenText.textContent = has ? 'Regenerate' : 'Generate';
+        const regen = document.getElementById('fac-pw-regen');
+        if (regen) {
+            const t = has ? 'Generate a different password' : 'Generate a password';
+            regen.title = t;
+            regen.setAttribute('aria-label', t);
+        }
+    }
+
     function _facSetGeneratedPassword(pw) {
         if (!facPasswordInput) return;
         facPasswordInput.value = pw;
@@ -2080,9 +2104,18 @@
         facPasswordInput.classList.remove('fac-gen-flash');
         void facPasswordInput.offsetWidth; // reflow to restart animation
         facPasswordInput.classList.add('fac-gen-flash');
+        _facSyncPasswordUi();
     }
 
-    // Wire up the regen button
+    function _facClearGeneratedPassword() {
+        if (facPasswordInput) {
+            facPasswordInput.value = '';
+            facPasswordInput.classList.remove('fac-gen-flash');
+        }
+        _facSyncPasswordUi();
+    }
+
+    // Wire up the generate button
     var facPwRegenBtn = document.getElementById('fac-pw-regen');
     if (facPwRegenBtn) {
         facPwRegenBtn.addEventListener('click', function () {
@@ -2091,7 +2124,6 @@
     }
 
     // Wire up the copy button
-    var facPwCopyBtn = document.getElementById('fac-pw-copy');
     if (facPwCopyBtn) {
         facPwCopyBtn.addEventListener('click', function () {
             if (!facPasswordInput || !facPasswordInput.value) return;
@@ -2127,10 +2159,8 @@
         } catch (e) { /* silent */ }
     }
 
-    // Generate a password immediately when the page loads
-    if (facPasswordInput) {
-        _facSetGeneratedPassword(_facGeneratePassword());
-    }
+    // Start empty (a browser may restore an old value when the page is reloaded)
+    _facClearGeneratedPassword();
 
     function _updateFacPasswordStrength() { /* no-op: password is auto-generated, no strength bar needed */ }
     function _getFacPasswordStrength(password) {
@@ -2171,11 +2201,12 @@
 
         // Empty the form right away so no browser can restore typed values (the password
         // included) after the reload.
-        ['fac-email', 'fac-faculty-id', 'fac-first', 'fac-last', 'fac-password']
+        ['fac-email', 'fac-faculty-id', 'fac-first', 'fac-last']
             .forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.value = '';
             });
+        _facClearGeneratedPassword();
         _clearFacAlert();
         _clearRegistryPreview();
 
@@ -2205,8 +2236,8 @@
             // Reset the create-account form so it's blank for the next account.
             var form = document.getElementById('fac-create-form') || document.getElementById('facCreateForm');
             if (form) form.reset();
-            // Generate a fresh password for the next account creation
-            if (facPasswordInput) _facSetGeneratedPassword(_facGeneratePassword());
+            // Leave the password empty for the next account: the admin taps Generate when they need one
+            _facClearGeneratedPassword();
             // Refresh the faculty list from the server so the new account appears immediately.
             if (typeof window.adminRefreshFacultyList === 'function') window.adminRefreshFacultyList();
         }, FAC_CREATED_OVERLAY_MS);
@@ -2234,9 +2265,10 @@
                 _showFacAlert('Last name is required.', true); return;
             }
             if (!password) {
-                // Should never happen (generated on load), but guard against it
-                _facSetGeneratedPassword(_facGeneratePassword());
-                _showFacAlert('A password was just generated. Please try again.', true); return;
+                _showFacAlert('Tap Generate to create a temporary password first.', true);
+                const regenBtn = document.getElementById('fac-pw-regen');
+                if (regenBtn) regenBtn.focus();
+                return;
             }
             if (_facEmailEdited && email && !/^[^\s@]+@pupsync\.edu$/i.test(email)) {
                 _showFacAlert('The PUPSync email must be a valid address ending in @pupsync.edu.', true);
