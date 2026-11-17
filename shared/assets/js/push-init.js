@@ -17,7 +17,15 @@
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
 
     // Register the service worker first, then proceed
-    navigator.serviceWorker.register('/Equipment-Lending-Website/OneSignalSDKWorker.js', { scope: '/Equipment-Lending-Website/' })
+    // Determine the correct service worker path based on current location
+    var swPath = '/OneSignalSDKWorker.js';
+    var swScope = '/';
+    // On local development the app lives in a subfolder
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        swPath = '/Equipment-Lending-Website/OneSignalSDKWorker.js';
+        swScope = '/Equipment-Lending-Website/';
+    }
+    navigator.serviceWorker.register(swPath, { scope: swScope })
         .then(function (reg) {
             console.log('[PUPSync push] SW registered, scope:', reg.scope);
         })
