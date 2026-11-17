@@ -34,7 +34,4 @@
     <script src="room-reservation/assets/js/fcty-class-schedule.js?v=<?php echo @filemtime(PS_ROOT . '/room-reservation/assets/js/fcty-class-schedule.js'); ?>"></script>
     <script src="dashboard/assets/js/faculty-dashboard-responsive.js?v=<?php echo @filemtime(PS_ROOT . '/dashboard/assets/js/faculty-dashboard-responsive.js'); ?>" defer></script>
     <script src="dashboard/assets/js/faculty-dashboard-mobile.js?v=<?php echo @filemtime(PS_ROOT . '/dashboard/assets/js/faculty-dashboard-mobile.js'); ?>" defer></script>
-    <script nonce="<?php echo $csp_nonce; ?>">
-        window.PS_CSRF_TOKEN = '<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES); ?>';
-    </script>
     <script src="shared/assets/js/push-init.js?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/js/push-init.js'); ?>"></script>

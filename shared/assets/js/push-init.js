@@ -7,10 +7,10 @@
 (function () {
     'use strict';
 
-    var CSRF_TOKEN   = window.PS_CSRF_TOKEN  || '';
     var SUBSCRIBE_EP = 'notifications/api/push-subscribe.php';
     var UNSUB_EP     = 'notifications/api/push-unsubscribe.php';
     var VAPID_EP     = 'notifications/api/push-vapid-key.php';
+    var CSRF_EP      = 'notifications/api/push-csrf.php';
     var DISMISS_KEY  = 'ps_push_dismissed';
     var DISMISS_DAYS = 7;
 
@@ -98,27 +98,39 @@
     }
 
     function saveSubscription(sub) {
-        fetch(SUBSCRIBE_EP, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                subscription: sub.toJSON(),
-                csrf_token: CSRF_TOKEN
-            }),
-            credentials: 'same-origin',
-        }).catch(function (e) {
-            console.error('[PUPSync push] Save error:', e);
-        });
+        // Fetch CSRF token fresh from server — never rely on a cached page variable
+        fetch(CSRF_EP, { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (!data.token) return;
+                return fetch(SUBSCRIBE_EP, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        subscription: sub.toJSON(),
+                        csrf_token: data.token
+                    }),
+                    credentials: 'same-origin',
+                });
+            })
+            .catch(function (e) {
+                console.error('[PUPSync push] Save error:', e);
+            });
     }
 
     function removeSub() {
-        if (!CSRF_TOKEN) return;
-        fetch(UNSUB_EP, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ csrf_token: CSRF_TOKEN }),
-            credentials: 'same-origin',
-        }).catch(function () {});
+        fetch(CSRF_EP, { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (!data.token) return;
+                fetch(UNSUB_EP, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ csrf_token: data.token }),
+                    credentials: 'same-origin',
+                });
+            })
+            .catch(function () {});
     }
 
     function showModal() {
