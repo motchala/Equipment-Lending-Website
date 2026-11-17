@@ -14,6 +14,7 @@
      • back bars        – a "‹ Settings" header on full-screen overlays
      • category chips   – replaces the Equipment category <select>
      • floor picker     – replaces the Facilities floor tabs
+     • pull-to-refresh  – drag down from the top of the page to reload
 
    It never re-implements app logic: every button here either carries
    an existing data-action (go-tab, open-overlay, open-notif-modal,
@@ -360,6 +361,125 @@
     });
 
     /* ------------------------------------------------------------
+       Pull-to-refresh
+       The phone shell scrolls inside #appMain (the document itself never
+       scrolls) and html/body use overscroll-behavior, so the browser's own
+       "drag down to refresh" can never fire. This re-creates it: pull down
+       from the very top of the page, release past the threshold and the
+       page reloads (tab / state restore is handled by faculty-dashboard.js).
+    ------------------------------------------------------------ */
+    var ptr;
+
+    function buildPullToRefresh() {
+        var main = $('#appMain');
+        if (!main || ptr) return;
+
+        ptr = el('div', 'rxm-ptr', '<span class="rxm-ptr-disc">' + icon('refresh') + '</span>');
+        ptr.setAttribute('aria-hidden', 'true');
+        D.body.appendChild(ptr);
+
+        var THRESHOLD = 72;   // px of (damped) pull needed to trigger
+        var MAX_PULL = 120;   // visual cap
+        var DAMPING = 0.5;    // finger distance -> indicator distance
+        var DEADZONE = 8;     // ignore tiny jitters before deciding it's a pull
+
+        var startY = 0, startX = 0, pull = 0;
+        var tracking = false, pulling = false, busy = false;
+
+        // Touches that begin in/around these must keep their normal behaviour.
+        var SKIP = 'input, textarea, select, [contenteditable="true"], ' +
+            '.modal-backdrop, .modal-box, .ps-modal, .ps-modal-backdrop, ' +
+            '.fcty-overlay, .rxm-sheet, [role="dialog"], [aria-modal="true"]';
+
+        function insideScrolledChild(node) {
+            // A nested vertical scroller (e.g. a list or the chat) that isn't at
+            // its top should scroll itself instead of starting a refresh.
+            for (; node && node !== main && node.nodeType === 1; node = node.parentNode) {
+                var oy = getComputedStyle(node).overflowY;
+                if ((oy === 'auto' || oy === 'scroll') &&
+                    node.scrollHeight > node.clientHeight + 1 && node.scrollTop > 0) return true;
+            }
+            return false;
+        }
+
+        function blocked(target) {
+            if (busy || !isMobile()) return true;
+            if (main.scrollTop > 0) return true;
+            if (D.querySelector('.overlay-page.active, .rxm-sheet.is-open')) return true;
+            var ae = D.activeElement;
+            if (ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) return true;
+            if (target && target.closest && target.closest(SKIP)) return true;
+            return insideScrolledChild(target);
+        }
+
+        function paint(px) {
+            ptr.style.setProperty('--rxm-ptr-pull', px + 'px');
+            ptr.style.setProperty('--rxm-ptr-p', Math.min(1, px / THRESHOLD).toFixed(3));
+            ptr.style.setProperty('--rxm-ptr-rot', Math.round(px / THRESHOLD * 270) + 'deg');
+        }
+
+        function reset() {
+            tracking = pulling = false;
+            pull = 0;
+            ptr.classList.remove('is-pulling', 'is-ready');
+            paint(0);
+        }
+
+        function refreshNow() {
+            if (navigator.onLine === false) { reset(); return; }   // nothing to reload into
+            busy = true;
+            tracking = pulling = false;
+            ptr.classList.remove('is-pulling', 'is-ready');
+            ptr.classList.add('is-refreshing');
+            paint(THRESHOLD);
+            // let the spinner show for a beat, then reload
+            setTimeout(function () { window.location.reload(); }, 350);
+            // safety net: if the reload never happens, give the UI back
+            setTimeout(function () {
+                busy = false;
+                ptr.classList.remove('is-refreshing');
+                paint(0);
+            }, 8000);
+        }
+
+        main.addEventListener('touchstart', function (e) {
+            tracking = pulling = false;
+            if (e.touches.length !== 1 || blocked(e.target)) return;
+            startY = e.touches[0].clientY;
+            startX = e.touches[0].clientX;
+            pull = 0;
+            tracking = true;
+        }, { passive: true });
+
+        main.addEventListener('touchmove', function (e) {
+            if (!tracking) return;
+            var t = e.touches[0];
+            var dy = t.clientY - startY, dx = t.clientX - startX;
+
+            if (!pulling) {
+                if (dy < 0 || Math.abs(dx) > Math.abs(dy)) { tracking = false; return; }  // scrolling up / sideways
+                if (dy < DEADZONE) return;
+                if (main.scrollTop > 0) { tracking = false; return; }
+                pulling = true;
+                ptr.classList.add('is-pulling');
+            }
+
+            pull = Math.min(MAX_PULL, Math.max(0, dy * DAMPING));
+            if (pull <= 0) { reset(); return; }          // finger went back above the start
+            if (e.cancelable) e.preventDefault();         // stop iOS rubber-banding the page
+            paint(pull);
+            ptr.classList.toggle('is-ready', pull >= THRESHOLD);
+        }, { passive: false });
+
+        function end() {
+            if (!pulling) { tracking = false; return; }
+            if (pull >= THRESHOLD) refreshNow(); else reset();
+        }
+        main.addEventListener('touchend', end, { passive: true });
+        main.addEventListener('touchcancel', reset, { passive: true });
+    }
+
+    /* ------------------------------------------------------------
        wiring
     ------------------------------------------------------------ */
     var queued = false;
@@ -373,7 +493,7 @@
 
     function init() {
         buildBar(); buildTabbar(); buildSheet(); buildOverlayBars();
-        buildCategoryChips(); buildFloorPicker();
+        buildCategoryChips(); buildFloorPicker(); buildPullToRefresh();
         refresh();
 
         if (window.MutationObserver) {
