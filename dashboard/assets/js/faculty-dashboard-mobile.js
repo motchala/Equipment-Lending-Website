@@ -36,6 +36,11 @@
         { tab: 'rooms', label: 'Facilities', icon: 'meeting_room', title: 'Facilities' }
     ];
 
+    // Same PUPSync logo mark as the desktop sidebar (faculty-shell-nav.php)
+    var LOGO_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" ' +
+        'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" aria-hidden="true">' +
+        '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>';
+
     function icon(name, cls) {
         return '<span class="material-symbols-outlined' + (cls ? ' ' + cls : '') + '" aria-hidden="true">' + name + '</span>';
     }
@@ -75,7 +80,7 @@
         bar.id = 'rxmBar';
         bar.innerHTML =
             '<button type="button" class="rxm-iconbtn rxm-back" id="rxmBack" aria-label="Back" hidden>' + icon('arrow_back') + '</button>' +
-            '<span class="rxm-logo" aria-hidden="true">' + icon('layers') + '</span>' +
+            '<span class="rxm-logo" aria-hidden="true">' + LOGO_SVG + '</span>' +
             '<h1 class="rxm-title" id="rxmTitle">PUPSync</h1>' +
             '<div class="rxm-actions">' +
             '<button type="button" class="rxm-iconbtn rxm-bell" id="rxmBell" aria-label="Notifications">' + icon('notifications') +

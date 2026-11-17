@@ -456,16 +456,16 @@
 
     function getMatchingEquipment() {
         const searchEl = document.getElementById('equipmentSearch');
-        const catEl    = document.getElementById('categoryFilter');
-        const search   = (searchEl ? searchEl.value : '').toLowerCase();
+        const catEl = document.getElementById('categoryFilter');
+        const search = (searchEl ? searchEl.value : '').toLowerCase();
         const category = (catEl ? catEl.value : '').toLowerCase();
         const activeCampusBtn = document.querySelector('.eq-campus-tab.active');
         const campus = activeCampusBtn ? (activeCampusBtn.dataset.campus || '') : '';
 
         return Array.from(document.querySelectorAll('.item-node')).filter(item => {
-            const nameMatch   = (item.dataset.name || '').includes(search);
-            const catMatch    = !category || item.dataset.category === category;
-            const campusMatch = !campus   || String(item.dataset.campus) === campus;
+            const nameMatch = (item.dataset.name || '').includes(search);
+            const catMatch = !category || item.dataset.category === category;
+            const campusMatch = !campus || String(item.dataset.campus) === campus;
             return nameMatch && catMatch && campusMatch;
         });
     }
@@ -497,16 +497,16 @@
                 const activeCampusTabBtn = document.querySelector('.eq-campus-tab.active');
                 const activeCampus = activeCampusTabBtn ? (activeCampusTabBtn.dataset.campus || '') : '';
                 const searchEl2 = document.getElementById('equipmentSearch');
-                const catEl2    = document.getElementById('categoryFilter');
+                const catEl2 = document.getElementById('categoryFilter');
                 const hasSearch = searchEl2 && searchEl2.value.trim() !== '';
-                const hasCat    = catEl2 && catEl2.value !== '';
-                const msgEl  = document.getElementById('equipNoResultsMsg');
+                const hasCat = catEl2 && catEl2.value !== '';
+                const msgEl = document.getElementById('equipNoResultsMsg');
                 const iconEl = document.getElementById('equipNoResultsIcon');
                 if (activeCampus && !hasSearch && !hasCat) {
-                    if (msgEl)  msgEl.textContent  = 'No equipment available in this campus yet.';
+                    if (msgEl) msgEl.textContent = 'No equipment available in this campus yet.';
                     if (iconEl) iconEl.textContent = 'location_off';
                 } else {
-                    if (msgEl)  msgEl.textContent  = 'No equipment matches your search.';
+                    if (msgEl) msgEl.textContent = 'No equipment matches your search.';
                     if (iconEl) iconEl.textContent = 'search_off';
                 }
             }
@@ -652,6 +652,12 @@
     const NOTIF_CAT_LABELS = { overdue: 'overdue', borrow: 'borrow', room: 'room', system: 'system' };
 
     let notifCurrentPage = 1;
+    /* Phones list notifications as one scrollable feed (no pager). Cards are drawn
+       NOTIF_BATCH at a time and the next batch is added as you near the bottom, so the
+       page never builds more rows than you have actually scrolled to. */
+    const NOTIF_BATCH = 15;
+    let notifShown = NOTIF_BATCH;     // phones: how many cards of the current filter are drawn
+    function notifIsPhone() { return document.documentElement.classList.contains('rx-mobile'); }
     let notifActiveCat = 'all';
     let notifItems = (window.FNOTIF_DATA && Array.isArray(window.FNOTIF_DATA.notifications))
         ? window.FNOTIF_DATA.notifications.slice() : [];
@@ -1071,6 +1077,67 @@
         }
     }
 
+    /* Adds cards (with their Today / Yesterday / … section labels) to the list.
+       lastGroup is the group of the card already above, so a batch that continues
+       a section doesn't repeat its label. */
+    function appendNotifCards(list, items, lastGroup) {
+        items.forEach(n => {
+            if (n.group !== lastGroup) {
+                lastGroup = n.group;
+                const isOver = n.group === 'overdue';
+                const lab = nEl('div', 'notif-section-label' + (isOver ? ' notif-section-overdue' : ''));
+                if (isOver) lab.appendChild(nIcon('warning'));
+                lab.appendChild(document.createTextNode(NOTIF_GROUP_LABELS[n.group] || 'Earlier'));
+                list.appendChild(lab);
+            }
+            list.appendChild(buildNotifCard(n));
+        });
+    }
+
+    /* Small spinner row shown under the last drawn card while more are waiting. */
+    function buildNotifMore() {
+        const m = nEl('div', 'fnotif-more');
+        m.setAttribute('aria-hidden', 'true');
+        m.appendChild(nEl('span', 'fnotif-more-spin'));
+        return m;
+    }
+
+    /* Phones: draw the next batch under the cards already on screen (nothing is rebuilt,
+       so the scroll position never jumps). Returns false when everything is drawn. */
+    function loadMoreNotifs() {
+        const list = document.getElementById('notifList');
+        if (!list || !notifIsPhone()) return false;
+        const matches = getMatchingNotifs(notifActiveCat);
+        if (notifShown >= matches.length) return false;
+        const from = notifShown;
+        notifShown = Math.min(matches.length, notifShown + NOTIF_BATCH);
+        const more = list.querySelector('.fnotif-more');
+        if (more) more.remove();
+        appendNotifCards(list, matches.slice(from, notifShown), from > 0 ? matches[from - 1].group : null);
+        if (notifShown < matches.length) list.appendChild(buildNotifMore());
+        return true;
+    }
+
+    function notifNearEnd() {
+        const modal = document.getElementById('notifModal');
+        const sc = document.querySelector('#notifModal .fnotif-body');
+        // modal closed (or not laid out yet) → never pull more in the background
+        if (!modal || modal.style.display !== 'flex' || !sc || !sc.clientHeight) return false;
+        return sc.scrollHeight - sc.scrollTop - sc.clientHeight < 320;
+    }
+
+    let notifFillQueued = false;
+    function queueNotifFill() {
+        if (notifFillQueued) return;
+        notifFillQueued = true;
+        requestAnimationFrame(function () {
+            notifFillQueued = false;
+            // also covers a first batch that doesn't fill a tall screen
+            let guard = 0;
+            while (guard++ < 20 && notifNearEnd() && loadMoreNotifs()) { /* keep filling */ }
+        });
+    }
+
     function renderNotifPage() {
         const list = document.getElementById('notifList');
         if (!list) return;
@@ -1089,20 +1156,12 @@
             ? (document.activeElement.closest('.notif-card') || {}).dataset : null;
         const focusedKey = focusKey ? focusKey.key : null;
 
+        const phone = notifIsPhone();
         list.textContent = '';
         list.classList.toggle('is-selecting', notifSelectMode);
-        let lastGroup = null;
-        matches.slice(start, start + NOTIF_PER_PAGE).forEach(n => {
-            if (n.group !== lastGroup) {
-                lastGroup = n.group;
-                const isOver = n.group === 'overdue';
-                const lab = nEl('div', 'notif-section-label' + (isOver ? ' notif-section-overdue' : ''));
-                if (isOver) lab.appendChild(nIcon('warning'));
-                lab.appendChild(document.createTextNode(NOTIF_GROUP_LABELS[n.group] || 'Earlier'));
-                list.appendChild(lab);
-            }
-            list.appendChild(buildNotifCard(n));
-        });
+        const visible = phone ? matches.slice(0, notifShown) : matches.slice(start, start + NOTIF_PER_PAGE);
+        appendNotifCards(list, visible, null);
+        if (phone && matches.length > visible.length) list.appendChild(buildNotifMore());
 
         if (scroller) scroller.scrollTop = keepScroll;
         if (focusedKey) {
@@ -1111,7 +1170,13 @@
         }
 
         updateNotifChrome(matches);
-        renderNotifPager(total, totalPages, start);
+        if (phone) {
+            const pager = document.getElementById('notifPagination');
+            if (pager) pager.style.display = 'none';
+            queueNotifFill();
+        } else {
+            renderNotifPager(total, totalPages, start);
+        }
     }
 
     function goToNotifPage(page) {
@@ -1127,11 +1192,16 @@
         if (btn) btn.classList.add('active');
         notifActiveCat = cat;
         notifCurrentPage = 1;
+        notifShown = NOTIF_BATCH;
         // A selection / pending delete must never silently follow you to a different tab.
         notifSelected.clear();
         notifLastAnchor = null;
         notifPendingConfirm = null;
         renderNotifPage();
+        if (notifIsPhone()) {            // a new tab starts at its top
+            const sc = document.querySelector('#notifModal .fnotif-body');
+            if (sc) sc.scrollTop = 0;
+        }
     }
 
     /* ── Event wiring ─────────────────────────────────────────────── */
@@ -1146,6 +1216,9 @@
             goToNotifLink(n);
         }
     }
+
+    const notifScrollEl = document.querySelector('#notifModal .fnotif-body');
+    if (notifScrollEl) notifScrollEl.addEventListener('scroll', queueNotifFill, { passive: true });
 
     const notifListEl = document.getElementById('notifList');
     if (notifListEl) {
@@ -2509,27 +2582,27 @@
 
             // Hide featured cards that don't belong to the selected campus
             var featHero = document.querySelector('.feat-hero[data-campus]');
-            var featSec  = document.querySelector('.feat-secondary[data-campus]');
+            var featSec = document.querySelector('.feat-secondary[data-campus]');
             var featSection = document.getElementById('featuredSection');
             if (featSection) {
                 featSection.style.display = '';
                 if (featHero) featHero.style.display = '';
-                if (featSec)  featSec.style.display  = '';
+                if (featSec) featSec.style.display = '';
 
                 if (!campus) {
                     featSection.classList.remove('eq-campus-hidden');
                     if (featHero) featHero.classList.remove('eq-campus-hidden');
-                    if (featSec)  featSec.classList.remove('eq-campus-hidden');
+                    if (featSec) featSec.classList.remove('eq-campus-hidden');
                 } else {
                     var heroMatch = featHero && String(featHero.dataset.campus) === campus;
-                    var secMatch  = featSec  && String(featSec.dataset.campus)  === campus;
+                    var secMatch = featSec && String(featSec.dataset.campus) === campus;
                     if (featHero) featHero.classList.toggle('eq-campus-hidden', !heroMatch);
-                    if (featSec)  featSec.classList.toggle('eq-campus-hidden', !secMatch);
+                    if (featSec) featSec.classList.toggle('eq-campus-hidden', !secMatch);
                     featSection.classList.toggle('eq-campus-hidden', !heroMatch && !secMatch);
                 }
             }
 
-            const catEl  = document.getElementById('categoryFilter');
+            const catEl = document.getElementById('categoryFilter');
             if (catEl) {
                 catEl.value = ''; // reset selection when switching campus
                 Array.from(catEl.options).forEach(function (opt) {
@@ -3218,7 +3291,7 @@
     /* ── Return / Claim QR Modal ───────────────────────────────────────── */
     function _openReturnQrModal(equipment, url, modalTitle, modalDesc) {
         const title = modalTitle || 'Return QR';
-        const desc  = modalDesc  || 'Show this QR code to the admin when returning the equipment.';
+        const desc = modalDesc || 'Show this QR code to the admin when returning the equipment.';
         // Reuse or create the modal
         let modal = document.getElementById('returnQrModal');
         if (!modal) {
@@ -3279,10 +3352,10 @@
     function _updateFacultyStatCards(data) {
         const counts = {
             approved: data.filter(r => r.status === 'Approved').length,
-            on_loan:  data.filter(r => r.status === 'On Loan').length,
-            overdue:  data.filter(r => r.status === 'Overdue').length,
-            waiting:  data.filter(r => r.status === 'Waiting').length,
-            total:    data.length,
+            on_loan: data.filter(r => r.status === 'On Loan').length,
+            overdue: data.filter(r => r.status === 'Overdue').length,
+            waiting: data.filter(r => r.status === 'Waiting').length,
+            total: data.length,
         };
         // .fdb-kpi = the Dashboard key-figure cards; .stat-tile = the older tiles (kept working)
         document.querySelectorAll('.fdb-kpi[data-stat], .stat-tile[data-stat]').forEach(tile => {
