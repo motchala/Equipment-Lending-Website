@@ -2409,3 +2409,84 @@ html.rx-mobile #panel-lending .eq-cart-bar-submit {
     background: var(--rxm-on-primary);
     color: var(--rxm-primary);
 }
+
+/* ---------------------------------------------------------------
+   PULL-TO-REFRESH indicator (built by faculty-dashboard-mobile.js)
+   Native pull-to-refresh can't run here (the shell scrolls inside
+   #appMain and overscroll-behavior is locked), so this draws our own.
+---------------------------------------------------------------- */
+.rxm-ptr {
+    display: none;
+}
+
+html.rx-mobile .rxm-ptr {
+    display: flex;
+    justify-content: center;
+    position: fixed;
+    top: calc(var(--rxm-bar-h) + var(--rxm-st));
+    left: 0;
+    right: 0;
+    z-index: 204;
+    /* just under the app bar (205) */
+    height: 0;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(calc(var(--rxm-ptr-pull, 0px) - 52px));
+    transition: transform .25s cubic-bezier(.2, .8, .2, 1), opacity .2s, visibility 0s .25s;
+}
+
+html.rx-mobile .rxm-ptr.is-pulling,
+html.rx-mobile .rxm-ptr.is-refreshing {
+    visibility: visible;
+    opacity: var(--rxm-ptr-p, 0);
+    transition: none;
+}
+
+html.rx-mobile .rxm-ptr.is-refreshing {
+    opacity: 1;
+    transition: transform .2s ease-out;
+}
+
+html.rx-mobile .rxm-ptr-disc {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--rxm-primary);
+    color: var(--rxm-on-primary);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, .22);
+    transform: scale(calc(.6 + .4 * var(--rxm-ptr-p, 0)));
+}
+
+html.rx-mobile .rxm-ptr-disc .material-symbols-outlined {
+    font-size: 22px;
+    transform: rotate(var(--rxm-ptr-rot, 0deg));
+}
+
+html.rx-mobile .rxm-ptr.is-ready .rxm-ptr-disc {
+    transform: scale(1.08);
+}
+
+html.rx-mobile .rxm-ptr.is-refreshing .rxm-ptr-disc .material-symbols-outlined {
+    animation: rxm-ptr-spin .8s linear infinite;
+}
+
+@keyframes rxm-ptr-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    html.rx-mobile .rxm-ptr,
+    html.rx-mobile .rxm-ptr-disc {
+        transition: none;
+    }
+
+    html.rx-mobile .rxm-ptr.is-refreshing .rxm-ptr-disc .material-symbols-outlined {
+        animation: none;
+    }
+}
