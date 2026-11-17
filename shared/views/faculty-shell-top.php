@@ -3,32 +3,14 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#800000">
-    <!-- Phone detection. Runs BEFORE first paint so a phone never flashes the desktop layout.
-         Sets class "rx-mobile" on <html> when the device is a phone (or the window is <= 600px wide).
-         Tablets/desktops do not get it and keep the responsive layout. -->
-    <script nonce="<?php echo $csp_nonce; ?>">
-        (function() {
-            var d = document.documentElement;
-
-            function phoneUA() {
-                var u = navigator.userAgentData;
-                if (u && typeof u.mobile === "boolean") return u.mobile;
-                return /iPhone|iPod|Android.+Mobile|Windows Phone|IEMobile|BlackBerry|Opera Mini|Mobile.+Firefox/i.test(navigator.userAgent || "");
-            }
-
-            function apply() {
-                var narrow = (window.innerWidth || 0) <= 600;
-                var shortSide = Math.min(screen.width || 9999, screen.height || 9999);
-                var phone = phoneUA() && shortSide <= 540; // phones stay in phone mode in landscape too
-                d.classList.toggle("rx-mobile", narrow || phone);
-            }
-            apply();
-            window.addEventListener("resize", apply);
-            window.addEventListener("orientationchange", apply);
-        })();
-    </script>
+    <!-- Phone detection. Runs BEFORE first paint so a phone never flashes the responsive layout.
+         Sets class "rx-mobile" on <html> when the device is a phone (phone-sized touch screen) or the window
+         is <= 600px wide. Tablets/desktops do not get it and keep the responsive layout.
+         External file on purpose (not inline): it judges the real screen size, not only window.innerWidth,
+         which real phones can report wider than the screen. Add ?rxdebug=1 to the URL to see what it reads. -->
+    <script src="dashboard/assets/js/faculty-phone-detect.js?v=<?php echo @filemtime(PS_ROOT . '/dashboard/assets/js/faculty-phone-detect.js'); ?>"></script>
     <!-- Refresh behaviour (faculty interface). Same rules as the admin interface:
          - Soft refresh (F5 / reload button): stay on the screen you are on.
          - Hard refresh (Ctrl+Shift+R / Ctrl+F5): back to the Dashboard.
