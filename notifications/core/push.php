@@ -310,11 +310,12 @@ if (!function_exists('ps_push_encrypt')) {
             $receiverPub   = ps_base64url_decode($p256dhB64);
 
             // Generate a sender (ephemeral) EC key pair
-            $senderKey = openssl_pkey_new([
-                'curve_name'       => 'prime256v1',
-                'private_key_type' => OPENSSL_KEYTYPE_EC,
-                'config'           => defined('OPENSSL_CNF') ? OPENSSL_CNF : '',
-            ]);
+            $keyConfig = ['curve_name' => 'prime256v1', 'private_key_type' => OPENSSL_KEYTYPE_EC];
+            if (defined('OPENSSL_CNF') && OPENSSL_CNF !== '') {
+                $keyConfig['config'] = OPENSSL_CNF;
+            }
+            while (openssl_error_string() !== false) {}
+            $senderKey = openssl_pkey_new($keyConfig);
             if (!$senderKey) return null;
 
             $senderDetails  = openssl_pkey_get_details($senderKey);
