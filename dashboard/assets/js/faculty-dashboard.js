@@ -4719,14 +4719,20 @@
             }, 120);
         });
 
-        /* Paging */
-        btnPrev.addEventListener('click', function () { state.page--; apply(); });
-        btnNext.addEventListener('click', function () { state.page++; apply(); });
+        /* Paging — after a page change the card is brought back into view (like Equipment does),
+           otherwise a tap on the page buttons at the bottom would leave you at the end of the next page */
+        function showHistoryTop() {
+            var card = $('factHistory');
+            if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        btnPrev.addEventListener('click', function () { state.page--; apply(); showHistoryTop(); });
+        btnNext.addEventListener('click', function () { state.page++; apply(); showHistoryTop(); });
         pagerNums.addEventListener('click', function (e) {
             var b = e.target.closest('[data-page]');
             if (!b) return;
             state.page = parseInt(b.dataset.page, 10) || 1;
             apply();
+            showHistoryTop();
         });
 
         /* ── 2. Equipment / Room cards: 5 rows per page ─────────────
