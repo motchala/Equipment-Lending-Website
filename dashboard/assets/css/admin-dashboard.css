@@ -13931,6 +13931,7 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
 #rr-wipe-btn {
     white-space: nowrap;
 }
+
 #eq-loan-wipe-btn {
     white-space: nowrap;
 }
@@ -14002,9 +14003,24 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
 }
 
 /* ── Loan table: streamlined cell helpers ── */
-.eq-cell-name { font-weight: 600; line-height: 1.3; }
-.eq-cell-sub { font-size: 11px; color: var(--text-light); margin-top: 2px; line-height: 1.3; }
-.eq-act-wrap { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.eq-cell-name {
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.eq-cell-sub {
+    font-size: 11px;
+    color: var(--text-light);
+    margin-top: 2px;
+    line-height: 1.3;
+}
+
+.eq-act-wrap {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+}
 
 /* ── Loans table: scheduled-section divider row ──────────────────────────
    Spans the full row width and visually separates "Pending review" rows
@@ -14074,6 +14090,26 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     font-size: 19px;
 }
 
+/* Generate sits on its own line under the password field and looks like the
+   "Look up in Faculty Registry" button (the .fac-lookup-btn rule above); only the spacing differs */
+.faculty-form-card .fac-lookup-btn.fac-gen-regen {
+    margin: 8px 0 0;
+}
+
+/* nothing to copy yet */
+.fac-gen-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* an empty field shows its placeholder in normal text, not the monospace password style */
+.fac-gen-row .fac-gen-input:placeholder-shown {
+    font-family: inherit;
+    font-weight: 400;
+    letter-spacing: normal;
+}
+
 .fac-gen-btn:hover {
     border-color: var(--accent-maroon);
     background: var(--accent-light);
@@ -14120,8 +14156,13 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
 }
 
 @keyframes fac-gen-flash-anim {
-    0%   { background-color: var(--accent-light, #fce8ec); }
-    100% { background-color: transparent; }
+    0% {
+        background-color: var(--accent-light, #fce8ec);
+    }
+
+    100% {
+        background-color: transparent;
+    }
 }
 
 /* Brief highlight on the generated password input after a regen */
@@ -14257,7 +14298,7 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     gap: 0.55rem;
 }
 
-.ps-reason-picker > .ps-form-label {
+.ps-reason-picker>.ps-form-label {
     margin-bottom: 0;
 }
 

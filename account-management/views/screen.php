@@ -117,17 +117,18 @@
                             <input type="text" id="fac-password" name="password"
                                 class="form-control-custom fac-gen-input" readonly aria-readonly="true"
                                 autocomplete="off" spellcheck="false" aria-describedby="fac-gen-hint"
-                                placeholder="Generating&hellip;">
+                                placeholder="Tap Generate to create a password">
                             <button type="button" class="fac-gen-btn fac-gen-copy" id="fac-pw-copy"
-                                title="Copy password" aria-label="Copy password">
+                                title="Copy password" aria-label="Copy password" disabled>
                                 <span class="material-symbols-outlined" aria-hidden="true">content_copy</span>
                             </button>
-                            <button type="button" class="fac-gen-btn" id="fac-pw-regen"
-                                title="Generate a different password" aria-label="Generate a different password">
-                                <span class="material-symbols-outlined" aria-hidden="true">autorenew</span>
-                            </button>
                         </div>
-                        <small class="fac-gen-hint" id="fac-gen-hint" aria-live="polite">Copy it before you create the account. It is shown once more on the confirmation, and never again.</small>
+                        <button type="button" class="ps-btn ps-btn--outline fac-lookup-btn fac-gen-regen" id="fac-pw-regen"
+                            title="Generate a password" aria-label="Generate a password">
+                            <span class="material-symbols-outlined" aria-hidden="true">autorenew</span>
+                            <span class="fac-gen-btn-text" id="fac-pw-regen-text">Generate</span>
+                        </button>
+                        <small class="fac-gen-hint" id="fac-gen-hint" aria-live="polite">Copy it before creating the account.</small>
                     </div>
 
                     <div id="fac-form-alert" class="alert-banner hidden" role="alert"></div>
