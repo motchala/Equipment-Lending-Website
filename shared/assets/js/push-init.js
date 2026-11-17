@@ -105,13 +105,13 @@
                     return;
                 }
                 console.log('[PUPSync push] No existing subscription, fetching VAPID key.');
-                fetch('notifications/api/push-vapid-key.php', {
+                return fetch('notifications/api/push-vapid-key.php', {
                     credentials: 'same-origin'
                 }).then(function (r) {
                     return r.json();
                 }).then(function (data) {
                     console.log('[PUPSync push] VAPID key received:', data.key ? 'yes' : 'NO KEY');
-                    if (!data.key) return;
+                    if (!data.key) return Promise.reject('No VAPID key');
                     return reg.pushManager.subscribe({
                         userVisibleOnly: true,
                         applicationServerKey: urlBase64ToUint8Array(data.key)
@@ -122,7 +122,17 @@
                         saveSubscription(sub);
                     }
                 }).catch(function (e) {
-                    console.error('[PUPSync push] Subscribe error:', e);
+                    // If subscribe fails (e.g. another tab already holds the subscription),
+                    // try to get the existing one and save it
+                    console.warn('[PUPSync push] Subscribe error, checking for existing sub:', e.message || e);
+                    return reg.pushManager.getSubscription().then(function (sub) {
+                        if (sub) {
+                            console.log('[PUPSync push] Recovered existing subscription, saving.');
+                            saveSubscription(sub);
+                        } else {
+                            console.error('[PUPSync push] No subscription available:', e);
+                        }
+                    });
                 });
             });
         }).catch(function (e) {
