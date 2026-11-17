@@ -2086,6 +2086,30 @@ select.st-input option:disabled {
     white-space: nowrap;
 }
 
+.st-req-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: -4px 0 12px;
+    font-size: .82rem;
+    font-weight: 600;
+    color: var(--st-ok);
+}
+
+.st-req-status.is-wait {
+    color: var(--st-warn);
+}
+
+.st-req-status .material-symbols-outlined {
+    font-size: 18px;
+}
+
+.st-req-note {
+    margin: -6px 0 12px;
+    font-size: .8rem;
+    color: var(--st-muted);
+}
+
 .st-qrs {
     display: grid;
     grid-template-columns: 1fr 1fr;

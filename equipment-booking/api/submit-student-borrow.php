@@ -169,6 +169,19 @@ if ($letter_path !== null) {
 require_once __DIR__ . '/../core/request-decision.php';
 $decision   = equipment_decide_on_submit($conn, [(int)$request_id])[(int)$request_id] ?? ['status' => 'Waiting', 'reason' => ''];
 $req_status = $decision['status'];
+
+// A request refused on the spot is not saved (ArbitrationEngine::discardIfDeclined removed the row), so there is
+// nothing for an admin to see. Say so as an error — never as a success — and keep the faculty code unused so the
+// student can fix the problem (pick another time or room, fewer units) and submit again.
+if ($req_status === 'Declined') {
+    $conn->close();
+    echo json_encode([
+        'error'    => $decision['reason'] !== '' ? $decision['reason'] : 'This request could not be accepted.',
+        'declined' => true,
+    ]);
+    exit();
+}
+
 $tokens     = $req_status === 'Approved'
     ? equipment_request_tokens($conn, (int)$request_id)
     : ['claim_token' => null, 'return_token' => null];

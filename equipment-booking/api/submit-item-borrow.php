@@ -145,6 +145,17 @@ try {
     $request_id = (int)$conn->insert_id;
     $ins->close();
 
+    // Remember the current code: if this request is refused on the spot (nothing is saved for the admin), the
+    // student gets the same code back instead of losing it.
+    $old_code = '';
+    $oc = $conn->prepare("SELECT code FROM tbl_faculty_item_codes WHERE id = ? LIMIT 1");
+    if ($oc) {
+        $oc->bind_param('i', $code_db_id);
+        $oc->execute();
+        $old_code = (string)($oc->get_result()->fetch_assoc()['code'] ?? '');
+        $oc->close();
+    }
+
     // Mark code as used
     $mark = $conn->prepare(
         "UPDATE tbl_faculty_item_codes
@@ -176,6 +187,28 @@ try {
     // After the commit on purpose: the rules engine opens its own transaction.
     require_once __DIR__ . '/../core/request-decision.php';
     $decision = equipment_decide_on_submit($conn, [$request_id])[$request_id] ?? ['status' => 'Waiting', 'reason' => ''];
+
+    // Refused on the spot: the row was removed, so nothing reaches the admin. Report it as an error (not a
+    // success) and hand the student's code back so they can try again with a different time, room or quantity.
+    if ($decision['status'] === 'Declined') {
+        if ($old_code !== '') {
+            $back = $conn->prepare(
+                "UPDATE tbl_faculty_item_codes
+                    SET code = ?, is_used = 0, used_by_name = NULL, used_by_id = NULL, used_at = NULL
+                  WHERE id = ?"
+            );
+            if ($back) {
+                $back->bind_param('si', $old_code, $code_db_id);
+                $back->execute();
+                $back->close();
+            }
+        }
+        echo json_encode([
+            'error'    => $decision['reason'] !== '' ? $decision['reason'] : 'This request could not be accepted.',
+            'declined' => true,
+        ]);
+        exit;
+    }
     $tokens   = $decision['status'] === 'Approved'
         ? equipment_request_tokens($conn, $request_id)
         : ['claim_token' => null, 'return_token' => null];

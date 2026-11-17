@@ -769,6 +769,9 @@
                 duration: duration,
                 is_last_item: last
             }, letter.file).then(function (d) {
+                /* The server can answer success:true with status "Declined" (the request was refused on the spot and
+                   NOT saved). That must never look like a submitted request, or the admin never sees it. */
+                if (!d.error && d.status === 'Declined') d = { error: d.reason || 'This request could not be accepted.' };
                 if (d.error) {
                     setBusy(btn, false);
                     updateSummary();
@@ -784,6 +787,7 @@
                 }
                 st.done.push({
                     equipment: cur.name, qty: cur.qty, request_id: d.request_id,
+                    status: d.status || 'Waiting', reason: d.reason || '',
                     claim_token: d.claim_token || '', return_token: d.return_token || ''
                 });
                 st.where = { room: room, roomId: roomId, borrow: borrow, startTime: startTime, duration: duration, ret: ret };
@@ -893,6 +897,7 @@
             start_time: startTime,
             duration: duration
         }).then(function (d) {
+            if (!d.error && d.status === 'Declined') d = { error: d.reason || 'This request could not be accepted.' };
             if (d.error) { setBusy(btn, false); return showAlert('flowError', d.error); }
             var receipt = {
                 kind: 'borrow',
@@ -900,6 +905,7 @@
                 room: room, borrow_date: borrow, return_date: returnDate,
                 items: [{
                     equipment: v.item_name, qty: qty, request_id: d.request_id,
+                    status: d.status || 'Waiting', reason: d.reason || '',
                     claim_token: d.claim_token || '', return_token: d.return_token || ''
                 }]
             };
@@ -1581,6 +1587,9 @@
         if (!r) { banner.hidden = true; return; }
         st.receipt = r;
         var names = r.items.map(function (i) { return (i.qty > 1 ? i.qty + '× ' : '') + i.equipment; }).join(', ');
+        var bt = $('receiptBanner').querySelector('strong');
+        if (bt) bt.textContent = r.items.every(function (i) { return itemStatus(i) !== 'Approved'; })
+            ? 'Your borrow request is pending admin review' : 'You have an active borrow request';
         $('receiptBannerSub').textContent = names + ' · Return by ' + fmtWhen(r.return_date);
         banner.hidden = false;
     }
@@ -1596,10 +1605,19 @@
     function claimUrl(token) { return new URL('equipment-booking/claim_confirm.php?token=' + encodeURIComponent(token), window.location.href).href; }
     function returnUrl(token) { return new URL('equipment-booking/return_confirm.php?token=' + encodeURIComponent(token), window.location.href).href; }
 
+    /* The real outcome of one request. Receipts saved before status was recorded: a QR means it was approved. */
+    function itemStatus(it) {
+        return it.status || (it.claim_token ? 'Approved' : 'Waiting');
+    }
+
     function showReceipt(r) {
         nav = { screen: 'receipt', r: r };
         var many = r.items.length > 1;
+        var nApproved = r.items.filter(function (it) { return itemStatus(it) === 'Approved'; }).length;
+        var allApproved = nApproved === r.items.length;
+        var noneApproved = nApproved === 0;
         var reqs = r.items.map(function (it) {
+            var ok = itemStatus(it) === 'Approved';
             var qrs = '';
             if (it.claim_token) {
                 qrs += '<div class="st-qr-box"><p class="st-qr-title">Claim QR<span>Show this to pick it up</span></p>' +
@@ -1612,15 +1630,31 @@
             return '<div class="st-card st-req"><div class="st-req-head"><span class="st-req-name">' +
                 (it.qty > 1 ? esc(it.qty) + '× ' : '') + esc(it.equipment) + '</span>' +
                 '<span class="st-req-id">Request #' + esc(String(it.request_id)) + '</span></div>' +
+                '<p class="st-req-status' + (ok ? '' : ' is-wait') + '">' + icon(ok ? 'check_circle' : 'hourglass_top') +
+                (ok ? 'Approved' : 'Waiting for admin review') + '</p>' +
+                (!ok && it.reason ? '<p class="st-req-note">' + esc(it.reason) + '</p>' : '') +
                 (qrs ? '<div class="st-qrs">' + qrs + '</div>' : '') + '</div>';
         }).join('');
 
+        var title, lead;
+        if (allApproved) {
+            title = many ? 'Requests approved' : 'Request approved';
+            lead = (many ? plural(r.items.length, 'item') + ' approved via faculty authorization.' : 'Approved via faculty authorization.') +
+                ' Show the QR codes below to the admin.';
+        } else if (noneApproved) {
+            title = 'Request sent — pending admin review';
+            lead = 'An admin will approve or decline ' + (many ? 'these requests' : 'this request') +
+                '. Check with your faculty or the admin office for the decision.';
+        } else {
+            title = 'Requests sent';
+            lead = nApproved + ' of ' + r.items.length + ' approved (show their QR codes to the admin). The rest are waiting for an admin to review.';
+        }
+
         flow(
             '<div class="st-result"><div class="st-result-top">' +
-            '<span class="st-result-icon">' + icon('check_circle') + '</span>' +
-            '<h2 class="st-h2">' + (many ? 'Requests approved' : 'Request approved') + '</h2>' +
-            '<p>' + (many ? plural(r.items.length, 'item') + ' approved via faculty authorization.' : 'Approved via faculty authorization.') +
-            ' Show the QR codes below to the admin.</p></div>' +
+            '<span class="st-result-icon' + (allApproved ? '' : ' is-wait') + '">' + icon(allApproved ? 'check_circle' : 'hourglass_top') + '</span>' +
+            '<h2 class="st-h2">' + esc(title) + '</h2>' +
+            '<p>' + esc(lead) + '</p></div>' +
             '<div class="st-card"><dl class="st-summary">' +
             row('Student', r.student_name + (r.student_id ? ' · ' + r.student_id : '')) +
             row('Authorized by', r.faculty_name) +
