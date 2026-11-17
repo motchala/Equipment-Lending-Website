@@ -66,5 +66,16 @@ function getDB(): mysqli
     // Always use UTF-8 to match the database charset.
     $conn->set_charset('utf8mb4');
 
+    // Put the database clock on the same time as PHP (Asia/Manila = UTC+08:00, no daylight saving).
+    // Without this, MySQL's NOW() / CURDATE() follow the DATABASE SERVER's own time zone, which on shared
+    // hosting (e.g. InfinityFree) is not Manila. request_date is stored with NOW() but compared with PHP
+    // Manila times (deadline checks), so the two clocks must agree. XAMPP already matches, which is why it
+    // only broke on the deployed site. A fixed offset needs no time-zone tables on the server.
+    try {
+        $conn->query("SET time_zone = '+08:00'");
+    } catch (Throwable $e) {
+        error_log('[PUPSync] Could not set the database time zone: ' . $e->getMessage());
+    }
+
     return $conn;
 }
