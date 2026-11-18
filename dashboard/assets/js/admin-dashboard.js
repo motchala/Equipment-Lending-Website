@@ -4979,6 +4979,66 @@
             scannedCount = 0;
         }
 
+        /* The camera is switched OFF as soon as a scan succeeds (the request's status is shown instead) and is
+           only switched back on when the admin chooses to scan another QR. */
+        function closeCamera() {
+            scanning = false;
+            if (animFrame) { cancelAnimationFrame(animFrame); animFrame = null; }
+            if (stream) stream.getTracks().forEach(t => t.stop());
+            stream = null;
+            try { video.pause(); } catch (e) { }
+            video.srcObject = null;
+        }
+
+        function resumeCamera() {
+            if (stream) { scanning = true; tick(); return; }
+            status.textContent = 'Starting camera...';
+            status.style.color = '#888';
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                status.textContent = '❌ Camera not available. Close the scanner and open it again.';
+                status.style.color = '#e53e3e';
+                return;
+            }
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+                .then(s => {
+                    if (modal.style.display === 'none') { s.getTracks().forEach(t => t.stop()); return; }   // closed meanwhile
+                    stream = s;
+                    video.srcObject = s;
+                    video.play();
+                    scanning = true;
+                    status.textContent = 'Point camera at the next QR code.';
+                    status.style.color = '#888';
+                    tick();
+                })
+                .catch(err => {
+                    status.textContent = '❌ Camera access denied. Please allow camera permission.';
+                    status.style.color = '#e53e3e';
+                    console.warn('Camera error:', err);
+                });
+        }
+
+        /* One line telling the admin where the scanned request stands */
+        function statusBannerHtml(items) {
+            const count = function (st) { return items.filter(function (i) { return i.status === st; }).length; };
+            const kinds = [
+                ['Overdue', 'overdue', 'Overdue', '#fdecea', '#b3261e'],
+                ['On Loan', 'on loan', 'On loan', '#e8f5e9', '#2e7d32'],
+                ['Waiting', 'waiting', 'Waiting for approval', '#fff3cd', '#856404'],
+                ['Approved', 'approved', 'Approved — ready for pick-up', '#e8f5e9', '#2e7d32']
+            ].filter(function (k) { return count(k[0]) > 0; });
+            if (!kinds.length) return '';
+            let label, bg, fg;
+            if (kinds.length === 1) {
+                label = kinds[0][2]; bg = kinds[0][3]; fg = kinds[0][4];
+            } else {
+                label = kinds.map(function (k) { return count(k[0]) + ' ' + k[1]; }).join(' · ');
+                bg = kinds[0][3]; fg = kinds[0][4];
+            }
+            return '<div style="display:flex;align-items:center;gap:.5rem;padding:.6rem 1rem;background:' + bg + ';color:' + fg +
+                ';font-size:.85rem;font-weight:600;border-bottom:1px solid rgba(0,0,0,.06);">' +
+                '<span style="font-weight:500;opacity:.8;">Request status:</span> ' + label + '</div>';
+        }
+
         function processFrame(canvas, ctx) {
             if (!scanning) return;
             if (video.readyState === video.HAVE_ENOUGH_DATA) {
@@ -5044,10 +5104,10 @@
                         document.getElementById('qrCameraView').style.display = '';
                         document.getElementById('qrScannerTitle').textContent = 'Scan QR Code';
                         document.getElementById('qrScannerSubtitle').textContent = 'Point the camera at the faculty member\'s QR code.';
+                        document.getElementById('qrChecklistCancel').textContent = 'Back';
                         status.textContent = 'Point camera at the next QR code.';
                         status.style.color = '#888';
-                        scanning = true;
-                        tick();
+                        resumeCamera();
                     }
 
                     /* STEP 1 of a Claim QR: show WHAT was requested (who, which items, how many, state) before
@@ -5073,7 +5133,8 @@
                         const meta = (data.room ? '<div><b>Room:</b> ' + scanEsc(data.room) + '</div>' : '') +
                             (data.borrow_start ? '<div><b>Borrow:</b> ' + scanEsc(data.borrow_start) + (data.return_by ? ' → ' + scanEsc(data.return_by) : '') + '</div>' : '');
 
-                        itemsEl.innerHTML = '<div style="padding:.75rem 1rem;background:#faf7f7;border-bottom:1px solid #efe6e6;font-size:.84rem;line-height:1.6;color:#444;">' + who + meta + '</div>';
+                        cancelBtn.textContent = 'Back';
+                        itemsEl.innerHTML = statusBannerHtml(data.items) + '<div style="padding:.75rem 1rem;background:#faf7f7;border-bottom:1px solid #efe6e6;font-size:.84rem;line-height:1.6;color:#444;">' + who + meta + '</div>';
                         data.items.forEach(function (item, idx) {
                             const ok = item.status === 'Approved';
                             const row = document.createElement('div');
@@ -5136,6 +5197,7 @@
                     }
 
                     function handleScanData(data, skipSummary) {
+                            if (data && data.success) closeCamera();   // valid QR: the camera is no longer needed
                             if (isClaimQr && data.success && data.checklist && Array.isArray(data.items)) {
                                 if (!skipSummary) { showClaimSummary(data); return; }
                                 // Handover only covers items an admin has approved.
@@ -5164,8 +5226,10 @@
                                     ? 'Hand over to ' + (data.collector || data.borrower)
                                     : 'Return from ' + data.borrower;
 
-                                // Build item rows
+                                // Build item rows (the request's status first)
+                                cancelBtn.textContent = 'Back';
                                 itemsEl.innerHTML = '';
+                                itemsEl.insertAdjacentHTML('beforeend', statusBannerHtml(data.items));
                                 const CONDITIONS = ['Good', 'Fair', 'Damaged', 'Missing'];
                                 data.items.forEach(function (item, idx) {
                                     const bg = idx % 2 === 0 ? '#fff' : '#fafafa';
@@ -5328,7 +5392,10 @@
                                                 const msg = (result.claimed || 0) + ' item(s) handed over' +
                                                     (result.withheld > 0 ? ', ' + result.withheld + ' unit(s) withheld.' : '.');
                                                 showToast('✅ ' + msg);
-                                                resetToCamera();
+                                                showResult('Handover complete', (result.claimed || 0) > 0 ? 'On loan' : 'No items handed over',
+                                                    (result.claimed || 0) > 0 ? '#2e7d32' : '#856404',
+                                                    (result.claimed || 0) + (result.claimed === 1 ? ' item' : ' items') + ' handed over to ' + (data.collector || data.borrower) +
+                                                    (result.withheld > 0 ? ' · ' + result.withheld + ' unit(s) withheld.' : '.'));
                                                 if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
                                             }).catch(function () {
                                                 showToast('Network error. Please try again.');
@@ -5338,6 +5405,7 @@
 
                                     } else {
                                         // Only process items whose checkbox is ticked
+                                        const rowsTotal = itemsEl.querySelectorAll('input[type="checkbox"][data-req-id]').length;
                                         itemsEl.querySelectorAll('input[type="checkbox"]:checked[data-req-id]').forEach(function (cb) {
                                             const rid = cb.dataset.reqId;
                                             const sel = itemsEl.querySelector('select[data-req-id="' + rid + '"]');
@@ -5354,7 +5422,11 @@
                                             .then(function (result) {
                                                 const n = result.returned || 0;
                                                 showToast('✅ ' + n + ' item' + (n === 1 ? '' : 's') + ' marked as returned.');
-                                                resetToCamera();
+                                                const stillOut = Math.max(0, rowsTotal - n);
+                                                showResult(n > 0 ? 'Return recorded' : 'Nothing was returned', n > 0 ? 'Returned' : 'Still on loan',
+                                                    n > 0 ? '#2e7d32' : '#856404',
+                                                    n + (n === 1 ? ' item' : ' items') + ' marked as returned' +
+                                                    (stillOut > 0 ? ' · ' + stillOut + ' still on loan.' : '.'));
                                                 if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
                                             }).catch(function () {
                                                 showToast('Network error. Please try again.');
@@ -5374,10 +5446,27 @@
                                     cameraView.style.display = '';
                                     titleEl.textContent = 'Scan QR Code';
                                     subtitleEl.textContent = 'Point the camera at the faculty member\'s QR code.';
+                                    cancelBtn.textContent = 'Back';
                                     status.textContent = 'Point camera at the next QR code.';
                                     status.style.color = '#888';
-                                    scanning = true;
-                                    tick();
+                                    resumeCamera();
+                                }
+
+                                /* After the handover / return is saved: show the request's new status (camera stays off) */
+                                function showResult(title, statusLabel, color, detail) {
+                                    titleEl.textContent = 'Request Status';
+                                    subtitleEl.textContent = title;
+                                    itemsEl.innerHTML =
+                                        '<div style="padding:1.5rem 1rem;text-align:center;">' +
+                                        '<div style="font-size:.78rem;color:#888;margin-bottom:.35rem;">Request status</div>' +
+                                        '<div style="display:inline-block;padding:.4rem 1.1rem;border-radius:999px;font-weight:700;font-size:1rem;background:#f5f5f5;color:' + color + ';">' + statusLabel + '</div>' +
+                                        '<p style="margin:.85rem 0 0;font-size:.88rem;color:#555;">' + scanEsc(detail) + '</p></div>';
+                                    hintEl.textContent = '';
+                                    confirmBtn.disabled = false;
+                                    confirmBtn.textContent = 'Scan Another';
+                                    confirmBtn.onclick = resetToCamera;
+                                    cancelBtn.textContent = 'Close';
+                                    cancelBtn.onclick = stopScanner;
                                 }
 
                             } else if (data.success) {
@@ -5390,8 +5479,7 @@
                                         ? `Point camera at the next QR code. (${scannedCount} confirmed this session)`
                                         : 'Point camera at the next QR code.';
                                     status.style.color = '#888';
-                                    scanning = true;
-                                    tick();
+                                    resumeCamera();
                                 }, 1500);
                             } else {
                                 status.textContent = '❌ ' + (data.message || 'Invalid or already-used QR token.');
@@ -5438,6 +5526,11 @@
             status.textContent = 'Initializing camera...';
             status.style.color = '#888';
             scanning = false;
+            // start on the camera, not on the details of a previous scan
+            document.getElementById('qrChecklistView').style.display = 'none';
+            document.getElementById('qrCameraView').style.display = '';
+            document.getElementById('qrScannerTitle').textContent = 'Scan QR Code';
+            document.getElementById('qrScannerSubtitle').textContent = 'Point camera at a Claim QR or Return QR.';
 
             // Load jsQR once
             function beginScan() {
