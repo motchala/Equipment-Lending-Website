@@ -30,13 +30,14 @@ $success = false;
 $is_ajax = (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest');
 
 $ret_row = null;
+$return_error = '';   // set when a real token is refused because the item is not on loan yet
 
 if ($token) {
     $stmt = $conn->prepare(
         "SELECT id, faculty_id, faculty_name, equipment_name, status,
                 return_token, borrow_qty, stock_applied, batch_id
            FROM tbl_requests
-          WHERE return_token = ? AND status IN ('Approved','On Loan','Overdue')
+          WHERE return_token = ? AND status IN ('On Loan','Overdue')
           LIMIT 1"
     );
     if ($stmt) {
@@ -46,10 +47,27 @@ if ($token) {
         $stmt->close();
     }
 
+    // The Return QR is handed out together with the Claim QR, but it only works while the item is actually
+    // out (On Loan / Overdue). If the token is real but the item is not out yet, say why instead of "invalid".
+    if (!$ret_row) {
+        $why = $conn->prepare("SELECT status FROM tbl_requests WHERE return_token = ? LIMIT 1");
+        if ($why) {
+            $why->bind_param('s', $token);
+            $why->execute();
+            $why_status = (string)($why->get_result()->fetch_assoc()['status'] ?? '');
+            $why->close();
+            if ($why_status === 'Approved') {
+                $return_error = 'This item has not been claimed yet. The Return QR only works once the item is on loan - scan its Claim QR first.';
+            } elseif ($why_status === 'Waiting') {
+                $return_error = 'This request is still waiting for admin approval, so there is nothing to return yet.';
+            }
+        }
+    }
+
     // AJAX from QR scanner: return checklist data instead of auto-confirming
     if ($is_ajax) {
         if (!$ret_row) {
-            echo json_encode(['success' => false, 'message' => 'Invalid or already-used QR token.']);
+            echo json_encode(['success' => false, 'message' => $return_error !== '' ? $return_error : 'Invalid or already-used QR token.']);
             exit();
         }
 
@@ -170,7 +188,7 @@ if ($is_ajax) {
     <div class="card" style="max-width:520px;text-align:left;">
         <?php if (!$ret_row): ?>
             <h2 style="color:#b71c1c;text-align:center;">Error</h2>
-            <p style="text-align:center;color:#555;">Invalid or already-used return token.</p>
+            <p style="text-align:center;color:#555;"><?php echo htmlspecialchars($return_error !== '' ? $return_error : 'Invalid or already-used return token.'); ?></p>
             <div style="text-align:center;"><a href="../admin-dashboard.php">Back to Dashboard</a></div>
         <?php else: ?>
             <div style="margin-bottom:1.25rem;">

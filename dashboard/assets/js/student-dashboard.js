@@ -823,6 +823,7 @@
             kind: 'borrow',
             student_name: v.student_name, student_id: v.student_id, faculty_name: v.faculty_name,
             room: room, borrow_date: borrow, return_date: ret,
+            requested_at: nowStamp(),
             items: st.done.slice()
         };
         st.verified = null; st.vKey = '';
@@ -919,6 +920,7 @@
                 kind: 'borrow',
                 student_name: v.student_name, student_id: v.student_id, faculty_name: v.faculty_name,
                 room: room, borrow_date: borrow, return_date: returnDate,
+                requested_at: nowStamp(),
                 items: [{
                     equipment: v.item_name, qty: qty, request_id: d.request_id,
                     status: d.status || 'Waiting', reason: d.reason || '',
@@ -1572,6 +1574,11 @@
 
     function row(k, v) { return '<div><dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd></div>'; }
 
+    /* When the request was sent, as Philippine time, e.g. "2026-11-18 15:05" (shown with fmtWhen) */
+    function nowStamp() {
+        try { return new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Manila' }).slice(0, 16); } catch (e) { return ''; }
+    }
+
     /* ══════════════════════════════════════════════════════════
        RECEIPT (borrow) — summary + a claim QR and a return QR per request
     ══════════════════════════════════════════════════════════ */
@@ -1608,7 +1615,8 @@
         if (bt) bt.textContent = r.items.some(function (i) { return itemStatus(i) === 'Approved'; })
             ? 'Your claim QR is ready' : (r.items.some(function (i) { return itemStatus(i) === 'Waiting'; })
                 ? 'Your borrow request is pending admin review' : 'You have an active borrow request');
-        $('receiptBannerSub').textContent = names + ' · Return by ' + fmtWhen(r.return_date);
+        $('receiptBannerSub').textContent = names + ' · ' + (r.requested_at ? 'Requested ' + fmtWhen(r.requested_at) + ' · ' : '') +
+            'Return by ' + fmtWhen(r.return_date);
         banner.hidden = false;
         startReceiptPoll();
     }
@@ -1623,6 +1631,18 @@
 
     function claimUrl(token) { return new URL('equipment-booking/claim_confirm.php?token=' + encodeURIComponent(token), window.location.href).href; }
     function returnUrl(token) { return new URL('equipment-booking/return_confirm.php?token=' + encodeURIComponent(token), window.location.href).href; }
+
+    /* The Return QR is shown together with the Claim QR from the moment the request is sent, but it only
+       WORKS while the item is out (On Loan / Overdue) - the server refuses it before that (return_confirm.php). */
+    var RETURN_SHOWN = ['Waiting', 'Approved', 'On Loan', 'Overdue'];
+    function returnShown(status) { return RETURN_SHOWN.indexOf(status) !== -1; }
+    function returnLive(status) { return status === 'On Loan' || status === 'Overdue'; }
+
+    /* The Return QR of a bundle: use the token of an item that is already out, so one scan always works */
+    function bundleReturnItem(items) {
+        for (var i = 0; i < items.length; i++) { if (returnLive(itemStatus(items[i]))) return items[i]; }
+        return items[0];
+    }
 
     /* The real outcome of one request. Receipts saved before status was recorded: a QR means it was approved. */
     function itemStatus(it) {
@@ -1641,6 +1661,9 @@
         'Missing': { label: 'No longer on record', icon: 'info', tone: 'bad' }
     };
     function statusView(status) { return STATUS_VIEW[status] || { label: status, icon: 'info', tone: 'info' }; }
+    /* Short wording for the status pill on each request row */
+    var PILL_LABEL = { 'Waiting': 'Waiting', 'Approved': 'Approved', 'On Loan': 'On loan', 'Overdue': 'Overdue',
+        'Returned': 'Returned', 'Declined': 'Declined', 'Cancelled': 'Cancelled', 'Missing': 'Not on record' };
 
     function showReceipt(r) {
         nav = { screen: 'receipt', r: r };
@@ -1655,66 +1678,67 @@
         r.items.forEach(function (it) {
             var s = itemStatus(it);
             if (it.claim_token && (s === 'Approved' || s === 'Waiting')) (claimGroups[it.claim_token] = claimGroups[it.claim_token] || []).push(it);
-            if (it.return_token && it.batch_id && (s === 'Approved' || s === 'On Loan' || s === 'Overdue')) (retGroups[it.batch_id] = retGroups[it.batch_id] || []).push(it);
+            if (it.return_token && it.batch_id && returnShown(s)) (retGroups[it.batch_id] = retGroups[it.batch_id] || []).push(it);
         });
         var sharedClaim = Object.keys(claimGroups).filter(function (k) { return claimGroups[k].length > 1; });
         var sharedRet = Object.keys(retGroups).filter(function (k) { return retGroups[k].length > 1; });
         function inSharedClaim(it) { return !!it.claim_token && sharedClaim.indexOf(it.claim_token) !== -1 && (itemStatus(it) === 'Approved' || itemStatus(it) === 'Waiting'); }
-        function inSharedRet(it) { return !!it.batch_id && sharedRet.indexOf(it.batch_id) !== -1 && !!it.return_token && ['Approved', 'On Loan', 'Overdue'].indexOf(itemStatus(it)) !== -1; }
+        function inSharedRet(it) { return !!it.batch_id && sharedRet.indexOf(it.batch_id) !== -1 && !!it.return_token && returnShown(itemStatus(it)); }
 
-        var reqs = r.items.map(function (it) {
-            var status = itemStatus(it);
-            var v = statusView(status);
-            var qrs = '';
-            /* The Claim QR is shown from the start; it only works once an admin approves the request */
-            if ((status === 'Approved' || status === 'Waiting') && it.claim_token && !inSharedClaim(it)) {
-                qrs += '<div class="st-qr-box"><p class="st-qr-title">Claim QR<span>' +
-                    (status === 'Waiting' ? 'Valid once an admin approves' : 'Show this to pick it up') + '</span></p>' +
-                    '<div class="st-qr" data-qr="' + esc(claimUrl(it.claim_token)) + '" data-color="#800000"></div></div>';
-            }
-            if (it.return_token && (status === 'Approved' || status === 'On Loan' || status === 'Overdue') && !inSharedRet(it)) {
-                qrs += '<div class="st-qr-box"><p class="st-qr-title">Return QR<span>Show this when returning</span></p>' +
-                    '<div class="st-qr is-return" data-qr="' + esc(returnUrl(it.return_token)) + '" data-color="#444444"></div></div>';
-            }
-            var note = '';
-            if (status === 'Waiting') {
-                note = it.claim_token
-                    ? (inSharedClaim(it) ? 'Covered by the one Claim QR below. It works once an admin approves this item' :
-                        'Keep this Claim QR. It works for pick-up once an admin approves your request') +
-                        (canWatch && it.status_key ? ' — this page updates by itself.' : '.')
-                    : (it.reason || '');
-            } else if (status === 'Approved' && inSharedClaim(it)) {
-                note = 'Covered by the one Claim QR below.';
-            } else if (status !== 'Approved' && it.reason) {
-                note = it.reason;
-            }
-            return '<div class="st-card st-req"><div class="st-req-head"><span class="st-req-name">' +
+        /* Compact request rows. Items that share one set of QR codes live together in ONE card (rows on top, the
+           QR codes once at the bottom); any other item gets a small card of its own. */
+        function itemRowHtml(it) {
+            var status = itemStatus(it), v = statusView(status);
+            return '<div class="st-rq-row"><div class="st-rq-main"><span class="st-rq-name">' +
                 (it.qty > 1 ? esc(it.qty) + '× ' : '') + esc(it.equipment) + '</span>' +
-                '<span class="st-req-id">Request #' + esc(String(it.request_id)) + '</span></div>' +
-                '<p class="st-req-status' + (v.tone === 'ok' ? '' : ' is-' + v.tone) + '">' + icon(v.icon) + esc(v.label) + '</p>' +
+                '<span class="st-rq-id">Request #' + esc(String(it.request_id)) + '</span></div>' +
+                '<span class="st-rq-pill is-' + v.tone + '">' + icon(v.icon) + esc(PILL_LABEL[status] || v.label) + '</span></div>';
+        }
+        function claimBox(tok, sub) {
+            return '<div class="st-qr-box"><p class="st-qr-title">Claim QR<span>' + sub + '</span></p>' +
+                '<div class="st-qr" data-qr="' + esc(claimUrl(tok)) + '" data-color="#800000"></div></div>';
+        }
+        function returnBox(tok, live, subLive, subLocked) {
+            return '<div class="st-qr-box' + (live ? '' : ' is-locked') + '"><p class="st-qr-title">Return QR<span>' +
+                (live ? subLive : subLocked) + '</span></p>' +
+                '<div class="st-qr is-return" data-qr="' + esc(returnUrl(tok)) + '" data-color="#444444"></div></div>';
+        }
+        function reqCard(head, rows, note, qrs, cls) {
+            return '<div class="st-card st-req' + (cls || '') + '">' + head + '<div class="st-rq-rows">' + rows + '</div>' +
                 (note ? '<p class="st-req-note">' + esc(note) + '</p>' : '') +
                 (qrs ? '<div class="st-qrs">' + qrs + '</div>' : '') + '</div>';
-        }).join('');
+        }
 
-        /* One bundle card per shared QR: the Claim QR, plus the Return QR of the same request when it has one */
-        var bundleCards = '', usedRet = {};
+        var bundled = {}, bundleCards = '', usedRet = {};
         function bundleCard(claimItems, retItems) {
-            var qrs = '', n = (claimItems || retItems).length;
+            var all = [], seen = {};
+            (claimItems || []).concat(retItems || []).forEach(function (it) {
+                if (!seen[it.request_id]) { seen[it.request_id] = 1; all.push(it); bundled[it.request_id] = 1; }
+            });
+            var qrs = '';
+            /* Part of the batch may already be on loan while another part is still waiting to be picked up:
+               that part keeps its Claim QR next to the shared Return QR */
+            if (!claimItems && retItems) {
+                var pending = retItems.filter(function (it) {
+                    var st2 = itemStatus(it);
+                    return !!it.claim_token && (st2 === 'Approved' || st2 === 'Waiting');
+                });
+                if (pending.length) claimItems = pending;
+            }
             if (claimItems) {
                 var allWaiting = claimItems.every(function (it) { return itemStatus(it) === 'Waiting'; });
-                qrs += '<div class="st-qr-box"><p class="st-qr-title">Claim QR<span>' +
-                    (allWaiting ? 'Valid once an admin approves' : 'Show this to pick up the approved items') + '</span></p>' +
-                    '<div class="st-qr" data-qr="' + esc(claimUrl(claimItems[0].claim_token)) + '" data-color="#800000"></div></div>';
+                qrs += claimBox(claimItems[0].claim_token, allWaiting ? 'Valid once an admin approves' : 'Show this to pick up the approved items');
             }
             if (retItems) {
-                qrs += '<div class="st-qr-box"><p class="st-qr-title">Return QR<span>One scan returns them all</span></p>' +
-                    '<div class="st-qr is-return" data-qr="' + esc(returnUrl(retItems[0].return_token)) + '" data-color="#444444"></div></div>';
+                qrs += returnBox(bundleReturnItem(retItems).return_token,
+                    retItems.some(function (it) { return returnLive(itemStatus(it)); }),
+                    'One scan returns them all', 'Works once you have claimed the items');
             }
-            return '<div class="st-card st-req st-bundle"><div class="st-req-head"><span class="st-req-name">One QR for all ' + n + ' items</span></div>' +
-                '<p class="st-req-note">' + (claimItems
-                    ? 'This single Claim QR covers every item in your request that an admin has approved. Items an admin declines are left out.'
-                    : 'This single Return QR covers every item still on loan from your request.') + '</p>' +
-                '<div class="st-qrs">' + qrs + '</div></div>';
+            var note = claimItems
+                ? 'One Claim QR covers every approved item. Items an admin declines are left out. The Return QR works once the items are on loan.'
+                : 'This Return QR covers every item still on loan from your request.';
+            return reqCard('<p class="st-bundle-head">' + all.length + ' items · one set of QR codes</p>',
+                all.map(itemRowHtml).join(''), note, qrs, ' st-bundle');
         }
         sharedClaim.forEach(function (tok) {
             var group = claimGroups[tok], ret = null;
@@ -1724,7 +1748,30 @@
             bundleCards += bundleCard(group, ret);
         });
         sharedRet.forEach(function (bid) { if (!usedRet[bid]) bundleCards += bundleCard(null, retGroups[bid]); });
-        reqs += bundleCards;
+
+        var singles = r.items.filter(function (it) { return !bundled[it.request_id]; }).map(function (it) {
+            var status = itemStatus(it);
+            var qrs = '';
+            /* The Claim QR is shown from the start; it only works once an admin approves the request */
+            if ((status === 'Approved' || status === 'Waiting') && it.claim_token) {
+                qrs += claimBox(it.claim_token, status === 'Waiting' ? 'Valid once an admin approves' : 'Show this to pick it up');
+            }
+            /* The Return QR is shown from the start too; it only works once the item is on loan */
+            if (it.return_token && returnShown(status)) {
+                qrs += returnBox(it.return_token, returnLive(status), 'Show this when returning', 'Works once you have claimed the item');
+            }
+            var note = '';
+            if (status === 'Waiting') {
+                note = it.claim_token
+                    ? 'Keep this Claim QR. It works for pick-up once an admin approves your request' +
+                    (canWatch && it.status_key ? ' — this page updates by itself.' : '.')
+                    : (it.reason || '');
+            } else if (status !== 'Approved' && it.reason) {
+                note = it.reason;
+            }
+            return reqCard('', itemRowHtml(it), note, qrs, '');
+        }).join('');
+        var reqs = bundleCards + singles;
 
         var title, lead, tone = 'wait', ic = 'hourglass_top';
         if (nReady === r.items.length) {
@@ -1753,10 +1800,11 @@
             '<span class="st-result-icon' + (tone === 'ok' ? '' : ' is-wait') + '">' + icon(ic) + '</span>' +
             '<h2 class="st-h2">' + esc(title) + '</h2>' +
             '<p>' + esc(lead) + '</p></div>' +
-            '<div class="st-card"><dl class="st-summary">' +
+            '<div class="st-card st-summary-card"><dl class="st-summary is-grid">' +
             row('Student', r.student_name + (r.student_id ? ' · ' + r.student_id : '')) +
             row('Authorized by', r.faculty_name) +
             row('Room', r.room) +
+            (r.requested_at ? row('Requested', fmtWhen(r.requested_at)) : '') +
             row('Borrow', fmtWhen(r.borrow_date)) +
             row('Return by', fmtWhen(r.return_date)) +
             '</dl></div>' +
