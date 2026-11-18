@@ -360,21 +360,30 @@
             // Refresh the rate-limit counter from the server every time the
             // Rooms tab becomes active — covers hard resets, tab switches, and
             // FAB opens, so the displayed count is always accurate.
-            fetch('room-reservation/api/chat-quota.php', { credentials: 'same-origin' })
-                .then(function (r) { return r.json(); })
-                .then(function (d) {
-                    if (typeof d.remaining === 'number') {
-                        var el = document.getElementById('actAiCounter');
-                        var bar = document.getElementById('actAiCounterBar');
-                        if (el) el.textContent = d.remaining;
-                        if (bar) {
-                            bar.classList.remove('is-low', 'is-empty');
-                            if (d.remaining === 0) bar.classList.add('is-empty');
-                            else if (d.remaining <= 5) bar.classList.add('is-low');
+            (function fetchQuota(attempt) {
+                fetch('room-reservation/api/chat-quota.php', { credentials: 'same-origin' })
+                    .then(function (r) {
+                        if (!r.ok) {
+                            if (attempt < 3) setTimeout(function () { fetchQuota(attempt + 1); }, 1500);
+                            return null;
                         }
-                    }
-                })
-                .catch(function () { /* silently ignore */ });
+                        return r.json();
+                    })
+                    .then(function (d) {
+                        if (!d) return;
+                        if (typeof d.remaining === 'number') {
+                            var el = document.getElementById('actAiCounter');
+                            var bar = document.getElementById('actAiCounterBar');
+                            if (el) el.textContent = d.remaining;
+                            if (bar) {
+                                bar.classList.remove('is-low', 'is-empty');
+                                if (d.remaining === 0) bar.classList.add('is-empty');
+                                else if (d.remaining <= 5) bar.classList.add('is-low');
+                            }
+                        }
+                    })
+                    .catch(function () { /* silently ignore */ });
+            }(1));
         } else {
             if (aiFab) aiFab.style.display = 'none';
             _aiTooltipHide();
