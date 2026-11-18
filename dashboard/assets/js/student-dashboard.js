@@ -62,6 +62,15 @@
         return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
             .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
+    /* A random UUID-shaped id that ties the items of one request together */
+    function newBatchId() {
+        var b = new Uint8Array(16);
+        try { (window.crypto || window.msCrypto).getRandomValues(b); }
+        catch (e) { for (var i = 0; i < 16; i++) b[i] = Math.floor(Math.random() * 256); }
+        b[6] = (b[6] & 0x0f) | 0x40; b[8] = (b[8] & 0x3f) | 0x80;
+        var h = Array.prototype.map.call(b, function (x) { return (x < 16 ? '0' : '') + x.toString(16); }).join('');
+        return h.slice(0, 8) + '-' + h.slice(8, 12) + '-' + h.slice(12, 16) + '-' + h.slice(16, 20) + '-' + h.slice(20);
+    }
     function plural(n, one, many) { return n + ' ' + (n === 1 ? one : (many || one + 's')); }
     function pad(n) { return n < 10 ? '0' + n : '' + n; }
     /* Dates are built from LOCAL parts — toISOString() is UTC and gives "yesterday" in the Philippines
@@ -349,6 +358,7 @@
             cart: {},           /* item_name → quantity                            */
             eqPage: 1,          /* current equipment-grid page                       */
             done: [],           /* requests already accepted by the server          */
+            batchId: '',        /* shared by every item of one request (one Claim QR) */
             where: null,        /* room / dates locked in after the first accept   */
             query: '',
             cat: '',
@@ -743,6 +753,9 @@
         var letter = pickLetter('borrowLetter', borrow);
         if (letter.error) return showAlert('flowError', letter.error);
 
+        /* Several items = ONE request: they share a batch id, so they share ONE Claim QR (and the admin sees them as a bundle) */
+        if (items.length > 1 || st.batchId) st.batchId = st.batchId || newBatchId();
+
         var btn = $('btnSubmitBorrow');
         setBusy(btn, true, 'Submitting…');
         lockWhere(true);
@@ -768,7 +781,8 @@
                 borrow_date: borrow,
                 start_time: startTime,
                 duration: duration,
-                is_last_item: last
+                is_last_item: last,
+                batch_id: st.batchId || ''
             }, letter.file).then(function (d) {
                 /* The server can answer success:true with status "Declined" (the request was refused on the spot and
                    NOT saved). That must never look like a submitted request, or the admin never sees it. */
@@ -790,7 +804,7 @@
                     equipment: cur.name, qty: cur.qty, request_id: d.request_id,
                     status: d.status || 'Waiting', reason: d.reason || '',
                     claim_token: d.claim_token || '', return_token: d.return_token || '',
-                    status_key: d.status_key || ''
+                    status_key: d.status_key || '', batch_id: st.batchId || ''
                 });
                 st.where = { room: room, roomId: roomId, borrow: borrow, startTime: startTime, duration: duration, ret: ret };
                 i++;
@@ -1634,26 +1648,43 @@
         var n = function (s) { return r.items.filter(function (it) { return itemStatus(it) === s; }).length; };
         var nWaiting = n('Waiting'), nReady = n('Approved');
         var canWatch = r.items.some(function (it) { return it.status_key && receiptItemOpen(it); });
+        /* Items of one request share ONE Claim QR (same token) and ONE Return QR (same batch): draw each once,
+           in a bundle card, instead of once per item. Each item keeps its own status, so an admin can still
+           approve or decline them one by one; the shared QR only ever lists the approved ones. */
+        var claimGroups = {}, retGroups = {};
+        r.items.forEach(function (it) {
+            var s = itemStatus(it);
+            if (it.claim_token && (s === 'Approved' || s === 'Waiting')) (claimGroups[it.claim_token] = claimGroups[it.claim_token] || []).push(it);
+            if (it.return_token && it.batch_id && (s === 'Approved' || s === 'On Loan' || s === 'Overdue')) (retGroups[it.batch_id] = retGroups[it.batch_id] || []).push(it);
+        });
+        var sharedClaim = Object.keys(claimGroups).filter(function (k) { return claimGroups[k].length > 1; });
+        var sharedRet = Object.keys(retGroups).filter(function (k) { return retGroups[k].length > 1; });
+        function inSharedClaim(it) { return !!it.claim_token && sharedClaim.indexOf(it.claim_token) !== -1 && (itemStatus(it) === 'Approved' || itemStatus(it) === 'Waiting'); }
+        function inSharedRet(it) { return !!it.batch_id && sharedRet.indexOf(it.batch_id) !== -1 && !!it.return_token && ['Approved', 'On Loan', 'Overdue'].indexOf(itemStatus(it)) !== -1; }
+
         var reqs = r.items.map(function (it) {
             var status = itemStatus(it);
             var v = statusView(status);
             var qrs = '';
             /* The Claim QR is shown from the start; it only works once an admin approves the request */
-            if ((status === 'Approved' || status === 'Waiting') && it.claim_token) {
+            if ((status === 'Approved' || status === 'Waiting') && it.claim_token && !inSharedClaim(it)) {
                 qrs += '<div class="st-qr-box"><p class="st-qr-title">Claim QR<span>' +
                     (status === 'Waiting' ? 'Valid once an admin approves' : 'Show this to pick it up') + '</span></p>' +
                     '<div class="st-qr" data-qr="' + esc(claimUrl(it.claim_token)) + '" data-color="#800000"></div></div>';
             }
-            if (it.return_token && (status === 'Approved' || status === 'On Loan' || status === 'Overdue')) {
+            if (it.return_token && (status === 'Approved' || status === 'On Loan' || status === 'Overdue') && !inSharedRet(it)) {
                 qrs += '<div class="st-qr-box"><p class="st-qr-title">Return QR<span>Show this when returning</span></p>' +
                     '<div class="st-qr is-return" data-qr="' + esc(returnUrl(it.return_token)) + '" data-color="#444444"></div></div>';
             }
             var note = '';
             if (status === 'Waiting') {
                 note = it.claim_token
-                    ? 'Keep this Claim QR. It works for pick-up once an admin approves your request' +
+                    ? (inSharedClaim(it) ? 'Covered by the one Claim QR below. It works once an admin approves this item' :
+                        'Keep this Claim QR. It works for pick-up once an admin approves your request') +
                         (canWatch && it.status_key ? ' — this page updates by itself.' : '.')
                     : (it.reason || '');
+            } else if (status === 'Approved' && inSharedClaim(it)) {
+                note = 'Covered by the one Claim QR below.';
             } else if (status !== 'Approved' && it.reason) {
                 note = it.reason;
             }
@@ -1664,6 +1695,36 @@
                 (note ? '<p class="st-req-note">' + esc(note) + '</p>' : '') +
                 (qrs ? '<div class="st-qrs">' + qrs + '</div>' : '') + '</div>';
         }).join('');
+
+        /* One bundle card per shared QR: the Claim QR, plus the Return QR of the same request when it has one */
+        var bundleCards = '', usedRet = {};
+        function bundleCard(claimItems, retItems) {
+            var qrs = '', n = (claimItems || retItems).length;
+            if (claimItems) {
+                var allWaiting = claimItems.every(function (it) { return itemStatus(it) === 'Waiting'; });
+                qrs += '<div class="st-qr-box"><p class="st-qr-title">Claim QR<span>' +
+                    (allWaiting ? 'Valid once an admin approves' : 'Show this to pick up the approved items') + '</span></p>' +
+                    '<div class="st-qr" data-qr="' + esc(claimUrl(claimItems[0].claim_token)) + '" data-color="#800000"></div></div>';
+            }
+            if (retItems) {
+                qrs += '<div class="st-qr-box"><p class="st-qr-title">Return QR<span>One scan returns them all</span></p>' +
+                    '<div class="st-qr is-return" data-qr="' + esc(returnUrl(retItems[0].return_token)) + '" data-color="#444444"></div></div>';
+            }
+            return '<div class="st-card st-req st-bundle"><div class="st-req-head"><span class="st-req-name">One QR for all ' + n + ' items</span></div>' +
+                '<p class="st-req-note">' + (claimItems
+                    ? 'This single Claim QR covers every item in your request that an admin has approved. Items an admin declines are left out.'
+                    : 'This single Return QR covers every item still on loan from your request.') + '</p>' +
+                '<div class="st-qrs">' + qrs + '</div></div>';
+        }
+        sharedClaim.forEach(function (tok) {
+            var group = claimGroups[tok], ret = null;
+            for (var g = 0; g < group.length && !ret; g++) {
+                if (inSharedRet(group[g])) { ret = retGroups[group[g].batch_id]; usedRet[group[g].batch_id] = 1; }
+            }
+            bundleCards += bundleCard(group, ret);
+        });
+        sharedRet.forEach(function (bid) { if (!usedRet[bid]) bundleCards += bundleCard(null, retGroups[bid]); });
+        reqs += bundleCards;
 
         var title, lead, tone = 'wait', ic = 'hourglass_top';
         if (nReady === r.items.length) {
@@ -1748,6 +1809,7 @@
                 cur.items.forEach(function (it) {
                     if (String(it.request_id) !== String(u.request_id)) return;
                     var tok = u.claim_token || '', ret = u.return_token || '';
+                    if (u.batch_id) it.batch_id = u.batch_id;
                     if (it.status !== u.status || (it.claim_token || '') !== tok || (it.return_token || '') !== ret ||
                         (u.reason && it.reason !== u.reason)) {
                         it.status = u.status;
@@ -1852,7 +1914,7 @@
                 st: {
                     service: st.service, kind: st.kind, verified: st.verified, vKey: st.vKey,
                     cart: st.cart, eqPage: st.eqPage, query: st.query, cat: st.cat,
-                    done: st.done, where: st.where, receipt: st.receipt,
+                    done: st.done, batchId: st.batchId, where: st.where, receipt: st.receipt,
                     fac: { bid: st.fac.bid, floor: st.fac.floor }
                 }
             }));
@@ -1919,6 +1981,7 @@
             });
             st.cart = s.cart && typeof s.cart === 'object' ? s.cart : {};
             st.done = Array.isArray(s.done) ? s.done : [];
+            st.batchId = typeof s.batchId === 'string' ? s.batchId : '';
             var fac = s.fac || {};
 
             if (n.screen === 'details') {

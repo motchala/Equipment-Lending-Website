@@ -48,7 +48,7 @@ BookingSchedule::ensureSchema($conn);
 equipment_auto_approve_tick($conn);
 
 $stmt = $conn->prepare(
-    "SELECT status, COALESCE(reason, '') AS reason, COALESCE(student_key, '') AS student_key,
+    "SELECT status, COALESCE(batch_id, '') AS batch_id, COALESCE(reason, '') AS reason, COALESCE(student_key, '') AS student_key,
             COALESCE(NULLIF(claim_token, ''), NULLIF(bundle_claim_token, '')) AS claim,
             NULLIF(return_token, '') AS ret
        FROM tbl_requests WHERE id = ? LIMIT 1"
@@ -86,6 +86,7 @@ foreach ($asked as $it) {
     }
     $out[] = [
         'request_id'   => $id,
+        'batch_id'     => (string)$row['batch_id'],
         'status'       => $status,
         'reason'       => (string)$row['reason'],
         // the Claim QR is shown from the start but only works once Approved (claim_confirm.php); the Return QR until it is returned

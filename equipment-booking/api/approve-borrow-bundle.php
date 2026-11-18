@@ -120,12 +120,29 @@ try {
         }
     }
 
-    $bundle_claim_token = bin2hex(random_bytes(32));
+    // Reuse the Claim QR the requester may already hold (a student's bundle gets one when submitted)
+    $bundle_claim_token = '';
+    foreach ($batchRows as $br) {
+        if ((string)$br['status'] === 'Waiting' || (string)$br['status'] === 'Approved') {
+            $q = $conn->prepare("SELECT bundle_claim_token FROM tbl_requests WHERE id = ? LIMIT 1");
+            if ($q) {
+                $qid = (int)$br['id'];
+                $q->bind_param('i', $qid);
+                $q->execute();
+                $bundle_claim_token = (string)($q->get_result()->fetch_assoc()['bundle_claim_token'] ?? '');
+                $q->close();
+            }
+            if ($bundle_claim_token !== '') break;
+        }
+    }
+    if ($bundle_claim_token === '') {
+        $bundle_claim_token = bin2hex(random_bytes(32));
+    }
     $update = $conn->prepare(
         "UPDATE tbl_requests
             SET status = 'Approved',
                 arbitration_rule = 'override',
-                return_token = ?,
+                return_token = COALESCE(NULLIF(return_token, ''), ?),
                 claim_token = NULL,
                 bundle_claim_token = ?
           WHERE id = ? AND batch_id = ? AND status = 'Waiting'"

@@ -20,6 +20,13 @@ $booking_mode  = trim($body['booking_mode']    ?? '');
 $borrow_date   = trim($body['borrow_date']     ?? '');
 $start_time    = trim($body['start_time']      ?? '');
 $duration      = (int)($body['duration']       ?? 0);
+// Items of ONE student request share a batch id (made by the portal), so they share one Claim QR
+// and the admin sees them as a bundle; each item is still its own request an admin can approve or decline.
+$batch_id      = strtolower(trim((string)($body['batch_id'] ?? '')));
+if ($batch_id !== '' && !preg_match('/^[a-f0-9-]{36}$/', $batch_id)) {
+    echo json_encode(['error' => 'Invalid request group. Please refresh and try again.']);
+    exit();
+}
 
 if (
     !$code_db_id || !$faculty_id || !$student_name ||
@@ -113,6 +120,27 @@ if ($booking_mode === 'future' && $is_multipart && isset($_FILES['document'])) {
     }
 }
 
+// ── A batch id may only extend this same student's own bundle (never join someone else's) ──
+if ($batch_id !== '') {
+    $bchk = $conn->prepare(
+        "SELECT COUNT(*) AS n,
+                SUM(faculty_id = ? AND COALESCE(submitted_by_name, '') = ? AND COALESCE(submitted_by_id, '') = ?
+                    AND COALESCE(submitted_as, '') = 'student') AS mine
+           FROM tbl_requests WHERE batch_id = ?"
+    );
+    if ($bchk) {
+        $bchk->bind_param('ssss', $faculty_id, $student_name, $student_id, $batch_id);
+        $bchk->execute();
+        $b = $bchk->get_result()->fetch_assoc();
+        $bchk->close();
+        if ((int)($b['n'] ?? 0) > 0 && ((int)($b['mine'] ?? 0) !== (int)$b['n'] || (int)$b['n'] >= 20)) {
+            $conn->close();
+            echo json_encode(['error' => 'Invalid request group. Please refresh and try again.']);
+            exit();
+        }
+    }
+}
+
 // ── Insert as Waiting — it is decided right below (core/request-decision.php) ──
 // Tokens and inventory decrement happen at approval time (auto-approve-tick.php
 // or admin-override.php), not at insert time.
@@ -121,11 +149,11 @@ $ins = $conn->prepare(
         (faculty_name, faculty_id, equipment_name, instructor, room, room_id,
             borrow_date, return_date, borrow_time, return_time, borrow_qty, booking_mode,
             stock_applied, status, request_date,
-            submitted_by_name, submitted_by_id, submitted_as)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'Waiting', NOW(), ?, ?, 'student')"
+            submitted_by_name, submitted_by_id, submitted_as, batch_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'Waiting', NOW(), ?, ?, 'student', NULLIF(?, ''))"
 );
 $ins->bind_param(
-    'sssssissssisss',
+    'sssssissssisssss',
     $faculty_name,
     $faculty_id,
     $equipment,
@@ -139,7 +167,8 @@ $ins->bind_param(
     $quantity,
     $booking_mode,
     $student_name,
-    $student_id
+    $student_id,
+    $batch_id
 );
 
 if (!$ins->execute()) {
