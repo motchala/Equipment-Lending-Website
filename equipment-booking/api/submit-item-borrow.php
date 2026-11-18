@@ -145,6 +145,9 @@ try {
     $request_id = (int)$conn->insert_id;
     $ins->close();
 
+    require_once __DIR__ . '/../core/request-decision.php';
+    $status_key = equipment_issue_student_key($conn, $request_id);
+
     // Remember the current code: if this request is refused on the spot (nothing is saved for the admin), the
     // student gets the same code back instead of losing it.
     $old_code = '';
@@ -245,6 +248,7 @@ try {
         'reason'       => $decision['reason'],
         'return_token' => $tokens['return_token'],
         'claim_token'  => $tokens['claim_token'],
+        'status_key'   => $status_key,   // lets the portal fetch the Claim QR once an admin approves
     ]);
 
 } catch (Throwable $e) {

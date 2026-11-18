@@ -154,6 +154,9 @@ if (!$ins->execute()) {
 $request_id = $conn->insert_id;
 $ins->close();
 
+require_once __DIR__ . '/../core/request-decision.php';
+$status_key = equipment_issue_student_key($conn, (int)$request_id);
+
 if ($letter_path !== null) {
     $doc = $conn->prepare('UPDATE tbl_requests SET document_path = ? WHERE id = ?');
     if ($doc) {
@@ -295,4 +298,5 @@ echo json_encode([
     'reason'       => $decision['reason'],
     'return_token' => $tokens['return_token'],
     'claim_token'  => $tokens['claim_token'],
+    'status_key'   => $status_key,   // lets the portal fetch the Claim QR once an admin approves
 ]);

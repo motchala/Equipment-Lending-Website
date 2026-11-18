@@ -195,6 +195,9 @@ final class BookingSchedule
             'stock_applied' => 'TINYINT(1) NOT NULL DEFAULT 1',
             'batch_id'      => 'CHAR(36) NULL DEFAULT NULL',
             'bundle_claim_token' => 'VARCHAR(64) NULL DEFAULT NULL',
+            // secret handed only to the student who submitted the request, so the Student Portal can ask
+            // "was it approved yet?" and receive the Claim QR without a login (see student-request-status.php)
+            'student_key'   => 'VARCHAR(64) NULL DEFAULT NULL',
         ];
 
         try {

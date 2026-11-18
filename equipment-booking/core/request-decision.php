@@ -173,6 +173,29 @@ function equipment_request_tokens(mysqli $conn, int $id): array
 }
 
 /**
+ * Give a student-submitted request its status key and return it (null if it could not be saved).
+ * The Student Portal has no login, so this random key is what proves "this is my request" when the
+ * portal later asks equipment-booking/api/student-request-status.php whether an admin approved it.
+ */
+function equipment_issue_student_key(mysqli $conn, int $id): ?string
+{
+    try {
+        $key  = bin2hex(random_bytes(24));
+        $stmt = $conn->prepare('UPDATE tbl_requests SET student_key = ? WHERE id = ?');
+        if (!$stmt) {
+            return null;
+        }
+        $stmt->bind_param('si', $key, $id);
+        $ok = $stmt->execute();
+        $stmt->close();
+        return $ok ? $key : null;
+    } catch (\Throwable $e) {
+        error_log('equipment_issue_student_key[' . $id . '] - ' . $e->getMessage());
+        return null;
+    }
+}
+
+/**
  * Most units of one item a same-day request may ask for and still be auto-approved (0 = never).
  * The point is to never let an automatic approval leave an item low on stock:
  *   - under 3 in stock ........ 0 (always reviewed by an admin)

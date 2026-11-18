@@ -51,6 +51,7 @@
         borrowRules: 'equipment-booking/api/borrow-rules.php',
         borrow: 'equipment-booking/api/submit-student-borrow.php',
         itemBorrow: 'equipment-booking/api/submit-item-borrow.php',
+        requestStatus: 'equipment-booking/api/student-request-status.php',
         reserve: 'room-reservation/api/submit-student-reserve.php',
         roomSchedule: 'room-reservation/api/student-room-schedule.php'
     };
@@ -788,7 +789,8 @@
                 st.done.push({
                     equipment: cur.name, qty: cur.qty, request_id: d.request_id,
                     status: d.status || 'Waiting', reason: d.reason || '',
-                    claim_token: d.claim_token || '', return_token: d.return_token || ''
+                    claim_token: d.claim_token || '', return_token: d.return_token || '',
+                    status_key: d.status_key || ''
                 });
                 st.where = { room: room, roomId: roomId, borrow: borrow, startTime: startTime, duration: duration, ret: ret };
                 i++;
@@ -906,7 +908,8 @@
                 items: [{
                     equipment: v.item_name, qty: qty, request_id: d.request_id,
                     status: d.status || 'Waiting', reason: d.reason || '',
-                    claim_token: d.claim_token || '', return_token: d.return_token || ''
+                    claim_token: d.claim_token || '', return_token: d.return_token || '',
+                    status_key: d.status_key || ''
                 }]
             };
             st.verified = null; st.vKey = '';
@@ -1588,10 +1591,12 @@
         st.receipt = r;
         var names = r.items.map(function (i) { return (i.qty > 1 ? i.qty + '× ' : '') + i.equipment; }).join(', ');
         var bt = $('receiptBanner').querySelector('strong');
-        if (bt) bt.textContent = r.items.every(function (i) { return itemStatus(i) !== 'Approved'; })
-            ? 'Your borrow request is pending admin review' : 'You have an active borrow request';
+        if (bt) bt.textContent = r.items.some(function (i) { return itemStatus(i) === 'Approved'; })
+            ? 'Your claim QR is ready' : (r.items.some(function (i) { return itemStatus(i) === 'Waiting'; })
+                ? 'Your borrow request is pending admin review' : 'You have an active borrow request');
         $('receiptBannerSub').textContent = names + ' · Return by ' + fmtWhen(r.return_date);
         banner.hidden = false;
+        startReceiptPoll();
     }
 
     /* "2026-11-07" -> "Sat, Nov 7, 2026"   |   "2026-11-05 15:30" -> "Thu, Nov 5, 2026 · 3:30 PM" */
@@ -1610,49 +1615,79 @@
         return it.status || (it.claim_token ? 'Approved' : 'Waiting');
     }
 
+    /* How each request status reads on the receipt: label, icon, tone (ok / wait / bad / info) */
+    var STATUS_VIEW = {
+        'Waiting': { label: 'Waiting for admin review', icon: 'hourglass_top', tone: 'wait' },
+        'Approved': { label: 'Approved – ready for pick up', icon: 'check_circle', tone: 'ok' },
+        'On Loan': { label: 'Claimed – on loan', icon: 'inventory_2', tone: 'ok' },
+        'Overdue': { label: 'Overdue – please return it', icon: 'error', tone: 'bad' },
+        'Returned': { label: 'Returned', icon: 'task_alt', tone: 'ok' },
+        'Declined': { label: 'Declined', icon: 'cancel', tone: 'bad' },
+        'Cancelled': { label: 'Cancelled', icon: 'cancel', tone: 'bad' },
+        'Missing': { label: 'No longer on record', icon: 'info', tone: 'bad' }
+    };
+    function statusView(status) { return STATUS_VIEW[status] || { label: status, icon: 'info', tone: 'info' }; }
+
     function showReceipt(r) {
         nav = { screen: 'receipt', r: r };
         var many = r.items.length > 1;
-        var nApproved = r.items.filter(function (it) { return itemStatus(it) === 'Approved'; }).length;
-        var allApproved = nApproved === r.items.length;
-        var noneApproved = nApproved === 0;
+        var n = function (s) { return r.items.filter(function (it) { return itemStatus(it) === s; }).length; };
+        var nWaiting = n('Waiting'), nReady = n('Approved');
+        var canWatch = r.items.some(function (it) { return it.status_key && receiptItemOpen(it); });
         var reqs = r.items.map(function (it) {
-            var ok = itemStatus(it) === 'Approved';
+            var status = itemStatus(it);
+            var v = statusView(status);
             var qrs = '';
-            if (it.claim_token) {
+            /* The Claim QR appears here the moment an admin approves the request (see pollReceipt) */
+            if (status === 'Approved' && it.claim_token) {
                 qrs += '<div class="st-qr-box"><p class="st-qr-title">Claim QR<span>Show this to pick it up</span></p>' +
                     '<div class="st-qr" data-qr="' + esc(claimUrl(it.claim_token)) + '" data-color="#800000"></div></div>';
             }
-            if (it.return_token) {
+            if (it.return_token && (status === 'Approved' || status === 'On Loan' || status === 'Overdue')) {
                 qrs += '<div class="st-qr-box"><p class="st-qr-title">Return QR<span>Show this when returning</span></p>' +
                     '<div class="st-qr is-return" data-qr="' + esc(returnUrl(it.return_token)) + '" data-color="#444444"></div></div>';
+            }
+            var note = '';
+            if (status === 'Waiting') {
+                note = canWatch && it.status_key
+                    ? 'Your claim QR will appear here as soon as an admin approves this request. You can keep this page open.'
+                    : (it.reason || '');
+            } else if (status !== 'Approved' && it.reason) {
+                note = it.reason;
             }
             return '<div class="st-card st-req"><div class="st-req-head"><span class="st-req-name">' +
                 (it.qty > 1 ? esc(it.qty) + '× ' : '') + esc(it.equipment) + '</span>' +
                 '<span class="st-req-id">Request #' + esc(String(it.request_id)) + '</span></div>' +
-                '<p class="st-req-status' + (ok ? '' : ' is-wait') + '">' + icon(ok ? 'check_circle' : 'hourglass_top') +
-                (ok ? 'Approved' : 'Waiting for admin review') + '</p>' +
-                (!ok && it.reason ? '<p class="st-req-note">' + esc(it.reason) + '</p>' : '') +
+                '<p class="st-req-status' + (v.tone === 'ok' ? '' : ' is-' + v.tone) + '">' + icon(v.icon) + esc(v.label) + '</p>' +
+                (note ? '<p class="st-req-note">' + esc(note) + '</p>' : '') +
                 (qrs ? '<div class="st-qrs">' + qrs + '</div>' : '') + '</div>';
         }).join('');
 
-        var title, lead;
-        if (allApproved) {
+        var title, lead, tone = 'wait', ic = 'hourglass_top';
+        if (nReady === r.items.length) {
             title = many ? 'Requests approved' : 'Request approved';
-            lead = (many ? plural(r.items.length, 'item') + ' approved via faculty authorization.' : 'Approved via faculty authorization.') +
-                ' Show the QR codes below to the admin.';
-        } else if (noneApproved) {
+            lead = (many ? plural(r.items.length, 'item') + ' approved.' : 'Approved.') + ' Show the Claim QR below to the admin to pick it up.';
+            tone = 'ok'; ic = 'check_circle';
+        } else if (nReady > 0) {
+            title = 'Requests updated';
+            lead = nReady + ' of ' + r.items.length + ' approved (show their Claim QR to the admin).' +
+                (nWaiting ? ' The rest are still waiting for an admin to review.' : '');
+            tone = nWaiting ? 'wait' : 'ok'; ic = nWaiting ? 'hourglass_top' : 'check_circle';
+        } else if (nWaiting) {
             title = 'Request sent — pending admin review';
-            lead = 'An admin will approve or decline ' + (many ? 'these requests' : 'this request') +
-                '. Check with your faculty or the admin office for the decision.';
+            lead = canWatch
+                ? 'An admin will approve or decline ' + (many ? 'these requests' : 'this request') + '. Your Claim QR will show up on this page once it is approved.'
+                : 'An admin will approve or decline ' + (many ? 'these requests' : 'this request') + '. Check with your faculty or the admin office for the decision.';
         } else {
-            title = 'Requests sent';
-            lead = nApproved + ' of ' + r.items.length + ' approved (show their QR codes to the admin). The rest are waiting for an admin to review.';
+            title = many ? 'Your requests' : 'Your request';
+            lead = r.items.some(function (it) { return itemStatus(it) === 'Declined' || itemStatus(it) === 'Cancelled'; })
+                ? 'See the details below.' : 'Here is where your request stands.';
+            tone = 'ok'; ic = 'info';
         }
 
         flow(
-            '<div class="st-result"><div class="st-result-top">' +
-            '<span class="st-result-icon' + (allApproved ? '' : ' is-wait') + '">' + icon(allApproved ? 'check_circle' : 'hourglass_top') + '</span>' +
+            '<div class="st-result"><div class="st-result-top" role="status" aria-live="polite">' +
+            '<span class="st-result-icon' + (tone === 'ok' ? '' : ' is-wait') + '">' + icon(ic) + '</span>' +
             '<h2 class="st-h2">' + esc(title) + '</h2>' +
             '<p>' + esc(lead) + '</p></div>' +
             '<div class="st-card"><dl class="st-summary">' +
@@ -1663,10 +1698,82 @@
             row('Return by', fmtWhen(r.return_date)) +
             '</dl></div>' +
             '<div class="st-req-list">' + reqs + '</div>' +
-            '<div class="st-actions"><button type="button" class="st-btn st-btn-primary st-btn-block" data-action="done">Done</button></div></div>', 3);
+            '<div class="st-actions">' +
+            (canWatch && nWaiting ? '<button type="button" class="st-btn st-btn-ghost" data-action="receipt-refresh">' + icon('refresh') + 'Check status</button>' : '') +
+            '<button type="button" class="st-btn st-btn-primary st-btn-block" data-action="done">Done</button></div></div>', 3);
 
         drawQrs($('view-flow'));
+        startReceiptPoll();
     }
+
+    /* ── Live status: an admin's decision reaches the receipt without a refresh ───────────────
+       A request is "open" while something can still change (waiting, approved but not claimed, on loan).
+       While the page is visible the receipt asks the server every few seconds, and when a status or QR
+       changes it saves the new receipt and redraws it (or the home banner). Only requests that came
+       with a status_key can be asked about; older saved receipts simply stay as they were. */
+    var POLL_MS = 6000, pollTimer = 0, pollBusy = false;
+
+    function receiptItemOpen(it) {
+        var s = itemStatus(it);
+        return s === 'Waiting' || s === 'Approved' || s === 'On Loan' || s === 'Overdue';
+    }
+    function receiptWatchable(r) {
+        return !!(r && r.items && r.items.some(function (it) { return it.status_key && receiptItemOpen(it); }));
+    }
+    function stopReceiptPoll() { if (pollTimer) { clearTimeout(pollTimer); pollTimer = 0; } }
+    function startReceiptPoll() {
+        stopReceiptPoll();
+        if (!receiptWatchable(st.receipt)) return;
+        pollTimer = setTimeout(function () { pollReceipt(false); }, POLL_MS);
+    }
+
+    function pollReceipt(manual) {
+        stopReceiptPoll();
+        var r = st.receipt;
+        if (!receiptWatchable(r)) return Promise.resolve();
+        if (document.hidden && !manual) { startReceiptPoll(); return Promise.resolve(); }
+        if (pollBusy) return Promise.resolve();
+        pollBusy = true;
+        var ask = r.items.filter(function (it) { return it.status_key; })
+            .map(function (it) { return { request_id: it.request_id, key: it.status_key }; });
+        return post(URLS.requestStatus, { items: ask }).then(function (d) {
+            pollBusy = false;
+            if (!d || d.error || !Array.isArray(d.items)) return;
+            var cur = st.receipt;
+            if (!cur || cur !== r) return;              /* a different receipt took over meanwhile */
+            var changed = false;
+            d.items.forEach(function (u) {
+                cur.items.forEach(function (it) {
+                    if (String(it.request_id) !== String(u.request_id)) return;
+                    var tok = u.claim_token || '', ret = u.return_token || '';
+                    if (it.status !== u.status || (it.claim_token || '') !== tok || (it.return_token || '') !== ret ||
+                        (u.reason && it.reason !== u.reason)) {
+                        it.status = u.status;
+                        it.claim_token = tok;
+                        it.return_token = ret;
+                        if (u.reason || u.status !== 'Waiting') it.reason = u.reason || '';
+                        changed = true;
+                    }
+                });
+            });
+            if (changed) {
+                saveReceipt(cur);
+                if (nav && nav.screen === 'receipt') {
+                    var y = window.scrollY;
+                    showReceipt(cur);
+                    window.scrollTo(0, y);
+                    return;
+                }
+                loadReceiptBanner();
+                return;
+            }
+        }).catch(function () { pollBusy = false; }).then(function () {
+            if (!pollTimer) startReceiptPoll();
+        });
+    }
+    document.addEventListener('visibilitychange', function () {
+        if (!document.hidden && receiptWatchable(st.receipt)) pollReceipt(true);
+    });
 
     /* ── QR codes (library loaded on demand) ───────────────────── */
     var qrState = 'idle', qrQueue = [];
@@ -1913,6 +2020,9 @@
             case 'open-receipt':
                 if (st.receipt) showReceipt(st.receipt);
                 return;
+            case 'receipt-refresh':
+                setBusy(t, true, 'Checking…');
+                return pollReceipt(true).then(function () { if (document.body.contains(t)) setBusy(t, false); });
 
             /* equipment */
             case 'eq-cat':
