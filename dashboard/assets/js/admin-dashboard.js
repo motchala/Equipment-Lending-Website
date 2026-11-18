@@ -6037,16 +6037,18 @@ function psSelectFmt(btn) {
             });
     }
 
-    // Approve: reason typed in the drawer
+    // Approve: no reason needed (the server saves a default note). Declining is done in its own form, which requires one.
+    var APPROVED_NOTE = 'Approved by an admin.';
     function submitDecision(decision, btn) {
         if (!currentRow) return;
         var row = currentRow;
         var reason = reasonBox ? reasonBox.value.trim() : '';
-        if (reason.length < 5) {
+        if (decision !== 'Approved' && reason.length < 5) {
             showReviewError('Please enter a reason of at least 5 characters.');
             if (reasonBox) reasonBox.focus();
             return;
         }
+        if (decision === 'Approved' && !reason) reason = APPROVED_NOTE;
         var idleHtml = btn.innerHTML;
         if (reviewErr) reviewErr.hidden = true;
         decideBtns.forEach(function (b) { b.disabled = true; });

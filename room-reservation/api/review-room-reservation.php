@@ -6,6 +6,8 @@
  *   - Reservations for a LATER DATE wait for ANY admin (Super Admin or Admin), with or
  *     without an attached request letter.
  *
+ * Approving needs no reason; declining requires one (at least 5 characters).
+ *
  * Anything undecided past its deadline (12:01 AM on the reservation date, see
  * core/room-expiry.php) is declined automatically before a decision is taken,
  * so an expired request can no longer be approved.
@@ -45,8 +47,12 @@ $reason         = trim((string)($body['reason'] ?? ''));
 if ($reservation_id < 1 || !in_array($decision, ['Approved', 'Declined'], true)) {
     room_review_reply(422, 'Invalid reservation decision.');
 }
-if (mb_strlen($reason) < 5) {
-    room_review_reply(422, 'Please provide a decision reason of at least 5 characters.');
+// A reason is required only when DECLINING. Approving needs none (a default note is saved instead).
+if ($decision === 'Declined' && mb_strlen($reason) < 5) {
+    room_review_reply(422, 'Please provide a decline reason of at least 5 characters.');
+}
+if ($decision === 'Approved' && $reason === '') {
+    $reason = 'Approved by an admin.';
 }
 
 $conn = getDB();
