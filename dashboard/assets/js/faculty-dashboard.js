@@ -360,30 +360,21 @@
             // Refresh the rate-limit counter from the server every time the
             // Rooms tab becomes active — covers hard resets, tab switches, and
             // FAB opens, so the displayed count is always accurate.
-            (function fetchQuota(attempt) {
-                fetch('room-reservation/api/chat-quota.php', { credentials: 'same-origin' })
-                    .then(function (r) {
-                        if (!r.ok) {
-                            if (attempt < 3) setTimeout(function () { fetchQuota(attempt + 1); }, 1500);
-                            return null;
+            fetch('room-reservation/api/chat-quota.php')
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (typeof d.remaining === 'number') {
+                        var el = document.getElementById('actAiCounter');
+                        var bar = document.getElementById('actAiCounterBar');
+                        if (el) el.textContent = d.remaining;
+                        if (bar) {
+                            bar.classList.remove('is-low', 'is-empty');
+                            if (d.remaining === 0) bar.classList.add('is-empty');
+                            else if (d.remaining <= 5) bar.classList.add('is-low');
                         }
-                        return r.json();
-                    })
-                    .then(function (d) {
-                        if (!d) return;
-                        if (typeof d.remaining === 'number') {
-                            var el = document.getElementById('actAiCounter');
-                            var bar = document.getElementById('actAiCounterBar');
-                            if (el) el.textContent = d.remaining;
-                            if (bar) {
-                                bar.classList.remove('is-low', 'is-empty');
-                                if (d.remaining === 0) bar.classList.add('is-empty');
-                                else if (d.remaining <= 5) bar.classList.add('is-low');
-                            }
-                        }
-                    })
-                    .catch(function () { /* silently ignore */ });
-            }(1));
+                    }
+                })
+                .catch(function () { /* silently ignore */ });
         } else {
             if (aiFab) aiFab.style.display = 'none';
             _aiTooltipHide();
@@ -4241,7 +4232,6 @@
 
             fetch('room-reservation/api/check-slot-availability.php', {
                 method: 'POST',
-                credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     csrf_token: csrfToken,
@@ -4424,7 +4414,6 @@
 
         fetch('room-reservation/api/chat.php', {
             method: 'POST',
-            credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ message: msg, csrf_token: csrfToken }),
         })
