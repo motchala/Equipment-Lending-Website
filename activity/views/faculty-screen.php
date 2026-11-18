@@ -188,7 +188,9 @@
             </div><!-- /panel-activity -->
 
             <!-- ── AI Support Hub ──────────────────────────────────────────── -->
-            <div class="act-ai-chat" id="actAiChat">
+            <div class="act-ai-chat" id="actAiChat"
+    data-max-advance-days="<?= (int)RoomRules::maxAdvanceDays() ?>"
+    data-max-hours="<?= (int)RoomRules::maxHours() ?>">
 
                 <!-- Header -->
                 <div class="act-ai-chat-head">

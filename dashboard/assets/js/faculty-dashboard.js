@@ -2225,7 +2225,7 @@
                 case 'ai-chat-report-room-issue': {
                     const inp = document.getElementById('actAiInput');
                     if (inp) {
-                        inp.value = 'I need to report a room issue.';
+                        inp.value = 'I need to report an issue with this room.';
                         inp.focus();
                     }
                     break;
@@ -4053,18 +4053,42 @@
     // This form does NOT submit any reservation itself.
     // It only collects context and hands off to the existing Facilities UI.
 
-    function showMiniForm(lastRow) {
+    function showMiniForm(lastRow, prefill) {
         var col = lastRow && lastRow.querySelector('.act-chat-col');
         if (!col) return;
+
+        // Read limits injected by PHP; fall back to safe defaults
+        var chatEl = document.getElementById('actAiChat');
+        var maxAdvanceDays = chatEl ? (parseInt(chatEl.dataset.maxAdvanceDays, 10) || 21) : 21;
+        var maxHoursVal    = chatEl ? (parseInt(chatEl.dataset.maxHours,       10) || 5)  : 5;
 
         var now = new Date();
         var today = now.getFullYear() + '-' +
             String(now.getMonth() + 1).padStart(2, '0') + '-' +
             String(now.getDate()).padStart(2, '0');
-        var maxDt = new Date(now.getTime() + 21 * 86400000);
+        var maxDt = new Date(now.getTime() + maxAdvanceDays * 86400000);
         var maxDay = maxDt.getFullYear() + '-' +
             String(maxDt.getMonth() + 1).padStart(2, '0') + '-' +
             String(maxDt.getDate()).padStart(2, '0');
+
+        // Determine initial campus value and option selected states
+        var pf           = prefill || {};
+        var pfCampus     = pf.campus  || '';
+        var pfDate       = pf.date    || today;
+        var pfStart      = pf.start   || '';
+        var pfEnd        = pf.end     || '';
+        var campusMainSel = pfCampus === 'main' ? ' selected' : '';
+        var campusCiteSel = pfCampus === 'cite' ? ' selected' : '';
+        var campusDefault = pfCampus === '' ? ' selected' : '';
+
+        // Disclaimer bubble — shown before the form
+        var body = document.getElementById('actAiChatBody');
+        if (body) {
+            appendAiBubble(body,
+                "I\u2019ll help you get there! Just so you know \u2014 I won\u2019t complete " +
+                "the booking myself. Confirm the details below and I\u2019ll open the " +
+                "reservation form with everything ready.");
+        }
 
         var form = document.createElement('div');
         form.className = 'act-mini-form';
@@ -4077,30 +4101,30 @@
             '<div class="act-mini-field">' +
             '<label for="actMfCampus">Campus <span class="act-mini-req">*</span></label>' +
             '<select id="actMfCampus">' +
-            '<option value="" disabled selected>Select campus…</option>' +
-            '<option value="main">PUP Main (Buildings A &amp; B)</option>' +
-            '<option value="cite">PUP CITE (Building C)</option>' +
+            '<option value=""' + campusDefault + ' disabled>Select campus\u2026</option>' +
+            '<option value="main"' + campusMainSel + '>PUP Main (Buildings A & B)</option>' +
+            '<option value="cite"' + campusCiteSel + '>PUP CITE (Building C)</option>' +
             '</select>' +
             '</div>' +
             '<div class="act-mini-field">' +
             '<label for="actMfDate">Date <span class="act-mini-req">*</span></label>' +
-            '<input type="date" id="actMfDate" min="' + today + '" max="' + maxDay + '">' +
+            '<input type="date" id="actMfDate" min="' + today + '" max="' + maxDay + '" value="' + pfDate + '">' +
             '</div>' +
             '<div class="act-mini-row">' +
             '<div class="act-mini-field">' +
             '<label for="actMfStart">Start <span class="act-mini-req">*</span></label>' +
-            '<input type="time" id="actMfStart" min="07:00" max="20:00">' +
+            '<input type="time" id="actMfStart" min="07:00" max="20:00" value="' + pfStart + '">' +
             '</div>' +
             '<div class="act-mini-field">' +
             '<label for="actMfEnd">End <span class="act-mini-req">*</span></label>' +
-            '<input type="time" id="actMfEnd" min="07:00" max="20:00">' +
+            '<input type="time" id="actMfEnd" min="07:00" max="20:00" value="' + pfEnd + '">' +
             '</div>' +
             '</div>' +
             '<div class="act-mini-field">' +
             '<label for="actMfRoomSearch">Room <span class="act-mini-req">*</span></label>' +
             '<div class="act-mini-combobox" id="actMfComboWrap">' +
             '<input type="text" id="actMfRoomSearch" ' +
-            'placeholder="Fill campus, date & time first\u2026" ' +
+            'placeholder="Fill campus, date &amp; time first\u2026" ' +
             'autocomplete="off" disabled>' +
             '<input type="hidden" id="actMfRoomId">' +
             '<div class="act-mini-dropdown" id="actMfDropdown" style="display:none;"></div>' +
@@ -4111,17 +4135,18 @@
             '<button type="button" class="act-mini-btn act-mini-cancel" ' +
             'id="actMfCancelBtn">Cancel</button>' +
             '<button type="button" class="act-mini-btn act-mini-submit" ' +
-            'id="actMfSubmitBtn" disabled>Find &amp; Reserve</button>' +
+            'id="actMfSubmitBtn" disabled>Find & Reserve</button>' +
             '</div>';
 
         col.appendChild(form);
-        _wireMiniForm();
+        _wireMiniForm(maxHoursVal, pfCampus !== '' && pfDate !== '' && pfStart !== '' && pfEnd !== '');
     }
 
     var _miniFormRooms = [];
     var _miniFormRoomSelected = false;
 
-    function _wireMiniForm() {
+    function _wireMiniForm(maxHoursVal, autoSearch) {
+        maxHoursVal = maxHoursVal || 5;
         var campusSel = document.getElementById('actMfCampus');
         var dateInp = document.getElementById('actMfDate');
         var startInp = document.getElementById('actMfStart');
@@ -4189,11 +4214,11 @@
                 }
             }
 
-            // Maximum booking duration: 5 hours (300 minutes)
+            // Maximum booking duration — read from PHP-injected limit
             var startMin = parseInt(start.split(':')[0], 10) * 60 + parseInt(start.split(':')[1], 10);
             var endMin = parseInt(end.split(':')[0], 10) * 60 + parseInt(end.split(':')[1], 10);
-            if (endMin - startMin > 300) {
-                showErr('Maximum booking duration is 5 hours.');
+            if (endMin - startMin > maxHoursVal * 60) {
+                showErr('Maximum booking duration is ' + maxHoursVal + ' hour' + (maxHoursVal === 1 ? '' : 's') + '.');
                 roomSearch.disabled = true;
                 roomSearch.placeholder = 'Fix the duration first\u2026';
                 return;
@@ -4244,6 +4269,11 @@
         dateInp.addEventListener('change', onSlotChange);
         startInp.addEventListener('change', onSlotChange);
         endInp.addEventListener('change', onSlotChange);
+
+        // Auto-trigger room search if all fields were pre-filled by the AI
+        if (autoSearch) {
+            onSlotChange();
+        }
 
         function renderDropdown(query) {
             var q = query.trim().toLowerCase();
@@ -4419,9 +4449,9 @@
                     }
                 }
 
-                // Reservation intent — show 4-field mini-form
+                // Reservation intent — show 4-field mini-form with optional AI prefill
                 if (data.intent_reserve) {
-                    showMiniForm(lastRow);
+                    showMiniForm(lastRow, data.reserve_prefill || {});
                     // Keep send disabled until form is cancelled or submitted
                     return;
                 }
@@ -4521,6 +4551,11 @@
                     .then(function (d) {
                         if (d.success) {
                             cancelled.push(items[idx].room);
+                            // Refresh the Activity feed so the cancelled reservation
+                            // disappears without a manual page reload
+                            if (window.PUPSyncActivity && typeof window.PUPSyncActivity.refresh === 'function') {
+                                window.PUPSyncActivity.refresh();
+                            }
                         } else {
                             failed.push(items[idx].room + ': ' + (d.error || 'error'));
                         }

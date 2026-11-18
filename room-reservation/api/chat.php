@@ -68,14 +68,10 @@ if ($session_token === '' || $submitted_token === '' ||
 // ── 8. Load API keys ──────────────────────────────────────────────────────────
 require_once __DIR__ . '/../../config/env.php';
 load_env();
-$api_keys = array_values(array_filter([
-    trim((string)($_ENV['AI_API_KEY']  ?? '')),
-    trim((string)($_ENV['AI_API_KEY2'] ?? '')),
-    trim((string)($_ENV['AI_API_KEY3'] ?? '')),
-], fn($k) => $k !== ''));
+$groq_key = trim((string)($_ENV['GROQ_API_KEY'] ?? ''));
 
-if (empty($api_keys)) {
-    error_log('[PUPSync AI] No API keys configured in .env');
+if ($groq_key === '') {
+    error_log('[PUPSync AI] GROQ_API_KEY is not set in .env');
     chat_respond(503, 'error', 'The AI assistant is temporarily unavailable.');
 }
 
@@ -200,6 +196,164 @@ $wl_stmt->bind_param('s', $faculty_id);
 $wl_stmt->execute();
 $wl_rows = $wl_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $wl_stmt->close();
+
+// ── 12b. Faculty timetable rooms (class schedule assignments this semester) ──
+require_once __DIR__ . '/../../shared/core/arbitration-config.php';
+$arb            = ArbitrationConfig::all($conn);
+$semester_name  = (string)($arb['semester_name']  ?? '');
+$semester_start = (string)($arb['semester_start'] ?? '');
+$semester_end   = (string)($arb['semester_end']   ?? '');
+
+$semester_label = '';
+if ($semester_start !== '' && $semester_end !== '') {
+    $sem_names = ['first' => '1st Semester', 'second' => '2nd Semester', 'summer' => 'Summer', 'none' => 'No active semester'];
+    $semester_label = ($sem_names[$semester_name] ?? ucfirst($semester_name))
+        . ' (' . $semester_start . ' to ' . $semester_end . ')';
+} else {
+    $semester_label = 'No semester configured';
+}
+
+// Rooms where THIS faculty has timetable classes
+$my_rooms_stmt = $conn->prepare(
+    "SELECT DISTINCT cs.room_id, r.room_name, r.room_code, b.name AS building_name
+       FROM tbl_class_schedule cs
+       JOIN tbl_rooms     r ON r.room_id     = cs.room_id
+       JOIN tbl_buildings b ON b.building_id = r.building_id
+      WHERE cs.account_faculty_id = ?
+        AND cs.is_tba   = 0
+        AND cs.room_id IS NOT NULL"
+);
+$my_rooms_stmt->bind_param('s', $faculty_id);
+$my_rooms_stmt->execute();
+$my_timetable_rooms = $my_rooms_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$my_rooms_stmt->close();
+
+$ctx_my_timetable = empty($my_timetable_rooms)
+    ? 'None — no classes scheduled for this faculty this semester.'
+    : implode("\n", array_map(fn($r) =>
+        '- ' . $r['room_name'] . ' (' . $r['room_code'] . ') in ' . $r['building_name'],
+        $my_timetable_rooms));
+
+// All rooms that have ANY faculty timetable assignment (excluding this faculty)
+// Used to warn faculty when they try to reserve a room used by another faculty's timetable
+$all_assigned_stmt = $conn->prepare(
+    "SELECT DISTINCT cs.room_id, r.room_name, r.room_code, b.name AS building_name,
+            cs.faculty_name AS assigned_faculty
+       FROM tbl_class_schedule cs
+       JOIN tbl_rooms     r ON r.room_id     = cs.room_id
+       JOIN tbl_buildings b ON b.building_id = r.building_id
+      WHERE cs.account_faculty_id != ?
+        AND cs.is_tba   = 0
+        AND cs.room_id IS NOT NULL"
+);
+$all_assigned_stmt->bind_param('s', $faculty_id);
+$all_assigned_stmt->execute();
+$all_assigned_rows = $all_assigned_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$all_assigned_stmt->close();
+
+// Group by room_id, collect unique faculty names per room
+$assigned_rooms_map = [];
+foreach ($all_assigned_rows as $row) {
+    $rid = $row['room_id'];
+    if (!isset($assigned_rooms_map[$rid])) {
+        $assigned_rooms_map[$rid] = [
+            'room_name'      => $row['room_name'],
+            'room_code'      => $row['room_code'],
+            'building_name'  => $row['building_name'],
+            'faculty_names'  => [],
+        ];
+    }
+    $fname = trim($row['assigned_faculty']);
+    if ($fname !== '' && !in_array($fname, $assigned_rooms_map[$rid]['faculty_names'], true)) {
+        $assigned_rooms_map[$rid]['faculty_names'][] = $fname;
+    }
+}
+
+$ctx_assigned_rooms = empty($assigned_rooms_map)
+    ? 'None — no rooms are assigned in another faculty\'s timetable this semester.'
+    : implode("\n", array_map(fn($r) =>
+        '- ' . $r['room_name'] . ' (' . $r['room_code'] . ') in ' . $r['building_name']
+        . ' — used by: ' . implode(', ', $r['faculty_names']),
+        array_values($assigned_rooms_map)));
+
+// ── 12b. Faculty timetable rooms (class schedule assignments this semester) ──
+require_once __DIR__ . '/../../shared/core/arbitration-config.php';
+$arb            = ArbitrationConfig::all($conn);
+$semester_name  = (string)($arb['semester_name']  ?? '');
+$semester_start = (string)($arb['semester_start'] ?? '');
+$semester_end   = (string)($arb['semester_end']   ?? '');
+
+$semester_label = '';
+if ($semester_start !== '' && $semester_end !== '') {
+    $sem_names = ['first' => '1st Semester', 'second' => '2nd Semester', 'summer' => 'Summer', 'none' => 'No active semester'];
+    $semester_label = ($sem_names[$semester_name] ?? ucfirst($semester_name))
+        . ' (' . $semester_start . ' to ' . $semester_end . ')';
+} else {
+    $semester_label = 'No semester configured';
+}
+
+// Rooms where THIS faculty has timetable classes
+$my_rooms_stmt = $conn->prepare(
+    "SELECT DISTINCT cs.room_id, r.room_name, r.room_code, b.name AS building_name
+       FROM tbl_class_schedule cs
+       JOIN tbl_rooms     r ON r.room_id     = cs.room_id
+       JOIN tbl_buildings b ON b.building_id = r.building_id
+      WHERE cs.account_faculty_id = ?
+        AND cs.is_tba   = 0
+        AND cs.room_id IS NOT NULL"
+);
+$my_rooms_stmt->bind_param('s', $faculty_id);
+$my_rooms_stmt->execute();
+$my_timetable_rooms = $my_rooms_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$my_rooms_stmt->close();
+
+$ctx_my_timetable = empty($my_timetable_rooms)
+    ? 'None — no classes scheduled for this faculty this semester.'
+    : implode("\n", array_map(fn($r) =>
+        '- ' . $r['room_name'] . ' (' . $r['room_code'] . ') in ' . $r['building_name'],
+        $my_timetable_rooms));
+
+// All rooms that have ANY faculty timetable assignment (excluding this faculty)
+// Used to warn faculty when they try to reserve a room used by another faculty's timetable
+$all_assigned_stmt = $conn->prepare(
+    "SELECT DISTINCT cs.room_id, r.room_name, r.room_code, b.name AS building_name,
+            cs.faculty_name AS assigned_faculty
+       FROM tbl_class_schedule cs
+       JOIN tbl_rooms     r ON r.room_id     = cs.room_id
+       JOIN tbl_buildings b ON b.building_id = r.building_id
+      WHERE cs.account_faculty_id != ?
+        AND cs.is_tba   = 0
+        AND cs.room_id IS NOT NULL"
+);
+$all_assigned_stmt->bind_param('s', $faculty_id);
+$all_assigned_stmt->execute();
+$all_assigned_rows = $all_assigned_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$all_assigned_stmt->close();
+
+// Group by room_id, collect unique faculty names per room
+$assigned_rooms_map = [];
+foreach ($all_assigned_rows as $row) {
+    $rid = $row['room_id'];
+    if (!isset($assigned_rooms_map[$rid])) {
+        $assigned_rooms_map[$rid] = [
+            'room_name'      => $row['room_name'],
+            'room_code'      => $row['room_code'],
+            'building_name'  => $row['building_name'],
+            'faculty_names'  => [],
+        ];
+    }
+    $fname = trim($row['assigned_faculty']);
+    if ($fname !== '' && !in_array($fname, $assigned_rooms_map[$rid]['faculty_names'], true)) {
+        $assigned_rooms_map[$rid]['faculty_names'][] = $fname;
+    }
+}
+
+$ctx_assigned_rooms = empty($assigned_rooms_map)
+    ? 'None — no rooms are assigned in another faculty\'s timetable this semester.'
+    : implode("\n", array_map(fn($r) =>
+        '- ' . $r['room_name'] . ' (' . $r['room_code'] . ') in ' . $r['building_name']
+        . ' — used by: ' . implode(', ', $r['faculty_names']),
+        array_values($assigned_rooms_map)));
 
 $quota_used = count($res_rows);
 $quota_max  = RoomRules::maxActive();
@@ -454,7 +608,24 @@ You are PUPSync Room Assistant, an AI assistant for the Polytechnic University o
 Go to the Facilities tab → choose a building → browse by floor → click a room card → Reserve.
 
 ## HOW TO RESERVE VIA AI ASSISTANT
-If a faculty asks YOU to reserve a room for them, respond naturally and then include the exact text INTENT:reserve at the end of your message. The system will show them a reservation form automatically. Do not include any other special codes or signals.
+If a faculty asks YOU to reserve a room for them, respond with a short, friendly message that:
+1. Acknowledges their request
+2. Briefly notes that you will not be doing the booking yourself — you will open a pre-filled form so they can confirm and submit it
+3. Mentions any fields you detected from their message (room, date, time) so they know what will be pre-filled
+Then append the reservation signal at the very end of your message using this format:
+  INTENT:reserve|campus:{campus}|date:{date}|start:{start}|end:{end}
+Only include fields you are confident about from the faculty's message. Omit any field you are not sure about — leave it blank and the faculty will fill it in.
+Field values:
+- campus: use exactly "main" for PUP Main (Buildings A & B) or "cite" for PUP CITE (Building C). Omit if unknown.
+- date: use YYYY-MM-DD format. Resolve relative words (today, tomorrow, next Monday) using TODAY's date above. Omit if unknown.
+- start: use HH:MM (24-hour). Omit if unknown.
+- end: use HH:MM (24-hour). Omit if unknown.
+Examples:
+- Faculty says "reserve me a room" → reply naturally then append: INTENT:reserve
+- Faculty says "reserve a room tomorrow 9am to 11am" → append: INTENT:reserve|date:{tomorrow's date}|start:09:00|end:11:00
+- Faculty says "book a room in Building C on Friday 2pm to 4pm" → append: INTENT:reserve|campus:cite|date:{next Friday's date}|start:14:00|end:16:00
+- Faculty says "reserve Building A Room A402 tomorrow 8am to 11am" → append: INTENT:reserve|campus:main|date:{tomorrow's date}|start:08:00|end:11:00
+Do not include any other special codes or signals in INTENT:reserve lines.
 
 ## HOW TO CANCEL (manual)
 My Activity → Room reservations → Cancel (only if more than 1 hour before start time).
@@ -468,6 +639,18 @@ Active/upcoming reservations:
 {$ctx_reservations}
 Waitlist:
 {$ctx_waitlist}
+
+## CURRENT SEMESTER
+{$semester_label}
+Room assignments below are scoped to this semester's timetable. They are not permanent — the super admin replaces the timetable each semester via import.
+
+## THIS FACULTY'S TIMETABLE ROOMS (rooms where they have scheduled classes this semester)
+{$ctx_my_timetable}
+If the faculty tries to reserve one of these rooms, remind them that this room is already in their timetable this semester — they do not need to reserve it. They can still proceed if they want, but flag it.
+
+## OTHER FACULTY'S TIMETABLE ROOMS (rooms used by other faculty in the timetable this semester)
+{$ctx_assigned_rooms}
+If the faculty tries to reserve one of these rooms, warn them that the room is currently used in another faculty member's timetable this semester. Mention the faculty name(s) using that room. Suggest they choose a different room, but allow them to proceed if they insist.
 
 ## HOW TO CANCEL VIA AI ASSISTANT
 ⚠️ MANDATORY: When a faculty member asks you to cancel any reservation, you MUST append a signal at the end of your message. Do NOT cancel anything yourself. Do NOT just say "Sure, I'll cancel it." Instead, respond naturally AND then add the signal so the system can show confirmation buttons.
@@ -515,122 +698,43 @@ NEVER omit the signal when cancelling. NEVER use an ID not in FACULTY CONTEXT.
 - If asked something unrelated to rooms or PUPSync, politely redirect.
 PROMPT;
 
-// ── 15. Call Gemini with multi-key rotation ───────────────────────────────────
-$gemini_url          = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent';
-$gemini_request_body = json_encode([
-    'system_instruction' => ['parts' => [['text' => $system_prompt]]],
-    'contents'           => [['role' => 'user', 'parts' => [['text' => $raw_message]]]],
-    'generationConfig'   => ['maxOutputTokens' => 300, 'thinkingConfig' => ['thinkingLevel' => 'low']],
+// ── 15. Call Groq ─────────────────────────────────────────────────────────────
+$groq_url          = 'https://api.groq.com/openai/v1/chat/completions';
+$groq_request_body = json_encode([
+    'model'       => 'openai/gpt-oss-120b',
+    'messages'    => [
+        ['role' => 'system', 'content' => $system_prompt],
+        ['role' => 'user',   'content' => $raw_message],
+    ],
+    'max_tokens'  => 300,
+    'temperature' => 0.7,
 ]);
 
-$response    = false;
-$curl_error  = '';
+$groq_context = stream_context_create([
+    'http' => [
+        'method'        => 'POST',
+        'header'        => "Content-Type: application/json\r\nAuthorization: Bearer " . $groq_key,
+        'content'       => $groq_request_body,
+        'timeout'       => 15,
+        'ignore_errors' => true,
+    ],
+]);
+
+$response    = @file_get_contents($groq_url, false, $groq_context);
+$curl_error  = ($response === false) ? 'file_get_contents failed' : '';
 $http_status = 0;
-$provider    = 'gemini'; // tracks which provider ultimately answered
 
-foreach ($api_keys as $current_key) {
-    for ($attempt = 1; $attempt <= 2; $attempt++) {
-        $context = stream_context_create([
-            'http' => [
-                'method'        => 'POST',
-                'header'        => "Content-Type: application/json\r\nx-goog-api-key: " . $current_key,
-                'content'       => $gemini_request_body,
-                'timeout'       => 15,
-                'ignore_errors' => true, // get response body even on 4xx/5xx
-            ],
-        ]);
-
-        $response    = @file_get_contents($gemini_url, false, $context);
-        $curl_error  = ($response === false) ? 'file_get_contents failed' : '';
-        $http_status = 0;
-
-        // Parse HTTP status from response headers
-        if (isset($http_response_header) && is_array($http_response_header)) {
-            foreach ($http_response_header as $h) {
-                if (preg_match('#^HTTP/\S+\s+(\d+)#', $h, $m)) {
-                    $http_status = (int)$m[1];
-                    break;
-                }
-            }
-        }
-
-        if ($curl_error || $response === false) {
-            error_log('[PUPSync AI] Gemini key request failed.');
-            break; // try next key
-        }
-        if ($http_status === 200) {
-            $decoded_check = json_decode((string)$response, true);
-            $reply_check   = trim((string)($decoded_check['candidates'][0]['content']['parts'][0]['text'] ?? ''));
-            if ($reply_check !== '') break 2; // success — exit both loops
-            error_log('[PUPSync AI] Gemini key returned 200 but empty reply, rotating.');
-            $response = false;
+if (isset($http_response_header) && is_array($http_response_header)) {
+    foreach ($http_response_header as $h) {
+        if (preg_match('#^HTTP/\S+\s+(\d+)#', $h, $m)) {
+            $http_status = (int)$m[1];
             break;
         }
-        if ($http_status === 429) {
-            error_log('[PUPSync AI] Gemini key quota exhausted (429), rotating.');
-            break; // try next key
-        }
-        if ($http_status === 503 && $attempt < 2) {
-            usleep(700000);
-            continue; // retry same key once
-        }
-        error_log('[PUPSync AI] Gemini key failed with status ' . $http_status . ', rotating.');
-        break; // try next key
     }
 }
 
-// ── 15b. Groq fallback — fires if ALL Gemini keys failed for any reason ───────
-if ($response === false || $http_status !== 200) {
-    error_log('[PUPSync AI] All Gemini keys failed. Switching to Groq fallback for faculty ' . $faculty_id);
-
-    load_env(); // already called above, safe to call again (no-op if already loaded)
-    $groq_key = trim((string)($_ENV['GROQ_API_KEY'] ?? ''));
-
-    if ($groq_key === '') {
-        error_log('[PUPSync AI] Groq fallback triggered but GROQ_API_KEY is not set in .env');
-        // Fall through — sections 16 error handling will respond 503
-    } else {
-        $groq_url          = 'https://api.groq.com/openai/v1/chat/completions';
-        $groq_request_body = json_encode([
-            'model'       => 'openai/gpt-oss-120b',
-            'messages'    => [
-                ['role' => 'system', 'content' => $system_prompt],
-                ['role' => 'user',   'content' => $raw_message],
-            ],
-            'max_tokens'  => 300,
-            'temperature' => 0.7,
-        ]);
-
-        $groq_context = stream_context_create([
-            'http' => [
-                'method'        => 'POST',
-                'header'        => "Content-Type: application/json\r\nAuthorization: Bearer " . $groq_key,
-                'content'       => $groq_request_body,
-                'timeout'       => 15,
-                'ignore_errors' => true,
-            ],
-        ]);
-
-        $response    = @file_get_contents($groq_url, false, $groq_context);
-        $curl_error  = ($response === false) ? 'file_get_contents failed' : '';
-        $http_status = 0;
-
-        if (isset($http_response_header) && is_array($http_response_header)) {
-            foreach ($http_response_header as $h) {
-                if (preg_match('#^HTTP/\S+\s+(\d+)#', $h, $m)) {
-                    $http_status = (int)$m[1];
-                    break;
-                }
-            }
-        }
-
-        if ($http_status === 200) {
-            $provider = 'groq';
-            error_log('[PUPSync AI] Groq fallback succeeded for faculty ' . $faculty_id);
-        } else {
-            error_log('[PUPSync AI] Groq fallback also failed. Status: ' . $http_status);
-        }
-    }
+if ($http_status !== 200) {
+    error_log('[PUPSync AI] Groq request failed. Status: ' . $http_status);
 }
 
 // ── 16. Error handling ────────────────────────────────────────────────────────
@@ -649,7 +753,7 @@ if ($curl_error || $response === false) {
 $decoded = json_decode((string)$response, true);
 if ($http_status !== 200 || isset($decoded['error'])) {
     $api_err = $decoded['error']['message'] ?? 'Unknown error';
-    error_log('[PUPSync AI] Final failure (' . $provider . '). Status ' . $http_status . ': ' . $api_err);
+    error_log('[PUPSync AI] Groq request failed. Status ' . $http_status . ': ' . $api_err);
     if (in_array($http_status, [500, 503, 504], true) || $http_status === 0) $refund_log();
     if ($http_status === 429) {
         $refund_log();
@@ -658,22 +762,49 @@ if ($http_status !== 200 || isset($decoded['error'])) {
     chat_respond(503, 'error', 'The AI assistant encountered an error. Please try again.');
 }
 
-// Parse reply — path differs by provider
-if ($provider === 'groq') {
-    $reply = trim((string)($decoded['choices'][0]['message']['content'] ?? ''));
-} else {
-    $reply = trim((string)($decoded['candidates'][0]['content']['parts'][0]['text'] ?? ''));
-}
+$reply = trim((string)($decoded['choices'][0]['message']['content'] ?? ''));
 
 if ($reply === '') {
-    error_log('[PUPSync AI] Empty reply from ' . $provider . '.');
+    error_log('[PUPSync AI] Empty reply from Groq.');
     chat_respond(503, 'error', 'The AI assistant did not return a response. Please try again.');
 }
 
 // ── 17. Extract intent signals ────────────────────────────────────────────────
-// INTENT:reserve — show reservation mini-form (existing)
-$intent_reserve = str_contains($reply, 'INTENT:reserve');
-$reply          = trim(str_replace('INTENT:reserve', '', $reply));
+// INTENT:reserve[|field:value ...] — show reservation mini-form with optional prefill data
+$intent_reserve  = false;
+$reserve_prefill = [];
+if (preg_match('/INTENT:reserve([^\n]*)/', $reply, $rm)) {
+    $intent_reserve  = true;
+    $signal_tail     = trim($rm[1]);
+    // Parse pipe-delimited key:value pairs after INTENT:reserve
+    if ($signal_tail !== '') {
+        foreach (explode('|', ltrim($signal_tail, '|')) as $pair) {
+            $pair = trim($pair);
+            if ($pair === '') continue;
+            $sep = strpos($pair, ':');
+            if ($sep === false) continue;
+            $k = trim(substr($pair, 0, $sep));
+            $v = trim(substr($pair, $sep + 1));
+            if ($k !== '' && $v !== '') {
+                $reserve_prefill[$k] = $v;
+            }
+        }
+    }
+    // Sanitise values: campus must be 'main' or 'cite', date must be YYYY-MM-DD,
+    // times must be HH:MM — anything else is dropped so the form stays blank
+    if (isset($reserve_prefill['campus']) && !in_array($reserve_prefill['campus'], ['main', 'cite'], true)) {
+        unset($reserve_prefill['campus']);
+    }
+    if (isset($reserve_prefill['date']) && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $reserve_prefill['date'])) {
+        unset($reserve_prefill['date']);
+    }
+    foreach (['start', 'end'] as $tf) {
+        if (isset($reserve_prefill[$tf]) && !preg_match('/^\d{2}:\d{2}$/', $reserve_prefill[$tf])) {
+            unset($reserve_prefill[$tf]);
+        }
+    }
+    $reply = trim(preg_replace('/INTENT:reserve[^\n]*/', '', $reply));
+}
 
 // INTENT:cancel_confirm:{id} — confirm cancelling one reservation
 $intent_cancel_confirm = null;
@@ -747,6 +878,7 @@ echo json_encode([
     'remaining'                   => $new_remaining,
     'ask_campus'                  => $ask_campus,
     'intent_reserve'              => $intent_reserve,
+    'reserve_prefill'             => $reserve_prefill,
     'intent_cancel_confirm'       => $intent_cancel_confirm,
     'intent_cancel_confirm_multi' => $intent_cancel_confirm_multi,
     'intent_cancel_pick'          => $intent_cancel_pick,
