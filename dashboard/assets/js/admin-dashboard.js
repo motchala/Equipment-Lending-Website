@@ -5026,12 +5026,124 @@
                         ? 'equipment-booking/claim_confirm.php?token=' + encodeURIComponent(token)
                         : 'equipment-booking/return_confirm.php?token=' + encodeURIComponent(token);
 
-                    fetch(endpoint, {
+                    const scanFetchOpts = {
                         credentials: 'same-origin',
                         headers: { 'X-Requested-With': 'XMLHttpRequest' }
-                    })
-                        .then(r => r.json())
-                        .then(data => {
+                    };
+
+                    function scanEsc(v) {
+                        return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
+                            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+                        });
+                    }
+
+                    function backToCamera() {
+                        document.getElementById('qrChecklistConfirm').disabled = false;
+                        document.getElementById('qrChecklistConfirm').textContent = 'Confirm';
+                        document.getElementById('qrChecklistView').style.display = 'none';
+                        document.getElementById('qrCameraView').style.display = '';
+                        document.getElementById('qrScannerTitle').textContent = 'Scan QR Code';
+                        document.getElementById('qrScannerSubtitle').textContent = 'Point the camera at the faculty member\'s QR code.';
+                        status.textContent = 'Point camera at the next QR code.';
+                        status.style.color = '#888';
+                        scanning = true;
+                        tick();
+                    }
+
+                    /* STEP 1 of a Claim QR: show WHAT was requested (who, which items, how many, state) before
+                       anything is handed over. Waiting items can be approved right here; the Claim QR the
+                       student already holds stays the same, so it keeps working after approval. */
+                    function showClaimSummary(data) {
+                        const confirmBtn = document.getElementById('qrChecklistConfirm');
+                        const cancelBtn = document.getElementById('qrChecklistCancel');
+                        const itemsEl = document.getElementById('qrChecklistItems');
+                        const hintEl = document.getElementById('qrChecklistHint');
+                        const waiting = data.items.filter(function (i) { return i.status === 'Waiting'; });
+                        const units = data.items.reduce(function (n, i) { return n + (i.borrow_qty || 1); }, 0);
+
+                        document.getElementById('qrCameraView').style.display = 'none';
+                        document.getElementById('qrChecklistView').style.display = '';
+                        document.getElementById('qrScannerTitle').textContent = 'Request Details';
+                        document.getElementById('qrScannerSubtitle').textContent = 'Review what was requested before handing over.';
+
+                        const who = data.collector
+                            ? '<div><b>Requested by:</b> ' + scanEsc(data.collector) + (data.collector_id ? ' · ' + scanEsc(data.collector_id) : '') + '</div>' +
+                            '<div><b>Faculty:</b> ' + scanEsc(data.borrower) + '</div>'
+                            : '<div><b>Borrower:</b> ' + scanEsc(data.borrower) + '</div>';
+                        const meta = (data.room ? '<div><b>Room:</b> ' + scanEsc(data.room) + '</div>' : '') +
+                            (data.borrow_start ? '<div><b>Borrow:</b> ' + scanEsc(data.borrow_start) + (data.return_by ? ' → ' + scanEsc(data.return_by) : '') + '</div>' : '');
+
+                        itemsEl.innerHTML = '<div style="padding:.75rem 1rem;background:#faf7f7;border-bottom:1px solid #efe6e6;font-size:.84rem;line-height:1.6;color:#444;">' + who + meta + '</div>';
+                        data.items.forEach(function (item, idx) {
+                            const ok = item.status === 'Approved';
+                            const row = document.createElement('div');
+                            row.style.cssText = 'display:flex;align-items:center;gap:.65rem;padding:.75rem 1rem;border-bottom:1px solid #f0f0f0;background:' + (idx % 2 === 0 ? '#fff' : '#fafafa') + ';';
+                            row.innerHTML =
+                                '<span style="flex:1;"><strong style="display:block;font-size:.9rem;">' + scanEsc(item.equipment_name) + '</strong>' +
+                                '<span style="font-size:.78rem;color:#888;">Quantity: ' + item.borrow_qty + '</span></span>' +
+                                '<span style="font-size:.75rem;padding:2px 10px;border-radius:12px;white-space:nowrap;background:' + (ok ? '#e8f5e9' : '#fff3cd') + ';color:' + (ok ? '#2e7d32' : '#856404') + ';">' + (ok ? 'Approved' : 'Waiting') + '</span>';
+                            itemsEl.appendChild(row);
+                        });
+
+                        hintEl.textContent = data.items.length + (data.items.length === 1 ? ' item' : ' items') + ' · ' + units + (units === 1 ? ' unit' : ' units') + ' requested.' +
+                            (waiting.length ? ' ' + waiting.length + ' still waiting for approval.' : '');
+
+                        confirmBtn.disabled = false;
+                        confirmBtn.textContent = waiting.length ? (waiting.length === data.items.length ? 'Approve & Continue' : 'Approve Waiting & Continue') : 'Continue to Handover';
+                        cancelBtn.onclick = backToCamera;
+                        confirmBtn.onclick = function () {
+                            confirmBtn.disabled = true;
+                            if (!waiting.length) { handleScanData(data, true); return; }
+                            confirmBtn.textContent = 'Approving...';
+                            let reason = '';
+                            const csrf = (document.querySelector('input[name="csrf_token"]') || {}).value || '';
+                            function approveNext(i) {
+                                if (i >= waiting.length) {
+                                    // Approved: reload the same QR, then go straight to the handover step.
+                                    return fetch(endpoint, scanFetchOpts).then(function (r) { return r.json(); }).then(function (fresh) {
+                                        if (fresh.success && fresh.checklist) { handleScanData(fresh, true); }
+                                        else { throw new Error(fresh.message || 'Could not reload the request.'); }
+                                    });
+                                }
+                                function send() {
+                                    const fd = new FormData();
+                                    fd.append('request_id', waiting[i].id);
+                                    fd.append('new_status', 'Approved');
+                                    fd.append('override_reason', reason);
+                                    fd.append('csrf_token', csrf);
+                                    return fetch('equipment-booking/api/admin-override.php', { method: 'POST', credentials: 'same-origin', body: fd })
+                                        .then(function (r) { return r.json(); });
+                                }
+                                return send().then(function (res) {
+                                    if (res.needs_reason && !reason) {
+                                        const typed = window.prompt('Approval reason for ' + waiting[i].equipment_name + ' (min. 5 characters):', '');
+                                        if (typed === null || typed.trim().length < 5) { throw new Error('__cancel__'); }
+                                        reason = typed.trim();
+                                        return send();
+                                    }
+                                    return res;
+                                }).then(function (res) {
+                                    if (res.status !== 'success') { throw new Error(res.message || 'Could not approve.'); }
+                                    return approveNext(i + 1);
+                                });
+                            }
+                            approveNext(0).catch(function (err) {
+                                confirmBtn.disabled = false;
+                                confirmBtn.textContent = waiting.length === data.items.length ? 'Approve & Continue' : 'Approve Waiting & Continue';
+                                if (err && err.message && err.message !== '__cancel__') { showToast('❌ ' + err.message); }
+                            });
+                        };
+                    }
+
+                    function handleScanData(data, skipSummary) {
+                            if (isClaimQr && data.success && data.checklist && Array.isArray(data.items)) {
+                                if (!skipSummary) { showClaimSummary(data); return; }
+                                // Handover only covers items an admin has approved.
+                                data.items = data.items.filter(function (i) { return !i.status || i.status === 'Approved'; });
+                                if (!data.items.length) { showToast('❌ Nothing approved to hand over yet.'); backToCamera(); return; }
+                                document.getElementById('qrChecklistConfirm').disabled = false;
+                                document.getElementById('qrChecklistConfirm').textContent = 'Confirm';
+                            }
                             if (data.success && data.checklist) {
                                 // Show inline checklist inside the scanner modal
                                 scanning = false;
@@ -5106,7 +5218,7 @@
 
                                 // Wire qty +/- buttons and condition dropdown visibility
                                 if (isClaimQr) {
-                                    itemsEl.addEventListener('click', function (e) {
+                                    itemsEl.onclick = function (e) {
                                         var dec = e.target.closest('[data-claim-dec]');
                                         var inc = e.target.closest('[data-claim-inc]');
                                         var btn = dec || inc;
@@ -5122,8 +5234,8 @@
                                         inp.value = v;
                                         // Show condition dropdown only when some units are withheld
                                         if (cond) cond.style.display = (v < max) ? '' : 'none';
-                                    });
-                                    itemsEl.addEventListener('change', function (e) {
+                                    };
+                                    itemsEl.onchange = function (e) {
                                         var inp = e.target.closest('input[data-claim-qty]');
                                         if (!inp) return;
                                         var max = parseInt(inp.dataset.maxQty || inp.max, 10);
@@ -5132,7 +5244,7 @@
                                         var rid = inp.getAttribute('data-req-id');
                                         var cond = itemsEl.querySelector('select[data-claim-cond][data-req-id="' + rid + '"]');
                                         if (cond) cond.style.display = (v < max) ? '' : 'none';
-                                    });
+                                    };
                                 }
 
                                 hintEl.textContent = isClaimQr
@@ -5207,6 +5319,12 @@
                                             method: 'POST', credentials: 'same-origin', body: formData
                                         }).then(function (r) { return r.json(); })
                                             .then(function (result) {
+                                                if (!result || !result.success) {
+                                                    showToast('❌ ' + ((result && (result.error || result.message)) || 'Could not save the handover.'));
+                                                    confirmBtn.disabled = false;
+                                                    confirmBtn.textContent = 'Confirm';
+                                                    return;
+                                                }
                                                 const msg = (result.claimed || 0) + ' item(s) handed over' +
                                                     (result.withheld > 0 ? ', ' + result.withheld + ' unit(s) withheld.' : '.');
                                                 showToast('✅ ' + msg);
@@ -5285,8 +5403,9 @@
                                     tick();
                                 }, 2500);
                             }
-                        })
-                        .catch(() => {
+                    }
+
+                    function onScanFail() {
                             status.textContent = '❌ Network error. Please try again.';
                             status.style.color = '#e53e3e';
                             setTimeout(() => {
@@ -5295,7 +5414,12 @@
                                 scanning = true;
                                 tick();
                             }, 2500);
-                        });
+                    }
+
+                    fetch(endpoint, scanFetchOpts)
+                        .then(r => r.json())
+                        .then(d => handleScanData(d, false))
+                        .catch(onScanFail);
                     return;
                 }
             }

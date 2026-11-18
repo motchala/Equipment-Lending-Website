@@ -23,17 +23,21 @@ admin_activity_bootstrap($conn);
 $token    = trim($_GET['token'] ?? '');
 $is_ajax  = (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest');
 $items    = [];
-$pending_approval = false;   // the QR is real, but an admin has not approved the request yet
 $borrower = '';
 $collector = '';
+$collector_id = '';
+
+// Everything the admin needs to see BEFORE handing anything over: what was requested, how many, and its state.
+// Waiting items are included on purpose: a student's Claim QR is issued at submission, so it is scanned
+// before an admin has approved the request. The admin must be able to see it (and approve it) at that point.
+$cols = "id, faculty_id, faculty_name, equipment_name, borrow_qty, status, room,
+         borrow_date, borrow_time, return_date, return_time, submitted_by_name, submitted_by_id";
 
 if ($token !== '') {
     // ── Try bundle token first ────────────────────────────────────────────
     $s = $conn->prepare(
-        "SELECT id, faculty_id, faculty_name, equipment_name,
-                bundle_claim_token, borrow_qty, submitted_by_name, submitted_by_id
-           FROM tbl_requests
-          WHERE bundle_claim_token = ? AND status = 'Approved'
+        "SELECT $cols FROM tbl_requests
+          WHERE bundle_claim_token = ? AND status IN ('Waiting', 'Approved')
           ORDER BY id"
     );
     if ($s) {
@@ -47,10 +51,8 @@ if ($token !== '') {
     // ── Fall back to individual claim token ───────────────────────────────
     if (empty($items)) {
         $s = $conn->prepare(
-            "SELECT id, faculty_id, faculty_name, equipment_name,
-                    claim_token, borrow_qty, submitted_by_name, submitted_by_id
-               FROM tbl_requests
-              WHERE claim_token = ? AND status = 'Approved'
+            "SELECT $cols FROM tbl_requests
+              WHERE claim_token = ? AND status IN ('Waiting', 'Approved')
               LIMIT 1"
         );
         if ($s) {
@@ -61,43 +63,59 @@ if ($token !== '') {
             if ($row) $items[] = $row;
         }
     }
-
-    // A Claim QR is issued as soon as a student submits, so it can be scanned before an admin approved it.
-    if (empty($items)) {
-        $s = $conn->prepare("SELECT status FROM tbl_requests WHERE (claim_token = ? OR bundle_claim_token = ?) AND status = 'Waiting' LIMIT 1");
-        if ($s) {
-            $s->bind_param('ss', $token, $token);
-            $s->execute();
-            $w = $s->get_result()->fetch_assoc();
-            $s->close();
-            $pending_approval = $w && $w['status'] === 'Waiting';
-        }
-    }
-
-    if (!empty($items)) {
-        $borrower  = (string)$items[0]['faculty_name'];
-        $collector = trim((string)($items[0]['submitted_by_name'] ?? ''));
-    }
 }
 
-// ── AJAX from QR scanner: return checklist data as JSON ──────────────────────
+function cc_when(?string $d, ?string $t): string
+{
+    $raw = trim((string)$d . ' ' . (string)$t);
+    $ts  = $raw !== '' ? strtotime($raw) : false;
+    return $ts ? date('M j, Y g:i A', $ts) : $raw;
+}
+
+$waiting_n  = 0;
+$approved_n = 0;
+$units_n    = 0;
+foreach ($items as $it) {
+    if ($it['status'] === 'Waiting') $waiting_n++;
+    if ($it['status'] === 'Approved') $approved_n++;
+    $units_n += max(1, (int)($it['borrow_qty'] ?? 1));
+}
+$room_label   = '';
+$borrow_start = '';
+$return_by    = '';
+if (!empty($items)) {
+    $borrower     = (string)$items[0]['faculty_name'];
+    $collector    = trim((string)($items[0]['submitted_by_name'] ?? ''));
+    $collector_id = trim((string)($items[0]['submitted_by_id'] ?? ''));
+    $room_label   = trim((string)($items[0]['room'] ?? ''));
+    $borrow_start = cc_when($items[0]['borrow_date'] ?? '', $items[0]['borrow_time'] ?? '');
+    $return_by    = cc_when($items[0]['return_date'] ?? '', $items[0]['return_time'] ?? '');
+}
+
+// ── AJAX from QR scanner: return the request details + checklist data as JSON ──
 if ($is_ajax) {
     header('Content-Type: application/json');
     if (empty($items)) {
-        echo json_encode(['success' => false, 'message' => $pending_approval
-            ? 'This request is still waiting for admin approval. Approve it first, then scan again.'
-            : 'Invalid or already-used claim token.']);
+        echo json_encode(['success' => false, 'message' => 'Invalid or already-used claim token.']);
     } else {
         echo json_encode([
-            'success'   => true,
-            'checklist' => true,
-            'token'     => $token,
-            'borrower'  => $borrower,
-            'collector' => $collector,
-            'items'     => array_map(fn($r) => [
+            'success'        => true,
+            'checklist'      => true,
+            'token'          => $token,
+            'borrower'       => $borrower,
+            'collector'      => $collector,
+            'collector_id'   => $collector_id,
+            'room'           => $room_label,
+            'borrow_start'   => $borrow_start,
+            'return_by'      => $return_by,
+            'total_units'    => $units_n,
+            'waiting_count'  => $waiting_n,
+            'approved_count' => $approved_n,
+            'items'          => array_map(fn($r) => [
                 'id'             => (int)$r['id'],
                 'equipment_name' => $r['equipment_name'],
                 'borrow_qty'     => (int)($r['borrow_qty'] ?? 1),
+                'status'         => (string)$r['status'],
             ], $items),
         ]);
     }
@@ -204,6 +222,16 @@ if ($is_ajax) {
             text-decoration: none;
         }
         .back-link:hover { text-decoration: underline; }
+        .who { font-size: .84rem; color: #444; background: #faf7f7; border: 1px solid #efe6e6; border-radius: 12px; padding: .7rem 1rem; margin-bottom: 1rem; line-height: 1.6; }
+        .who b { color: #1a1a1a; }
+        .badge--amber  { background: #fff3cd; color: #856404; }
+        .item-row.is-locked { cursor: default; opacity: .85; }
+        .item-chip.is-ok { background: #e8f5e9; color: #2e7d32; }
+        .total { font-size: .8rem; color: #666; margin-bottom: 1rem; }
+        .notice { font-size: .84rem; color: #856404; background: #fff8e1; border: 1px solid #ffe69c; border-radius: 10px; padding: .75rem 1rem; margin-bottom: 1rem; }
+        .result { margin-top: .9rem; font-size: .9rem; text-align: center; font-weight: 600; }
+        .result.ok  { color: #2e7d32; }
+        .result.bad { color: #b71c1c; }
         .error-state { text-align: center; }
         .error-state h2 { color: #b71c1c; margin-bottom: .5rem; }
         .error-state p  { color: #555; margin-bottom: 1.25rem; }
@@ -213,47 +241,101 @@ if ($is_ajax) {
 <div class="card">
 <?php if (empty($items)): ?>
     <div class="error-state">
-<?php if ($pending_approval): ?>
-        <span class="badge badge--red">Waiting for approval</span>
-        <h2>Not approved yet</h2>
-        <p>This request is still waiting for an admin to approve it. Approve it from the Equipment requests list, then scan this QR again to hand the item over.</p>
-<?php else: ?>
         <span class="badge badge--red">Already Claimed</span>
         <h2>Nothing left to claim</h2>
         <p>All items linked to this QR code have already been handed over, or this code is no longer valid.</p>
-<?php endif; ?>
         <p style="font-size:.82rem;color:#aaa;margin-top:.5rem;">If some items are still pending, ask the faculty to open My Activity — each remaining item will show its own Claim QR.</p>
         <a href="../admin-dashboard.php" class="btn-primary" style="display:inline-block;width:auto;padding:.7rem 2rem;text-decoration:none;margin-top:1rem;">Back to Dashboard</a>
     </div>
 <?php else: ?>
-    <span class="badge badge--green">Claim Checklist</span>
-    <h2>Hand over to <?= htmlspecialchars($collector ?: $borrower) ?></h2>
-    <p class="sub"><?= $collector ? 'On behalf of ' . htmlspecialchars($borrower) . ' · ' : '' ?>Tick every item you are physically handing over right now. Unticked items stay <em>Approved</em> and can be claimed later.</p>
+    <span class="badge <?= $approved_n > 0 ? 'badge--green' : 'badge--amber' ?>"><?= $approved_n > 0 ? 'Claim Checklist' : 'Waiting for approval' ?></span>
+    <h2>Request details</h2>
+    <p class="sub">Review what was requested before handing anything over.</p>
 
-    <form method="POST" action="../equipment-booking/api/partial-claim.php">
+    <div class="who">
+        <?php if ($collector !== ''): ?>
+            <div><b>Requested by:</b> <?= htmlspecialchars($collector) ?><?= $collector_id !== '' ? ' · ' . htmlspecialchars($collector_id) : '' ?></div>
+            <div><b>Faculty:</b> <?= htmlspecialchars($borrower) ?></div>
+        <?php else: ?>
+            <div><b>Borrower:</b> <?= htmlspecialchars($borrower) ?></div>
+        <?php endif; ?>
+        <?php if ($room_label !== ''): ?><div><b>Room:</b> <?= htmlspecialchars($room_label) ?></div><?php endif; ?>
+        <?php if ($borrow_start !== ''): ?><div><b>Borrow:</b> <?= htmlspecialchars($borrow_start) ?><?= $return_by !== '' ? ' → ' . htmlspecialchars($return_by) : '' ?></div><?php endif; ?>
+    </div>
+
+    <?php if ($waiting_n > 0): ?>
+        <div class="notice"><?= $approved_n > 0
+            ? 'Some items are still waiting for admin approval. Only the approved items can be handed over now.'
+            : 'This request is still waiting for admin approval. Approve it first (use Scan QR in the admin dashboard, or the Equipment requests list), then hand the items over.' ?></div>
+    <?php endif; ?>
+
+    <form id="claimForm" method="POST" action="../equipment-booking/api/partial-claim.php">
         <?= csrf_field() ?>
         <input type="hidden" name="token" value="<?= htmlspecialchars($token) ?>">
 
         <div class="item-list">
-            <?php foreach ($items as $item): ?>
+            <?php foreach ($items as $item): $q = max(1, (int)($item['borrow_qty'] ?? 1)); ?>
+            <?php if ($item['status'] === 'Approved'): ?>
             <label class="item-row">
-                <input type="checkbox" name="hand_over[]"
-                       value="<?= (int)$item['id'] ?>" checked>
+                <input type="checkbox" name="give_qty[<?= (int)$item['id'] ?>]" value="<?= $q ?>" checked>
                 <div class="item-info">
                     <div class="item-name"><?= htmlspecialchars($item['equipment_name']) ?></div>
-                    <div class="item-qty">Qty: <?= (int)($item['borrow_qty'] ?? 1) ?></div>
+                    <div class="item-qty">Qty: <?= $q ?></div>
                 </div>
-                <span class="item-chip">Approved</span>
+                <span class="item-chip is-ok">Approved</span>
             </label>
+            <?php else: ?>
+            <div class="item-row is-locked">
+                <div class="item-info">
+                    <div class="item-name"><?= htmlspecialchars($item['equipment_name']) ?></div>
+                    <div class="item-qty">Qty: <?= $q ?></div>
+                </div>
+                <span class="item-chip">Waiting</span>
+            </div>
+            <?php endif; ?>
             <?php endforeach; ?>
         </div>
+        <p class="total"><?= count($items) ?> item<?= count($items) === 1 ? '' : 's' ?> · <?= $units_n ?> unit<?= $units_n === 1 ? '' : 's' ?> requested</p>
 
-        <p class="hint">Unticked items will remain <em>Approved</em> — claim them later or cancel individually from the dashboard.</p>
-
-        <button type="submit" class="btn-primary">Confirm Handover</button>
+        <?php if ($approved_n > 0): ?>
+        <p class="hint">Tick every item you are physically handing over right now. Unticked items stay <em>Approved</em> and can be claimed later.</p>
+        <button type="submit" class="btn-primary" id="claimBtn">Confirm Handover</button>
+        <?php endif; ?>
     </form>
+    <div id="claimResult" class="result" role="status"></div>
     <a href="../admin-dashboard.php" class="back-link">Cancel — Back to Dashboard</a>
 <?php endif; ?>
 </div>
+<script nonce="<?= $csp_nonce ?>">
+(function () {
+    var form = document.getElementById('claimForm');
+    if (!form) return;
+    var btn = document.getElementById('claimBtn');
+    var out = document.getElementById('claimResult');
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        if (!btn) return;
+        if (!form.querySelector('input[type=checkbox]:checked')) {
+            out.className = 'result bad'; out.textContent = 'Tick at least one item to hand over.'; return;
+        }
+        btn.disabled = true; btn.textContent = 'Saving...';
+        fetch(form.action, { method: 'POST', credentials: 'same-origin', body: new FormData(form) })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (d && d.success && d.claimed > 0) {
+                    out.className = 'result ok'; out.textContent = '✅ ' + d.claimed + ' item(s) handed over.';
+                    form.style.display = 'none';
+                } else {
+                    out.className = 'result bad'; out.textContent = (d && (d.error || d.message)) || 'Nothing was handed over.';
+                    btn.disabled = false; btn.textContent = 'Confirm Handover';
+                }
+            })
+            .catch(function () {
+                out.className = 'result bad'; out.textContent = 'Network error. Please try again.';
+                btn.disabled = false; btn.textContent = 'Confirm Handover';
+            });
+    });
+})();
+</script>
 </body>
 </html>
