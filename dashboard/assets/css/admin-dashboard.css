@@ -14015,6 +14015,17 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     line-height: 1.3;
 }
 
+.eq-when {
+    line-height: 1.3;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Requested / Needed By / Issued / Due: same two-line layout in every row, so dates and times line up */
+#eq-loan-table td[data-col="col3"],
+#eq-loan-table td[data-col="col4"] {
+    vertical-align: middle;
+}
+
 .eq-act-wrap {
     display: flex;
     gap: 6px;

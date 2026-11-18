@@ -718,7 +718,7 @@
                                         data-instructor="<?php echo htmlspecialchars($r['instructor']); ?>"
                                         data-room="<?php echo htmlspecialchars($r['room']); ?>"
                                         data-submitted="<?php echo date('M d, Y g:i A', strtotime($r['request_date'])); ?>"
-                                        data-date-needed="<?php echo date('M d, Y', strtotime($r['borrow_date'])); ?>"
+                                        data-date-needed="<?php echo date('M d, Y', strtotime($r['borrow_date'])) . ($lbt !== '' ? ' · ' . $lbt : ''); ?>"
                                         data-return-date="<?php echo htmlspecialchars($r['return_date']); ?>"
                                         data-return-date-display="<?php echo date('M d, Y', strtotime($r['return_date'])); ?>"
                                         data-arb-rule="<?php echo htmlspecialchars($r['arbitration_rule'] ?? ''); ?>"
@@ -759,20 +759,20 @@
                                         </td>
                                         <td data-col="col3">
                                             <?php if ($lst === 'waiting' || $lst === 'scheduled'): ?>
-                                                <?php echo date('M d', strtotime($r['request_date'])); ?><div class="eq-cell-sub"><?php echo date('g:i A', strtotime($r['request_date'])); ?></div>
+                                                <div class="eq-when"><?php echo date('M d', strtotime($r['request_date'])); ?></div><div class="eq-cell-sub"><?php echo date('g:i A', strtotime($r['request_date'])); ?></div>
                                             <?php else: ?>
-                                                <?php echo date('M d', strtotime($r['borrow_date'])); ?><?php if ($lbt !== ''): ?><div class="eq-cell-sub"><?php echo $lbt; ?></div><?php endif; ?>
+                                                <div class="eq-when"><?php echo date('M d', strtotime($r['borrow_date'])); ?></div><div class="eq-cell-sub"><?php echo $lbt !== '' ? $lbt : '&mdash;'; ?></div>
                                         <?php endif; ?>
                                         </td>
                                         <td data-col="col4" <?php echo ($lst === 'overdue') ? ' style="color:var(--danger);font-weight:600"' : ''; ?>>
                                             <?php if ($lst === 'waiting'): ?>
-                                                <?php echo date('M d', strtotime($r['borrow_date'])); ?><?php if ($lbt !== ''): ?><div class="eq-cell-sub"><?php echo $lbt; ?></div><?php endif; ?>
+                                                <div class="eq-when"><?php echo date('M d', strtotime($r['borrow_date'])); ?></div><div class="eq-cell-sub"><?php echo $lbt !== '' ? $lbt : '&mdash;'; ?></div>
                                         <?php elseif ($lst === 'scheduled'): ?>
-                                            <?php echo date('M d', strtotime($r['borrow_date'])); ?><div class="eq-cell-sub"><?php echo $ldays > 0 ? 'in ' . $ldays . 'd' : 'today'; ?></div>
+                                            <div class="eq-when"><?php echo date('M d', strtotime($r['borrow_date'])); ?></div><div class="eq-cell-sub"><?php echo ($lbt !== '' ? $lbt . ' &middot; ' : '') . ($ldays > 0 ? 'in ' . $ldays . 'd' : 'today'); ?></div>
                                         <?php elseif ($lst === 'returned'): ?>
-                                            <?php echo date('M d', strtotime($lret)); ?><div class="eq-cell-sub"><?php echo date('g:i A', strtotime($lret)); ?></div>
+                                            <div class="eq-when"><?php echo date('M d', strtotime($lret)); ?></div><div class="eq-cell-sub"><?php echo date('g:i A', strtotime($lret)); ?></div>
                                         <?php elseif ($lst === 'overdue'): ?>
-                                            <?php echo date('M d', strtotime($r['return_date'])); ?>
+                                            <div class="eq-when"><?php echo date('M d', strtotime($r['return_date'])); ?></div>
                                             <div class="eq-cell-sub" style="font-weight:400"><?php echo max(1, $ldays); ?>d overdue</div>
                                             <?php if (!empty($eq_notices[(int)$r['id']])):
                                                     $ninfo = $eq_notices[(int)$r['id']];
@@ -785,7 +785,7 @@
                                                 </div>
                                             <?php endif; ?>
                                         <?php else: ?>
-                                            <?php echo date('M d', strtotime($r['return_date'])); ?><?php if ($lrt !== ''): ?><div class="eq-cell-sub"><?php echo $lrt; ?></div><?php endif; ?><?php if ((int)($r['extension_count'] ?? 0) > 0): $lext = (int)$r['extension_count']; ?><div class="eq-cell-sub" title="Extended <?php echo $lext; ?> time<?php echo $lext === 1 ? '' : 's'; ?><?php echo !empty($r['original_return_date']) ? ', was ' . date('M d', strtotime($r['original_return_date'])) : ''; ?>">+<?php echo $lext; ?> ext</div><?php endif; ?>
+                                            <div class="eq-when"><?php echo date('M d', strtotime($r['return_date'])); ?></div><div class="eq-cell-sub"><?php echo $lrt !== '' ? $lrt : '&mdash;'; ?></div><?php if ((int)($r['extension_count'] ?? 0) > 0): $lext = (int)$r['extension_count']; ?><div class="eq-cell-sub" title="Extended <?php echo $lext; ?> time<?php echo $lext === 1 ? '' : 's'; ?><?php echo !empty($r['original_return_date']) ? ', was ' . date('M d', strtotime($r['original_return_date'])) : ''; ?>">+<?php echo $lext; ?> ext</div><?php endif; ?>
                                     <?php endif; ?>
                                         </td>
                                         <td data-col="col5">
