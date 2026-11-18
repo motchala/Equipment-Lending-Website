@@ -66,12 +66,11 @@ if ($session_token === '' || $submitted_token === '' ||
 }
 
 // ── 8. Load API keys ──────────────────────────────────────────────────────────
-require_once __DIR__ . '/../../config/env.php';
-load_env();
-$groq_key = trim((string)($_ENV['GROQ_API_KEY'] ?? ''));
+// GROQ_API_KEY is defined in config/db.php (gitignored — never pushed to repo)
+$groq_key = defined('GROQ_API_KEY') ? GROQ_API_KEY : '';
 
 if ($groq_key === '') {
-    error_log('[PUPSync AI] GROQ_API_KEY is not set in .env');
+    error_log('[PUPSync AI] GROQ_API_KEY is not defined in config/db.php');
     chat_respond(503, 'error', 'The AI assistant is temporarily unavailable.');
 }
 
