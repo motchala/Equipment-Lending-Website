@@ -1734,9 +1734,7 @@
                     retItems.some(function (it) { return returnLive(itemStatus(it)); }),
                     'One scan returns them all', 'Works once you have claimed the items');
             }
-            var note = claimItems
-                ? 'One Claim QR covers every approved item. Items an admin declines are left out. The Return QR works once the items are on loan.'
-                : 'This Return QR covers every item still on loan from your request.';
+            var note = '';
             return reqCard('<p class="st-bundle-head">' + all.length + ' items · one set of QR codes</p>',
                 all.map(itemRowHtml).join(''), note, qrs, ' st-bundle');
         }
@@ -1762,10 +1760,7 @@
             }
             var note = '';
             if (status === 'Waiting') {
-                note = it.claim_token
-                    ? 'Keep this Claim QR. It works for pick-up once an admin approves your request' +
-                    (canWatch && it.status_key ? ' — this page updates by itself.' : '.')
-                    : (it.reason || '');
+                note = it.claim_token ? '' : (it.reason || '');
             } else if (status !== 'Approved' && it.reason) {
                 note = it.reason;
             }
