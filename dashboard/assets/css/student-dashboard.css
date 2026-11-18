@@ -3073,7 +3073,162 @@ select.st-input option:disabled {
         transition-duration: .01ms !important;
     }
 }
+/* Return QR before the item is on loan: shown, but visibly not usable yet (the server refuses it as well) */
+.st-qr-box.is-locked .st-qr {
+    opacity: .4;
+    filter: grayscale(1);
+}
+
+.st-qr-box.is-locked .st-qr-title span {
+    color: #b26a00;
+    font-weight: 600;
+}
+
 /* Bundle card: one shared QR is centred instead of sitting in half of a two-column grid */
 .st-bundle .st-qrs:has(> .st-qr-box:only-child) {
     grid-template-columns: 1fr;
+}
+
+
+/* ── Receipt layout: compact summary grid, request rows with status pills, one card per set of QR codes ── */
+.st-summary-card {
+    padding: 18px 20px;
+}
+
+.st-summary.is-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px 20px;
+}
+
+.st-summary.is-grid>div {
+    display: block;
+    min-width: 0;
+    padding: 0;
+    border-bottom: none;
+}
+
+.st-summary.is-grid dt {
+    margin-bottom: 2px;
+    font-size: .68rem;
+    font-weight: 600;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+}
+
+.st-summary.is-grid dd {
+    font-size: .88rem;
+    text-align: left;
+}
+
+.st-req-list {
+    gap: 12px;
+}
+
+.st-req {
+    padding: 14px 18px 16px;
+}
+
+.st-bundle-head {
+    margin: 0 0 4px;
+    font-size: .72rem;
+    font-weight: 600;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: var(--st-muted);
+}
+
+.st-rq-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px dashed var(--st-line);
+}
+
+.st-rq-row:last-child {
+    border-bottom: none;
+}
+
+.st-rq-main {
+    min-width: 0;
+}
+
+.st-rq-name {
+    display: block;
+    font-family: var(--st-display);
+    font-weight: 700;
+    font-size: .98rem;
+    overflow-wrap: anywhere;
+}
+
+.st-rq-id {
+    display: block;
+    margin-top: 1px;
+    font-size: .72rem;
+    color: var(--st-muted);
+}
+
+.st-rq-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    padding: 4px 10px 4px 8px;
+    border-radius: 999px;
+    font-size: .72rem;
+    font-weight: 600;
+    white-space: nowrap;
+    background: var(--st-ok-bg);
+    color: var(--st-ok);
+}
+
+.st-rq-pill .material-symbols-outlined {
+    font-size: 15px;
+}
+
+.st-rq-pill.is-wait {
+    background: var(--st-warn-bg);
+    color: var(--st-warn);
+}
+
+.st-rq-pill.is-bad {
+    background: var(--st-err-bg);
+    color: var(--st-err);
+}
+
+.st-rq-pill.is-info {
+    background: var(--st-tint);
+    color: var(--st-muted);
+}
+
+.st-req>.st-req-note {
+    margin: 4px 0 0;
+    line-height: 1.45;
+}
+
+.st-req>.st-qrs {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--st-line);
+}
+
+@media (max-width: 860px) {
+    .st-summary-card {
+        padding: 14px 14px;
+    }
+
+    .st-summary.is-grid {
+        gap: 12px 14px;
+    }
+
+    .st-req {
+        padding: 12px 14px 14px;
+    }
+}
+
+/* QR codes: two side by side when there is room (also on phones), one per row only on very narrow screens */
+.st-req>.st-qrs {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }

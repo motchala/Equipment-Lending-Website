@@ -64,7 +64,7 @@ foreach ($conditions as $req_id_raw => $condition_raw) {
                     borrow_qty, stock_applied, status
                FROM tbl_requests
               WHERE id = ? AND return_token = ?
-                AND status IN ('Approved','On Loan','Overdue')
+                AND status IN ('On Loan','Overdue')
               LIMIT 1 FOR UPDATE"
         );
         if (!$stmt) { $conn->rollback(); continue; }

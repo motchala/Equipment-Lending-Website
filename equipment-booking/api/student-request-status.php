@@ -89,9 +89,10 @@ foreach ($asked as $it) {
         'batch_id'     => (string)$row['batch_id'],
         'status'       => $status,
         'reason'       => (string)$row['reason'],
-        // the Claim QR is shown from the start but only works once Approved (claim_confirm.php); the Return QR until it is returned
+        // Both QRs are shown from the start. The Claim QR only works once Approved (claim_confirm.php); the Return QR
+        // only works while the item is On Loan / Overdue (return_confirm.php, partial-return.php).
         'claim_token'  => in_array($status, ['Waiting', 'Approved'], true) ? ($row['claim'] ?: null) : null,
-        'return_token' => in_array($status, ['Approved', 'On Loan', 'Overdue'], true) ? ($row['ret'] ?: null) : null,
+        'return_token' => in_array($status, ['Waiting', 'Approved', 'On Loan', 'Overdue'], true) ? ($row['ret'] ?: null) : null,
     ];
 }
 $stmt->close();
