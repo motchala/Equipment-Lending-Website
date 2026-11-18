@@ -29,3 +29,5 @@ importing.md
 
 # Claude context file (local only)
 /x-CLAUDE.md
+
+.agents/
