@@ -127,54 +127,57 @@ $st_semester = ps_semester_label();
             </ul>
         </section>
 
-        <!-- ═══ DETAILS — code + who you are ════════════════════════════ -->
-        <section class="st-view" id="view-details" aria-labelledby="detailsTitle" hidden>
-            <form class="st-card st-narrow" id="detailsForm" novalidate>
-                <div class="st-card-head">
-                    <span class="st-tile" aria-hidden="true"><span class="material-symbols-outlined" id="detailsIcon">inventory_2</span></span>
-                    <div>
-                        <h2 class="st-h2" id="detailsTitle" tabindex="-1">Borrow equipment</h2>
-                        <p class="st-sub">Enter the code from your faculty, then tell us who you are.</p>
-                    </div>
-                </div>
-
-                <div class="st-alert is-error" id="detailsError" role="alert" hidden></div>
-
-                <div class="st-field">
-                    <label for="facultyCode" id="codeLabel">Faculty or item code</label>
-                    <div class="st-input-icon">
-                        <span class="material-symbols-outlined" aria-hidden="true">key</span>
-                        <input type="text" id="facultyCode" class="st-input st-mono" placeholder="Enter code"
-                            autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
-                    </div>
-                    <p class="st-hint" id="codeHint">Ask your faculty for their code.</p>
-                </div>
-
-                <div class="st-field">
-                    <label for="studentName">Your name</label>
-                    <input type="text" id="studentName" class="st-input" placeholder="Juan Dela Cruz" autocomplete="name">
-                </div>
-
-                <div class="st-field">
-                    <label for="studentCourse">Course</label>
-                    <select id="studentCourse" class="st-input">
-                        <option value="" selected disabled>Select your course</option>
-                    </select>
-                </div>
-
-                <div class="st-actions">
-                    <button type="button" class="st-btn st-btn-ghost" data-action="home">Cancel</button>
-                    <button type="submit" class="st-btn st-btn-primary" id="btnVerifyCode">
-                        <span class="material-symbols-outlined" aria-hidden="true">verified</span>Verify &amp; continue
-                    </button>
-                </div>
-            </form>
-        </section>
-
         <!-- ═══ FLOW — equipment / facility / receipt (rendered by JS) ══ -->
         <section class="st-view" id="view-flow" hidden></section>
 
     </main>
+
+    <!-- ═══ DETAILS — code + who you are (pop-up form over the home screen) ═══ -->
+    <div class="st-modal" id="view-details" role="dialog" aria-modal="true" aria-labelledby="detailsTitle" hidden>
+        <form class="st-modal-card" id="detailsForm" novalidate>
+            <div class="st-card-head">
+                <span class="st-tile" aria-hidden="true"><span class="material-symbols-outlined" id="detailsIcon">inventory_2</span></span>
+                <div>
+                    <h2 class="st-h2" id="detailsTitle" tabindex="-1">Borrow equipment</h2>
+                    <p class="st-sub">Enter the code from your faculty, then tell us who you are.</p>
+                </div>
+                <button type="button" class="st-icon-btn st-modal-close" data-action="home" aria-label="Close" title="Close">
+                    <span class="material-symbols-outlined" aria-hidden="true">close</span>
+                </button>
+            </div>
+
+            <div class="st-alert is-error" id="detailsError" role="alert" hidden></div>
+
+            <div class="st-field">
+                <label for="facultyCode" id="codeLabel">Faculty or item code</label>
+                <div class="st-input-icon">
+                    <span class="material-symbols-outlined" aria-hidden="true">key</span>
+                    <input type="text" id="facultyCode" class="st-input st-mono" placeholder="Enter code"
+                        autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
+                </div>
+                <p class="st-hint" id="codeHint">Ask your faculty for their code.</p>
+            </div>
+
+            <div class="st-field">
+                <label for="studentName">Your name</label>
+                <input type="text" id="studentName" class="st-input" placeholder="Juan Dela Cruz" autocomplete="name">
+            </div>
+
+            <div class="st-field">
+                <label for="studentCourse">Course</label>
+                <select id="studentCourse" class="st-input">
+                    <option value="" selected disabled>Select your course</option>
+                </select>
+            </div>
+
+            <div class="st-actions">
+                <button type="button" class="st-btn st-btn-ghost" data-action="home">Cancel</button>
+                <button type="submit" class="st-btn st-btn-primary" id="btnVerifyCode">
+                    <span class="material-symbols-outlined" aria-hidden="true">verified</span>Verify &amp; continue
+                </button>
+            </div>
+        </form>
+    </div>
 
     <footer class="st-foot">PUPSync &middot; Polytechnic University of the Philippines &ndash; Bi&ntilde;an Campus</footer>
 

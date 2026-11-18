@@ -4,6 +4,7 @@
  * room-reservation/api/submit-student-reserve.php
  * Student submits a room reservation via faculty code.
  * Mirrors equipment-booking/api/submit-student-borrow.php exactly.
+ * A student reservation is never auto-approved: it is always saved as Waiting for an admin to decide.
  *
  * POST body (JSON):
  *   code_db_id, faculty_id, faculty_name,
@@ -128,10 +129,13 @@ if (count($active_now) >= RoomRules::maxActive()) {
 }
 
 // ── Insert reservation ────────────────────────────────────────────────────
-// Same-day: Approved at once (the engine may flip it to Declined). A LATER DATE waits for an admin.
+// A student's reservation is NEVER auto-approved, on any date (same-day included) and whatever the
+// same-day auto-confirm setting says: it always waits for an admin to decide. The engine still runs
+// every check and refuses a clash with an already-approved booking on the spot (hold-for-review).
+// (Faculty reservations keep using RoomRules::holdsForReview().)
 require_once __DIR__ . '/../core/room-expiry.php';
 $is_future_day   = ps_room_is_future_date($res_date);
-$hold_for_review = RoomRules::holdsForReview($res_date);   // later date, or same-day when auto-confirm is off
+$hold_for_review = true;
 $initial_status  = $hold_for_review ? 'Waiting' : 'Approved';
 if ($hold_for_review) {
     ps_room_ensure_waiting_status($conn);
@@ -255,7 +259,11 @@ if ($fac_row && !empty($fac_row['email']) && notif_family_enabled($conn, 'facult
                 Hello <strong>' . htmlspecialchars($fac_row['fullname']) . '</strong>,
             </p>
             <p style="margin:0 0 20px;color:#333;font-size:.95rem;">
-                ' . ($is_pending ? 'The room reservation you authorized is for a later date, so it is waiting for an admin to approve it. If no decision is made, it is automatically declined at 12:01 AM on the reservation date.' : 'The room reservation you authorized has been processed by the system.') . '
+                ' . ($is_pending
+        ? ($is_future_day
+            ? 'The room reservation you authorized is for a later date, so it is waiting for an admin to approve it. If no decision is made, it is automatically declined at 12:01 AM on the reservation date.'
+            : 'The room reservation you authorized is waiting for an admin to approve it. If no decision is made before the start time, it is automatically declined.')
+        : 'The room reservation you authorized has been processed by the system.') . '
             </p>
             <table style="width:100%;border-collapse:collapse;font-size:.9rem;">
                 <tr style="background:#f9f5f5;">

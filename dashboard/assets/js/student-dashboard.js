@@ -3,8 +3,8 @@
 
    Flow (one page, with a building/floor/room picker for equipment):
      Home ─ pick a service   (a refresh keeps you on the same screen: see "KEEP THE SCREEN ON REFRESH")
-       └─ Details ─ faculty code + name + student ID + course   (verify)
-            ├─ Borrow, faculty code → photo grid → room picker → submit → receipt + QR
+       └─ Details ─ faculty code + name + course, in a pop-up (modal) over Home   (verify)
+            ├─ Borrow, faculty code → photo grid → Continue → "Where and when" pop-up (room picker, date, time) → submit → receipt + QR
             ├─ Borrow, item code    → item, qty / time, room picker → submit → receipt + QR
             └─ Facility             → building → floor → room  → reserve → result
 
@@ -387,8 +387,11 @@
 
     function show(name, step) {
         if (name !== 'flow') nav = { screen: name };
-        VIEWS.forEach(function (v) { $('view-' + v).hidden = (v !== name); });
-        setStep(step || 0);
+        /* The details form is a pop-up (modal) over the home screen; every other screen replaces the one before it */
+        var popup = (name === 'details');
+        VIEWS.forEach(function (v) { $('view-' + v).hidden = popup ? (v === 'flow') : (v !== name); });
+        document.body.classList.toggle('st-modal-open', popup);
+        setStep(popup ? 0 : (step || 0));
         window.scrollTo(0, 0);
         var h = $('view-' + name).querySelector('h1, h2');
         if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); }
@@ -526,9 +529,16 @@
             '<div class="st-pagination-numbers" id="eqPageNumbers"></div>' +
             '<button type="button" class="st-pagination-btn" data-action="eq-page-next" aria-label="Next page">' + icon('chevron_right') + '</button>' +
             '</nav></div>' +
-            '<form class="st-card" id="borrowForm" novalidate>' +
+            '<div class="st-submitbar">' +
+            '<div class="st-submit-sum" id="eqSummary"></div>' +
+            '<button type="button" class="st-btn st-btn-primary" id="btnOpenBorrow" data-action="open-borrow-modal">Continue' + icon('arrow_forward') + '</button>' +
+            '</div>' +
+            /* "Where and when" is a pop-up (modal) form opened by Continue */
+            '<div class="st-modal" id="borrowModal" role="dialog" aria-modal="true" aria-labelledby="borrowModalTitle" hidden>' +
+            '<form class="st-modal-card is-wide" id="borrowForm" novalidate>' +
             '<div class="st-card-head"><span class="st-tile" aria-hidden="true">' + icon('event') + '</span>' +
-            '<div><h3 class="st-h2">Where and when</h3><p class="st-sub">Tell us where you will use it and for how long.</p></div></div>' +
+            '<div><h3 class="st-h2" id="borrowModalTitle">Where and when</h3><p class="st-sub">Tell us where you will use it and for how long.</p></div>' +
+            '<button type="button" class="st-icon-btn st-modal-close" data-action="close-borrow-modal" aria-label="Close" title="Close">' + icon('close') + '</button></div>' +
             '<div class="st-alert is-error" id="flowError" role="alert" hidden></div>' +
             '<div class="st-field"><label for="borrowRoomPicker">Room / location <span class="st-star">*</span></label>' +
             '<input type="hidden" id="borrowRoomId"><input type="hidden" id="borrowRoom">' +
@@ -537,12 +547,12 @@
             scheduleFields('borrow') +
             LETTER_HTML('borrowLetter', 'Recommended when borrowing on a later date. You can still submit without one.') +
             '<div class="st-alert is-note">' + icon('info') + '<span>Each item creates its own request. Your faculty will be notified.</span></div>' +
-            roomPickerHTML() +
-            '</form>' +
-            '<div class="st-submitbar">' +
-            '<div class="st-submit-sum" id="eqSummary"></div>' +
-            '<button type="button" class="st-btn st-btn-primary" id="btnSubmitBorrow" data-action="submit-borrow">' + icon('send') + 'Submit request</button>' +
-            '</div>', 2);
+            '<div class="st-actions">' +
+            '<button type="button" class="st-btn st-btn-ghost" data-action="close-borrow-modal">Cancel</button>' +
+            '<button type="submit" class="st-btn st-btn-primary" id="btnSubmitBorrow">' + icon('send') + 'Submit request</button>' +
+            '</div>' +
+            '</form></div>' +
+            roomPickerHTML(), 2);
 
         refreshStudentSchedule('borrow');
         syncStudentSchedule('borrow');
@@ -699,7 +709,7 @@
     function isDoneName(n) { return st.done.some(function (d) { return d.equipment === n; }); }
 
     function updateSummary() {
-        var el = $('eqSummary'), btn = $('btnSubmitBorrow');
+        var el = $('eqSummary'), btn = $('btnSubmitBorrow'), openBtn = $('btnOpenBorrow');
         if (!el) return;
         var items = pendingItems();
         var units = items.reduce(function (s, i) { return s + i.qty; }, 0);
@@ -707,6 +717,33 @@
             ? '<strong>' + plural(items.length, 'item') + ' selected</strong><span>' + plural(units, 'unit') + ' in total</span>'
             : '<strong>No items selected</strong><span>Add at least one item to continue.</span>';
         if (btn && btn.getAttribute('data-html') == null) btn.disabled = !items.length;
+        if (openBtn) openBtn.disabled = !items.length;
+    }
+
+    /* "Where and when" pop-up: Continue opens it, Cancel / X / Esc close it */
+    function openBorrowModal() {
+        var m = $('borrowModal');
+        if (!m || !pendingItems().length) return;
+        hideAlert('flowError');
+        m.hidden = false;
+        document.body.classList.add('st-modal-open');
+        nav.modal = true;
+        var first = $('borrowRoomPicker');
+        if (first) first.focus({ preventScroll: true });
+        schedulePersist();
+    }
+
+    function closeBorrowModal() {
+        var m = $('borrowModal');
+        if (!m) return;
+        var submit = $('btnSubmitBorrow');
+        if (submit && submit.getAttribute('data-html') != null) return;   /* a request is being sent */
+        m.hidden = true;
+        document.body.classList.remove('st-modal-open');
+        delete nav.modal;
+        var back = $('btnOpenBorrow');
+        if (back) back.focus({ preventScroll: true });
+        schedulePersist();
     }
 
     function lockWhere(lock) {
@@ -1552,8 +1589,11 @@
         var approved = res.status === 'Approved';
         var waiting = res.status === 'Waiting';   /* a later date waits for an admin's decision */
         var title = approved ? 'Reservation approved' : (waiting ? 'Request sent — pending admin review' : 'Reservation ' + esc(res.status || 'received'));
+        var later = !!f.reservation_date && f.reservation_date > todayStr();
         var note = waiting
-            ? 'This reservation is for a later date, so an admin has to approve it. If it is not reviewed in time, it is automatically declined at 12:01 AM on the reservation date.'
+            ? (later
+                ? 'This reservation is for a later date, so an admin has to approve it. If it is not reviewed in time, it is automatically declined at 12:01 AM on the reservation date.'
+                : 'An admin has to approve your reservation first. If it is not reviewed before the start time, it is automatically declined.')
             : (res.reason ? res.reason : '');
         flow(
             '<div class="st-result"><div class="st-result-top">' +
@@ -1569,7 +1609,7 @@
             row('Time', minToLabel(hhmmToMin(f.start_time)) + ' – ' + minToLabel(hhmmToMin(f.end_time))) +
             row('Purpose', f.purpose) +
             '</dl></div>' +
-            '<div class="st-actions"><button type="button" class="st-btn st-btn-primary st-btn-block" data-action="home">Done</button></div></div>', 3);
+            '<div class="st-actions st-result-actions"><button type="button" class="st-btn st-btn-primary" data-action="home">Done</button></div></div>', 3);
     }
 
     function row(k, v) { return '<div><dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd></div>'; }
@@ -1804,9 +1844,9 @@
             row('Return by', fmtWhen(r.return_date)) +
             '</dl></div>' +
             '<div class="st-req-list">' + reqs + '</div>' +
-            '<div class="st-actions">' +
+            '<div class="st-actions st-result-actions">' +
             (canWatch && nWaiting ? '<button type="button" class="st-btn st-btn-ghost" data-action="receipt-refresh">' + icon('refresh') + 'Check status</button>' : '') +
-            '<button type="button" class="st-btn st-btn-primary st-btn-block" data-action="done">Done</button></div></div>', 3);
+            '<button type="button" class="st-btn st-btn-primary" data-action="done">Done</button></div></div>', 3);
 
         drawQrs($('view-flow'));
         startReceiptPoll();
@@ -2057,6 +2097,7 @@
                     restoreRoom('borrow', f);
                     restoreSchedule('borrow', f);
                     if (st.where) lockWhere(true);
+                    if (n.modal) openBorrowModal();
                 } else if (n.screen === 'item') {
                     renderItem();
                     if ($('itemQty') && f.itemQty) $('itemQty').value = f.itemQty;
@@ -2147,7 +2188,8 @@
                 name = nameOfCard(t);
                 if (name) { delete st.cart[name]; refreshCard(name, '[data-action="eq-add"]'); }
                 return;
-            case 'submit-borrow': return submitBorrow();
+            case 'open-borrow-modal': return openBorrowModal();
+            case 'close-borrow-modal': return closeBorrowModal();
             case 'eq-page-prev':
                 st.eqPage = Math.max(1, st.eqPage - 1);
                 return renderEqGrid();
@@ -2247,8 +2289,29 @@
     }
 
     function onKeyDown(e) {
-        if (e.key === 'Escape' && $('studentRoomPicker') && !$('studentRoomPicker').hidden) {
-            closeStudentRoomPicker();
+        var picker = $('studentRoomPicker');
+        if (picker && !picker.hidden) {
+            if (e.key === 'Escape') closeStudentRoomPicker();
+            return;
+        }
+        if (document.querySelector('.pslc-overlay:not([hidden])')) return;   /* the letter camera handles its own keys */
+        var modal = null;
+        ['view-details', 'borrowModal'].forEach(function (id) { var m = $(id); if (m && !m.hidden) modal = m; });
+        if (!modal) return;
+        if (e.key === 'Escape') {                       /* closes the open pop-up */
+            if (modal.id === 'borrowModal') closeBorrowModal(); else goHome();
+            return;
+        }
+        if (e.key === 'Tab') {                          /* keep keyboard focus inside the pop-up */
+            var items = Array.prototype.filter.call(
+                modal.querySelectorAll('a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])'),
+                function (el) { return !el.disabled && !el.hidden && el.offsetParent !== null; }
+            );
+            if (!items.length) return;
+            var first = items[0], last = items[items.length - 1];
+            if (!modal.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+            else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+            else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
         }
     }
 
