@@ -197,9 +197,25 @@
     /* ── Browser Back/Forward Navigation ───────────────────────────────── */
     // We use a lightweight pushState approach: each tab switch or overlay open
     // pushes a state object onto the history stack. popstate restores the UI.
-    // Reload always lands on Home because initPage() calls replaceState with
-    // the home state and never reads the hash back on load.
+    // A soft refresh (F5) keeps the screen you are on: the head script in faculty-shell-top.php works out
+    // which screen that is (window._facRestoreTab) and initPage() puts it back. A hard refresh
+    // (Ctrl+Shift+R / Ctrl+F5) starts on the Dashboard.
     let _navSuppressed = false;
+
+    /* Remember the screen you are on, for a soft refresh. sessionStorage is the backup for the #tab- part of the URL,
+       and the cookie lets the server print this screen as the active one from the very first byte (see the top of
+       faculty-shell-top.php), so the Dashboard never shows for a split second. */
+    function _rememberScreen(name) {
+        try { sessionStorage.setItem('facultyCurrentTab', name); } catch (_) { }
+        try {
+            document.cookie = 'ps_fac_tab=' + name + '; path=/; SameSite=Lax' + (location.protocol === 'https:' ? '; Secure' : '');
+        } catch (_) { }
+    }
+
+    /* A real tab change ends the "restored screen" state, so the new screen slides in as usual. */
+    function _endRestoredState() {
+        document.documentElement.classList.remove('fac-restored');
+    }
 
     function _pushNav(state) {
         if (_navSuppressed) return;
@@ -250,6 +266,7 @@
         const el = document.getElementById(id);
         if (!el) return;
         el.classList.add('active');
+        if (id === 'settingsOverlay') _rememberScreen('settings');
         document.querySelectorAll('.overlay-page.active').forEach(o => {
             if (o !== el) o.classList.remove('active');
         });
@@ -267,6 +284,7 @@
     }
 
     function openOverlay(id) {
+        _endRestoredState();
         _pushNav({
             type: 'overlay',
             value: id
@@ -289,6 +307,7 @@
         document.querySelectorAll('.side-nav-item').forEach(b => b.classList.remove('active'));
         // Restore the active state to the current tab
         const activePanel = document.querySelector('.tab-panel.active');
+        _rememberScreen(activePanel ? activePanel.id.replace('panel-', '') : 'home');
         if (activePanel) {
             const tabName = activePanel.id.replace('panel-', '');
             const tabNavItem = document.querySelector('.side-nav-item[data-tab="' + tabName + '"]');
@@ -301,6 +320,7 @@
     function _switchTabDOM(tabName) {
         const panel = document.getElementById('panel-' + tabName);
         if (panel) panel.classList.add('active');
+        if (panel) _rememberScreen(tabName);
         // Legacy nav-tab support (kept for compatibility)
         document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
         const btn = document.querySelector('.nav-tab[data-tab="' + tabName + '"]');
@@ -395,6 +415,7 @@
     }
 
     function switchTab(tabName, sub) {
+        _endRestoredState();
         _pushNav({
             type: 'tab',
             value: tabName,
@@ -2699,6 +2720,23 @@
         });
     });
 
+    /* ── Screen restore after a soft refresh ───────────────────────────── */
+    function _restoreScreenAfterRefresh(tab) {
+        if (!tab || tab === 'home') return;
+        const url = window.location.pathname + window.location.search;
+        _navSuppressed = true;
+        if (tab === 'settings') {
+            _switchTabDOM('home');
+            _openOverlayDOM('settingsOverlay');
+            window.history.replaceState({ type: 'overlay', value: 'settingsOverlay' }, '', url + '#overlay-settingsOverlay');
+        } else {
+            _switchTabDOM(tab);
+            if (tab === 'lending') switchLendingSub('browse');
+            window.history.replaceState({ type: 'tab', value: tab, sub: tab === 'lending' ? 'browse' : null }, '', url + '#tab-' + tab);
+        }
+        _navSuppressed = false;
+    }
+
     /* ── Page Init ────────────────────────────────────────────────────── */
     function initPage() {
         // Restore settings, account edits, and notification state from localStorage
@@ -2706,7 +2744,10 @@
         restorePersistedState();
 
         // Ensure no overlay is visible by default on initial page load
-        document.querySelectorAll('.overlay-page.active').forEach(o => o.classList.remove('active'));
+        // (except Settings after a refresh: it is the screen you were on, already painted as active)
+        if (window._facRestoreTab !== 'settings') {
+            document.querySelectorAll('.overlay-page.active').forEach(o => o.classList.remove('active'));
+        }
 
         // URL slug
         // USER_SLUG is injected by PHP into window.USER_SLUG via the inline <script>
@@ -2742,6 +2783,10 @@
                 if (sa) sa.style.display = 'none';
             }, 5000);
         }
+        // Soft refresh: come back to the screen you were on (the HTML already shows it; this brings the
+        // JavaScript state in line, e.g. the Facilities data, the AI button and the browser history entry).
+        _restoreScreenAfterRefresh(window._facRestoreTab);
+
         checkOverdueState();
         const overdueToastEl = document.getElementById('overdue-alert');
         if (overdueToastEl && overdueToastEl.dataset.shouldShow === '1') showOverdueToast();

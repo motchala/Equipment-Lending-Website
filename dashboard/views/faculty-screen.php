@@ -1,7 +1,7 @@
             <!-- ============================================================
          TAB: DASHBOARD (HOME)  — Redesigned v3
     ============================================================ -->
-            <div class="tab-panel active" id="panel-home">
+            <div class="tab-panel<?php echo in_array($fac_boot_tab ?? 'home', ['home', 'settings'], true) ? ' active' : ''; ?>" id="panel-home">
                 <?php
                 // ── Faculty Dashboard ──────────────────────────────────────────────────
                 // Built from this faculty member's own loans ($requests_js), room reservations

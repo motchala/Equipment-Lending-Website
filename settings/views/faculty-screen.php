@@ -181,7 +181,7 @@
 <!-- ================================================================
      OVERLAY: SETTINGS
 ================================================================ -->
-<div class="overlay-page" id="settingsOverlay">
+<div class="overlay-page<?php echo ($fac_boot_tab ?? 'home') === 'settings' ? ' active' : ''; ?>" id="settingsOverlay">
 
     <!-- Shell -->
     <div class="sov-shell">

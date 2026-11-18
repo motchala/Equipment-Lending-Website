@@ -2144,7 +2144,10 @@
         html.fac-tab-pending .mobile-menu-btn,
         html.fac-tab-pending .nav-backdrop,
         html.fac-tab-pending .act-ai-fab,
-        html.fac-tab-pending .act-ai-chat {
+        html.fac-tab-pending .act-ai-chat,
+        html.fac-tab-pending .rxm-bar,
+        html.fac-tab-pending .rxm-tabbar,
+        html.fac-tab-pending .rxm-sheet {
             visibility: hidden !important;
         }
 

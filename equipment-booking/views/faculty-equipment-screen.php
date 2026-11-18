@@ -2,7 +2,7 @@
          TAB: EQUIPMENT (LENDING)
     ============================================================ -->
             <?php require_once dirname(__DIR__, 2) . '/shared/core/equipment-image.php'; // no photo -> uploads/default.png ?>
-            <div class="tab-panel" id="panel-lending">
+            <div class="tab-panel<?php echo ($fac_boot_tab ?? 'home') === 'lending' ? ' active' : ''; ?>" id="panel-lending">
 
 
                 <!-- ── Sub: Browse ─────────────────────────────────────── -->

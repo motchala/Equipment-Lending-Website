@@ -1,7 +1,7 @@
             <!-- ============================================================
                  TAB: MY ACTIVITY
             ============================================================ -->
-            <div class="tab-panel" id="panel-activity">
+            <div class="tab-panel<?php echo ($fac_boot_tab ?? 'home') === 'activity' ? ' active' : ''; ?>" id="panel-activity">
 
                 <?php
                 /* ── My Activity ─────────────────────────────────────────────

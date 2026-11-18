@@ -499,6 +499,8 @@
     function init() {
         buildBar(); buildTabbar(); buildSheet(); buildOverlayBars();
         buildCategoryChips(); buildFloorPicker(); buildPullToRefresh();
+        // highlight the current screen right away (not on the next frame), so the bar never appears without it
+        syncBar(); syncTabbar();
         refresh();
 
         if (window.MutationObserver) {
