@@ -4434,7 +4434,6 @@
 
         const approveConfirmBtn = document.getElementById('ps-approve-confirm-btn');
         const declineConfirmBtn = document.getElementById('ps-decline-confirm-btn');
-        const approveReasonInput = document.getElementById('approve-reason');
         const declinePicker = document.getElementById('decline-reason-picker');   // one-tap reasons (shared/assets/js/admin-decline-reasons.js)
 
         function rowCtx(el) {
@@ -4450,15 +4449,6 @@
                 arbRule: d.arbRule,
                 autoOk: d.autoOk === '1'   // meets every automatic-approval rule: approve without reason / internal note
             };
-        }
-
-        // Approve screen: a request that meets every automatic-approval rule needs no reason and no internal note
-        let approveAutoOk = false;
-        function setApproveFieldsHidden(hide) {
-            [approveReasonInput, document.getElementById('approve-admin-note')].forEach(function (el) {
-                const grp = el && el.closest('.ps-form-group');
-                if (grp) grp.style.display = hide ? 'none' : '';
-            });
         }
 
         function reqNo(id) { return '#R-' + String(id || 0).padStart(4, '0'); }
@@ -4486,12 +4476,7 @@
             document.getElementById('approve-date-needed').textContent = ctx.dateNeeded || '—';
             const dd = document.getElementById('approve-due-date');
             if (dd) dd.value = ctx.returnDate || '';
-            if (approveReasonInput) approveReasonInput.value = '';
-            const approveAdminNoteEl = document.getElementById('approve-admin-note');
-            if (approveAdminNoteEl) approveAdminNoteEl.value = '';
-            approveAutoOk = !!ctx.autoOk;
-            setApproveFieldsHidden(approveAutoOk);
-            if (approveConfirmBtn) approveConfirmBtn.disabled = !approveAutoOk;
+            if (approveConfirmBtn) approveConfirmBtn.disabled = false;   // approving needs no reason or note
             clearAlert('ps-approve-alert');
         }
 
@@ -4584,11 +4569,6 @@
             else if (modalId === 'ps-req-detail-modal') fillDetail(ctx);
         });
 
-        if (approveReasonInput && approveConfirmBtn) {
-            approveReasonInput.addEventListener('input', function () {
-                approveConfirmBtn.disabled = this.value.trim().length < 5;
-            });
-        }
         if (declinePicker && declineConfirmBtn) {
             declinePicker.addEventListener('psreason:change', function (e) {
                 declineConfirmBtn.disabled = !e.detail.ok;
@@ -4662,12 +4642,6 @@
 
                         if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
                     } else {
-                        // The request stopped meeting the automatic rules since the list was drawn: ask for the reason
-                        if (data && data.needs_reason && newStatus === 'Approved') {
-                            approveAutoOk = false;
-                            setApproveFieldsHidden(false);
-                            if (approveConfirmBtn) approveConfirmBtn.disabled = true;
-                        }
                         showAlert(alertId, (data && data.message) || 'Action failed. Please try again.');
                         btn.disabled = false;
                         btn.innerHTML = btn.dataset.origLabel;
@@ -4683,14 +4657,7 @@
         if (approveConfirmBtn) {
             approveConfirmBtn.addEventListener('click', function () {
                 const id = document.getElementById('approve-request-id').value;
-                const reason = (approveReasonInput.value || '').trim();
-                const adminNoteEl = document.getElementById('approve-admin-note');
-                const adminNote = adminNoteEl ? adminNoteEl.value.trim() : '';
-                if (!approveAutoOk && reason.length < 5) {
-                    showAlert('ps-approve-alert', 'Please enter a reason (min. 5 characters).');
-                    return;
-                }
-                submitDecision(id, 'Approved', approveAutoOk ? '' : reason, 'ps-approve-alert', approveConfirmBtn, 'Approving…', approveAutoOk ? '' : adminNote);
+                submitDecision(id, 'Approved', '', 'ps-approve-alert', approveConfirmBtn, 'Approving…');
             });
         }
         if (declineConfirmBtn) {
@@ -4710,17 +4677,11 @@
         var modal = document.getElementById('eq-bundle-approve-modal');
         var batchInput = document.getElementById('eq-bundle-approve-id');
         var itemsBox = document.getElementById('eq-bundle-approve-items');
-        var reasonInput = document.getElementById('eq-bundle-approve-reason');
         var alertBox = document.getElementById('eq-bundle-approve-alert');
         var confirmButton = document.getElementById('eq-bundle-approve-confirm');
-        if (!modal || !batchInput || !itemsBox || !reasonInput || !confirmButton) return;
+        if (!modal || !batchInput || !itemsBox || !confirmButton) return;
 
         var pendingRows = [];
-        var bundleAutoOk = false;
-        function setBundleReasonHidden(hide) {
-            var grp = reasonInput.closest('.ps-form-group');
-            if (grp) grp.style.display = hide ? 'none' : '';
-        }
         function showError(message) {
             alertBox.textContent = message;
             alertBox.style.display = 'block';
@@ -4736,9 +4697,6 @@
         // rules (no reason needed). show = false prepares it without displaying it (used for the one-click approve).
         function openBundleModal(batchId, autoOk, show) {
             batchInput.value = batchId || '';
-            reasonInput.value = '';
-            bundleAutoOk = !!autoOk;
-            setBundleReasonHidden(bundleAutoOk);
             confirmButton.disabled = true;
             clearError();
             itemsBox.textContent = '';
@@ -4759,7 +4717,7 @@
             if (pendingRows.length < 2) {
                 showError('At least two requests in this bundle must still be pending.');
             }
-            confirmButton.disabled = !bundleAutoOk || pendingRows.length < 2;
+            confirmButton.disabled = pendingRows.length < 2;
             if (show !== false && typeof psOpenModal === 'function') psOpenModal('eq-bundle-approve-modal');
         }
 
@@ -4850,21 +4808,16 @@
                     openBundleModal(choice.batchId, true, false);
                     submitBundle(true);
                 } else {
-                    openBundleModal(choice.batchId, false, true);   // asks for the approval reason
+                    openBundleModal(choice.batchId, false, true);   // shows the bundle once more for a final confirm
                 }
             });
         }
 
-        reasonInput.addEventListener('input', function () {
-            confirmButton.disabled = this.value.trim().length < 5 || pendingRows.length < 2;
-        });
-
         confirmButton.addEventListener('click', function () { submitBundle(false); });
 
         function submitBundle(modalIsHidden) {
-            var reason = bundleAutoOk ? '' : reasonInput.value.trim();
-            if ((!bundleAutoOk && reason.length < 5) || pendingRows.length < 2) {
-                showError('Enter an approval reason of at least 5 characters.');
+            if (pendingRows.length < 2) {
+                showError('At least two requests in this bundle must still be pending.');
                 return;
             }
             confirmButton.disabled = true;
@@ -4873,7 +4826,7 @@
             clearError();
             var body = new FormData();
             body.append('batch_id', batchInput.value);
-            body.append('override_reason', reason);
+            body.append('override_reason', '');
             body.append('csrf_token', getCsrfToken());
 
             fetch('equipment-booking/api/approve-borrow-bundle.php', { method: 'POST', body: body })
@@ -4881,7 +4834,6 @@
                     return response.json().then(function (data) {
                         if (!response.ok || data.status !== 'success') {
                             var failure = new Error(data.message || 'Bundle approval failed.');
-                            failure.needsReason = !!data.needs_reason;   // the cart stopped meeting the automatic rules
                             throw failure;
                         }
                         return data;
@@ -4917,16 +4869,12 @@
                     if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
                 })
                 .catch(function (error) {
-                    if (error.needsReason) {
-                        bundleAutoOk = false;
-                        setBundleReasonHidden(false);
-                    }
                     showError(error.message || 'Network error. Please try again.');
                     // approved in one click without the screen showing: show it now so the problem can be read / fixed
                     if (modalIsHidden && typeof psOpenModal === 'function') psOpenModal('eq-bundle-approve-modal');
                 })
                 .finally(function () {
-                    confirmButton.disabled = (!bundleAutoOk && reasonInput.value.trim().length < 5) || pendingRows.length < 2;
+                    confirmButton.disabled = pendingRows.length < 2;
                     confirmButton.innerHTML = confirmButton.dataset.originalText || '<span class="material-symbols-outlined">done_all</span> Approve Bundle';
                 });
         }
@@ -5156,7 +5104,6 @@
                             confirmBtn.disabled = true;
                             if (!waiting.length) { handleScanData(data, true); return; }
                             confirmBtn.textContent = 'Approving...';
-                            let reason = '';
                             const csrf = (document.querySelector('input[name="csrf_token"]') || {}).value || '';
                             function approveNext(i) {
                                 if (i >= waiting.length) {
@@ -5170,20 +5117,12 @@
                                     const fd = new FormData();
                                     fd.append('request_id', waiting[i].id);
                                     fd.append('new_status', 'Approved');
-                                    fd.append('override_reason', reason);
+                                    fd.append('override_reason', '');
                                     fd.append('csrf_token', csrf);
                                     return fetch('equipment-booking/api/admin-override.php', { method: 'POST', credentials: 'same-origin', body: fd })
                                         .then(function (r) { return r.json(); });
                                 }
                                 return send().then(function (res) {
-                                    if (res.needs_reason && !reason) {
-                                        const typed = window.prompt('Approval reason for ' + waiting[i].equipment_name + ' (min. 5 characters):', '');
-                                        if (typed === null || typed.trim().length < 5) { throw new Error('__cancel__'); }
-                                        reason = typed.trim();
-                                        return send();
-                                    }
-                                    return res;
-                                }).then(function (res) {
                                     if (res.status !== 'success') { throw new Error(res.message || 'Could not approve.'); }
                                     return approveNext(i + 1);
                                 });
