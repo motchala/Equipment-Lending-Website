@@ -234,11 +234,13 @@ try {
     }
 
     // ── Task 7.4: UPDATE tbl_requests.status to new_status ───────────────────
+    // An item of a student's bundle keeps the shared Claim QR when approved one by one (the QR then
+    // lists only the approved items); any other decision, or a request without one, clears it as before.
     $upd_stmt = $conn->prepare(
         "UPDATE tbl_requests
             SET status           = ?,
                 arbitration_rule = 'override',
-                bundle_claim_token = NULL
+                bundle_claim_token = IF(? = 'Approved', bundle_claim_token, NULL)
           WHERE id = ?"
     );
 
@@ -246,7 +248,7 @@ try {
         throw new RuntimeException('Failed to prepare request status update.');
     }
 
-    $upd_stmt->bind_param('si', $new_status, $request_id);
+    $upd_stmt->bind_param('ssi', $new_status, $new_status, $request_id);
 
     if (!$upd_stmt->execute()) {
         $upd_stmt->close();
@@ -262,8 +264,7 @@ try {
         $tok_stmt = $conn->prepare(
             "UPDATE tbl_requests
                 SET return_token = COALESCE(NULLIF(return_token, ''), ?),
-                    claim_token  = COALESCE(NULLIF(claim_token, ''), ?),
-                    bundle_claim_token = NULL
+                    claim_token  = IF(COALESCE(bundle_claim_token, '') <> '', NULL, COALESCE(NULLIF(claim_token, ''), ?))
               WHERE id = ?"
         );
         if (!$tok_stmt) {

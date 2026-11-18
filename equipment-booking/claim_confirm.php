@@ -64,9 +64,9 @@ if ($token !== '') {
 
     // A Claim QR is issued as soon as a student submits, so it can be scanned before an admin approved it.
     if (empty($items)) {
-        $s = $conn->prepare("SELECT status FROM tbl_requests WHERE claim_token = ? LIMIT 1");
+        $s = $conn->prepare("SELECT status FROM tbl_requests WHERE (claim_token = ? OR bundle_claim_token = ?) AND status = 'Waiting' LIMIT 1");
         if ($s) {
-            $s->bind_param('s', $token);
+            $s->bind_param('ss', $token, $token);
             $s->execute();
             $w = $s->get_result()->fetch_assoc();
             $s->close();

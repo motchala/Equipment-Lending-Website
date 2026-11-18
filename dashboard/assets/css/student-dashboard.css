@@ -3073,3 +3073,7 @@ select.st-input option:disabled {
         transition-duration: .01ms !important;
     }
 }
+/* Bundle card: one shared QR is centred instead of sitting in half of a two-column grid */
+.st-bundle .st-qrs:has(> .st-qr-box:only-child) {
+    grid-template-columns: 1fr;
+}

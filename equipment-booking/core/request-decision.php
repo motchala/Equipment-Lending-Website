@@ -207,29 +207,67 @@ function equipment_issue_pending_tokens(mysqli $conn, int $id): array
 {
     $none = ['claim_token' => null, 'return_token' => null];
     try {
-        $claim  = bin2hex(random_bytes(32));
-        $return = bin2hex(random_bytes(32));
-        $stmt = $conn->prepare(
-            "UPDATE tbl_requests
-                SET claim_token  = COALESCE(NULLIF(claim_token, ''), ?),
-                    return_token = COALESCE(NULLIF(return_token, ''), ?)
-              WHERE id = ? AND status = 'Waiting' AND COALESCE(NULLIF(bundle_claim_token, ''), '') = ''"
+        $sel = $conn->prepare(
+            "SELECT status, COALESCE(batch_id, '') AS batch_id, COALESCE(claim_token, '') AS claim_token,
+                    COALESCE(bundle_claim_token, '') AS bundle_claim_token, COALESCE(return_token, '') AS return_token
+               FROM tbl_requests WHERE id = ? LIMIT 1"
         );
-        if (!$stmt) {
-            return $none;
-        }
-        $stmt->bind_param('ssi', $claim, $return, $id);
-        $stmt->execute();
-        $stmt->close();
-        $sel = $conn->prepare("SELECT NULLIF(claim_token, '') AS c, NULLIF(return_token, '') AS r FROM tbl_requests WHERE id = ? LIMIT 1");
         if (!$sel) {
             return $none;
         }
         $sel->bind_param('i', $id);
         $sel->execute();
-        $row = $sel->get_result()->fetch_assoc();
+        $r = $sel->get_result()->fetch_assoc();
         $sel->close();
-        return $row ? ['claim_token' => $row['c'] ?: null, 'return_token' => $row['r'] ?: null] : $none;
+        if (!$r) {
+            return $none;
+        }
+        $claim  = $r['bundle_claim_token'] !== '' ? $r['bundle_claim_token'] : $r['claim_token'];
+        $return = $r['return_token'];
+
+        if ($r['status'] === 'Waiting' && ($claim === '' || $return === '')) {
+            if ($return === '') {
+                $return = bin2hex(random_bytes(32));
+            }
+            if ($claim === '' && $r['batch_id'] !== '') {
+                // Items of one request share ONE Claim QR (bundle_claim_token): reuse the one its siblings already hold.
+                $q = $conn->prepare(
+                    "SELECT bundle_claim_token FROM tbl_requests
+                      WHERE batch_id = ? AND id <> ? AND COALESCE(bundle_claim_token, '') <> ''
+                        AND status IN ('Waiting', 'Approved') LIMIT 1"
+                );
+                if ($q) {
+                    $q->bind_param('si', $r['batch_id'], $id);
+                    $q->execute();
+                    $claim = (string)($q->get_result()->fetch_assoc()['bundle_claim_token'] ?? '');
+                    $q->close();
+                }
+                if ($claim === '') {
+                    $claim = bin2hex(random_bytes(32));
+                }
+                $upd = $conn->prepare(
+                    "UPDATE tbl_requests SET bundle_claim_token = ?, claim_token = NULL,
+                            return_token = COALESCE(NULLIF(return_token, ''), ?)
+                      WHERE id = ? AND status = 'Waiting'"
+                );
+            } else {
+                if ($claim === '') {
+                    $claim = bin2hex(random_bytes(32));
+                }
+                $upd = $conn->prepare(
+                    "UPDATE tbl_requests SET claim_token = COALESCE(NULLIF(claim_token, ''), ?),
+                            return_token = COALESCE(NULLIF(return_token, ''), ?)
+                      WHERE id = ? AND status = 'Waiting'"
+                );
+            }
+            if (!$upd) {
+                return $none;
+            }
+            $upd->bind_param('ssi', $claim, $return, $id);
+            $upd->execute();
+            $upd->close();
+        }
+        return ['claim_token' => $claim !== '' ? $claim : null, 'return_token' => $return !== '' ? $return : null];
     } catch (\Throwable $e) {
         error_log('equipment_issue_pending_tokens[' . $id . '] - ' . $e->getMessage());
         return $none;
