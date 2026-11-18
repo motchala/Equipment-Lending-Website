@@ -3357,13 +3357,13 @@
             waiting: data.filter(r => r.status === 'Waiting').length,
             total: data.length,
         };
-        // .fdb-kpi = the Dashboard key-figure cards; .stat-tile = the older tiles (kept working)
-        document.querySelectorAll('.fdb-kpi[data-stat], .stat-tile[data-stat]').forEach(tile => {
+        // .fdb-kpi-item = the Dashboard key-figure items (combined card); .stat-tile = the older tiles (kept working)
+        document.querySelectorAll('.fdb-kpi-item[data-stat], .stat-tile[data-stat]').forEach(tile => {
             const key = tile.dataset.stat;
             if (!(key in counts)) return;
             const val = tile.querySelector('.fdb-kpi-val, .stat-tile-value');
             if (val && val.textContent.trim() !== String(counts[key])) val.textContent = counts[key];
-            // Ready for pickup card: amber tone when there are items waiting, neutral when none
+            // Ready for pickup item: amber tone when there are items waiting, neutral when none
             if (key === 'approved') {
                 tile.className = tile.className.replace(/fdb-tone-\w+/, counts[key] > 0 ? 'fdb-tone-warn' : 'fdb-tone-ok');
             }

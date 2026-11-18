@@ -2,7 +2,7 @@
 // ── Room Reservations for My Reservations history panel ───────────────────
 $room_res_stmt = $conn->prepare(
     "SELECT rr.id, rr.room_id, rr.reservation_date, rr.start_time, rr.end_time,
-            rr.purpose, rr.submitted_as, rr.status, rr.reason,
+            rr.purpose, rr.submitted_as, rr.submitted_by_name, rr.submitted_by_id, rr.status, rr.reason,
             rr.request_date,
             r.room_name,
             b.name AS building_name,

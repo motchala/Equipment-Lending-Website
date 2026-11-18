@@ -313,10 +313,6 @@
             <div id="eq-bundle-approve-alert" class="ps-inline-alert" style="display:none;margin-bottom:.85rem;padding:.6rem .8rem;border-radius:8px;font-size:12.5px"></div>
             <p class="ps-form-hint" style="margin-top:0">This approves every request still pending in this bundle. Individual declines remain available from each row. The borrower will receive one Claim Bundle QR.</p>
             <div class="ps-req-summary" id="eq-bundle-approve-items"></div>
-            <div class="ps-form-group" style="margin-top:1rem">
-                <label class="ps-form-label" for="eq-bundle-approve-reason">Reason / Note <span style="font-size:11px;color:var(--text-light)">(required, min. 5 characters)</span></label>
-                <textarea class="ps-form-control" id="eq-bundle-approve-reason" rows="2" placeholder="e.g. Items available, request meets policy..."></textarea>
-            </div>
         </div>
         <div class="ps-modal-foot">
             <button class="ps-btn ps-btn--ghost" type="button" data-action="ps-close-modal" data-modal="eq-bundle-approve-modal">Cancel</button>

@@ -577,7 +577,8 @@ function fact_render_room_item(array $it, string $kind): string
     $sub = [fact_h(fact_s($it, 'where'))];
     if ($kind !== 'waitlist') {
         if (fact_s($it, 'student_name') !== '') {
-            $sub[] = 'For ' . fact_h(fact_s($it, 'student_name'));
+            $sub[] = '<span class="fact-student-chip"><span class="material-symbols-outlined" aria-hidden="true">school</span>'
+                . fact_h(fact_s($it, 'student_name')) . '</span>';
         }
         if (fact_s($it, 'purpose') !== '') {
             $sub[] = '<span title="' . fact_h(fact_s($it, 'purpose')) . '">' . fact_h(fact_short(fact_s($it, 'purpose'), 22)) . '</span>';
@@ -712,6 +713,9 @@ function fact_render_room_history_rows(array $d): string
         $note = '';
         if (fact_s($it, 'student_name') !== '') {
             $note = fact_h('For ' . fact_s($it, 'student_name') . (fact_s($it, 'purpose') !== '' ? ' · ' . fact_short(fact_s($it, 'purpose'), 32) : ''));
+            $note = '<span class="fact-student-chip"><span class="material-symbols-outlined" aria-hidden="true">school</span>'
+                . fact_h(fact_s($it, 'student_name')) . '</span>'
+                . (fact_s($it, 'purpose') !== '' ? ' · ' . fact_h(fact_short(fact_s($it, 'purpose'), 32)) : '');
         } else {
             $note = fact_h(fact_short(fact_s($it, 'purpose'), 40));
         }

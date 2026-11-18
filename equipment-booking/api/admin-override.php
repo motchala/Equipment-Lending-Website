@@ -148,22 +148,13 @@ $current_status  = (string)$request['status'];
 // Today / Later bookings are judged against the schedule, not the shelf count
 $is_scheduled    = in_array((string)($request['booking_mode'] ?? ''), ['today', 'future'], true);
 
-// ── Approval without a typed reason: only for a request that meets every automatic-approval rule ──
+// ── Approval needs no typed reason or internal note: a default reason is logged ──
 if ($reason_missing) {
     require_once __DIR__ . '/../core/request-decision.php';
-    if ($new_status === 'Approved' && $current_status === 'Waiting' && equipment_waiting_meets_auto_rules($conn, $request_id)) {
-        $raw_override_reason = EQ_AUTO_APPROVE_REASON;
-        $admin_notes_value   = null;   // no internal note for this case
-    } else {
-        ob_end_clean();
-        http_response_code(400);
-        echo json_encode([
-            'status'       => 'error',
-            'message'      => 'This request needs an approval reason. Please enter one (min. 5 characters).',
-            'needs_reason' => true,
-        ]);
-        exit;
-    }
+    $raw_override_reason = ($current_status === 'Waiting' && equipment_waiting_meets_auto_rules($conn, $request_id))
+        ? EQ_AUTO_APPROVE_REASON
+        : 'Approved by admin.';
+    $admin_notes_value   = null;
 }
 
 // ── Enforce direction rules ───────────────────────────────────────────────────

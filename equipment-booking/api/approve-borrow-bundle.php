@@ -42,14 +42,10 @@ if (!BookingSchedule::ensureSchema($conn)) {
     send_bundle_json(500, 'error', 'Could not prepare bundle approval. Please try again.');
 }
 
-// A reason is required, unless every pending item in the cart already meets the automatic-approval rules
+// No typed reason needed: a default one is logged
 if ($reason_missing) {
     require_once __DIR__ . '/../core/request-decision.php';
-    if (equipment_cart_meets_auto_rules($conn, $batch_id)) {
-        $reason = EQ_AUTO_APPROVE_REASON;
-    } else {
-        send_bundle_json(400, 'error', 'Approval reason must be at least 5 characters.', ['needs_reason' => true]);
-    }
+    $reason = equipment_cart_meets_auto_rules($conn, $batch_id) ? EQ_AUTO_APPROVE_REASON : 'Approved by admin.';
 }
 admin_activity_bootstrap($conn);
 $admin_name = (string)($_SESSION['admin_name'] ?? 'Admin');
