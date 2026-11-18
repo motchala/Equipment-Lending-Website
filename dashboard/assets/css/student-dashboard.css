@@ -2100,6 +2100,14 @@ select.st-input option:disabled {
     color: var(--st-warn);
 }
 
+.st-req-status.is-bad {
+    color: var(--st-err);
+}
+
+.st-req-status.is-info {
+    color: var(--st-muted);
+}
+
 .st-req-status .material-symbols-outlined {
     font-size: 18px;
 }
