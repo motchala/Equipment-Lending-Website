@@ -153,7 +153,7 @@ $ins = $conn->prepare(
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'Waiting', NOW(), ?, ?, 'student', NULLIF(?, ''))"
 );
 $ins->bind_param(
-    'sssssissssisssss',
+    'sssssissssissss',
     $faculty_name,
     $faculty_id,
     $equipment,

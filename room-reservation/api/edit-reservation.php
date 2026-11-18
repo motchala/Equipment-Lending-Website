@@ -127,7 +127,7 @@ $conflictStmt = $conn->prepare(
 if (!$conflictStmt) {
     room_edit_reply(500, 'Database query error.');
 }
-$conflictStmt->bind_param('isis', $new_room_id, $new_date, $reservation_id, $new_end, $new_start);
+$conflictStmt->bind_param('isiss', $new_room_id, $new_date, $reservation_id, $new_end, $new_start);
 $conflictStmt->execute();
 $hasConflict = $conflictStmt->get_result()->num_rows > 0;
 $conflictStmt->close();
@@ -245,4 +245,3 @@ room_edit_reply(200, 'Reservation rescheduled successfully.', [
         'notes'      => $final_notes,
     ]
 ]);
-
