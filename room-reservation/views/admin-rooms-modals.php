@@ -108,8 +108,7 @@
                 <!-- Shown for Waiting requests. Open the attached request letter (if any) above, then decide. -->
                 <section class="ps-drawer-sec" id="ps-rr-review-sec" hidden>
                     <h4>Your decision</h4>
-                    <label class="ps-drawer-muted" for="ps-rr-review-reason">Reason for approving (at least 5 characters). It is saved with the decision. To decline, use the Decline button and pick a reason.</label>
-                    <textarea class="ps-rr-reason" id="ps-rr-review-reason" rows="3" maxlength="500"></textarea>
+                    <p class="ps-drawer-muted">Approve to confirm this reservation &mdash; no reason is needed. To decline, use the Decline button and pick a reason.</p>
                     <div class="ps-rr-review-err" id="ps-rr-review-err" role="alert" hidden></div>
                 </section>
             </div>
