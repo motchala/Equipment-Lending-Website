@@ -525,7 +525,7 @@
                                     <span class="material-symbols-outlined help-item-chevron">expand_more</span>
                                 </summary>
                                 <div class="help-item-a">
-                                    A <strong>same-day</strong> request for a single item is decided by the system right away: you will see it approved at once, or the reason it could not be accepted. A <strong>later-date</strong> request, or a <strong>Borrow All</strong> request for several items, goes to the admin as <strong>Pending</strong>. You will see the result in your <strong>Notifications</strong> and in <strong>My Activity</strong>.<br><br><strong>Pending</strong>: waiting for the admin.<br><strong>Approved / Ready for pickup</strong>: approved, but not collected yet.<br><strong>Active</strong>: the item is with you.<br><strong>Overdue</strong>: the return time has passed.<br><strong>Returned</strong>: the item is back.<br><strong>Declined</strong>: the admin declined it (the reason is shown), or nobody decided before the borrow date passed.<br><strong>Cancelled</strong>: you or an admin cancelled it.
+                                    A <strong>same-day</strong> request for a single item is decided by the system right away: you will see it approved at once, or the reason it could not be accepted. A <strong>later-date</strong> request, or a <strong>Borrow All</strong> request for several items, goes to the admin as <strong>Pending</strong>. You will see the result in your <strong>Notifications</strong> and in <strong>My Activity</strong>.<br><br><strong>Pending</strong>: waiting for the admin.<br><strong>Approved / For Pickup</strong>: approved, but not collected yet.<br><strong>Active</strong>: the item is with you.<br><strong>Overdue</strong>: the return time has passed.<br><strong>Returned</strong>: the item is back.<br><strong>Declined</strong>: the admin declined it (the reason is shown), or nobody decided before the borrow date passed.<br><strong>Cancelled</strong>: you or an admin cancelled it.
                                 </div>
                             </details>
 
@@ -536,7 +536,7 @@
                                     <span class="material-symbols-outlined help-item-chevron">expand_more</span>
                                 </summary>
                                 <div class="help-item-a">
-                                    Open <strong>My Activity</strong> and find the item under <em>Ready for pickup</em>. Tap its <strong>Claim QR</strong> (borrowing several items together gives you one Claim Bundle QR). Show it to the admin at the Admin Office, who scans it. The item then shows as <strong>Active</strong>. If a student is collecting for you, they show the same QR.
+                                    Open <strong>My Activity</strong> and find the item under <em>For Pickup</em>. Tap its <strong>Claim QR</strong> (borrowing several items together gives you one Claim Bundle QR). Show it to the admin at the Admin Office, who scans it. The item then shows as <strong>Active</strong>. If a student is collecting for you, they show the same QR.
                                 </div>
                             </details>
 
@@ -635,7 +635,7 @@
                                     <span class="material-symbols-outlined help-item-chevron">expand_more</span>
                                 </summary>
                                 <div class="help-item-a">
-                                    <strong>My Activity</strong> shows your loans and room reservations: ready for pickup, active, overdue, pending, and a searchable history. Your <strong>Dashboard</strong> shows what needs your attention and your schedule today. The bell on the Dashboard opens your Notifications.
+                                    <strong>My Activity</strong> shows your loans and room reservations: for pickup, active, overdue, pending, and a searchable history. Your <strong>Dashboard</strong> shows what needs your attention and your schedule today. The bell on the Dashboard opens your Notifications.
                                 </div>
                             </details>
 

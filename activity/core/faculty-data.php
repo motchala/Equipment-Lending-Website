@@ -517,7 +517,8 @@ function fact_eq_render_item(array $it, string $kind, string $rootUrl, DateTimeI
     }
     $sub[] = fact_h(fact_eq_where_short(fact_s($it, 'where')));
     if (fact_s($it, 'student') !== '') {
-        $sub[] = 'For ' . fact_h(fact_s($it, 'student'));
+        $sub[] = '<span class="fact-student-chip"><span class="material-symbols-outlined" aria-hidden="true">school</span>'
+            . fact_h(fact_s($it, 'student')) . '</span>';
     }
     if (fact_eq_extended_label($it) !== '') {
         $sub[] = fact_h(fact_eq_extended_label($it));
@@ -720,7 +721,8 @@ function fact_eq_render_history_rows(array $d, string $rootUrl): string
                 . 'Bundle · ' . fact_i($it, 'bundle_count') . ' items</span>';
         }
         if (fact_s($it, 'student') !== '') {
-            $sub[0] .= ' · For ' . fact_h(fact_s($it, 'student'));
+            $sub[0] .= ' · <span class="fact-student-chip"><span class="material-symbols-outlined" aria-hidden="true">school</span>'
+                . fact_h(fact_s($it, 'student')) . '</span>';
         }
 
         $html .= '<tr class="fact-row" data-kind="equipment" data-status="' . fact_h(strtolower($status)) . '" data-ts="' . fact_i($it, 'start_ts') . '">'

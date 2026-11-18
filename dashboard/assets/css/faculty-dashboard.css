@@ -11565,6 +11565,25 @@ body .side-nav .side-nav-user .side-nav-user-name {
     font-size: 14px;
 }
 
+#panel-activity .fact-student-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 7px 2px 5px;
+    border: 1px solid color-mix(in srgb, var(--color-secondary) 25%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-secondary) 8%, white);
+    color: var(--color-on-surface);
+    font-size: 0.72rem;
+    font-weight: 600;
+    vertical-align: middle;
+}
+
+#panel-activity .fact-student-chip .material-symbols-outlined {
+    font-size: 13px;
+    color: var(--color-secondary);
+}
+
 #panel-activity .fact-attach {
     display: inline-flex;
     align-items: center;

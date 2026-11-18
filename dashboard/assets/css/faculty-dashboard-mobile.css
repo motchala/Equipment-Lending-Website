@@ -763,59 +763,58 @@ html.rx-mobile #panel-home .fdb-btn--primary {
     box-shadow: 0 6px 16px rgba(128, 0, 0, .28) !important;
 }
 
-/* The four stat cards become ONE card */
-html.rx-mobile #panel-home .fdb-kpis {
+/* The stat tiles are now one combined card */
+html.rx-mobile #panel-home .fdb-kpis-wrap {
+    max-width: 100% !important;
+    margin: 0 0 20px !important;
+}
+
+html.rx-mobile #panel-home .fdb-kpis-card {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
-    gap: 0 !important;
-    margin: 0 0 20px !important;
     background: var(--rxm-card) !important;
+    border: 0 !important;
     border-radius: var(--rxm-r) !important;
     box-shadow: var(--rxm-shadow) !important;
-    overflow: hidden !important;
+    padding: 0 !important;
 }
 
-html.rx-mobile #panel-home .fdb-kpi {
-    position: relative !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 12px !important;
-    min-width: 0 !important;
-    margin: 0 !important;
-    padding: 16px 16px !important;
-    border: 0 !important;
-    border-radius: 0 !important;
-    background: transparent !important;
-    box-shadow: none !important;
-    text-align: left !important;
+html.rx-mobile #panel-home .fdb-kpis-items {
+    display: contents !important;
 }
 
-html.rx-mobile #panel-home .fdb-kpi::before,
-html.rx-mobile #panel-home .fdb-kpi::after {
-    display: none !important;
-}
-
-html.rx-mobile #panel-home .fdb-kpi:nth-child(odd) {
-    border-right: 1px solid var(--rxm-line) !important;
-}
-
-html.rx-mobile #panel-home .fdb-kpi:nth-child(-n+4) {
+html.rx-mobile #panel-home .fdb-kpi-item {
+    gap: 10px !important;
+    padding: 14px 14px !important;
+    border-right: none !important;
     border-bottom: 1px solid var(--rxm-line) !important;
 }
 
-html.rx-mobile #panel-home .fdb-kpi-icon {
-    width: 40px !important;
-    height: 40px !important;
-    flex: 0 0 40px !important;
-    border-radius: 13px !important;
+html.rx-mobile #panel-home .fdb-kpi-item:nth-child(odd) {
+    border-right: 1px solid var(--rxm-line) !important;
 }
 
-html.rx-mobile #panel-home .fdb-kpi-body {
-    min-width: 0 !important;
+html.rx-mobile #panel-home .fdb-kpis-cta {
+    grid-column: span 2 !important;
+    place-items: center !important;
+    width: 40px !important;
+    height: 40px !important;
+    margin: 8px auto !important;
+    padding: 0 !important;
+    border-right: none !important;
+    border-bottom: none !important;
+    border-top: none !important;
+}
+
+html.rx-mobile #panel-home .fdb-kpi-icon {
+    width: 38px !important;
+    height: 38px !important;
+    flex: 0 0 38px !important;
+    border-radius: 11px !important;
 }
 
 html.rx-mobile #panel-home .fdb-kpi-val {
-    font-size: 1.6rem !important;
+    font-size: 1.5rem !important;
     line-height: 1 !important;
 }
 
@@ -824,8 +823,6 @@ html.rx-mobile #panel-home .fdb-kpi-label {
     font-size: .74rem !important;
     line-height: 1.2 !important;
     color: var(--rxm-muted) !important;
-    white-space: normal !important;
-    overflow-wrap: normal !important;
 }
 
 /* Home sections: flat surfaces, ordered by importance */
@@ -1817,38 +1814,7 @@ html.rx-mobile #panel-rooms .fcty-room-foot {
 --------------------------------------------------------------- */
 
 /* ===== HOME ===== */
-/* the stat tiles: number + label only (the icons repeat the label), three across */
-html.rx-mobile #panel-home .fdb-kpis {
-    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
-}
-
-html.rx-mobile #panel-home .fdb-kpi {
-    grid-column: span 2 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center !important;
-    justify-content: center !important;
-    gap: 0 !important;
-    min-height: 0 !important;
-    padding: 12px 6px !important;
-    text-align: center !important;
-}
-
-html.rx-mobile #panel-home .fdb-kpi:nth-child(n+4) {
-    grid-column: span 3 !important;
-}
-
-html.rx-mobile #panel-home .fdb-kpi-icon {
-    display: none !important;
-}
-
-html.rx-mobile #panel-home .fdb-kpi-body {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center !important;
-    gap: 1px !important;
-}
-
+/* combined stats card: items already in 2-col grid on mobile */
 html.rx-mobile #panel-home .fdb-kpi-val {
     font-size: 1.4rem !important;
     line-height: 1.1 !important;
@@ -1857,27 +1823,6 @@ html.rx-mobile #panel-home .fdb-kpi-val {
 html.rx-mobile #panel-home .fdb-kpi-label {
     font-size: .72rem !important;
     line-height: 1.25 !important;
-}
-
-html.rx-mobile #panel-home .fdb-kpi:nth-child(1),
-html.rx-mobile #panel-home .fdb-kpi:nth-child(2) {
-    border-right: 1px solid var(--rxm-line) !important;
-    border-bottom: 1px solid var(--rxm-line) !important;
-}
-
-html.rx-mobile #panel-home .fdb-kpi:nth-child(3) {
-    border-right: 0 !important;
-    border-bottom: 1px solid var(--rxm-line) !important;
-}
-
-html.rx-mobile #panel-home .fdb-kpi:nth-child(4) {
-    border-right: 1px solid var(--rxm-line) !important;
-    border-bottom: 0 !important;
-}
-
-html.rx-mobile #panel-home .fdb-kpi:nth-child(5) {
-    border-right: 0 !important;
-    border-bottom: 0 !important;
 }
 
 /* the chart and the recent-activity list live in the Activity tab; "today" stays as its own card */

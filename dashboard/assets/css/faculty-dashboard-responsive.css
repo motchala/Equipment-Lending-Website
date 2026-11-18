@@ -1881,21 +1881,18 @@ html {
 
 
 /* ================================================================
-   § 47  HOME — stat cards + student access code on small phones
-   • Stat cards: on 320px screens the 42px icon tile left too little
-     room for "Reservations", so the tile shrinks (words are never
-     broken mid-word).
+   § 47  HOME — combined stats card + student access code on small phones
    • Access code: 34px monospace wrapped as "szs-67p-mc / d". It now
      scales with the screen and stays on one line, because it is a
      code people read out and copy.
 ================================================================ */
 @media (max-width: 480px) {
-    #panel-home .fdb-kpi {
-        min-width: 0;
+    #panel-home .fdb-kpis-wrap {
+        max-width: 100%;
     }
 
-    #panel-home .fdb-kpi-body {
-        min-width: 0;
+    #panel-home .fdb-kpi-item {
+        flex: 1 1 calc(50% - 1px);
     }
 
     #panel-home .fcc-code-value {
@@ -1906,10 +1903,10 @@ html {
 }
 
 @media (max-width: 360px) {
-    #panel-home .fdb-kpi {
+    #panel-home .fdb-kpi-item {
         gap: 8px;
-        padding-left: 12px;
-        padding-right: 10px;
+        padding-left: 0;
+        padding-right: 8px;
     }
 
     #panel-home .fdb-kpi-icon {
