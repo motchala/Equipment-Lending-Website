@@ -1638,9 +1638,10 @@
             var status = itemStatus(it);
             var v = statusView(status);
             var qrs = '';
-            /* The Claim QR appears here the moment an admin approves the request (see pollReceipt) */
-            if (status === 'Approved' && it.claim_token) {
-                qrs += '<div class="st-qr-box"><p class="st-qr-title">Claim QR<span>Show this to pick it up</span></p>' +
+            /* The Claim QR is shown from the start; it only works once an admin approves the request */
+            if ((status === 'Approved' || status === 'Waiting') && it.claim_token) {
+                qrs += '<div class="st-qr-box"><p class="st-qr-title">Claim QR<span>' +
+                    (status === 'Waiting' ? 'Valid once an admin approves' : 'Show this to pick it up') + '</span></p>' +
                     '<div class="st-qr" data-qr="' + esc(claimUrl(it.claim_token)) + '" data-color="#800000"></div></div>';
             }
             if (it.return_token && (status === 'Approved' || status === 'On Loan' || status === 'Overdue')) {
@@ -1649,8 +1650,9 @@
             }
             var note = '';
             if (status === 'Waiting') {
-                note = canWatch && it.status_key
-                    ? 'Your claim QR will appear here as soon as an admin approves this request. You can keep this page open.'
+                note = it.claim_token
+                    ? 'Keep this Claim QR. It works for pick-up once an admin approves your request' +
+                        (canWatch && it.status_key ? ' — this page updates by itself.' : '.')
                     : (it.reason || '');
             } else if (status !== 'Approved' && it.reason) {
                 note = it.reason;
@@ -1675,8 +1677,8 @@
             tone = nWaiting ? 'wait' : 'ok'; ic = nWaiting ? 'hourglass_top' : 'check_circle';
         } else if (nWaiting) {
             title = 'Request sent — pending admin review';
-            lead = canWatch
-                ? 'An admin will approve or decline ' + (many ? 'these requests' : 'this request') + '. Your Claim QR will show up on this page once it is approved.'
+            lead = r.items.some(function (it) { return it.claim_token; })
+                ? 'Your Claim QR is below. Show it to the admin to pick up your ' + (many ? 'items' : 'item') + ' once ' + (many ? 'they are' : 'it is') + ' approved.'
                 : 'An admin will approve or decline ' + (many ? 'these requests' : 'this request') + '. Check with your faculty or the admin office for the decision.';
         } else {
             title = many ? 'Your requests' : 'Your request';

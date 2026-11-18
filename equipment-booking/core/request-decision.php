@@ -196,6 +196,47 @@ function equipment_issue_student_key(mysqli $conn, int $id): ?string
 }
 
 /**
+ * Give a request that is still Waiting for an admin its Claim QR and Return QR right away, so the student's
+ * receipt can show the Claim QR immediately. The Claim QR does nothing until the request is Approved
+ * (claim_confirm.php only accepts Approved requests), and the admin's approval keeps these same tokens
+ * (admin-override.php), so the QR the student already holds is the one that works.
+ *
+ * @return array{claim_token:?string, return_token:?string}
+ */
+function equipment_issue_pending_tokens(mysqli $conn, int $id): array
+{
+    $none = ['claim_token' => null, 'return_token' => null];
+    try {
+        $claim  = bin2hex(random_bytes(32));
+        $return = bin2hex(random_bytes(32));
+        $stmt = $conn->prepare(
+            "UPDATE tbl_requests
+                SET claim_token  = COALESCE(NULLIF(claim_token, ''), ?),
+                    return_token = COALESCE(NULLIF(return_token, ''), ?)
+              WHERE id = ? AND status = 'Waiting' AND COALESCE(NULLIF(bundle_claim_token, ''), '') = ''"
+        );
+        if (!$stmt) {
+            return $none;
+        }
+        $stmt->bind_param('ssi', $claim, $return, $id);
+        $stmt->execute();
+        $stmt->close();
+        $sel = $conn->prepare("SELECT NULLIF(claim_token, '') AS c, NULLIF(return_token, '') AS r FROM tbl_requests WHERE id = ? LIMIT 1");
+        if (!$sel) {
+            return $none;
+        }
+        $sel->bind_param('i', $id);
+        $sel->execute();
+        $row = $sel->get_result()->fetch_assoc();
+        $sel->close();
+        return $row ? ['claim_token' => $row['c'] ?: null, 'return_token' => $row['r'] ?: null] : $none;
+    } catch (\Throwable $e) {
+        error_log('equipment_issue_pending_tokens[' . $id . '] - ' . $e->getMessage());
+        return $none;
+    }
+}
+
+/**
  * Most units of one item a same-day request may ask for and still be auto-approved (0 = never).
  * The point is to never let an automatic approval leave an item low on stock:
  *   - under 3 in stock ........ 0 (always reviewed by an admin)

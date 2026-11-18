@@ -212,9 +212,12 @@ try {
         ]);
         exit;
     }
+    // Approved: its QR codes. Waiting for an admin: it still gets its Claim QR now (valid once approved).
     $tokens   = $decision['status'] === 'Approved'
         ? equipment_request_tokens($conn, $request_id)
-        : ['claim_token' => null, 'return_token' => null];
+        : ($decision['status'] === 'Waiting'
+            ? equipment_issue_pending_tokens($conn, $request_id)
+            : ['claim_token' => null, 'return_token' => null]);
 
     // Notify faculty via their notification feed
     fnotif_ensure_admin_notice_table($conn);
