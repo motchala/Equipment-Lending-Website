@@ -185,9 +185,12 @@ if ($req_status === 'Declined') {
     exit();
 }
 
+// Approved: its QR codes. Waiting for an admin: it still gets its Claim QR now (valid once approved).
 $tokens     = $req_status === 'Approved'
     ? equipment_request_tokens($conn, (int)$request_id)
-    : ['claim_token' => null, 'return_token' => null];
+    : ($req_status === 'Waiting'
+        ? equipment_issue_pending_tokens($conn, (int)$request_id)
+        : ['claim_token' => null, 'return_token' => null]);
 
 // ── Mark code as used — only on the last item of a multi-item submission ──────
 // JS sends is_last_item=true on the final request. For intermediate items the

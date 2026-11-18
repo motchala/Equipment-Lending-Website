@@ -38,7 +38,7 @@ if (!$asked) {
 
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../core/booking-schedule.php';
-require_once __DIR__ . '/../core/auto-approve-tick.php';
+require_once __DIR__ . '/../core/auto-approve-tick.php';   // also loads request-decision.php
 
 $conn = getDB();
 $conn->set_charset('utf8mb4');
@@ -78,13 +78,18 @@ foreach ($asked as $it) {
         continue;
     }
     $status   = (string)$row['status'];
-    $approved = $status === 'Approved';
+    // A request submitted before Claim QRs were issued at submission: give it one now.
+    if ($status === 'Waiting' && !$row['claim']) {
+        $made = equipment_issue_pending_tokens($conn, $id);
+        $row['claim'] = $made['claim_token'];
+        $row['ret']   = $made['return_token'];
+    }
     $out[] = [
         'request_id'   => $id,
         'status'       => $status,
         'reason'       => (string)$row['reason'],
-        // the Claim QR only works while the request is Approved (claim_confirm.php); the Return QR until it is returned
-        'claim_token'  => $approved ? ($row['claim'] ?: null) : null,
+        // the Claim QR is shown from the start but only works once Approved (claim_confirm.php); the Return QR until it is returned
+        'claim_token'  => in_array($status, ['Waiting', 'Approved'], true) ? ($row['claim'] ?: null) : null,
         'return_token' => in_array($status, ['Approved', 'On Loan', 'Overdue'], true) ? ($row['ret'] ?: null) : null,
     ];
 }

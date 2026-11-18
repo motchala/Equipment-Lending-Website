@@ -261,7 +261,9 @@ try {
         $claim_token  = bin2hex(random_bytes(32)); // 64-char hex token
         $tok_stmt = $conn->prepare(
             "UPDATE tbl_requests
-                SET return_token = ?, claim_token = ?, bundle_claim_token = NULL
+                SET return_token = COALESCE(NULLIF(return_token, ''), ?),
+                    claim_token  = COALESCE(NULLIF(claim_token, ''), ?),
+                    bundle_claim_token = NULL
               WHERE id = ?"
         );
         if (!$tok_stmt) {

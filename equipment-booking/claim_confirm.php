@@ -23,6 +23,7 @@ admin_activity_bootstrap($conn);
 $token    = trim($_GET['token'] ?? '');
 $is_ajax  = (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest');
 $items    = [];
+$pending_approval = false;   // the QR is real, but an admin has not approved the request yet
 $borrower = '';
 $collector = '';
 
@@ -61,6 +62,18 @@ if ($token !== '') {
         }
     }
 
+    // A Claim QR is issued as soon as a student submits, so it can be scanned before an admin approved it.
+    if (empty($items)) {
+        $s = $conn->prepare("SELECT status FROM tbl_requests WHERE claim_token = ? LIMIT 1");
+        if ($s) {
+            $s->bind_param('s', $token);
+            $s->execute();
+            $w = $s->get_result()->fetch_assoc();
+            $s->close();
+            $pending_approval = $w && $w['status'] === 'Waiting';
+        }
+    }
+
     if (!empty($items)) {
         $borrower  = (string)$items[0]['faculty_name'];
         $collector = trim((string)($items[0]['submitted_by_name'] ?? ''));
@@ -71,7 +84,9 @@ if ($token !== '') {
 if ($is_ajax) {
     header('Content-Type: application/json');
     if (empty($items)) {
-        echo json_encode(['success' => false, 'message' => 'Invalid or already-used claim token.']);
+        echo json_encode(['success' => false, 'message' => $pending_approval
+            ? 'This request is still waiting for admin approval. Approve it first, then scan again.'
+            : 'Invalid or already-used claim token.']);
     } else {
         echo json_encode([
             'success'   => true,
@@ -198,9 +213,15 @@ if ($is_ajax) {
 <div class="card">
 <?php if (empty($items)): ?>
     <div class="error-state">
+<?php if ($pending_approval): ?>
+        <span class="badge badge--red">Waiting for approval</span>
+        <h2>Not approved yet</h2>
+        <p>This request is still waiting for an admin to approve it. Approve it from the Equipment requests list, then scan this QR again to hand the item over.</p>
+<?php else: ?>
         <span class="badge badge--red">Already Claimed</span>
         <h2>Nothing left to claim</h2>
         <p>All items linked to this QR code have already been handed over, or this code is no longer valid.</p>
+<?php endif; ?>
         <p style="font-size:.82rem;color:#aaa;margin-top:.5rem;">If some items are still pending, ask the faculty to open My Activity — each remaining item will show its own Claim QR.</p>
         <a href="../admin-dashboard.php" class="btn-primary" style="display:inline-block;width:auto;padding:.7rem 2rem;text-decoration:none;margin-top:1rem;">Back to Dashboard</a>
     </div>
