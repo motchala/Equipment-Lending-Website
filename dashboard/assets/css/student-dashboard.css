@@ -1661,6 +1661,90 @@ select.st-input option:disabled {
     color: var(--st-err);
 }
 
+/* ── Details pop-up (code + name + course) — opens over the home screen ── */
+.st-modal-open {
+    overflow: hidden;
+}
+
+.st-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    overflow-y: auto;
+    background: rgba(31, 20, 20, .58);
+    animation: st-modal-fade .2s ease;
+}
+
+.st-modal-card {
+    position: relative;
+    width: min(500px, 100%);
+    max-height: calc(100vh - 32px);
+    max-height: calc(100dvh - 32px);
+    overflow-y: auto;
+    padding: 26px 24px 22px;
+    background: var(--st-card);
+    border: 1px solid var(--st-line);
+    border-radius: var(--st-r-xl);
+    box-shadow: var(--st-shadow-lg);
+    animation: st-modal-pop .25s var(--st-ease);
+}
+
+.st-modal-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--st-gold-deep), var(--st-gold-light) 50%, var(--st-gold-deep));
+}
+
+.st-modal-card.is-wide {
+    width: min(580px, 100%);
+}
+
+.st-modal-card .st-card-head {
+    margin-bottom: 18px;
+}
+
+.st-modal-close {
+    margin-left: auto;
+    align-self: flex-start;
+}
+
+@keyframes st-modal-fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes st-modal-pop {
+    from { opacity: 0; transform: translateY(10px) scale(.98); }
+    to { opacity: 1; transform: none; }
+}
+
+@media (max-width: 640px) {
+    .st-modal {
+        padding: 10px;
+    }
+
+    .st-modal-card {
+        max-height: calc(100vh - 20px);
+        max-height: calc(100dvh - 20px);
+        padding: 20px 16px 16px;
+        border-radius: var(--st-r-lg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .st-modal,
+    .st-modal-card {
+        animation: none;
+    }
+}
+
 /* ── Facility: reserve form ─────────────────────────────────── */
 .st-picked {
     display: flex;
@@ -2022,6 +2106,46 @@ select.st-input option:disabled {
     margin-top: 6px;
     color: var(--st-muted);
     font-size: .9rem;
+}
+
+/* Receipt / result buttons (Check status + Done): compact, centred side by side instead of one full-width bar.
+   The extra class beats the generic .st-actions / .st-actions .st-btn phone rules (stacked, 100% wide). */
+.st-actions.st-result-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.st-actions.st-result-actions .st-btn {
+    width: auto;
+    min-width: 120px;
+    min-height: 40px;
+    padding: 7px 20px;
+    font-size: .88rem;
+}
+
+.st-actions.st-result-actions .st-btn .material-symbols-outlined {
+    font-size: 18px;
+}
+
+@media (max-width: 640px) {
+    .st-actions.st-result-actions {
+        gap: 8px;
+        margin-top: 16px;
+    }
+
+    .st-actions.st-result-actions .st-btn {
+        min-width: 104px;
+        min-height: 36px;
+        padding: 6px 14px;
+        font-size: .82rem;
+    }
+
+    .st-actions.st-result-actions .st-btn .material-symbols-outlined {
+        font-size: 16px;
+    }
 }
 
 .st-summary {
