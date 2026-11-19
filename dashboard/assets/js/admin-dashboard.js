@@ -220,26 +220,8 @@
         if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
     }
 
-    /* ── Phone view: desktop-only screens ────────────────────────
-       On a phone (<html class="rx-mobile">, see the head script in admin-shell-top.php) these screens are not offered.
-       Every road to them (sidebar, Dashboard shortcuts, ?view=, #tab-, refresh restore) ends in _switchTabDOM or
-       switchSettMainTab, so the guard lives here. It is a convenience, not security: the server still checks the role
-       on every request. admin-dashboard-mobile.js owns the wording (window.psDesktopOnlyNotice). */
-    const PS_DESKTOP_ONLY_TABS = ['faculty', 'admins', 'imports', 'reports'];
-    const PS_DESKTOP_ONLY_SETT = ['sett-arbitration', 'sett-data', 'sett-ratings'];
-    function _psIsPhone() { return document.documentElement.classList.contains('rx-mobile'); }
-    function _psDesktopOnlyNotice(what) {
-        if (typeof window.psDesktopOnlyNotice === 'function') window.psDesktopOnlyNotice(what);
-    }
-
     /* ── Tab switcher ────────────────────────────────────────── */
     function _switchTabDOM(tabName, clickedEl) {
-        if (_psIsPhone() && PS_DESKTOP_ONLY_TABS.indexOf(tabName) !== -1) {
-            // a real tap gets a short explanation; a silent restore (clickedEl === false) just lands on the Dashboard
-            if (clickedEl !== false) _psDesktopOnlyNotice(tabName);
-            tabName = 'dashboard';
-            if (clickedEl !== false) clickedEl = null;
-        }
         const panel = document.getElementById('panel-' + tabName);
         if (!panel) return;
         // A real tab switch ends the "restored screen" state (see admin-shell-bottom.php), so the new screen slides in as usual
@@ -345,10 +327,6 @@
     function switchSettMainTab(panelId) {
         const settPanel = document.getElementById('panel-settings');
         if (!settPanel) return;
-        if (_psIsPhone() && PS_DESKTOP_ONLY_SETT.indexOf(panelId) !== -1) {
-            _psDesktopOnlyNotice(panelId);
-            panelId = 'sett-account';
-        }
         settPanel.querySelectorAll(':scope > .rq-sub-panel').forEach(p => p.classList.remove('active'));
         const tabsWrap = document.getElementById('settMainTabs');
         if (tabsWrap) tabsWrap.querySelectorAll('.rq-sub-tab').forEach(t => t.classList.remove('active'));
@@ -1874,14 +1852,20 @@
     // null means no successful lookup yet — submit is blocked until set.
     let _facRegistryMatch = null;
 
-    function _showLookupAlert(msg, isError) {
+    let _facLookupAlertTimer = null;
+
+    // autoHideMs (optional): hide the message by itself after that many milliseconds.
+    function _showLookupAlert(msg, isError, autoHideMs) {
         if (!facLookupAlert) return;
+        clearTimeout(_facLookupAlertTimer);
         facLookupAlert.className = 'alert-banner ' + (isError ? 'alert-danger' : 'alert-success');
         facLookupAlert.textContent = msg;
         facLookupAlert.classList.remove('hidden');
+        if (autoHideMs > 0) _facLookupAlertTimer = setTimeout(_clearLookupAlert, autoHideMs);
     }
     function _clearLookupAlert() {
         if (!facLookupAlert) return;
+        clearTimeout(_facLookupAlertTimer);
         facLookupAlert.classList.add('hidden');
         facLookupAlert.textContent = '';
     }
@@ -1972,7 +1956,7 @@
                         return;
                     }
                     if (data.status === 'not_found') {
-                        let msg = firstName + ' ' + lastName + ' was not found in the faculty registry. ';
+                        let msg = firstName + ' ' + lastName + ' was not found in the registry. ';
                         const hints = Array.isArray(data.hints) ? data.hints : [];
                         if (hints.length) {
                             // e.g. "Cruz" typed for "Edmundo B. Dela Cruz": show how to enter it so it matches
@@ -1980,11 +1964,11 @@
                                 return '\u201C' + h.full_name + '\u201D (First name \u201C' + h.first + '\u201D, Last name \u201C' + h.last + '\u201D)';
                             }).join(' or ') + '?';
                         } else {
-                            msg += 'Check the spelling or upload an updated registry file. ' +
-                                'A surname of more than one word (like Dela Cruz) must be typed in full under Last name; ' +
-                                'if the registry shows no middle initial, only its last word counts as the last name.';
+                            msg += 'Check the spelling and type the full surname (e.g. Dela Cruz) under Last name.';
                         }
-                        _showLookupAlert(msg, true);
+                        // the short "not found" note fades away after 5 seconds; the "Did you mean" one stays,
+                        // because the admin needs it to correct the name
+                        _showLookupAlert(msg, true, hints.length ? 0 : 5000);
                         return;
                     }
                     if (data.status === 'found' && data.matches && data.matches.length === 1) {
@@ -2035,15 +2019,15 @@
 
     /* ── Auto-generate a strong temporary password ──────────────────────────
        The fac-password field is read-only; the admin never types in it.
-       We generate it on page load, and again when the regen button is clicked.
+       It is empty until the admin taps Generate (and again after an account is created).
        The password must pass the server's strength check (level >= 2 / "Fair"):
        ≥12 chars, upper + lower + digit + symbol, no trivial runs.          */
     function _facGeneratePassword() {
-        const upper  = 'ABCDEFGHJKLMNPQRSTUVWXYZ';   // no I/O to avoid confusion
-        const lower  = 'abcdefghjkmnpqrstuvwxyz';    // no i/l/o
+        const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';   // no I/O to avoid confusion
+        const lower = 'abcdefghjkmnpqrstuvwxyz';    // no i/l/o
         const digits = '23456789';                    // no 0/1
-        const syms   = '!@#$%^&*-_=+';
-        const all    = upper + lower + digits + syms;
+        const syms = '!@#$%^&*-_=+';
+        const all = upper + lower + digits + syms;
 
         // Use crypto.getRandomValues when available (all modern browsers + InfinityFree).
         function rand(max) {
@@ -2060,13 +2044,13 @@
         // server uses (level >= 2).  Typically succeeds on the first try.
         do {
             var chars = [
-                upper [rand(upper.length)],
-                upper [rand(upper.length)],
-                lower [rand(lower.length)],
-                lower [rand(lower.length)],
+                upper[rand(upper.length)],
+                upper[rand(upper.length)],
+                lower[rand(lower.length)],
+                lower[rand(lower.length)],
                 digits[rand(digits.length)],
                 digits[rand(digits.length)],
-                syms  [rand(syms.length)],
+                syms[rand(syms.length)],
             ];
             // Pad to 14 chars from the full alphabet
             while (chars.length < 14) {
@@ -2095,6 +2079,24 @@
         return true;
     }
 
+    /* The field starts empty. A password only appears when the admin taps Generate, and the field is
+       emptied again after an account is created. The Copy button and the Generate / Regenerate label
+       follow whether the field has a password. */
+    var facPwCopyBtn = document.getElementById('fac-pw-copy');
+    var facPwRegenText = document.getElementById('fac-pw-regen-text');
+
+    function _facSyncPasswordUi() {
+        const has = !!(facPasswordInput && facPasswordInput.value);
+        if (facPwCopyBtn) facPwCopyBtn.disabled = !has;
+        if (facPwRegenText) facPwRegenText.textContent = has ? 'Regenerate' : 'Generate';
+        const regen = document.getElementById('fac-pw-regen');
+        if (regen) {
+            const t = has ? 'Generate a different password' : 'Generate a password';
+            regen.title = t;
+            regen.setAttribute('aria-label', t);
+        }
+    }
+
     function _facSetGeneratedPassword(pw) {
         if (!facPasswordInput) return;
         facPasswordInput.value = pw;
@@ -2102,9 +2104,18 @@
         facPasswordInput.classList.remove('fac-gen-flash');
         void facPasswordInput.offsetWidth; // reflow to restart animation
         facPasswordInput.classList.add('fac-gen-flash');
+        _facSyncPasswordUi();
     }
 
-    // Wire up the regen button
+    function _facClearGeneratedPassword() {
+        if (facPasswordInput) {
+            facPasswordInput.value = '';
+            facPasswordInput.classList.remove('fac-gen-flash');
+        }
+        _facSyncPasswordUi();
+    }
+
+    // Wire up the generate button
     var facPwRegenBtn = document.getElementById('fac-pw-regen');
     if (facPwRegenBtn) {
         facPwRegenBtn.addEventListener('click', function () {
@@ -2113,7 +2124,6 @@
     }
 
     // Wire up the copy button
-    var facPwCopyBtn = document.getElementById('fac-pw-copy');
     if (facPwCopyBtn) {
         facPwCopyBtn.addEventListener('click', function () {
             if (!facPasswordInput || !facPasswordInput.value) return;
@@ -2149,10 +2159,8 @@
         } catch (e) { /* silent */ }
     }
 
-    // Generate a password immediately when the page loads
-    if (facPasswordInput) {
-        _facSetGeneratedPassword(_facGeneratePassword());
-    }
+    // Start empty (a browser may restore an old value when the page is reloaded)
+    _facClearGeneratedPassword();
 
     function _updateFacPasswordStrength() { /* no-op: password is auto-generated, no strength bar needed */ }
     function _getFacPasswordStrength(password) {
@@ -2193,11 +2201,12 @@
 
         // Empty the form right away so no browser can restore typed values (the password
         // included) after the reload.
-        ['fac-email', 'fac-faculty-id', 'fac-first', 'fac-last', 'fac-password']
+        ['fac-email', 'fac-faculty-id', 'fac-first', 'fac-last']
             .forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.value = '';
             });
+        _facClearGeneratedPassword();
         _clearFacAlert();
         _clearRegistryPreview();
 
@@ -2227,8 +2236,8 @@
             // Reset the create-account form so it's blank for the next account.
             var form = document.getElementById('fac-create-form') || document.getElementById('facCreateForm');
             if (form) form.reset();
-            // Generate a fresh password for the next account creation
-            if (facPasswordInput) _facSetGeneratedPassword(_facGeneratePassword());
+            // Leave the password empty for the next account: the admin taps Generate when they need one
+            _facClearGeneratedPassword();
             // Refresh the faculty list from the server so the new account appears immediately.
             if (typeof window.adminRefreshFacultyList === 'function') window.adminRefreshFacultyList();
         }, FAC_CREATED_OVERLAY_MS);
@@ -2256,9 +2265,10 @@
                 _showFacAlert('Last name is required.', true); return;
             }
             if (!password) {
-                // Should never happen (generated on load), but guard against it
-                _facSetGeneratedPassword(_facGeneratePassword());
-                _showFacAlert('A password was just generated. Please try again.', true); return;
+                _showFacAlert('Tap Generate to create a temporary password first.', true);
+                const regenBtn = document.getElementById('fac-pw-regen');
+                if (regenBtn) regenBtn.focus();
+                return;
             }
             if (_facEmailEdited && email && !/^[^\s@]+@pupsync\.edu$/i.test(email)) {
                 _showFacAlert('The PUPSync email must be a valid address ending in @pupsync.edu.', true);
@@ -2379,14 +2389,12 @@
         });
     }
 
-    /* Equipment: Catalog numbers (fragment endpoint) + the Loans table and its tab counts. */
-    function _psRefreshEquipment() {
-        const catalog = new Promise(function (resolve) {
-            if (typeof window.psRefreshInventoryTbody !== 'function') { resolve(); return; }
-            window.psRefreshInventoryTbody(resolve);
-            setTimeout(resolve, 15000);   // never leave the loading bar hanging
-        });
-        const loans = _psFetchPageDoc().then(function (doc) {
+    /* The Loans table and its tab counts, re-read from the server (keeps the active filter + page). */
+    let _psLoansBusy = false;
+    function _psRefreshLoansTable() {
+        if (_psLoansBusy) return Promise.resolve();
+        _psLoansBusy = true;
+        return _psFetchPageDoc().then(function (doc) {
             const fresh = doc.querySelector('#eq-loan-table tbody');
             const live = document.querySelector('#eq-loan-table tbody');
             if (!fresh || !live) return;
@@ -2398,8 +2406,20 @@
                 if (cur && nw) { cur.textContent = nw.textContent; cur.className = nw.className; }
             });
             if (typeof window.psRefreshEquipmentLoans === 'function') window.psRefreshEquipmentLoans(true);   // keeps filter + page
+        }).then(function () { _psLoansBusy = false; }, function (e) { _psLoansBusy = false; throw e; });
+    }
+    // The live poller (admin-live-render.js) calls this when a request arrives or changes, so a new
+    // student / faculty request shows up in Equipment > Loans without anyone reloading the page.
+    window.psRefreshLoansTable = function () { return _psRefreshLoansTable().catch(function () { /* try again on the next change */ }); };
+
+    /* Equipment: Catalog numbers (fragment endpoint) + the Loans table and its tab counts. */
+    function _psRefreshEquipment() {
+        const catalog = new Promise(function (resolve) {
+            if (typeof window.psRefreshInventoryTbody !== 'function') { resolve(); return; }
+            window.psRefreshInventoryTbody(resolve);
+            setTimeout(resolve, 15000);   // never leave the loading bar hanging
         });
-        return Promise.all([catalog, loans]);
+        return Promise.all([catalog, _psRefreshLoansTable()]);
     }
 
     window.psRefreshActiveTab = function (tab) {
@@ -4414,8 +4434,7 @@
 
         const approveConfirmBtn = document.getElementById('ps-approve-confirm-btn');
         const declineConfirmBtn = document.getElementById('ps-decline-confirm-btn');
-        const approveReasonInput = document.getElementById('approve-reason');
-        const declineReasonInput = document.getElementById('decline-reason');
+        const declinePicker = document.getElementById('decline-reason-picker');   // one-tap reasons (shared/assets/js/admin-decline-reasons.js)
 
         function rowCtx(el) {
             const tr = el.closest('tr[data-id]');
@@ -4430,15 +4449,6 @@
                 arbRule: d.arbRule,
                 autoOk: d.autoOk === '1'   // meets every automatic-approval rule: approve without reason / internal note
             };
-        }
-
-        // Approve screen: a request that meets every automatic-approval rule needs no reason and no internal note
-        let approveAutoOk = false;
-        function setApproveFieldsHidden(hide) {
-            [approveReasonInput, document.getElementById('approve-admin-note')].forEach(function (el) {
-                const grp = el && el.closest('.ps-form-group');
-                if (grp) grp.style.display = hide ? 'none' : '';
-            });
         }
 
         function reqNo(id) { return '#R-' + String(id || 0).padStart(4, '0'); }
@@ -4466,12 +4476,7 @@
             document.getElementById('approve-date-needed').textContent = ctx.dateNeeded || '—';
             const dd = document.getElementById('approve-due-date');
             if (dd) dd.value = ctx.returnDate || '';
-            if (approveReasonInput) approveReasonInput.value = '';
-            const approveAdminNoteEl = document.getElementById('approve-admin-note');
-            if (approveAdminNoteEl) approveAdminNoteEl.value = '';
-            approveAutoOk = !!ctx.autoOk;
-            setApproveFieldsHidden(approveAutoOk);
-            if (approveConfirmBtn) approveConfirmBtn.disabled = !approveAutoOk;
+            if (approveConfirmBtn) approveConfirmBtn.disabled = false;   // approving needs no reason or note
             clearAlert('ps-approve-alert');
         }
 
@@ -4481,7 +4486,7 @@
             document.getElementById('decline-borrower').textContent =
                 ctx.submittedAs === 'student' && ctx.studentName ? ctx.studentName : (ctx.borrower || '—');
             document.getElementById('decline-equipment').textContent = ctx.equipment || '—';
-            if (declineReasonInput) declineReasonInput.value = '';
+            if (declinePicker && window.PSReasonPicker) window.PSReasonPicker.reset(declinePicker);
             if (declineConfirmBtn) declineConfirmBtn.disabled = true;
             clearAlert('ps-decline-alert');
         }
@@ -4564,14 +4569,9 @@
             else if (modalId === 'ps-req-detail-modal') fillDetail(ctx);
         });
 
-        if (approveReasonInput && approveConfirmBtn) {
-            approveReasonInput.addEventListener('input', function () {
-                approveConfirmBtn.disabled = this.value.trim().length < 5;
-            });
-        }
-        if (declineReasonInput && declineConfirmBtn) {
-            declineReasonInput.addEventListener('input', function () {
-                declineConfirmBtn.disabled = this.value.trim().length < 5;
+        if (declinePicker && declineConfirmBtn) {
+            declinePicker.addEventListener('psreason:change', function (e) {
+                declineConfirmBtn.disabled = !e.detail.ok;
             });
         }
 
@@ -4642,12 +4642,6 @@
 
                         if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
                     } else {
-                        // The request stopped meeting the automatic rules since the list was drawn: ask for the reason
-                        if (data && data.needs_reason && newStatus === 'Approved') {
-                            approveAutoOk = false;
-                            setApproveFieldsHidden(false);
-                            if (approveConfirmBtn) approveConfirmBtn.disabled = true;
-                        }
                         showAlert(alertId, (data && data.message) || 'Action failed. Please try again.');
                         btn.disabled = false;
                         btn.innerHTML = btn.dataset.origLabel;
@@ -4663,25 +4657,18 @@
         if (approveConfirmBtn) {
             approveConfirmBtn.addEventListener('click', function () {
                 const id = document.getElementById('approve-request-id').value;
-                const reason = (approveReasonInput.value || '').trim();
-                const adminNoteEl = document.getElementById('approve-admin-note');
-                const adminNote = adminNoteEl ? adminNoteEl.value.trim() : '';
-                if (!approveAutoOk && reason.length < 5) {
-                    showAlert('ps-approve-alert', 'Please enter a reason (min. 5 characters).');
-                    return;
-                }
-                submitDecision(id, 'Approved', approveAutoOk ? '' : reason, 'ps-approve-alert', approveConfirmBtn, 'Approving…', approveAutoOk ? '' : adminNote);
+                submitDecision(id, 'Approved', '', 'ps-approve-alert', approveConfirmBtn, 'Approving…');
             });
         }
         if (declineConfirmBtn) {
             declineConfirmBtn.addEventListener('click', function () {
                 const id = document.getElementById('decline-request-id').value;
-                const reason = (declineReasonInput.value || '').trim();
-                if (reason.length < 5) {
-                    showAlert('ps-decline-alert', 'Please enter a reason (min. 5 characters).');
+                const pick = window.PSReasonPicker ? window.PSReasonPicker.read(declinePicker) : { ok: false, error: 'Please pick a reason.' };
+                if (!pick.ok) {
+                    showAlert('ps-decline-alert', pick.error || 'Please pick a reason.');
                     return;
                 }
-                submitDecision(id, 'Declined', reason, 'ps-decline-alert', declineConfirmBtn, 'Declining…');
+                submitDecision(id, 'Declined', pick.reason, 'ps-decline-alert', declineConfirmBtn, 'Declining…');
             });
         }
     })();
@@ -4690,17 +4677,11 @@
         var modal = document.getElementById('eq-bundle-approve-modal');
         var batchInput = document.getElementById('eq-bundle-approve-id');
         var itemsBox = document.getElementById('eq-bundle-approve-items');
-        var reasonInput = document.getElementById('eq-bundle-approve-reason');
         var alertBox = document.getElementById('eq-bundle-approve-alert');
         var confirmButton = document.getElementById('eq-bundle-approve-confirm');
-        if (!modal || !batchInput || !itemsBox || !reasonInput || !confirmButton) return;
+        if (!modal || !batchInput || !itemsBox || !confirmButton) return;
 
         var pendingRows = [];
-        var bundleAutoOk = false;
-        function setBundleReasonHidden(hide) {
-            var grp = reasonInput.closest('.ps-form-group');
-            if (grp) grp.style.display = hide ? 'none' : '';
-        }
         function showError(message) {
             alertBox.textContent = message;
             alertBox.style.display = 'block';
@@ -4716,9 +4697,6 @@
         // rules (no reason needed). show = false prepares it without displaying it (used for the one-click approve).
         function openBundleModal(batchId, autoOk, show) {
             batchInput.value = batchId || '';
-            reasonInput.value = '';
-            bundleAutoOk = !!autoOk;
-            setBundleReasonHidden(bundleAutoOk);
             confirmButton.disabled = true;
             clearError();
             itemsBox.textContent = '';
@@ -4739,7 +4717,7 @@
             if (pendingRows.length < 2) {
                 showError('At least two requests in this bundle must still be pending.');
             }
-            confirmButton.disabled = !bundleAutoOk || pendingRows.length < 2;
+            confirmButton.disabled = pendingRows.length < 2;
             if (show !== false && typeof psOpenModal === 'function') psOpenModal('eq-bundle-approve-modal');
         }
 
@@ -4830,21 +4808,16 @@
                     openBundleModal(choice.batchId, true, false);
                     submitBundle(true);
                 } else {
-                    openBundleModal(choice.batchId, false, true);   // asks for the approval reason
+                    openBundleModal(choice.batchId, false, true);   // shows the bundle once more for a final confirm
                 }
             });
         }
 
-        reasonInput.addEventListener('input', function () {
-            confirmButton.disabled = this.value.trim().length < 5 || pendingRows.length < 2;
-        });
-
         confirmButton.addEventListener('click', function () { submitBundle(false); });
 
         function submitBundle(modalIsHidden) {
-            var reason = bundleAutoOk ? '' : reasonInput.value.trim();
-            if ((!bundleAutoOk && reason.length < 5) || pendingRows.length < 2) {
-                showError('Enter an approval reason of at least 5 characters.');
+            if (pendingRows.length < 2) {
+                showError('At least two requests in this bundle must still be pending.');
                 return;
             }
             confirmButton.disabled = true;
@@ -4853,7 +4826,7 @@
             clearError();
             var body = new FormData();
             body.append('batch_id', batchInput.value);
-            body.append('override_reason', reason);
+            body.append('override_reason', '');
             body.append('csrf_token', getCsrfToken());
 
             fetch('equipment-booking/api/approve-borrow-bundle.php', { method: 'POST', body: body })
@@ -4861,7 +4834,6 @@
                     return response.json().then(function (data) {
                         if (!response.ok || data.status !== 'success') {
                             var failure = new Error(data.message || 'Bundle approval failed.');
-                            failure.needsReason = !!data.needs_reason;   // the cart stopped meeting the automatic rules
                             throw failure;
                         }
                         return data;
@@ -4897,16 +4869,12 @@
                     if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
                 })
                 .catch(function (error) {
-                    if (error.needsReason) {
-                        bundleAutoOk = false;
-                        setBundleReasonHidden(false);
-                    }
                     showError(error.message || 'Network error. Please try again.');
                     // approved in one click without the screen showing: show it now so the problem can be read / fixed
                     if (modalIsHidden && typeof psOpenModal === 'function') psOpenModal('eq-bundle-approve-modal');
                 })
                 .finally(function () {
-                    confirmButton.disabled = (!bundleAutoOk && reasonInput.value.trim().length < 5) || pendingRows.length < 2;
+                    confirmButton.disabled = pendingRows.length < 2;
                     confirmButton.innerHTML = confirmButton.dataset.originalText || '<span class="material-symbols-outlined">done_all</span> Approve Bundle';
                 });
         }
@@ -4959,6 +4927,66 @@
             scannedCount = 0;
         }
 
+        /* The camera is switched OFF as soon as a scan succeeds (the request's status is shown instead) and is
+           only switched back on when the admin chooses to scan another QR. */
+        function closeCamera() {
+            scanning = false;
+            if (animFrame) { cancelAnimationFrame(animFrame); animFrame = null; }
+            if (stream) stream.getTracks().forEach(t => t.stop());
+            stream = null;
+            try { video.pause(); } catch (e) { }
+            video.srcObject = null;
+        }
+
+        function resumeCamera() {
+            if (stream) { scanning = true; tick(); return; }
+            status.textContent = 'Starting camera...';
+            status.style.color = '#888';
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                status.textContent = '❌ Camera not available. Close the scanner and open it again.';
+                status.style.color = '#e53e3e';
+                return;
+            }
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+                .then(s => {
+                    if (modal.style.display === 'none') { s.getTracks().forEach(t => t.stop()); return; }   // closed meanwhile
+                    stream = s;
+                    video.srcObject = s;
+                    video.play();
+                    scanning = true;
+                    status.textContent = 'Point camera at the next QR code.';
+                    status.style.color = '#888';
+                    tick();
+                })
+                .catch(err => {
+                    status.textContent = '❌ Camera access denied. Please allow camera permission.';
+                    status.style.color = '#e53e3e';
+                    console.warn('Camera error:', err);
+                });
+        }
+
+        /* One line telling the admin where the scanned request stands */
+        function statusBannerHtml(items) {
+            const count = function (st) { return items.filter(function (i) { return i.status === st; }).length; };
+            const kinds = [
+                ['Overdue', 'overdue', 'Overdue', '#fdecea', '#b3261e'],
+                ['On Loan', 'on loan', 'On loan', '#e8f5e9', '#2e7d32'],
+                ['Waiting', 'waiting', 'Waiting for approval', '#fff3cd', '#856404'],
+                ['Approved', 'approved', 'Approved — ready for pick-up', '#e8f5e9', '#2e7d32']
+            ].filter(function (k) { return count(k[0]) > 0; });
+            if (!kinds.length) return '';
+            let label, bg, fg;
+            if (kinds.length === 1) {
+                label = kinds[0][2]; bg = kinds[0][3]; fg = kinds[0][4];
+            } else {
+                label = kinds.map(function (k) { return count(k[0]) + ' ' + k[1]; }).join(' · ');
+                bg = kinds[0][3]; fg = kinds[0][4];
+            }
+            return '<div style="display:flex;align-items:center;gap:.5rem;padding:.6rem 1rem;background:' + bg + ';color:' + fg +
+                ';font-size:.85rem;font-weight:600;border-bottom:1px solid rgba(0,0,0,.06);">' +
+                '<span style="font-weight:500;opacity:.8;">Request status:</span> ' + label + '</div>';
+        }
+
         function processFrame(canvas, ctx) {
             if (!scanning) return;
             if (video.readyState === video.HAVE_ENOUGH_DATA) {
@@ -5006,12 +5034,117 @@
                         ? 'equipment-booking/claim_confirm.php?token=' + encodeURIComponent(token)
                         : 'equipment-booking/return_confirm.php?token=' + encodeURIComponent(token);
 
-                    fetch(endpoint, {
+                    const scanFetchOpts = {
                         credentials: 'same-origin',
                         headers: { 'X-Requested-With': 'XMLHttpRequest' }
-                    })
-                        .then(r => r.json())
-                        .then(data => {
+                    };
+
+                    function scanEsc(v) {
+                        return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
+                            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+                        });
+                    }
+
+                    function backToCamera() {
+                        document.getElementById('qrChecklistConfirm').disabled = false;
+                        document.getElementById('qrChecklistConfirm').textContent = 'Confirm';
+                        document.getElementById('qrChecklistView').style.display = 'none';
+                        document.getElementById('qrCameraView').style.display = '';
+                        document.getElementById('qrScannerTitle').textContent = 'Scan QR Code';
+                        document.getElementById('qrScannerSubtitle').textContent = 'Point the camera at the faculty member\'s QR code.';
+                        document.getElementById('qrChecklistCancel').textContent = 'Back';
+                        status.textContent = 'Point camera at the next QR code.';
+                        status.style.color = '#888';
+                        resumeCamera();
+                    }
+
+                    /* STEP 1 of a Claim QR: show WHAT was requested (who, which items, how many, state) before
+                       anything is handed over. Waiting items can be approved right here; the Claim QR the
+                       student already holds stays the same, so it keeps working after approval. */
+                    function showClaimSummary(data) {
+                        const confirmBtn = document.getElementById('qrChecklistConfirm');
+                        const cancelBtn = document.getElementById('qrChecklistCancel');
+                        const itemsEl = document.getElementById('qrChecklistItems');
+                        const hintEl = document.getElementById('qrChecklistHint');
+                        const waiting = data.items.filter(function (i) { return i.status === 'Waiting'; });
+                        const units = data.items.reduce(function (n, i) { return n + (i.borrow_qty || 1); }, 0);
+
+                        document.getElementById('qrCameraView').style.display = 'none';
+                        document.getElementById('qrChecklistView').style.display = '';
+                        document.getElementById('qrScannerTitle').textContent = 'Request Details';
+                        document.getElementById('qrScannerSubtitle').textContent = 'Review what was requested before handing over.';
+
+                        const who = data.collector
+                            ? '<div><b>Requested by:</b> ' + scanEsc(data.collector) + (data.collector_id ? ' · ' + scanEsc(data.collector_id) : '') + '</div>' +
+                            '<div><b>Faculty:</b> ' + scanEsc(data.borrower) + '</div>'
+                            : '<div><b>Borrower:</b> ' + scanEsc(data.borrower) + '</div>';
+                        const meta = (data.room ? '<div><b>Room:</b> ' + scanEsc(data.room) + '</div>' : '') +
+                            (data.borrow_start ? '<div><b>Borrow:</b> ' + scanEsc(data.borrow_start) + (data.return_by ? ' → ' + scanEsc(data.return_by) : '') + '</div>' : '');
+
+                        cancelBtn.textContent = 'Back';
+                        itemsEl.innerHTML = statusBannerHtml(data.items) + '<div style="padding:.75rem 1rem;background:#faf7f7;border-bottom:1px solid #efe6e6;font-size:.84rem;line-height:1.6;color:#444;">' + who + meta + '</div>';
+                        data.items.forEach(function (item, idx) {
+                            const ok = item.status === 'Approved';
+                            const row = document.createElement('div');
+                            row.style.cssText = 'display:flex;align-items:center;gap:.65rem;padding:.75rem 1rem;border-bottom:1px solid #f0f0f0;background:' + (idx % 2 === 0 ? '#fff' : '#fafafa') + ';';
+                            row.innerHTML =
+                                '<span style="flex:1;"><strong style="display:block;font-size:.9rem;">' + scanEsc(item.equipment_name) + '</strong>' +
+                                '<span style="font-size:.78rem;color:#888;">Quantity: ' + item.borrow_qty + '</span></span>' +
+                                '<span style="font-size:.75rem;padding:2px 10px;border-radius:12px;white-space:nowrap;background:' + (ok ? '#e8f5e9' : '#fff3cd') + ';color:' + (ok ? '#2e7d32' : '#856404') + ';">' + (ok ? 'Approved' : 'Waiting') + '</span>';
+                            itemsEl.appendChild(row);
+                        });
+
+                        hintEl.textContent = data.items.length + (data.items.length === 1 ? ' item' : ' items') + ' · ' + units + (units === 1 ? ' unit' : ' units') + ' requested.' +
+                            (waiting.length ? ' ' + waiting.length + ' still waiting for approval.' : '');
+
+                        confirmBtn.disabled = false;
+                        confirmBtn.textContent = waiting.length ? (waiting.length === data.items.length ? 'Approve & Continue' : 'Approve Waiting & Continue') : 'Continue to Handover';
+                        cancelBtn.onclick = backToCamera;
+                        confirmBtn.onclick = function () {
+                            confirmBtn.disabled = true;
+                            if (!waiting.length) { handleScanData(data, true); return; }
+                            confirmBtn.textContent = 'Approving...';
+                            const csrf = (document.querySelector('input[name="csrf_token"]') || {}).value || '';
+                            function approveNext(i) {
+                                if (i >= waiting.length) {
+                                    // Approved: reload the same QR, then go straight to the handover step.
+                                    return fetch(endpoint, scanFetchOpts).then(function (r) { return r.json(); }).then(function (fresh) {
+                                        if (fresh.success && fresh.checklist) { handleScanData(fresh, true); }
+                                        else { throw new Error(fresh.message || 'Could not reload the request.'); }
+                                    });
+                                }
+                                function send() {
+                                    const fd = new FormData();
+                                    fd.append('request_id', waiting[i].id);
+                                    fd.append('new_status', 'Approved');
+                                    fd.append('override_reason', '');
+                                    fd.append('csrf_token', csrf);
+                                    return fetch('equipment-booking/api/admin-override.php', { method: 'POST', credentials: 'same-origin', body: fd })
+                                        .then(function (r) { return r.json(); });
+                                }
+                                return send().then(function (res) {
+                                    if (res.status !== 'success') { throw new Error(res.message || 'Could not approve.'); }
+                                    return approveNext(i + 1);
+                                });
+                            }
+                            approveNext(0).catch(function (err) {
+                                confirmBtn.disabled = false;
+                                confirmBtn.textContent = waiting.length === data.items.length ? 'Approve & Continue' : 'Approve Waiting & Continue';
+                                if (err && err.message && err.message !== '__cancel__') { showToast('❌ ' + err.message); }
+                            });
+                        };
+                    }
+
+                    function handleScanData(data, skipSummary) {
+                            if (data && data.success) closeCamera();   // valid QR: the camera is no longer needed
+                            if (isClaimQr && data.success && data.checklist && Array.isArray(data.items)) {
+                                if (!skipSummary) { showClaimSummary(data); return; }
+                                // Handover only covers items an admin has approved.
+                                data.items = data.items.filter(function (i) { return !i.status || i.status === 'Approved'; });
+                                if (!data.items.length) { showToast('❌ Nothing approved to hand over yet.'); backToCamera(); return; }
+                                document.getElementById('qrChecklistConfirm').disabled = false;
+                                document.getElementById('qrChecklistConfirm').textContent = 'Confirm';
+                            }
                             if (data.success && data.checklist) {
                                 // Show inline checklist inside the scanner modal
                                 scanning = false;
@@ -5032,8 +5165,10 @@
                                     ? 'Hand over to ' + (data.collector || data.borrower)
                                     : 'Return from ' + data.borrower;
 
-                                // Build item rows
+                                // Build item rows (the request's status first)
+                                cancelBtn.textContent = 'Back';
                                 itemsEl.innerHTML = '';
+                                itemsEl.insertAdjacentHTML('beforeend', statusBannerHtml(data.items));
                                 const CONDITIONS = ['Good', 'Fair', 'Damaged', 'Missing'];
                                 data.items.forEach(function (item, idx) {
                                     const bg = idx % 2 === 0 ? '#fff' : '#fafafa';
@@ -5086,7 +5221,7 @@
 
                                 // Wire qty +/- buttons and condition dropdown visibility
                                 if (isClaimQr) {
-                                    itemsEl.addEventListener('click', function (e) {
+                                    itemsEl.onclick = function (e) {
                                         var dec = e.target.closest('[data-claim-dec]');
                                         var inc = e.target.closest('[data-claim-inc]');
                                         var btn = dec || inc;
@@ -5102,8 +5237,8 @@
                                         inp.value = v;
                                         // Show condition dropdown only when some units are withheld
                                         if (cond) cond.style.display = (v < max) ? '' : 'none';
-                                    });
-                                    itemsEl.addEventListener('change', function (e) {
+                                    };
+                                    itemsEl.onchange = function (e) {
                                         var inp = e.target.closest('input[data-claim-qty]');
                                         if (!inp) return;
                                         var max = parseInt(inp.dataset.maxQty || inp.max, 10);
@@ -5112,7 +5247,7 @@
                                         var rid = inp.getAttribute('data-req-id');
                                         var cond = itemsEl.querySelector('select[data-claim-cond][data-req-id="' + rid + '"]');
                                         if (cond) cond.style.display = (v < max) ? '' : 'none';
-                                    });
+                                    };
                                 }
 
                                 hintEl.textContent = isClaimQr
@@ -5187,10 +5322,19 @@
                                             method: 'POST', credentials: 'same-origin', body: formData
                                         }).then(function (r) { return r.json(); })
                                             .then(function (result) {
+                                                if (!result || !result.success) {
+                                                    showToast('❌ ' + ((result && (result.error || result.message)) || 'Could not save the handover.'));
+                                                    confirmBtn.disabled = false;
+                                                    confirmBtn.textContent = 'Confirm';
+                                                    return;
+                                                }
                                                 const msg = (result.claimed || 0) + ' item(s) handed over' +
                                                     (result.withheld > 0 ? ', ' + result.withheld + ' unit(s) withheld.' : '.');
                                                 showToast('✅ ' + msg);
-                                                resetToCamera();
+                                                showResult('Handover complete', (result.claimed || 0) > 0 ? 'On loan' : 'No items handed over',
+                                                    (result.claimed || 0) > 0 ? '#2e7d32' : '#856404',
+                                                    (result.claimed || 0) + (result.claimed === 1 ? ' item' : ' items') + ' handed over to ' + (data.collector || data.borrower) +
+                                                    (result.withheld > 0 ? ' · ' + result.withheld + ' unit(s) withheld.' : '.'));
                                                 if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
                                             }).catch(function () {
                                                 showToast('Network error. Please try again.');
@@ -5200,6 +5344,7 @@
 
                                     } else {
                                         // Only process items whose checkbox is ticked
+                                        const rowsTotal = itemsEl.querySelectorAll('input[type="checkbox"][data-req-id]').length;
                                         itemsEl.querySelectorAll('input[type="checkbox"]:checked[data-req-id]').forEach(function (cb) {
                                             const rid = cb.dataset.reqId;
                                             const sel = itemsEl.querySelector('select[data-req-id="' + rid + '"]');
@@ -5216,7 +5361,11 @@
                                             .then(function (result) {
                                                 const n = result.returned || 0;
                                                 showToast('✅ ' + n + ' item' + (n === 1 ? '' : 's') + ' marked as returned.');
-                                                resetToCamera();
+                                                const stillOut = Math.max(0, rowsTotal - n);
+                                                showResult(n > 0 ? 'Return recorded' : 'Nothing was returned', n > 0 ? 'Returned' : 'Still on loan',
+                                                    n > 0 ? '#2e7d32' : '#856404',
+                                                    n + (n === 1 ? ' item' : ' items') + ' marked as returned' +
+                                                    (stillOut > 0 ? ' · ' + stillOut + ' still on loan.' : '.'));
                                                 if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
                                             }).catch(function () {
                                                 showToast('Network error. Please try again.');
@@ -5236,10 +5385,27 @@
                                     cameraView.style.display = '';
                                     titleEl.textContent = 'Scan QR Code';
                                     subtitleEl.textContent = 'Point the camera at the faculty member\'s QR code.';
+                                    cancelBtn.textContent = 'Back';
                                     status.textContent = 'Point camera at the next QR code.';
                                     status.style.color = '#888';
-                                    scanning = true;
-                                    tick();
+                                    resumeCamera();
+                                }
+
+                                /* After the handover / return is saved: show the request's new status (camera stays off) */
+                                function showResult(title, statusLabel, color, detail) {
+                                    titleEl.textContent = 'Request Status';
+                                    subtitleEl.textContent = title;
+                                    itemsEl.innerHTML =
+                                        '<div style="padding:1.5rem 1rem;text-align:center;">' +
+                                        '<div style="font-size:.78rem;color:#888;margin-bottom:.35rem;">Request status</div>' +
+                                        '<div style="display:inline-block;padding:.4rem 1.1rem;border-radius:999px;font-weight:700;font-size:1rem;background:#f5f5f5;color:' + color + ';">' + statusLabel + '</div>' +
+                                        '<p style="margin:.85rem 0 0;font-size:.88rem;color:#555;">' + scanEsc(detail) + '</p></div>';
+                                    hintEl.textContent = '';
+                                    confirmBtn.disabled = false;
+                                    confirmBtn.textContent = 'Scan Another';
+                                    confirmBtn.onclick = resetToCamera;
+                                    cancelBtn.textContent = 'Close';
+                                    cancelBtn.onclick = stopScanner;
                                 }
 
                             } else if (data.success) {
@@ -5252,8 +5418,7 @@
                                         ? `Point camera at the next QR code. (${scannedCount} confirmed this session)`
                                         : 'Point camera at the next QR code.';
                                     status.style.color = '#888';
-                                    scanning = true;
-                                    tick();
+                                    resumeCamera();
                                 }, 1500);
                             } else {
                                 status.textContent = '❌ ' + (data.message || 'Invalid or already-used QR token.');
@@ -5265,8 +5430,9 @@
                                     tick();
                                 }, 2500);
                             }
-                        })
-                        .catch(() => {
+                    }
+
+                    function onScanFail() {
                             status.textContent = '❌ Network error. Please try again.';
                             status.style.color = '#e53e3e';
                             setTimeout(() => {
@@ -5275,7 +5441,12 @@
                                 scanning = true;
                                 tick();
                             }, 2500);
-                        });
+                    }
+
+                    fetch(endpoint, scanFetchOpts)
+                        .then(r => r.json())
+                        .then(d => handleScanData(d, false))
+                        .catch(onScanFail);
                     return;
                 }
             }
@@ -5294,13 +5465,16 @@
             status.textContent = 'Initializing camera...';
             status.style.color = '#888';
             scanning = false;
+            // start on the camera, not on the details of a previous scan
+            document.getElementById('qrChecklistView').style.display = 'none';
+            document.getElementById('qrCameraView').style.display = '';
+            document.getElementById('qrScannerTitle').textContent = 'Scan QR Code';
+            document.getElementById('qrScannerSubtitle').textContent = 'Point camera at a Claim QR or Return QR.';
 
             // Load jsQR once
             function beginScan() {
                 if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                    status.textContent = window.isSecureContext === false
-                        ? '❌ The camera needs a secure connection. Open PUPSync with its https:// address.'
-                        : '❌ The camera is not available on this device or browser.';
+                    status.textContent = '❌ Camera not available on HTTP. Open the admin dashboard via the ngrok HTTPS URL instead.';
                     status.style.color = '#e53e3e';
                     return;
                 }
@@ -5775,22 +5949,10 @@ function psSelectFmt(btn) {
         document.dispatchEvent(new CustomEvent('rr:rows-changed'));
     }
 
-    function submitDecision(decision, btn) {
-        if (!currentRow) return;
-        var row = currentRow;
-        var reason = reasonBox ? reasonBox.value.trim() : '';
-        if (reason.length < 5) {
-            showReviewError('Please enter a reason of at least 5 characters.');
-            if (reasonBox) reasonBox.focus();
-            return;
-        }
+    // Sends one decision to the server; resolves with the server's answer or rejects with a readable error.
+    function postDecision(row, decision, reason) {
         var tokenEl = document.querySelector('input[name="csrf_token"]');
-        var idleHtml = btn.innerHTML;
-        if (reviewErr) reviewErr.hidden = true;
-        decideBtns.forEach(function (b) { b.disabled = true; });
-        btn.textContent = decision === 'Approved' ? 'Approving\u2026' : 'Declining\u2026';
-
-        fetch('room-reservation/api/review-room-reservation.php', {
+        return fetch('room-reservation/api/review-room-reservation.php', {
             method: 'POST',
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
@@ -5810,15 +5972,96 @@ function psSelectFmt(btn) {
                     err.fromServer = true;
                     throw err;
                 }
+                return res.j;
+            });
+    }
+
+    // Approve: no reason needed (the server saves a default note). Declining is done in its own form, which requires one.
+    var APPROVED_NOTE = 'Approved by an admin.';
+    function submitDecision(decision, btn) {
+        if (!currentRow) return;
+        var row = currentRow;
+        var reason = reasonBox ? reasonBox.value.trim() : '';
+        if (decision !== 'Approved' && reason.length < 5) {
+            showReviewError('Please enter a reason of at least 5 characters.');
+            if (reasonBox) reasonBox.focus();
+            return;
+        }
+        if (decision === 'Approved' && !reason) reason = APPROVED_NOTE;
+        var idleHtml = btn.innerHTML;
+        if (reviewErr) reviewErr.hidden = true;
+        decideBtns.forEach(function (b) { b.disabled = true; });
+        btn.textContent = decision === 'Approved' ? 'Approving\u2026' : 'Declining\u2026';
+
+        postDecision(row, decision, reason)
+            .then(function (j) {
                 applyDecision(row, decision, reason);
                 if (typeof psCloseModal === 'function') psCloseModal('ps-room-drawer');
-                if (typeof window.showToast === 'function') window.showToast(res.j.message || (decision === 'Approved' ? 'Reservation approved.' : 'Reservation declined.'));
+                if (typeof window.showToast === 'function') window.showToast(j.message || (decision === 'Approved' ? 'Reservation approved.' : 'Reservation declined.'));
             })
             .catch(function (err) {
                 showReviewError(err && err.fromServer ? err.message : 'Network error. Please try again.');
                 decideBtns.forEach(function (b) { b.disabled = false; });
                 btn.innerHTML = idleHtml;
             });
+    }
+
+    // Decline: its own small form (same layout as the equipment "Decline Request" modal) with one-tap reasons
+    var declineModal = el('ps-rr-decline-modal');
+    var declinePicker = el('rr-decline-reason-picker');
+    var declineConfirm = el('ps-rr-decline-confirm');
+    var declineAlert = el('ps-rr-decline-alert');
+
+    function setDeclineError(msg) {
+        if (!declineAlert) return;
+        declineAlert.textContent = msg || '';
+        declineAlert.hidden = !msg;
+    }
+
+    function openDecline() {
+        if (!currentRow || !declineModal) return;
+        var d = currentRow.dataset;
+        txt('ps-rr-decline-no', '#' + d.rrId);
+        txt('ps-rr-decline-who', d.who);
+        txt('ps-rr-decline-room', d.room);
+        txt('ps-rr-decline-when', [d.date, d.time].filter(Boolean).join(' \u00b7 '));
+        if (declinePicker && window.PSReasonPicker) window.PSReasonPicker.reset(declinePicker);
+        if (declineConfirm) declineConfirm.disabled = true;
+        setDeclineError('');
+        if (typeof psOpenModal === 'function') psOpenModal('ps-rr-decline-modal');
+    }
+
+    if (declinePicker && declineConfirm) {
+        declinePicker.addEventListener('psreason:change', function (e) {
+            declineConfirm.disabled = !e.detail.ok;
+        });
+        declineConfirm.addEventListener('click', function () {
+            if (!currentRow || !window.PSReasonPicker) return;
+            var pick = window.PSReasonPicker.read(declinePicker);
+            if (!pick.ok) {
+                setDeclineError(pick.error || 'Please pick a reason.');
+                return;
+            }
+            var row = currentRow;
+            var idleHtml = declineConfirm.innerHTML;
+            setDeclineError('');
+            declineConfirm.disabled = true;
+            declineConfirm.textContent = 'Declining\u2026';
+            postDecision(row, 'Declined', pick.reason)
+                .then(function (j) {
+                    applyDecision(row, 'Declined', pick.reason);
+                    if (typeof psCloseModal === 'function') {
+                        psCloseModal('ps-rr-decline-modal');
+                        psCloseModal('ps-room-drawer');
+                    }
+                    if (typeof window.showToast === 'function') window.showToast(j.message || 'Reservation declined.');
+                })
+                .catch(function (err) {
+                    setDeclineError(err && err.fromServer ? err.message : 'Network error. Please try again.');
+                    declineConfirm.disabled = false;
+                    declineConfirm.innerHTML = idleHtml;
+                });
+        });
     }
 
     document.addEventListener('click', function (e) {
@@ -5833,7 +6076,8 @@ function psSelectFmt(btn) {
     drawer.addEventListener('click', function (e) {
         var decideBtn = e.target.closest('[data-rr-decide]');
         if (decideBtn) {
-            submitDecision(decideBtn.getAttribute('data-rr-decide'), decideBtn);
+            if (decideBtn.getAttribute('data-rr-decide') === 'Declined') openDecline();
+            else submitDecision('Approved', decideBtn);
             return;
         }
         if (e.target.closest('[data-rr-reschedule]') && currentRow) {
@@ -5852,9 +6096,12 @@ function psSelectFmt(btn) {
     });
 
     document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape' && drawer.classList.contains('ps-modal-open') && typeof psCloseModal === 'function') {
-            psCloseModal('ps-room-drawer');
+        if (e.key !== 'Escape' || typeof psCloseModal !== 'function') return;
+        if (declineModal && declineModal.classList.contains('ps-modal-open')) {
+            psCloseModal('ps-rr-decline-modal');
+            return;
         }
+        if (drawer.classList.contains('ps-modal-open')) psCloseModal('ps-room-drawer');
     });
 })();
 

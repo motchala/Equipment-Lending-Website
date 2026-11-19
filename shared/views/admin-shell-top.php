@@ -41,33 +41,7 @@ if (
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <meta name="theme-color" content="#600302">
-    <!-- Phone detection (same rule as the Faculty portal). Runs BEFORE first paint so a phone never flashes the desktop
-         layout. Sets class "rx-mobile" on <html> when the device is a phone (also in landscape), or the window is
-         600px wide or less. Tablets and desktops do not get it and keep the layout they have today.
-         Everything phone-specific lives in admin-dashboard-mobile.css / .js and is scoped to html.rx-mobile. -->
-    <script nonce="<?php echo $csp_nonce; ?>">
-        (function() {
-            var d = document.documentElement;
-
-            function phoneUA() {
-                var u = navigator.userAgentData;
-                if (u && typeof u.mobile === "boolean") return u.mobile;
-                return /iPhone|iPod|Android.+Mobile|Windows Phone|IEMobile|BlackBerry|Opera Mini|Mobile.+Firefox/i.test(navigator.userAgent || "");
-            }
-
-            function apply() {
-                var narrow = (window.innerWidth || 0) <= 600;
-                var shortSide = Math.min(screen.width || 9999, screen.height || 9999);
-                var phone = phoneUA() && shortSide <= 540; // phones stay in phone mode in landscape too
-                d.classList.toggle("rx-mobile", narrow || phone);
-            }
-            apply();
-            window.addEventListener("resize", apply);
-            window.addEventListener("orientationchange", apply);
-        })();
-    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PUP Sync | Admin Portal</title>
     <!-- Favicon: the PUPSync logo mark (maroon square + layers) -->
     <link rel="icon" href="shared/assets/images/favicon.ico" sizes="32x32">
@@ -205,29 +179,6 @@ if (
                 }
             }
 
-            // Phone view: Faculty, Admins, Imports and Reports are desktop-only (see admin-dashboard-mobile.js),
-            // so a refresh, an old link or a leftover cookie must not land there. Also forget a desktop-only Settings
-            // sub-tab (Arbitration / Data / Service Ratings) so the First-paint bridge does not paint it.
-            if (root.classList.contains('rx-mobile')) {
-                if (['faculty', 'admins', 'imports', 'reports'].indexOf(tab) !== -1) {
-                    tab = null;
-                    window._adminStoredTab = null;
-                    try { sessionStorage.removeItem('adminCurrentTab'); } catch (_) {}
-                    if (hashTab) { try { history.replaceState(history.state, '', loc.pathname + loc.search); } catch (_) {} }
-                }
-                var bridgedSub = root.getAttribute('data-ps-sub');
-                if (bridgedSub === 'sett-arbitration' || bridgedSub === 'sett-data' || bridgedSub === 'sett-ratings') {
-                    root.removeAttribute('data-ps-sub');
-                }
-                try {
-                    var sv = JSON.parse(sessionStorage.getItem('adminSubView') || '{}');
-                    if (sv.settings === 'sett-arbitration' || sv.settings === 'sett-data' || sv.settings === 'sett-ratings') {
-                        delete sv.settings;
-                        sessionStorage.setItem('adminSubView', JSON.stringify(sv));
-                    }
-                } catch (_) {}
-            }
-
             if (TABS.indexOf(tab) === -1) {
                 // Nothing to restore, so the Dashboard is right: drop a wrong guess by the server and forget the stale screen.
                 dropBridge();
@@ -257,8 +208,6 @@ if (
         })();
     </script>
     <link rel="stylesheet" href="shared/assets/css/admin-shell.css?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/css/admin-shell.css'); ?>">
-    <!-- Phone app layout (only active when <html class="rx-mobile">). Loaded LAST on purpose. -->
-    <link rel="stylesheet" href="dashboard/assets/css/admin-dashboard-mobile.css?v=<?php echo @filemtime(PS_ROOT . '/dashboard/assets/css/admin-dashboard-mobile.css'); ?>">
 </head>
 
 <body>
