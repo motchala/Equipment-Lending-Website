@@ -9,7 +9,8 @@ require_once __DIR__ . '/../../config/security-headers.php';
 require_once __DIR__ . '/../../config/session.php';
 
 header('Content-Type: application/json');
-header('Cache-Control: no-store');
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     http_response_code(405);

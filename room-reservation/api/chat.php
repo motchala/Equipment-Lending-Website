@@ -30,7 +30,8 @@ date_default_timezone_set('Asia/Manila');
 // ── 2. Output buffer + JSON header ───────────────────────────────────────────
 ob_start();
 header('Content-Type: application/json');
-header('Cache-Control: no-store');
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
 
 // ── 3. Unified responder ──────────────────────────────────────────────────────
 function chat_respond(int $code, string $status, string $message, array $extra = []): never
