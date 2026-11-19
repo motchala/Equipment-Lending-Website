@@ -1,5 +1,4 @@
     <script src="shared/assets/js/logout-modal.js?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/js/logout-modal.js'); ?>"></script>
-    <script src="shared/assets/js/admin-decline-reasons.js?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/js/admin-decline-reasons.js'); ?>"></script>
     <script src="dashboard/assets/js/admin-dashboard.js?v=<?php echo @filemtime(PS_ROOT . '/dashboard/assets/js/admin-dashboard.js'); ?>"></script>
     <script src="shared/assets/js/admin-archived-pager.js?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/js/admin-archived-pager.js'); ?>"></script>
     <script src="notifications/assets/js/notif-prefs.js?v=<?php echo @filemtime(PS_ROOT . '/notifications/assets/js/notif-prefs.js'); ?>"></script>
@@ -9,6 +8,8 @@
     <script src="reports/assets/js/reports.js?v=<?php echo @filemtime(PS_ROOT . '/reports/assets/js/reports.js'); ?>" defer></script>
     <script src="dashboard/assets/js/admin-live-render.js?v=<?php echo @filemtime(PS_ROOT . '/dashboard/assets/js/admin-live-render.js'); ?>"></script>
     <script src="dashboard/assets/js/admin-dashboard-responsive.js?v=<?php echo @filemtime('dashboard/assets/js/admin-dashboard-responsive.js'); ?>" defer></script>
+    <!-- Phone app shell (top bar, bottom tabs, account sheet). Does nothing unless <html class="rx-mobile">. -->
+    <script src="dashboard/assets/js/admin-dashboard-mobile.js?v=<?php echo @filemtime(PS_ROOT . '/dashboard/assets/js/admin-dashboard-mobile.js'); ?>" defer></script>
 
     <!-- Admin poll toast -->
     <div id="admin-poll-toast">
@@ -16,6 +17,13 @@
 
     <!-- Modal helpers (inline for guaranteed global scope) -->
     <script src="shared/assets/js/admin-shell.js?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/js/admin-shell.js'); ?>"></script>
+    <script nonce="<?php echo $csp_nonce; ?>">
+        window.PS_PUSH_APP_ID = '<?php echo htmlspecialchars(trim((string)($_ENV['ONESIGNAL_APP_ID'] ?? '')), ENT_QUOTES); ?>';
+        window.PS_CSRF_TOKEN  = '<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES); ?>';
+    </script>
+    <?php if (!empty(trim((string)($_ENV['ONESIGNAL_APP_ID'] ?? '')))): ?>
+    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" nonce="<?php echo $csp_nonce; ?>"></script>
+    <?php endif; ?>
     <script src="shared/assets/js/push-init.js?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/js/push-init.js'); ?>"></script>
 
 
