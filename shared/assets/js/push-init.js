@@ -24,7 +24,9 @@
         swPath = '/Equipment-Lending-Website/OneSignalSDKWorker.js';
         swScope = '/Equipment-Lending-Website/';
     }
-    // Unregister any conflicting service worker first, then re-register cleanly
+    // Unregister any conflicting service worker first, then re-register cleanly.
+    // onReady() runs AFTER the SW is confirmed registered to avoid a race where
+    // the Allow button fires silentSubscribe() before serviceWorker.ready resolves.
     navigator.serviceWorker.getRegistrations().then(function (registrations) {
         var unregPromises = [];
         for (var i = 0; i < registrations.length; i++) {
@@ -37,15 +39,22 @@
         return navigator.serviceWorker.register(swPath, { scope: swScope });
     }).then(function (reg) {
         console.log('[PUPSync push] SW registered, scope:', reg.scope);
+        // SW is confirmed ready — now safe to wire up the modal buttons
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', onReady);
+        } else {
+            onReady();
+        }
     }).catch(function (e) {
         console.error('[PUPSync push] SW registration failed:', e);
+        // SW failed — still wire up the modal so the UI doesn't get stuck,
+        // but silentSubscribe() will catch the subscribe error gracefully.
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', onReady);
+        } else {
+            onReady();
+        }
     });
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', onReady);
-    } else {
-        onReady();
-    }
 
     function onReady() {
         var later = document.getElementById('psPushLater');

@@ -133,11 +133,17 @@ function rpt_most_borrowed(mysqli $conn, ?string $from, ?string $to): array
 function rpt_inventory_status(mysqli $conn, ?string $from, ?string $to): array
 {
     // Date range is intentionally ignored for inventory — it reflects the current state.
+    // GROUP BY item_name prevents duplicate rows when tbl_inventory has multiple
+    // entries for the same item name (e.g. from multiple add operations).
     $res  = $conn->query(
-        "SELECT item_name, category, quantity, `condition`,
-                IF(is_archived, 'Archived', 'Active') AS status
+        "SELECT item_name,
+                MAX(category)                              AS category,
+                SUM(quantity)                              AS quantity,
+                MAX(`condition`)                           AS `condition`,
+                IF(MAX(is_archived) = 1, 'Archived', 'Active') AS status
            FROM tbl_inventory
-          ORDER BY is_archived ASC, category ASC, item_name ASC"
+          GROUP BY item_name
+          ORDER BY MAX(is_archived) ASC, MAX(category) ASC, item_name ASC"
     );
     $rows = [];
     if ($res) {
@@ -153,7 +159,7 @@ function rpt_inventory_status(mysqli $conn, ?string $from, ?string $to): array
     }
 
     return rpt_envelope(
-        'Inventory Status', null, null,
+        'Inventory Status', $from, $to,
         ['Item', 'Category', 'Quantity', 'Condition', 'Status'],
         $rows
     );
