@@ -40,6 +40,7 @@
                         <div><span>Type</span><strong id="ps-loan-detail-type">—</strong></div>
                         <div><span>ID</span><strong id="ps-loan-detail-id-number">—</strong></div>
                         <div id="ps-loan-detail-authorizer-row" hidden><span>Authorized by faculty</span><strong id="ps-loan-detail-authorizer">—</strong></div>
+                        <div id="ps-loan-detail-pickup-row" hidden><span>Pick-up by (student)</span><strong id="ps-loan-detail-pickup">—</strong></div>
                     </div>
                 </section>
 

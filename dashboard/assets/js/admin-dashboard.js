@@ -4444,6 +4444,7 @@
                 id: d.id, status: d.status, condition: d.condition, borrower: d.borrower, idNumber: d.idNumber,
                 reqType: d.reqType, equipment: d.equipment, instructor: d.instructor,
                 submittedAs: d.submittedAs, studentName: d.studentName, studentId: d.studentId,
+                pickupName: d.pickupName,
                 room: d.room, submitted: d.submitted, dateNeeded: d.dateNeeded,
                 returnDate: d.returnDate, returnDateDisplay: d.returnDateDisplay,
                 arbRule: d.arbRule,
@@ -4502,6 +4503,11 @@
             const authorizer = document.getElementById('detail-authorizer');
             if (authorizerItem) authorizerItem.hidden = !studentRequest;
             if (authorizer) authorizer.textContent = studentRequest ? ctx.borrower + ' (' + ctx.idNumber + ')' : '—';
+            // The faculty borrowed it; this student only collects it
+            const pickupItem = document.getElementById('detail-pickup-item');
+            const pickupEl = document.getElementById('detail-pickup');
+            if (pickupItem) pickupItem.hidden = !ctx.pickupName;
+            if (pickupEl) pickupEl.textContent = ctx.pickupName || '—';
             document.getElementById('detail-room').textContent = ctx.room || '—';
             document.getElementById('detail-equipment').textContent = ctx.equipment || '—';
             document.getElementById('detail-date-needed').textContent = ctx.dateNeeded || '—';
@@ -5074,9 +5080,14 @@
                         document.getElementById('qrScannerTitle').textContent = 'Request Details';
                         document.getElementById('qrScannerSubtitle').textContent = 'Review what was requested before handing over.';
 
+                        // A faculty's own request with a student named to collect it: the faculty is the borrower and the
+                        // student only picks it up. A student's own request keeps "Requested by" + "Faculty".
                         const who = data.collector
-                            ? '<div><b>Requested by:</b> ' + scanEsc(data.collector) + (data.collector_id ? ' · ' + scanEsc(data.collector_id) : '') + '</div>' +
-                            '<div><b>Faculty:</b> ' + scanEsc(data.borrower) + '</div>'
+                            ? (data.collector_role === 'pickup'
+                                ? '<div><b>Borrowed by (faculty):</b> ' + scanEsc(data.borrower) + '</div>' +
+                                '<div><b>Pick-up by (student):</b> ' + scanEsc(data.collector) + '</div>'
+                                : '<div><b>Requested by:</b> ' + scanEsc(data.collector) + (data.collector_id ? ' · ' + scanEsc(data.collector_id) : '') + '</div>' +
+                                '<div><b>Faculty:</b> ' + scanEsc(data.borrower) + '</div>')
                             : '<div><b>Borrower:</b> ' + scanEsc(data.borrower) + '</div>';
                         const meta = (data.room ? '<div><b>Room:</b> ' + scanEsc(data.room) + '</div>' : '') +
                             (data.borrow_start ? '<div><b>Borrow:</b> ' + scanEsc(data.borrow_start) + (data.return_by ? ' → ' + scanEsc(data.return_by) : '') + '</div>' : '');
@@ -5688,6 +5699,9 @@ function psSelectFmt(btn) {
             : '');
         var authorizerRow = el('ps-loan-detail-authorizer-row');
         if (authorizerRow) authorizerRow.hidden = !studentRequest;
+        txt('ps-loan-detail-pickup', d.pickupName || '');
+        var pickupRow = el('ps-loan-detail-pickup-row');
+        if (pickupRow) pickupRow.hidden = !d.pickupName;
         txt('ps-loan-detail-note', d.note);
         var adminNote = (d.adminNote || '').trim();
         var adminNoteSection = el('ps-loan-detail-admin-note-section');

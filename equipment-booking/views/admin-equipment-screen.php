@@ -683,6 +683,9 @@
                                     $lstart_lbl = date('M d, Y', strtotime($r['borrow_date'])) . ($lbt !== '' ? ' · ' . $lbt : '');
                                     $ldue_lbl   = date('M d, Y', strtotime($r['return_date'])) . ($lrt !== '' ? ' · ' . $lrt : '');
                                     $lstudent = (string)($r['submitted_as'] ?? '') === 'student' && trim((string)($r['submitted_by_name'] ?? '')) !== '';
+                                    // A faculty's own request where a student was named to pick it up: the faculty is still the borrower,
+                                    // the student is only who collects it (a student's own request is $lstudent above).
+                                    $lpickup = !$lstudent ? trim((string)($r['submitted_by_name'] ?? '')) : '';
                                     // ── Section divider: emitted once when the first scheduled row follows
                                     //    pending-review rows (or is the first row in the table).
                                     if ($lst === 'scheduled' && $eq_prev_state !== 'scheduled'): ?>
@@ -713,6 +716,7 @@
                                         data-submitted-as="<?php echo htmlspecialchars((string)($r['submitted_as'] ?? '')); ?>"
                                         data-student-name="<?php echo $lstudent ? htmlspecialchars((string)$r['submitted_by_name']) : ''; ?>"
                                         data-student-id="<?php echo $lstudent ? htmlspecialchars((string)($r['submitted_by_id'] ?? '')) : ''; ?>"
+                                        data-pickup-name="<?php echo htmlspecialchars($lpickup); ?>"
                                         data-equipment="<?php echo htmlspecialchars($r['equipment_name']); ?>"
                                         data-qty="<?php echo $lqty; ?>"
                                         data-instructor="<?php echo htmlspecialchars($r['instructor']); ?>"
@@ -752,6 +756,9 @@
                                                 <?php else: ?><?php echo htmlspecialchars(faculty_id_display($r['faculty_id'], 'Not set')); ?>
                                             <?php endif; ?>
                                             </div>
+                                            <?php if ($lpickup !== ''): ?>
+                                            <div class="eq-cell-sub">Pick-up: <?php echo htmlspecialchars($lpickup); ?></div>
+                                            <?php endif; ?>
                                         </td>
                                         <td data-col="equipment">
                                             <div class="eq-cell-name"><?php echo htmlspecialchars($r['equipment_name']); ?><?php if ($lqty > 1): ?> <span class="ps-appr-qty">&times;<?php echo $lqty; ?></span><?php endif; ?></div>
