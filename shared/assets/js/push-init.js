@@ -105,6 +105,17 @@
     }
 
     function silentSubscribe() {
+        // Push subscriptions require HTTPS in production.
+        // On localhost/127.0.0.1 Chrome may still work, but FCM rejects
+        // subscriptions from non-HTTPS origins in some versions.
+        // If you're on HTTP and not localhost, skip silently.
+        var isSecure = window.location.protocol === 'https:' ||
+                       window.location.hostname === 'localhost' ||
+                       window.location.hostname === '127.0.0.1';
+        if (!isSecure) {
+            console.warn('[PUPSync push] Push requires HTTPS. Skipping subscription on:', window.location.origin);
+            return;
+        }
         navigator.serviceWorker.ready.then(function (reg) {
             console.log('[PUPSync push] SW ready, scope:', reg.scope);
             return reg.pushManager.getSubscription().then(function (existing) {

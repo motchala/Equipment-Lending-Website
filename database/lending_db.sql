@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Nov 16, 2026 at 10:19 AM
+-- Generation Time: Nov 19, 2026 at 05:32 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -47,7 +47,7 @@ CREATE TABLE `tbl_accounts` (
 --
 
 INSERT INTO `tbl_accounts` (`id`, `fullName`, `email`, `password`, `role`, `admin_no`, `created_at`, `last_login`, `dormant_until`, `session_epoch`, `last_password_change`, `backup_email`) VALUES
-(1, 'Redg Abelida', 'main@admin.edu', '$2y$10$dLNCtd5IGqTMf7VUHFYyEOPI00YWyd9h9n4uj6dTptlcKwFNcw57e', 'Super Admin', 1, '2026-01-01 00:00:00', '2026-11-15 17:35:39', NULL, 0, NULL, ''),
+(1, 'Redg Abelida', 'main@admin.edu', '$2y$10$dLNCtd5IGqTMf7VUHFYyEOPI00YWyd9h9n4uj6dTptlcKwFNcw57e', 'Super Admin', 1, '2026-01-01 00:00:00', '2026-11-19 11:54:05', NULL, 0, NULL, ''),
 (2, 'Chico Ramos', 'chico@admin.edu', '$2y$10$w.G7jIE6r6iSsVyn/T/G2OAhoqpyxgu4kkWKbHIhOky/CJk94xLGC', 'Admin', 2, '2026-10-02 11:05:03', '2026-11-09 23:25:05', NULL, 0, NULL, NULL),
 (3, 'Jell Alagon', 'jell@admin.edu', '$2y$10$Q2ZyDvxioT548b/LuPKdEe7XYwf3bh3t//5dN/mX2bNIKEQ3buhf6', 'Admin', 3, '2026-11-10 06:01:18', NULL, NULL, 0, NULL, NULL);
 
@@ -272,7 +272,54 @@ INSERT INTO `tbl_admin_activity` (`id`, `admin_id`, `admin_name`, `category`, `a
 (195, 1, 'Redg Abelida', 'equipment', NULL, 'Added the equipment category \"Offices Inventory\"', NULL, NULL, NULL, '2026-11-15 23:24:44'),
 (196, 1, 'Redg Abelida', 'equipment', NULL, 'Synced the equipment inventory from Google Sheets (0 added, 271 updated, 0 archived)', NULL, NULL, NULL, '2026-11-15 23:25:05'),
 (197, 1, 'Redg Abelida', 'equipment', NULL, 'Restored equipment: AC Remote', NULL, NULL, NULL, '2026-11-16 09:43:51'),
-(198, 1, 'Redg Abelida', 'request', 'request_declined', 'Declined request #75: Air Compressor for Stephen Perez', 'request', 75, NULL, '2026-11-16 10:20:45');
+(198, 1, 'Redg Abelida', 'request', 'request_declined', 'Declined request #75: Air Compressor for Stephen Perez', 'request', 75, NULL, '2026-11-16 10:20:45'),
+(199, 1, 'Redg Abelida', 'login', NULL, 'Signed in', NULL, NULL, NULL, '2026-11-17 11:17:42'),
+(200, 1, 'Redg Abelida', 'login', NULL, 'Signed in', NULL, NULL, NULL, '2026-11-17 11:52:39'),
+(201, 1, 'Redg Abelida', 'faculty', NULL, 'Created faculty account for Gio Marcos (8 weekly class meetings added to their schedule)', NULL, NULL, NULL, '2026-11-17 11:53:29'),
+(202, 1, 'Redg Abelida', 'faculty', NULL, 'Deleted faculty account of Gio Marcos', NULL, NULL, NULL, '2026-11-17 11:53:54'),
+(203, 1, 'Redg Abelida', 'faculty', NULL, 'Created faculty account for Gio Marcos (8 weekly class meetings added to their schedule)', NULL, NULL, NULL, '2026-11-17 11:54:10'),
+(204, 1, 'Redg Abelida', 'login', NULL, 'Signed in', NULL, NULL, NULL, '2026-11-17 16:34:01'),
+(205, 1, 'Redg Abelida', 'login', NULL, 'Signed in', NULL, NULL, NULL, '2026-11-18 10:43:51'),
+(206, 1, 'Redg Abelida', 'login', NULL, 'Signed in', NULL, NULL, NULL, '2026-11-18 10:48:45'),
+(207, 1, 'Redg Abelida', 'login', NULL, 'Signed in', NULL, NULL, NULL, '2026-11-18 21:50:14'),
+(208, 1, 'Redg Abelida', 'request', 'request_declined', 'Declined request #83: Active Speakers for Edmundo Dela Cruz', 'request', 83, NULL, '2026-11-18 21:52:11'),
+(209, 1, 'Redg Abelida', 'request', 'request_approved', 'Approved request #84: Unterrupted Power Supply for Edmundo Dela Cruz', 'request', 84, NULL, '2026-11-18 21:52:17'),
+(210, 1, 'Redg Abelida', 'login', NULL, 'Signed in', NULL, NULL, NULL, '2026-11-19 09:04:00'),
+(211, 1, 'Redg Abelida', 'login', NULL, 'Signed in', NULL, NULL, NULL, '2026-11-19 11:54:05'),
+(212, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Ballistic Pendulums', NULL, NULL, NULL, '2026-11-19 11:54:55'),
+(213, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Analog Audio Mixer', NULL, NULL, NULL, '2026-11-19 11:55:07'),
+(214, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Active Speakers', NULL, NULL, NULL, '2026-11-19 11:55:32'),
+(215, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Beaker (50ml)', NULL, NULL, NULL, '2026-11-19 11:55:41'),
+(216, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Beaker (150ml)', NULL, NULL, NULL, '2026-11-19 11:55:48'),
+(217, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Beaker (400ml)', NULL, NULL, NULL, '2026-11-19 11:55:53'),
+(218, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Beaker (250ml)', NULL, NULL, NULL, '2026-11-19 11:55:59'),
+(219, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Beaker (500ml)', NULL, NULL, NULL, '2026-11-19 11:56:04'),
+(220, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Beaker (1000ml)', NULL, NULL, NULL, '2026-11-19 11:56:08'),
+(221, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Beaker (100ml)', NULL, NULL, NULL, '2026-11-19 11:56:12'),
+(222, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Toothbrush', NULL, NULL, NULL, '2026-11-19 11:56:53'),
+(223, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Smart TV (Touch Screen)', NULL, NULL, NULL, '2026-11-19 11:57:29'),
+(224, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Alcohol Lamp', NULL, NULL, NULL, '2026-11-19 11:57:51'),
+(225, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Tuning Fork', NULL, NULL, NULL, '2026-11-19 11:58:24'),
+(226, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: ESP32', NULL, NULL, NULL, '2026-11-19 11:59:14'),
+(227, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Relay (8in)', NULL, NULL, NULL, '2026-11-19 12:00:07'),
+(228, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Test Tube Brush', NULL, NULL, NULL, '2026-11-19 12:00:49'),
+(229, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Test Tube Holder', NULL, NULL, NULL, '2026-11-19 12:01:18'),
+(230, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Multi-Function Meter', NULL, NULL, NULL, '2026-11-19 12:01:47'),
+(231, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Crucible Tong', NULL, NULL, NULL, '2026-11-19 12:02:15'),
+(232, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Vernier Caliper', NULL, NULL, NULL, '2026-11-19 12:03:02'),
+(233, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Mini Guage', NULL, NULL, NULL, '2026-11-19 12:03:24'),
+(234, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Precision Screwdriver', NULL, NULL, NULL, '2026-11-19 12:04:01'),
+(235, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Wrench (150x19)', NULL, NULL, NULL, '2026-11-19 12:04:47'),
+(236, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Wrench (200x24)', NULL, NULL, NULL, '2026-11-19 12:04:52'),
+(237, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Wrench (250x30)', NULL, NULL, NULL, '2026-11-19 12:04:57'),
+(238, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Wrench (300x36)', NULL, NULL, NULL, '2026-11-19 12:05:02'),
+(239, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Long Nose', NULL, NULL, NULL, '2026-11-19 12:05:44'),
+(240, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Pliers', NULL, NULL, NULL, '2026-11-19 12:06:10'),
+(241, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Cutting Pliers', NULL, NULL, NULL, '2026-11-19 12:06:29'),
+(242, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Power Amplifier', NULL, NULL, NULL, '2026-11-19 12:07:19'),
+(243, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Wireless Microphone', NULL, NULL, NULL, '2026-11-19 12:07:54'),
+(244, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: LCD Projector', NULL, NULL, NULL, '2026-11-19 12:08:12'),
+(245, 1, 'Redg Abelida', 'equipment', NULL, 'Updated equipment: Smart TV', NULL, NULL, NULL, '2026-11-19 12:08:37');
 
 -- --------------------------------------------------------
 
@@ -291,6 +338,14 @@ CREATE TABLE `tbl_ai_chat_log` (
 --
 
 INSERT INTO `tbl_ai_chat_log` (`id`, `faculty_id`, `sent_at`) VALUES
+(153, 'FA0008BN2023', '2026-11-18 16:56:51'),
+(154, 'FA0008BN2023', '2026-11-18 18:28:29'),
+(155, 'FA0008BN2023', '2026-11-18 18:30:02'),
+(156, 'FA0008BN2023', '2026-11-18 18:30:40'),
+(157, 'FA0008BN2023', '2026-11-18 18:41:57'),
+(158, 'FA0008BN2023', '2026-11-18 20:10:00'),
+(151, 'FA0011BN2026', '2026-11-18 16:24:25'),
+(152, 'FA0011BN2026', '2026-11-18 16:29:25'),
 (142, 'NOTSET-275A970376E5', '2026-10-24 17:28:30'),
 (143, 'NOTSET-275A970376E5', '2026-10-24 17:28:52'),
 (144, 'NOTSET-275A970376E5', '2026-10-25 09:26:43'),
@@ -326,7 +381,7 @@ INSERT INTO `tbl_arbitration_config` (`id`, `config_key`, `config_value`, `updat
 (6, 'rule_overdue_block_enabled', '0', '2026-11-09 10:20:53'),
 (7, 'rule_duplicate_block_enabled', '0', '2026-11-09 10:20:53'),
 (8, 'rule_missing_doc_block_enabled', '0', '2026-11-09 10:20:53'),
-(10, 'max_borrow_days', '3', '2026-11-09 10:20:53'),
+(10, 'max_borrow_days', '1', '2026-11-09 10:20:53'),
 (11, 'max_items_per_borrower', '3', '2026-11-09 10:20:53'),
 (12, 'low_stock_threshold', '2', '2026-11-09 10:20:53'),
 (13, 'auto_approve_timeout_minutes', '1', '2026-11-09 10:20:53'),
@@ -391,7 +446,14 @@ INSERT INTO `tbl_arbitration_log` (`id`, `request_id`, `borrower_id`, `borrower_
 (81, 74, 'FA0011BN2026', 'Stephen Perez', 'Active Speakers', 'Declined', 'rule_expired_unreviewed', 'Not reviewed before the borrow start time – automatically declined.', NULL, NULL, NULL, NULL, '2026-11-16 07:00:06'),
 (82, 77, 'FA0011BN2026', 'Stephen Perez', 'Adaptor', 'Approved', 'rule_1_fifo', 'Approved: the equipment is free for the requested schedule.', NULL, NULL, NULL, NULL, '2026-11-16 10:20:06'),
 (83, 78, 'FA0011BN2026', 'Stephen Perez', 'Ammeter (0-5A)', 'Approved', 'rule_1_fifo', 'Approved: the equipment is free for the requested schedule.', NULL, NULL, NULL, NULL, '2026-11-16 10:20:06'),
-(84, 75, 'FA0011BN2026', 'Stephen Perez', 'Air Compressor', 'Declined', 'override', 'sorry', 'Redg Abelida', 1, 'sorry', NULL, '2026-11-16 10:20:45');
+(84, 75, 'FA0011BN2026', 'Stephen Perez', 'Air Compressor', 'Declined', 'override', 'sorry', 'Redg Abelida', 1, 'sorry', NULL, '2026-11-16 10:20:45'),
+(85, 79, 'FA0011BN2026', 'Stephen Perez', 'Active Speakers', 'Declined', 'rule_expired_unreviewed', 'Not reviewed before the borrow start time – automatically declined.', NULL, NULL, NULL, NULL, '2026-11-18 10:33:24'),
+(86, 80, 'FA0011BN2026', 'Stephen Perez', 'Adaptor', 'Declined', 'rule_expired_unreviewed', 'Not reviewed before the borrow start time – automatically declined.', NULL, NULL, NULL, NULL, '2026-11-18 10:33:24'),
+(87, 81, 'FA0011BN2026', 'Stephen Perez', 'AC Remote', 'Declined', 'rule_expired_unreviewed', 'Not reviewed before the borrow start time – automatically declined.', NULL, NULL, NULL, NULL, '2026-11-18 16:23:58'),
+(88, 82, 'FA0011BN2026', 'Stephen Perez', 'Ammeter (0-5A)', 'Declined', 'rule_expired_unreviewed', 'Not reviewed before the borrow start time – automatically declined.', NULL, NULL, NULL, NULL, '2026-11-18 16:23:58'),
+(89, 83, 'FA0008BN2023', 'Edmundo Dela Cruz', 'Active Speakers', 'Declined', 'override', 'The item is already reserved for that time.', 'Redg Abelida', 1, 'The item is already reserved for that time.', NULL, '2026-11-18 21:52:11'),
+(90, 84, 'FA0008BN2023', 'Edmundo Dela Cruz', 'Unterrupted Power Supply', 'Approved', 'override', 'Approved by admin.', 'Redg Abelida', 1, 'Approved by admin.', NULL, '2026-11-18 21:52:17'),
+(91, 85, 'FA0005BN2016', 'Michael Anjelo Miguel', 'Active Speakers', 'Approved', 'rule_1_fifo', 'Approved: the equipment is free for the requested schedule.', NULL, NULL, NULL, NULL, '2026-11-19 12:25:20');
 
 -- --------------------------------------------------------
 
@@ -716,14 +778,14 @@ INSERT INTO `tbl_class_schedule` (`id`, `import_id`, `faculty_id`, `faculty_name
 (958, 2, NULL, 'Gian Carlo C. Villagracia', 'giancarlocvillagracia', 'Part-Time', NULL, 33, 'B301', 'SOST 322', 'Technology for Teaching and Learning 2', 'BSEDSS 3-2', 'Lecture', NULL, 4, '08:00:00', '11:00:00', 0, NULL, '2026-11-12 07:45:48'),
 (959, 2, NULL, 'Gian Carlo C. Villagracia', 'giancarlocvillagracia', 'Part-Time', NULL, 36, 'B304', 'GEED 037', 'Life and Works of Rizal/Buhay at Mga Gawa ni Rizal', 'BSIE 2-1', 'Lecture', NULL, 1, '08:00:00', '11:00:00', 0, NULL, '2026-11-12 07:45:48'),
 (960, 2, NULL, 'Gian Carlo C. Villagracia', 'giancarlocvillagracia', 'Part-Time', NULL, 41, 'B405', 'GEED 028', 'Reading Visual Arts', 'BSIT 2-2', 'Lecture', NULL, 6, '16:00:00', '19:00:00', 0, NULL, '2026-11-12 07:45:48'),
-(961, 2, 'FA0006BN2025', 'Gio M. Marcos', 'giommarcos', 'Part-Time', NULL, 14, 'A303', 'INTE 402', 'Capstone Project 2', 'BSIT 4-1', 'Lecture', NULL, 4, '09:00:00', '12:00:00', 0, NULL, '2026-11-12 07:45:48'),
-(962, 2, 'FA0006BN2025', 'Gio M. Marcos', 'giommarcos', 'Part-Time', NULL, 29, 'B202', 'INEN 407', 'Seminars, Industry Inspection and Observation', 'BSIE 4-1', 'Laboratory', NULL, 5, '07:00:00', '10:00:00', 0, NULL, '2026-11-12 07:45:48'),
-(963, 2, 'FA0006BN2025', 'Gio M. Marcos', 'giommarcos', 'Part-Time', NULL, 31, 'B204', 'INEN 101', 'Introduction to Industrial Engineering', 'BSIE 1-1', 'Lecture', NULL, 1, '11:00:00', '14:00:00', 0, NULL, '2026-11-12 07:45:48'),
-(964, 2, 'FA0006BN2025', 'Gio M. Marcos', 'giommarcos', 'Part-Time', NULL, 34, 'B302', 'ENSC 025', 'Environmental Science and Engineering', 'BSIE 3-2', 'Lecture', NULL, 1, '08:00:00', '11:00:00', 0, NULL, '2026-11-12 07:45:48'),
-(965, 2, 'FA0006BN2025', 'Gio M. Marcos', 'giommarcos', 'Part-Time', NULL, 37, 'B305', 'INEN 301', 'Operations Research 1', 'BSIE 3-1', 'Lecture', NULL, 6, '08:00:00', '11:00:00', 0, NULL, '2026-11-12 07:45:48'),
-(966, 2, 'FA0006BN2025', 'Gio M. Marcos', 'giommarcos', 'Part-Time', NULL, 38, 'B401', 'INEN 407', 'Seminars, Industry Inspection and Observation', 'BSIE 4-1', 'Laboratory', NULL, 6, '14:00:00', '17:00:00', 0, NULL, '2026-11-12 07:45:48'),
-(967, 2, 'FA0006BN2025', 'Gio M. Marcos', 'giommarcos', 'Part-Time', NULL, 39, 'B402', 'INEN 401', 'IE Capstone Project 1', 'BSIE 4-2', 'Laboratory', NULL, 2, '16:00:00', '19:00:00', 0, NULL, '2026-11-12 07:45:48'),
-(968, 2, 'FA0006BN2025', 'Gio M. Marcos', 'giommarcos', 'Part-Time', NULL, 59, 'C103', 'INTE 402', 'Capstone Project 2', 'BSIT 4-2', 'Lecture', NULL, 2, '11:00:00', '14:00:00', 0, NULL, '2026-11-12 07:45:48'),
+(961, 2, 'FA0006BN2025', 'Gio M. Marcos', 'giommarcos', 'Part-Time', 'FA0006BN2025', 14, 'A303', 'INTE 402', 'Capstone Project 2', 'BSIT 4-1', 'Lecture', NULL, 4, '09:00:00', '12:00:00', 0, NULL, '2026-11-12 07:45:48'),
+(962, 2, 'FA0006BN2025', 'Gio M. Marcos', 'giommarcos', 'Part-Time', 'FA0006BN2025', 29, 'B202', 'INEN 407', 'Seminars, Industry Inspection and Observation', 'BSIE 4-1', 'Laboratory', NULL, 5, '07:00:00', '10:00:00', 0, NULL, '2026-11-12 07:45:48'),
+(963, 2, 'FA0006BN2025', 'Gio M. Marcos', 'giommarcos', 'Part-Time', 'FA0006BN2025', 31, 'B204', 'INEN 101', 'Introduction to Industrial Engineering', 'BSIE 1-1', 'Lecture', NULL, 1, '11:00:00', '14:00:00', 0, NULL, '2026-11-12 07:45:48'),
+(964, 2, 'FA0006BN2025', 'Gio M. Marcos', 'giommarcos', 'Part-Time', 'FA0006BN2025', 34, 'B302', 'ENSC 025', 'Environmental Science and Engineering', 'BSIE 3-2', 'Lecture', NULL, 1, '08:00:00', '11:00:00', 0, NULL, '2026-11-12 07:45:48'),
+(965, 2, 'FA0006BN2025', 'Gio M. Marcos', 'giommarcos', 'Part-Time', 'FA0006BN2025', 37, 'B305', 'INEN 301', 'Operations Research 1', 'BSIE 3-1', 'Lecture', NULL, 6, '08:00:00', '11:00:00', 0, NULL, '2026-11-12 07:45:48'),
+(966, 2, 'FA0006BN2025', 'Gio M. Marcos', 'giommarcos', 'Part-Time', 'FA0006BN2025', 38, 'B401', 'INEN 407', 'Seminars, Industry Inspection and Observation', 'BSIE 4-1', 'Laboratory', NULL, 6, '14:00:00', '17:00:00', 0, NULL, '2026-11-12 07:45:48'),
+(967, 2, 'FA0006BN2025', 'Gio M. Marcos', 'giommarcos', 'Part-Time', 'FA0006BN2025', 39, 'B402', 'INEN 401', 'IE Capstone Project 1', 'BSIE 4-2', 'Laboratory', NULL, 2, '16:00:00', '19:00:00', 0, NULL, '2026-11-12 07:45:48'),
+(968, 2, 'FA0006BN2025', 'Gio M. Marcos', 'giommarcos', 'Part-Time', 'FA0006BN2025', 59, 'C103', 'INTE 402', 'Capstone Project 2', 'BSIT 4-2', 'Lecture', NULL, 2, '11:00:00', '14:00:00', 0, NULL, '2026-11-12 07:45:48'),
 (969, 2, 'FA0001BN2020', 'Glorina Divina P. Orozco', 'glorinadivinaporozco', 'Part-Time', NULL, 10, 'A204', 'CHEM 015', 'Chemistry for Engineers', 'BSCPE 1-2', 'Lecture', NULL, 6, '08:00:00', '11:00:00', 0, NULL, '2026-11-12 07:45:48'),
 (970, 2, 'FA0001BN2020', 'Glorina Divina P. Orozco', 'glorinadivinaporozco', 'Part-Time', NULL, 10, 'A204', 'GEED 007', 'Science, Technology and Society/Agham, Teknolohiya, at Lipunan', 'BSCPE 1-2', 'Lecture', NULL, 5, '08:00:00', '11:00:00', 0, NULL, '2026-11-12 07:45:48'),
 (971, 2, 'FA0001BN2020', 'Glorina Divina P. Orozco', 'glorinadivinaporozco', 'Part-Time', NULL, 30, 'B203', 'CHEM 015', 'Chemistry for Engineers', 'BSIE 1-1', 'Lecture', NULL, 3, '08:00:00', '11:00:00', 0, NULL, '2026-11-12 07:45:48'),
@@ -1285,7 +1347,13 @@ CREATE TABLE `tbl_faculty_codes` (
 INSERT INTO `tbl_faculty_codes` (`id`, `faculty_id`, `faculty_name`, `code`, `is_used`, `used_by_name`, `used_by_id`, `created_at`, `used_at`) VALUES
 (13, 'FA0005BN2016', 'Michael Anjelo Miguel', '9e3-n6c-xb2', 1, 'Frederick Rosales', '', '2026-11-09 22:54:26', '2026-11-10 02:01:39'),
 (15, 'FA0143MN2016', 'Archie Arevalo', 'nua-jcp-npm', 0, NULL, NULL, '2026-11-10 22:45:08', NULL),
-(19, 'FA0011BN2026', 'Stephen Perez', 'xw4-c4m-6ns', 0, NULL, NULL, '2026-11-16 11:40:21', NULL);
+(20, 'FA0011BN2026', 'Stephen Perez', 'atv-3cm-wzq', 1, 'Von Resma', '', '2026-11-17 16:32:46', '2026-11-17 16:33:45'),
+(22, 'FA0011BN2026', 'Stephen Perez', '4kv-asu-3k3', 1, 'AWW', '', '2026-11-18 10:38:25', '2026-11-18 10:40:41'),
+(23, 'FA0011BN2026', 'Stephen Perez', 'hau-tpb-bn8', 1, 'dawda', '', '2026-11-18 10:41:53', '2026-11-18 10:42:26'),
+(24, 'FA0011BN2026', 'Stephen Perez', '5cb-jzw-gpz', 1, 'dadddd', '', '2026-11-18 10:47:42', '2026-11-18 10:48:26'),
+(25, 'FA0011BN2026', 'Stephen Perez', '4e6-6vy-ka7', 0, NULL, NULL, '2026-11-18 16:31:29', NULL),
+(26, 'FA0008BN2023', 'Edmundo Dela Cruz', '6m7-6uq-6uy', 0, NULL, NULL, '2026-11-18 18:13:52', NULL),
+(27, 'FA0005BN2016', 'Michael Anjelo Miguel', 'pjp-v9m-2r8', 0, NULL, NULL, '2026-11-19 11:19:46', NULL);
 
 -- --------------------------------------------------------
 
@@ -1345,7 +1413,9 @@ INSERT INTO `tbl_faculty_notif_state` (`id`, `faculty_id`, `notif_key`, `is_read
 (10, 'FA0011BN2026', 'adminnotice-5', 1, 0, '2026-11-13 05:52:10'),
 (11, 'FA0011BN2026', 'adminnotice-2', 1, 0, '2026-11-16 11:16:41'),
 (12, 'FA0011BN2026', 'sysnotice-1', 1, 0, '2026-11-16 11:17:15'),
-(13, 'FA0011BN2026', 'sysnotice-2', 1, 0, '2026-11-16 11:17:22');
+(13, 'FA0011BN2026', 'sysnotice-2', 1, 0, '2026-11-16 11:17:22'),
+(14, 'FA0008BN2023', 'reqapproved-84', 1, 0, '2026-11-18 22:08:59'),
+(15, 'FA0008BN2023', 'reqdeclined-83', 1, 0, '2026-11-18 22:09:06');
 
 -- --------------------------------------------------------
 
@@ -1524,7 +1594,7 @@ INSERT INTO `tbl_inventory` (`item_id`, `campus_id`, `synced_from_sheet`, `item_
 (30, 1, 0, 'Table', 'Others', 4, 'Good', NULL, 'uploads/1790901156_item_table2.jpg', '2026-10-02 08:32:36', 1, 0),
 (31, 1, 0, 'Projector', 'Audio/Visual', 3, 'Good', NULL, 'uploads/1790901270_images.jpg', '2026-10-02 08:34:30', 1, 0),
 (32, 1, 0, 'Double A Batter', 'Power', 16, 'Fair', NULL, 'uploads/1790910199_batteryAA.jpg', '2026-10-02 11:03:19', 1, 0),
-(33, 2, 1, 'Unterrupted Power Supply', 'Computer Laboratories', 30, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:55', 0, 0),
+(33, 2, 1, 'Unterrupted Power Supply', 'Computer Laboratories', 29, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:55', 0, 0),
 (34, 2, 1, 'Automatic Voltage Regulator', 'Computer Laboratories', 30, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:55', 0, 0),
 (35, 2, 1, 'Data Comm Cabinet', 'Computer Laboratories', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:55', 0, 0),
 (36, 2, 1, 'D-Link Switch/Hub', 'Computer Laboratories', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:55', 0, 0),
@@ -1606,13 +1676,13 @@ INSERT INTO `tbl_inventory` (`item_id`, `campus_id`, `synced_from_sheet`, `item_
 (112, 2, 1, 'Dynamic Cart', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
 (113, 2, 1, 'Friction Block', 'Dispensing Room', 6, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
 (114, 2, 1, 'Winch Roller Fairlead', 'Dispensing Room', 11, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
-(115, 2, 1, 'Ballistic Pendulums', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(115, 1, 1, 'Ballistic Pendulums', 'Dispensing Room', 3, 'Good', NULL, 'uploads/1795060495_images__3_.jpg', '2026-11-08 16:22:56', 0, 0),
 (116, 2, 1, 'Demonstration Balance', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
 (117, 2, 1, 'Force Table', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
 (118, 2, 1, 'Slinky Coil 3x4', 'Dispensing Room', 4, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
 (119, 2, 1, 'Cage Style Slotted Mass Hanger', 'Dispensing Room', 11, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
 (120, 2, 1, 'Graduated Cylinder (100ml)', 'Chem Lab', 10, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
-(121, 2, 1, 'Beaker (100ml)', 'Chem Lab', 4, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
+(121, 1, 1, 'Beaker (100ml)', 'Chem Lab', 4, 'Good', NULL, 'uploads/1795060572_41vGxqzVasL.jpg', '2026-11-08 16:22:56', 0, 0),
 (122, 2, 1, 'Resistor Assortment Kit', 'Dispensing Room', 15, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
 (123, 2, 1, 'Freefall Apparatus Accessories', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
 (124, 2, 1, 'Electric Calorimeter', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:56', 0, 0),
@@ -1652,9 +1722,9 @@ INSERT INTO `tbl_inventory` (`item_id`, `campus_id`, `synced_from_sheet`, `item_
 (158, 2, 1, 'Portable Monitor', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
 (159, 2, 1, 'Wadfow Claw Hammer', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
 (160, 2, 1, 'Wadfow Ball Pein Hammer', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
-(161, 2, 1, 'Beaker (250ml)', 'Chem Lab', 8, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
-(162, 2, 1, 'Beaker (500ml)', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
-(163, 2, 1, 'Beaker (1000ml)', 'Chem Lab', 10, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
+(161, 1, 1, 'Beaker (250ml)', 'Chem Lab', 8, 'Good', NULL, 'uploads/1795060559_41vGxqzVasL.jpg', '2026-11-08 16:22:57', 0, 0),
+(162, 1, 1, 'Beaker (500ml)', 'Dispensing Room', 3, 'Good', NULL, 'uploads/1795060564_41vGxqzVasL.jpg', '2026-11-08 16:22:57', 0, 0),
+(163, 1, 1, 'Beaker (1000ml)', 'Chem Lab', 10, 'Good', NULL, 'uploads/1795060568_41vGxqzVasL.jpg', '2026-11-08 16:22:57', 0, 0),
 (164, 2, 1, 'Glass Funnel (50mm)', 'Chem Lab', 10, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
 (165, 2, 1, 'Glass Funnel (60mm)', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
 (166, 2, 1, 'Glass Funnel (75mm)', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
@@ -1697,23 +1767,23 @@ INSERT INTO `tbl_inventory` (`item_id`, `campus_id`, `synced_from_sheet`, `item_
 (203, 2, 1, 'Watch Glass (Large)', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
 (204, 2, 1, 'Watch Glass (Medium)', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
 (205, 2, 1, 'Watch Glass (Small)', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:57', 0, 0),
-(206, 2, 1, 'Test Tube Holder', 'Dispensing Room', 10, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
-(207, 2, 1, 'Test Tube Brush', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
-(208, 2, 1, 'Crucible Tong', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
-(209, 2, 1, 'Tuning Fork', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
-(210, 2, 1, 'ESP32', 'Dispensing Room', 4, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
-(211, 2, 1, 'Multi-Function Meter', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
-(212, 2, 1, 'Relay (8in)', 'Dispensing Room', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
-(213, 2, 1, 'Vernier Caliper', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
-(214, 2, 1, 'Mini Guage', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
-(215, 2, 1, 'Precision Screwdriver', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
-(216, 2, 1, 'Wrench (150x19)', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
-(217, 2, 1, 'Wrench (200x24)', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
-(218, 2, 1, 'Wrench (250x30)', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
-(219, 2, 1, 'Wrench (300x36)', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
-(220, 2, 1, 'Long Nose', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
-(221, 2, 1, 'Pliers', 'Dispensing Room', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
-(222, 2, 1, 'Cutting Pliers', 'Dispensing Room', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(206, 1, 1, 'Test Tube Holder', 'Dispensing Room', 10, 'Good', NULL, 'uploads/1795060878_Test_Tube_Holder_Wire1.jpg', '2026-11-08 16:22:58', 0, 0),
+(207, 1, 1, 'Test Tube Brush', 'Dispensing Room', 5, 'Good', NULL, 'uploads/1795060849_images__10_.jpg', '2026-11-08 16:22:58', 0, 0),
+(208, 1, 1, 'Crucible Tong', 'Dispensing Room', 5, 'Good', NULL, 'uploads/1795060935_0007324_lab_tongs_600.jpeg', '2026-11-08 16:22:58', 0, 0),
+(209, 1, 1, 'Tuning Fork', 'Dispensing Room', 3, 'Good', NULL, 'uploads/1795060703_images__7_.jpg', '2026-11-08 16:22:58', 0, 0),
+(210, 1, 1, 'ESP32', 'Dispensing Room', 4, 'Good', NULL, 'uploads/1795060754_images__8_.jpg', '2026-11-08 16:22:58', 0, 0),
+(211, 1, 1, 'Multi-Function Meter', 'Dispensing Room', 3, 'Good', NULL, 'uploads/1795060907_images__11_.jpg', '2026-11-08 16:22:58', 0, 0),
+(212, 1, 1, 'Relay (8in)', 'Dispensing Room', 5, 'Good', NULL, 'uploads/1795060807_images__9_.jpg', '2026-11-08 16:22:58', 0, 0),
+(213, 1, 1, 'Vernier Caliper', 'Dispensing Room', 3, 'Good', NULL, 'uploads/1795060982_2_2_2_Product_900x900_Large_size_Calipers_a51c81f96e.jpg', '2026-11-08 16:22:58', 0, 0),
+(214, 1, 1, 'Mini Guage', 'Dispensing Room', 3, 'Good', NULL, 'uploads/1795061004_dc1e8e1fe25abfa895f2db5d6a7287a1.jpg_720x720q80.jpg', '2026-11-08 16:22:58', 0, 0),
+(215, 1, 1, 'Precision Screwdriver', 'Dispensing Room', 2, 'Good', NULL, 'uploads/1795061041_images__12_.jpg', '2026-11-08 16:22:58', 0, 0),
+(216, 1, 1, 'Wrench (150x19)', 'Dispensing Room', 3, 'Good', NULL, 'uploads/1795061087_71UQTCpwndL.jpg', '2026-11-08 16:22:58', 0, 0),
+(217, 1, 1, 'Wrench (200x24)', 'Dispensing Room', 3, 'Good', NULL, 'uploads/1795061092_71UQTCpwndL.jpg', '2026-11-08 16:22:58', 0, 0),
+(218, 1, 1, 'Wrench (250x30)', 'Dispensing Room', 3, 'Good', NULL, 'uploads/1795061097_71UQTCpwndL.jpg', '2026-11-08 16:22:58', 0, 0),
+(219, 1, 1, 'Wrench (300x36)', 'Dispensing Room', 3, 'Good', NULL, 'uploads/1795061102_71UQTCpwndL.jpg', '2026-11-08 16:22:58', 0, 0),
+(220, 1, 1, 'Long Nose', 'Dispensing Room', 2, 'Good', NULL, 'uploads/1795061144_images__13_.jpg', '2026-11-08 16:22:58', 0, 0),
+(221, 1, 1, 'Pliers', 'Dispensing Room', 2, 'Good', NULL, 'uploads/1795061170_71FSIonNe3L.jpg', '2026-11-08 16:22:58', 0, 0),
+(222, 1, 1, 'Cutting Pliers', 'Dispensing Room', 3, 'Good', NULL, 'uploads/1795061189_43W8052_40.jpg', '2026-11-08 16:22:58', 0, 0),
 (223, 2, 1, 'Graduated Cylinder (10ml)', 'Chem Lab', 4, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
 (224, 2, 1, 'Graduated Cylinder (25ml)', 'Chem Lab', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
 (225, 2, 1, 'Graduated Cylinder (50ml)', 'Chem Lab', 8, 'Fair', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
@@ -1725,9 +1795,9 @@ INSERT INTO `tbl_inventory` (`item_id`, `campus_id`, `synced_from_sheet`, `item_
 (231, 2, 1, 'Separatory Funnel (500ml)', 'Chem Lab', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
 (232, 2, 1, 'Florence Flask (250ml)', 'Chem Lab', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
 (233, 2, 1, 'Florence Flask (500ml)', 'Chem Lab', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
-(234, 2, 1, 'Beaker (50ml)', 'Chem Lab', 5, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
-(235, 2, 1, 'Beaker (150ml)', 'Chem Lab', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
-(236, 2, 1, 'Beaker (400ml)', 'Chem Lab', 7, 'Fair', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(234, 1, 1, 'Beaker (50ml)', 'Chem Lab', 5, 'Good', NULL, 'uploads/1795060541_41vGxqzVasL.jpg', '2026-11-08 16:22:58', 0, 0),
+(235, 1, 1, 'Beaker (150ml)', 'Chem Lab', 2, 'Good', NULL, 'uploads/1795060548_41vGxqzVasL.jpg', '2026-11-08 16:22:58', 0, 0),
+(236, 1, 1, 'Beaker (400ml)', 'Chem Lab', 7, 'Fair', NULL, 'uploads/1795060553_41vGxqzVasL.jpg', '2026-11-08 16:22:58', 0, 0),
 (237, 1, 1, 'Alcohol Lamp', 'Audio/Visual', 2, 'For Repair', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 1, 0),
 (238, 2, 1, 'Pipette', 'Chem Lab', 10, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
 (239, 2, 1, 'Hydrometer', 'Chem Lab', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
@@ -1738,14 +1808,14 @@ INSERT INTO `tbl_inventory` (`item_id`, `campus_id`, `synced_from_sheet`, `item_
 (244, 2, 1, 'Petri Dish (100mm)', 'Chem Lab', 10, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
 (245, 2, 1, 'Double Beam Balance', 'Chem Lab', 7, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
 (246, 2, 1, 'Fume Hood', 'Chem Lab', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
-(247, 2, 1, 'Smart TV', 'Audio-Visual Equipment', 17, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(247, 1, 1, 'Smart TV', 'Audio-Visual Equipment', 17, 'Good', NULL, 'uploads/1795061317_images__5_.jpg', '2026-11-08 16:22:58', 0, 0),
 (248, 1, 1, 'Smart TV (Touch Screen)', 'Audio-Visual Equipment', 3, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 1, 0),
-(249, 2, 1, 'LCD Projector', 'Audio-Visual Equipment', 6, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
-(250, 2, 1, 'Analog Audio Mixer', 'Audio-Visual Equipment', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
-(251, 2, 1, 'Active Speakers', 'Audio-Visual Equipment', 4, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(249, 1, 1, 'LCD Projector', 'Audio-Visual Equipment', 6, 'Good', NULL, 'uploads/1795061292_images__15_.jpg', '2026-11-08 16:22:58', 0, 0),
+(250, 1, 1, 'Analog Audio Mixer', 'Audio-Visual Equipment', 1, 'Good', NULL, 'uploads/1795060507_images__4_.jpg', '2026-11-08 16:22:58', 0, 0),
+(251, 1, 1, 'Active Speakers', 'Audio-Visual Equipment', 4, 'Good', NULL, 'uploads/1795060532_images__2_.jpg', '2026-11-08 16:22:58', 0, 0),
 (252, 2, 1, 'Passive Speakers with Power Amplifier', 'Audio-Visual Equipment', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
-(253, 2, 1, 'Power Amplifier', 'Audio-Visual Equipment', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
-(254, 2, 1, 'Wireless Microphone', 'Audio-Visual Equipment', 2, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:58', 0, 0),
+(253, 1, 1, 'Power Amplifier', 'Audio-Visual Equipment', 1, 'Good', NULL, 'uploads/1795061239_images__14_.jpg', '2026-11-08 16:22:58', 0, 0),
+(254, 1, 1, 'Wireless Microphone', 'Audio-Visual Equipment', 2, 'Good', NULL, 'uploads/1795061274_61kfh4LmU8L.jpg', '2026-11-08 16:22:58', 0, 0),
 (255, 2, 0, 'Test Raspberry Pi Kit', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-08 16:31:32', 1, 0),
 (256, 2, 0, 'Helloo', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-08 16:41:05', 1, 0),
 (257, 2, 0, 'Ostin', 'Dispensing Room', 1, 'Good', NULL, NULL, '2026-11-08 16:44:58', 1, 0),
@@ -1769,9 +1839,9 @@ INSERT INTO `tbl_inventory` (`item_id`, `campus_id`, `synced_from_sheet`, `item_
 (275, 1, 1, 'Alcohol Lamp', 'Chem Lab', 1, 'Good', NULL, 'uploads/default.png', '2026-11-15 20:45:12', 1, 0),
 (276, 1, 1, 'Alcohol Lamp', 'Chem Lab', 3, 'Good', NULL, 'uploads/default.png', '2026-11-15 20:48:08', 1, 0),
 (277, 1, 1, 'Alcohol Lamp', 'Chem Lab', 0, 'For Repair', NULL, 'uploads/default.png', '2026-11-15 21:55:47', 1, 0),
-(278, 2, 1, 'Alcohol Lamp', 'Chem Lab', 0, 'For Repair', NULL, 'uploads/default.png', '2026-11-15 21:58:49', 0, 0),
-(279, 2, 1, 'Smart TV (Touch Screen)', 'Audio-Visual Equipment', 3, 'Good', NULL, 'uploads/default.png', '2026-11-15 22:04:40', 0, 0),
-(280, 2, 1, 'Toothbrush', 'Chem Lab', 3, 'Good', NULL, 'uploads/default.png', '2026-11-15 22:55:15', 0, 0);
+(278, 1, 1, 'Alcohol Lamp', 'Chem Lab', 0, 'For Repair', NULL, 'uploads/1795060671_images__6_.jpg', '2026-11-15 21:58:49', 0, 0),
+(279, 1, 1, 'Smart TV (Touch Screen)', 'Audio-Visual Equipment', 3, 'Good', NULL, 'uploads/1795060649_images__5_.jpg', '2026-11-15 22:04:40', 0, 0),
+(280, 1, 1, 'Toothbrush', 'Chem Lab', 3, 'Good', NULL, 'uploads/1795060613_toothb_noun_001_17891.jpg', '2026-11-15 22:55:15', 0, 0);
 
 -- --------------------------------------------------------
 
@@ -1792,7 +1862,7 @@ CREATE TABLE `tbl_ip_login_attempts` (
 --
 
 INSERT INTO `tbl_ip_login_attempts` (`id`, `ip_address`, `fail_count`, `window_start`, `locked_until`) VALUES
-(1, '::1', 0, '2026-11-16 12:16:02', NULL),
+(1, '::1', 0, '2026-11-19 11:53:58', NULL),
 (19, '127.0.0.1', 0, '2026-11-15 17:27:29', NULL);
 
 -- --------------------------------------------------------
@@ -1942,37 +2012,45 @@ CREATE TABLE `tbl_requests` (
   `original_return_date` date DEFAULT NULL,
   `original_return_time` time DEFAULT NULL,
   `extension_late_seconds` int(10) UNSIGNED NOT NULL DEFAULT 0,
-  `return_condition` varchar(20) DEFAULT NULL
+  `return_condition` varchar(20) DEFAULT NULL,
+  `student_key` varchar(64) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `tbl_requests`
 --
 
-INSERT INTO `tbl_requests` (`id`, `faculty_name`, `faculty_id`, `equipment_name`, `instructor`, `room`, `borrow_date`, `return_date`, `return_token`, `claim_token`, `returned_at`, `claimed_at`, `status`, `request_date`, `reason`, `document_path`, `arbitration_rule`, `submitted_by_name`, `submitted_by_id`, `submitted_as`, `batch_id`, `bundle_claim_token`, `borrow_time`, `return_time`, `borrow_qty`, `room_id`, `booking_mode`, `stock_applied`, `extension_count`, `original_return_date`, `original_return_time`, `extension_late_seconds`, `return_condition`) VALUES
-(2, 'Mendoza', '2023-00230-BN-0', 'AC Remote', 'elaine', 'B403', '2026-01-15', '2026-01-15', NULL, NULL, NULL, NULL, 'Declined', '2026-01-15 11:08:29', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0, NULL),
-(8, 'Frederick Rosales', '2023-00251-BN-0', 'Projector', 'sir noy', 'B304', '2026-02-23', '2026-02-25', NULL, NULL, NULL, NULL, 'Declined', '2026-02-22 17:29:16', 'Out of stock – maximum approved requests reached', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0, NULL),
-(9, 'Derick Ramsey', '2023-00651-BN-0', 'Projector', 'ma\'am JJ', 'A901', '2026-03-01', '2026-03-09', NULL, NULL, NULL, NULL, 'Declined', '2026-02-22 17:31:37', 'Out of stock – maximum approved requests reached', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0, NULL),
-(10, 'Frederick Rosales', '2023-00251-BN-0', 'AC Remote', 'Sir ajon', 'B207', '2026-02-25', '2026-02-26', NULL, NULL, NULL, NULL, 'Declined', '2026-02-22 17:38:07', 'Out of stock – maximum approved requests reached', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0, NULL),
-(12, 'Frederick Rosales', '2023-00251-BN-0', 'Projector', 'joyce', 'b203', '2026-02-23', '2026-02-24', NULL, NULL, NULL, NULL, 'Declined', '2026-02-22 17:52:27', 'Out of stock – maximum approved requests reached', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0, NULL),
-(14, 'Frederick Rosales', '2023-00251-BN-0', 'HDMI Cable', 'sir redg', 'b201', '2026-02-24', '2026-02-25', NULL, NULL, NULL, NULL, 'Declined', '2026-02-23 17:46:05', 'Request expired – borrow date has already passed', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0, NULL),
-(60, 'Edmundo Dela Cruz', 'FA0008BN2023', 'Acer System Unit', 'Edmundo Dela Cruz', 'Room 210Building C (CITE) · 2nd Floor', '2026-11-09', '2026-11-09', NULL, NULL, '2026-11-11 16:10:35', NULL, 'Returned', '2026-11-09 19:08:21', 'Auto-approved: no admin action within the buffer time.', NULL, 'auto_approve_timeout', '', '', 'personal', 'f46b09c1-cc5d-48ee-a6dd-dd85865092fc', '53a4512b54a2477f43f49dafd6af1cb689e8a9eff81d66cab707eba1bafa7448', '19:10:00', '20:10:00', 1, 76, '0', 0, 0, NULL, NULL, 0, NULL),
-(61, 'Edmundo Dela Cruz', 'FA0008BN2023', 'Adaptor', 'Edmundo Dela Cruz', 'Room 210Building C (CITE) · 2nd Floor', '2026-11-09', '2026-11-09', NULL, NULL, '2026-11-11 16:10:26', NULL, 'Returned', '2026-11-09 19:08:22', 'Auto-approved: no admin action within the buffer time.', NULL, 'auto_approve_timeout', '', '', 'personal', 'f46b09c1-cc5d-48ee-a6dd-dd85865092fc', '53a4512b54a2477f43f49dafd6af1cb689e8a9eff81d66cab707eba1bafa7448', '19:10:00', '20:10:00', 2, 76, '0', 0, 0, NULL, NULL, 0, NULL),
-(62, 'Edmundo Dela Cruz', 'FA0008BN2023', 'Active Speakers', 'Edmundo Dela Cruz', 'Room 210Building C (CITE) · 2nd Floor', '2026-11-09', '2026-11-09', NULL, NULL, '2026-11-11 16:10:13', NULL, 'Returned', '2026-11-09 19:08:22', 'Auto-approved: no admin action within the buffer time.', NULL, 'auto_approve_timeout', '', '', 'personal', 'f46b09c1-cc5d-48ee-a6dd-dd85865092fc', '53a4512b54a2477f43f49dafd6af1cb689e8a9eff81d66cab707eba1bafa7448', '19:10:00', '20:10:00', 2, 76, '0', 0, 0, NULL, NULL, 0, NULL),
-(63, 'Michael Anjelo Miguel', 'FA0005BN2016', 'Active Speakers', 'Michael Anjelo Miguel', 'Room 205 · Building A (Old) · 2nd Floor', '2026-11-11', '2026-11-11', NULL, 'b150c281e41c1e07f6bc499dc59df089d36748a131b196afdd8012890822b60a', '2026-11-12 17:14:52', NULL, 'Returned', '2026-11-10 00:36:01', 'Auto-approved: no admin action within the buffer time.', NULL, 'auto_approve_timeout', 'Napiza, Sandy', '', 'personal', NULL, NULL, '07:00:00', '09:00:00', 1, 11, 'future', 1, 0, NULL, NULL, 0, NULL),
-(64, 'Michael Anjelo Miguel', 'FA0005BN2016', 'Unterrupted Power Supply', 'Michael Anjelo Miguel', 'Room 203', '2026-11-10', '2026-11-10', NULL, '27a1178a554ef46246a325a44d28bf61c4ec0824bce89a2e057c84e799d98445', '2026-11-12 18:27:39', NULL, 'Returned', '2026-11-10 02:01:36', 'Auto-approved: no admin action within the buffer time.', NULL, 'auto_approve_timeout', 'Frederick Rosales', '', 'student', NULL, NULL, '07:00:00', '08:00:00', 1, 30, 'today', 0, 0, NULL, NULL, 0, NULL),
-(65, 'Michael Anjelo Miguel', 'FA0005BN2016', 'Router', 'Michael Anjelo Miguel', 'Room 203', '2026-11-10', '2026-11-10', NULL, '92dce4fbd4bda5a060f63161ec8ad1d9ad64bf4bcd6e7685f97d5f3407ecc3f1', '2026-11-12 17:14:30', NULL, 'Returned', '2026-11-10 02:01:39', 'Auto-approved: no admin action within the buffer time.', NULL, 'auto_approve_timeout', 'Frederick Rosales', '', 'student', NULL, NULL, '07:00:00', '08:00:00', 1, 30, 'today', 0, 0, NULL, NULL, 0, NULL),
-(66, 'Stephen Perez', 'FA0011BN2026', 'Active Speakers', 'Stephen Perez', 'Audio Visual Room 2 · Building A (Old) · 1st Floor', '2026-11-11', '2026-11-11', NULL, '341a723fe4194caa6f47847514e8689a6213abcf40ef0d5e6360a49feae1b722', '2026-11-13 05:52:40', NULL, 'Returned', '2026-11-10 15:27:09', 'Auto-approved: no admin action within the buffer time.', NULL, 'auto_approve_timeout', '', '', 'personal', NULL, NULL, '16:00:00', '19:00:00', 2, 99, 'future', 1, 0, NULL, NULL, 0, NULL),
-(67, 'Stephen Perez', 'FA0011BN2026', 'Active Speakers', 'Stephen Perez', 'Room 203Building A (Old) · 2nd Floor', '2026-11-10', '2026-11-10', NULL, NULL, '2026-11-13 05:52:37', NULL, 'Returned', '2026-11-10 15:29:13', 'Auto-approved: no admin action within the buffer time.', NULL, 'auto_approve_timeout', '', '', 'personal', '9c3fa87e-ba96-4960-aaf8-d3fc071d6372', '5a193f9913356a6330038f68408348967bf7e92ae106d2fe779017325e7bec9a', '16:00:00', '19:00:00', 1, 9, '0', 0, 0, NULL, NULL, 0, NULL),
-(68, 'Stephen Perez', 'FA0011BN2026', 'Active Speakers', 'Stephen Perez', 'Outside', '2026-11-13', '2026-11-13', NULL, NULL, '2026-11-13 06:03:35', '2026-11-13 05:58:09', 'Returned', '2026-11-13 05:53:58', 'Approved: the equipment is free for the requested schedule.', NULL, 'rule_1_fifo', '', '', 'personal', NULL, NULL, '07:00:00', '09:00:00', 1, NULL, 'today', 1, 0, NULL, NULL, 0, NULL),
-(69, 'Stephen Perez', 'FA0011BN2026', 'Unterrupted Power Supply', 'Stephen Perez', 'Room 203 · Building B (New) · 2nd Floor', '2026-11-13', '2026-11-13', NULL, NULL, '2026-11-13 06:33:15', '2026-11-13 06:33:03', 'Returned', '2026-11-13 06:32:31', 'Approved: the equipment is free for the requested schedule.', NULL, 'rule_1_fifo', '', '', 'personal', NULL, NULL, '07:00:00', '08:00:00', 3, 30, 'today', 1, 0, NULL, NULL, 0, NULL),
-(70, 'Stephen Perez', 'FA0011BN2026', 'Unterrupted Power Supply', 'Stephen Perez', 'Audio Visual Room 2 · Building A (Old) · 1st Floor', '2026-11-13', '2026-11-13', NULL, NULL, '2026-11-13 06:35:32', '2026-11-13 06:35:23', 'Returned', '2026-11-13 06:34:52', 'Approved: the equipment is free for the requested schedule.', NULL, 'rule_1_fifo', '', '', 'personal', NULL, NULL, '07:00:00', '08:00:00', 2, 99, 'today', 1, 0, NULL, NULL, 0, NULL),
-(73, 'Stephen Perez', 'FA0011BN2026', 'Acer System Unit', 'Stephen Perez', 'Room 301 · Building C (CITE) · 3rd Floor', '2026-11-16', '2026-11-16', NULL, NULL, NULL, NULL, 'Declined', '2026-11-16 04:58:46', 'Not reviewed before the borrow start time – automatically declined.', NULL, 'rule_expired_unreviewed', '', '', 'personal', 'c4ed8a8c-6736-4e7d-a658-8cb1f9aed8cd', NULL, '07:00:00', '10:00:00', 1, 82, 'today', 0, 0, NULL, NULL, 0, NULL),
-(74, 'Stephen Perez', 'FA0011BN2026', 'Active Speakers', 'Stephen Perez', 'Room 301 · Building C (CITE) · 3rd Floor', '2026-11-16', '2026-11-16', NULL, NULL, NULL, NULL, 'Declined', '2026-11-16 04:58:46', 'Not reviewed before the borrow start time – automatically declined.', NULL, 'rule_expired_unreviewed', '', '', 'personal', 'c4ed8a8c-6736-4e7d-a658-8cb1f9aed8cd', NULL, '07:00:00', '10:00:00', 2, 82, 'today', 0, 0, NULL, NULL, 0, NULL),
-(75, 'Stephen Perez', 'FA0011BN2026', 'Air Compressor', 'Stephen Perez', 'Room 202 · Building B (New) · 2nd Floor', '2026-11-17', '2026-11-17', NULL, NULL, NULL, NULL, 'Declined', '2026-11-16 05:00:13', 'Waiting for an admin to review it. If nobody decides, it is declined automatically at 12:01 AM on the borrow date.', NULL, 'override', '', '', 'personal', NULL, NULL, '12:00:00', '15:00:00', 1, 29, 'future', 0, 0, NULL, NULL, 0, NULL),
-(76, 'Stephen Perez', 'FA0011BN2026', 'Ammeter (30A)', 'Stephen Perez', 'Room 201 · Building A (Old) · 2nd Floor', '2026-11-16', '2026-11-16', '9ce2ab7a87c607451b9003452c18e7b141be4fdd561008a063046ccfacf62fcb', '601bdcfdf6a836ad57cbef9f993308330f03bca2ce9ace9859283c0abbe9223c', NULL, NULL, 'Cancelled', '2026-11-16 05:01:17', 'Not collected – the borrow period ended before it was picked up.', NULL, 'rule_no_show', '', '', 'personal', NULL, NULL, '14:00:00', '17:00:00', 1, 7, 'today', 0, 0, NULL, NULL, 0, NULL),
-(77, 'Stephen Perez', 'FA0011BN2026', 'Adaptor', 'Stephen Perez', 'Audio Visual Room 2 · Building A (Old) · 1st Floor', '2026-11-16', '2026-11-16', '6943ae5dd78a63a4e4e68bf1b4a8962a360dec3d54e657d3d23b9f389061b0e1', NULL, NULL, NULL, 'Cancelled', '2026-11-16 10:20:06', 'Not collected – the borrow period ended before it was picked up.', NULL, 'rule_no_show', '', '', 'personal', 'faaa5039-8046-4dc6-a8cd-46e0a0dc374c', '56b397ebadf990d9f6768457a2f0c035b9d3c643c8d4064a13e3531d5773e90d', '11:00:00', '13:00:00', 1, 99, 'today', 0, 0, NULL, NULL, 0, NULL),
-(78, 'Stephen Perez', 'FA0011BN2026', 'Ammeter (0-5A)', 'Stephen Perez', 'Audio Visual Room 2 · Building A (Old) · 1st Floor', '2026-11-16', '2026-11-16', '4286e475c29b4463c1d81df7a5284e719a5efc9ede8727065ee04c3bdadb9c9a', NULL, NULL, NULL, 'Cancelled', '2026-11-16 10:20:06', 'Not collected – the borrow period ended before it was picked up.', NULL, 'rule_no_show', '', '', 'personal', 'faaa5039-8046-4dc6-a8cd-46e0a0dc374c', '56b397ebadf990d9f6768457a2f0c035b9d3c643c8d4064a13e3531d5773e90d', '11:00:00', '13:00:00', 2, 99, 'today', 0, 0, NULL, NULL, 0, NULL);
+INSERT INTO `tbl_requests` (`id`, `faculty_name`, `faculty_id`, `equipment_name`, `instructor`, `room`, `borrow_date`, `return_date`, `return_token`, `claim_token`, `returned_at`, `claimed_at`, `status`, `request_date`, `reason`, `document_path`, `arbitration_rule`, `submitted_by_name`, `submitted_by_id`, `submitted_as`, `batch_id`, `bundle_claim_token`, `borrow_time`, `return_time`, `borrow_qty`, `room_id`, `booking_mode`, `stock_applied`, `extension_count`, `original_return_date`, `original_return_time`, `extension_late_seconds`, `return_condition`, `student_key`) VALUES
+(2, 'Mendoza', '2023-00230-BN-0', 'AC Remote', 'elaine', 'B403', '2026-01-15', '2026-01-15', NULL, NULL, NULL, NULL, 'Declined', '2026-01-15 11:08:29', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0, NULL, NULL),
+(8, 'Frederick Rosales', '2023-00251-BN-0', 'Projector', 'sir noy', 'B304', '2026-02-23', '2026-02-25', NULL, NULL, NULL, NULL, 'Declined', '2026-02-22 17:29:16', 'Out of stock – maximum approved requests reached', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0, NULL, NULL),
+(9, 'Derick Ramsey', '2023-00651-BN-0', 'Projector', 'ma\'am JJ', 'A901', '2026-03-01', '2026-03-09', NULL, NULL, NULL, NULL, 'Declined', '2026-02-22 17:31:37', 'Out of stock – maximum approved requests reached', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0, NULL, NULL),
+(10, 'Frederick Rosales', '2023-00251-BN-0', 'AC Remote', 'Sir ajon', 'B207', '2026-02-25', '2026-02-26', NULL, NULL, NULL, NULL, 'Declined', '2026-02-22 17:38:07', 'Out of stock – maximum approved requests reached', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0, NULL, NULL),
+(12, 'Frederick Rosales', '2023-00251-BN-0', 'Projector', 'joyce', 'b203', '2026-02-23', '2026-02-24', NULL, NULL, NULL, NULL, 'Declined', '2026-02-22 17:52:27', 'Out of stock – maximum approved requests reached', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0, NULL, NULL),
+(14, 'Frederick Rosales', '2023-00251-BN-0', 'HDMI Cable', 'sir redg', 'b201', '2026-02-24', '2026-02-25', NULL, NULL, NULL, NULL, 'Declined', '2026-02-23 17:46:05', 'Request expired – borrow date has already passed', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, 1, 0, NULL, NULL, 0, NULL, NULL),
+(60, 'Edmundo Dela Cruz', 'FA0008BN2023', 'Acer System Unit', 'Edmundo Dela Cruz', 'Room 210Building C (CITE) · 2nd Floor', '2026-11-09', '2026-11-09', NULL, NULL, '2026-11-11 16:10:35', NULL, 'Returned', '2026-11-09 19:08:21', 'Auto-approved: no admin action within the buffer time.', NULL, 'auto_approve_timeout', '', '', 'personal', 'f46b09c1-cc5d-48ee-a6dd-dd85865092fc', '53a4512b54a2477f43f49dafd6af1cb689e8a9eff81d66cab707eba1bafa7448', '19:10:00', '20:10:00', 1, 76, '0', 0, 0, NULL, NULL, 0, NULL, NULL),
+(61, 'Edmundo Dela Cruz', 'FA0008BN2023', 'Adaptor', 'Edmundo Dela Cruz', 'Room 210Building C (CITE) · 2nd Floor', '2026-11-09', '2026-11-09', NULL, NULL, '2026-11-11 16:10:26', NULL, 'Returned', '2026-11-09 19:08:22', 'Auto-approved: no admin action within the buffer time.', NULL, 'auto_approve_timeout', '', '', 'personal', 'f46b09c1-cc5d-48ee-a6dd-dd85865092fc', '53a4512b54a2477f43f49dafd6af1cb689e8a9eff81d66cab707eba1bafa7448', '19:10:00', '20:10:00', 2, 76, '0', 0, 0, NULL, NULL, 0, NULL, NULL),
+(62, 'Edmundo Dela Cruz', 'FA0008BN2023', 'Active Speakers', 'Edmundo Dela Cruz', 'Room 210Building C (CITE) · 2nd Floor', '2026-11-09', '2026-11-09', NULL, NULL, '2026-11-11 16:10:13', NULL, 'Returned', '2026-11-09 19:08:22', 'Auto-approved: no admin action within the buffer time.', NULL, 'auto_approve_timeout', '', '', 'personal', 'f46b09c1-cc5d-48ee-a6dd-dd85865092fc', '53a4512b54a2477f43f49dafd6af1cb689e8a9eff81d66cab707eba1bafa7448', '19:10:00', '20:10:00', 2, 76, '0', 0, 0, NULL, NULL, 0, NULL, NULL),
+(63, 'Michael Anjelo Miguel', 'FA0005BN2016', 'Active Speakers', 'Michael Anjelo Miguel', 'Room 205 · Building A (Old) · 2nd Floor', '2026-11-11', '2026-11-11', NULL, 'b150c281e41c1e07f6bc499dc59df089d36748a131b196afdd8012890822b60a', '2026-11-12 17:14:52', NULL, 'Returned', '2026-11-10 00:36:01', 'Auto-approved: no admin action within the buffer time.', NULL, 'auto_approve_timeout', 'Napiza, Sandy', '', 'personal', NULL, NULL, '07:00:00', '09:00:00', 1, 11, 'future', 1, 0, NULL, NULL, 0, NULL, NULL),
+(64, 'Michael Anjelo Miguel', 'FA0005BN2016', 'Unterrupted Power Supply', 'Michael Anjelo Miguel', 'Room 203', '2026-11-10', '2026-11-10', NULL, '27a1178a554ef46246a325a44d28bf61c4ec0824bce89a2e057c84e799d98445', '2026-11-12 18:27:39', NULL, 'Returned', '2026-11-10 02:01:36', 'Auto-approved: no admin action within the buffer time.', NULL, 'auto_approve_timeout', 'Frederick Rosales', '', 'student', NULL, NULL, '07:00:00', '08:00:00', 1, 30, 'today', 0, 0, NULL, NULL, 0, NULL, NULL),
+(65, 'Michael Anjelo Miguel', 'FA0005BN2016', 'Router', 'Michael Anjelo Miguel', 'Room 203', '2026-11-10', '2026-11-10', NULL, '92dce4fbd4bda5a060f63161ec8ad1d9ad64bf4bcd6e7685f97d5f3407ecc3f1', '2026-11-12 17:14:30', NULL, 'Returned', '2026-11-10 02:01:39', 'Auto-approved: no admin action within the buffer time.', NULL, 'auto_approve_timeout', 'Frederick Rosales', '', 'student', NULL, NULL, '07:00:00', '08:00:00', 1, 30, 'today', 0, 0, NULL, NULL, 0, NULL, NULL),
+(66, 'Stephen Perez', 'FA0011BN2026', 'Active Speakers', 'Stephen Perez', 'Audio Visual Room 2 · Building A (Old) · 1st Floor', '2026-11-11', '2026-11-11', NULL, '341a723fe4194caa6f47847514e8689a6213abcf40ef0d5e6360a49feae1b722', '2026-11-13 05:52:40', NULL, 'Returned', '2026-11-10 15:27:09', 'Auto-approved: no admin action within the buffer time.', NULL, 'auto_approve_timeout', '', '', 'personal', NULL, NULL, '16:00:00', '19:00:00', 2, 99, 'future', 1, 0, NULL, NULL, 0, NULL, NULL),
+(67, 'Stephen Perez', 'FA0011BN2026', 'Active Speakers', 'Stephen Perez', 'Room 203Building A (Old) · 2nd Floor', '2026-11-10', '2026-11-10', NULL, NULL, '2026-11-13 05:52:37', NULL, 'Returned', '2026-11-10 15:29:13', 'Auto-approved: no admin action within the buffer time.', NULL, 'auto_approve_timeout', '', '', 'personal', '9c3fa87e-ba96-4960-aaf8-d3fc071d6372', '5a193f9913356a6330038f68408348967bf7e92ae106d2fe779017325e7bec9a', '16:00:00', '19:00:00', 1, 9, '0', 0, 0, NULL, NULL, 0, NULL, NULL),
+(68, 'Stephen Perez', 'FA0011BN2026', 'Active Speakers', 'Stephen Perez', 'Outside', '2026-11-13', '2026-11-13', NULL, NULL, '2026-11-13 06:03:35', '2026-11-13 05:58:09', 'Returned', '2026-11-13 05:53:58', 'Approved: the equipment is free for the requested schedule.', NULL, 'rule_1_fifo', '', '', 'personal', NULL, NULL, '07:00:00', '09:00:00', 1, NULL, 'today', 1, 0, NULL, NULL, 0, NULL, NULL),
+(69, 'Stephen Perez', 'FA0011BN2026', 'Unterrupted Power Supply', 'Stephen Perez', 'Room 203 · Building B (New) · 2nd Floor', '2026-11-13', '2026-11-13', NULL, NULL, '2026-11-13 06:33:15', '2026-11-13 06:33:03', 'Returned', '2026-11-13 06:32:31', 'Approved: the equipment is free for the requested schedule.', NULL, 'rule_1_fifo', '', '', 'personal', NULL, NULL, '07:00:00', '08:00:00', 3, 30, 'today', 1, 0, NULL, NULL, 0, NULL, NULL),
+(70, 'Stephen Perez', 'FA0011BN2026', 'Unterrupted Power Supply', 'Stephen Perez', 'Audio Visual Room 2 · Building A (Old) · 1st Floor', '2026-11-13', '2026-11-13', NULL, NULL, '2026-11-13 06:35:32', '2026-11-13 06:35:23', 'Returned', '2026-11-13 06:34:52', 'Approved: the equipment is free for the requested schedule.', NULL, 'rule_1_fifo', '', '', 'personal', NULL, NULL, '07:00:00', '08:00:00', 2, 99, 'today', 1, 0, NULL, NULL, 0, NULL, NULL),
+(73, 'Stephen Perez', 'FA0011BN2026', 'Acer System Unit', 'Stephen Perez', 'Room 301 · Building C (CITE) · 3rd Floor', '2026-11-16', '2026-11-16', NULL, NULL, NULL, NULL, 'Declined', '2026-11-16 04:58:46', 'Not reviewed before the borrow start time – automatically declined.', NULL, 'rule_expired_unreviewed', '', '', 'personal', 'c4ed8a8c-6736-4e7d-a658-8cb1f9aed8cd', NULL, '07:00:00', '10:00:00', 1, 82, 'today', 0, 0, NULL, NULL, 0, NULL, NULL),
+(74, 'Stephen Perez', 'FA0011BN2026', 'Active Speakers', 'Stephen Perez', 'Room 301 · Building C (CITE) · 3rd Floor', '2026-11-16', '2026-11-16', NULL, NULL, NULL, NULL, 'Declined', '2026-11-16 04:58:46', 'Not reviewed before the borrow start time – automatically declined.', NULL, 'rule_expired_unreviewed', '', '', 'personal', 'c4ed8a8c-6736-4e7d-a658-8cb1f9aed8cd', NULL, '07:00:00', '10:00:00', 2, 82, 'today', 0, 0, NULL, NULL, 0, NULL, NULL),
+(75, 'Stephen Perez', 'FA0011BN2026', 'Air Compressor', 'Stephen Perez', 'Room 202 · Building B (New) · 2nd Floor', '2026-11-17', '2026-11-17', NULL, NULL, NULL, NULL, 'Declined', '2026-11-16 05:00:13', 'Waiting for an admin to review it. If nobody decides, it is declined automatically at 12:01 AM on the borrow date.', NULL, 'override', '', '', 'personal', NULL, NULL, '12:00:00', '15:00:00', 1, 29, 'future', 0, 0, NULL, NULL, 0, NULL, NULL),
+(76, 'Stephen Perez', 'FA0011BN2026', 'Ammeter (30A)', 'Stephen Perez', 'Room 201 · Building A (Old) · 2nd Floor', '2026-11-16', '2026-11-16', '9ce2ab7a87c607451b9003452c18e7b141be4fdd561008a063046ccfacf62fcb', '601bdcfdf6a836ad57cbef9f993308330f03bca2ce9ace9859283c0abbe9223c', NULL, NULL, 'Cancelled', '2026-11-16 05:01:17', 'Not collected – the borrow period ended before it was picked up.', NULL, 'rule_no_show', '', '', 'personal', NULL, NULL, '14:00:00', '17:00:00', 1, 7, 'today', 0, 0, NULL, NULL, 0, NULL, NULL),
+(77, 'Stephen Perez', 'FA0011BN2026', 'Adaptor', 'Stephen Perez', 'Audio Visual Room 2 · Building A (Old) · 1st Floor', '2026-11-16', '2026-11-16', '6943ae5dd78a63a4e4e68bf1b4a8962a360dec3d54e657d3d23b9f389061b0e1', NULL, NULL, NULL, 'Cancelled', '2026-11-16 10:20:06', 'Not collected – the borrow period ended before it was picked up.', NULL, 'rule_no_show', '', '', 'personal', 'faaa5039-8046-4dc6-a8cd-46e0a0dc374c', '56b397ebadf990d9f6768457a2f0c035b9d3c643c8d4064a13e3531d5773e90d', '11:00:00', '13:00:00', 1, 99, 'today', 0, 0, NULL, NULL, 0, NULL, NULL),
+(78, 'Stephen Perez', 'FA0011BN2026', 'Ammeter (0-5A)', 'Stephen Perez', 'Audio Visual Room 2 · Building A (Old) · 1st Floor', '2026-11-16', '2026-11-16', '4286e475c29b4463c1d81df7a5284e719a5efc9ede8727065ee04c3bdadb9c9a', NULL, NULL, NULL, 'Cancelled', '2026-11-16 10:20:06', 'Not collected – the borrow period ended before it was picked up.', NULL, 'rule_no_show', '', '', 'personal', 'faaa5039-8046-4dc6-a8cd-46e0a0dc374c', '56b397ebadf990d9f6768457a2f0c035b9d3c643c8d4064a13e3531d5773e90d', '11:00:00', '13:00:00', 2, 99, 'today', 0, 0, NULL, NULL, 0, NULL, NULL),
+(79, 'Stephen Perez', 'FA0011BN2026', 'Active Speakers', 'Stephen Perez', 'Room 105', '2026-11-17', '2026-11-17', NULL, NULL, NULL, NULL, 'Declined', '2026-11-17 16:33:42', 'Not reviewed before the borrow start time – automatically declined.', NULL, 'rule_expired_unreviewed', 'Von Resma', '', 'student', NULL, NULL, '18:00:00', '20:00:00', 1, 60, 'today', 0, 0, NULL, NULL, 0, NULL, NULL),
+(80, 'Stephen Perez', 'FA0011BN2026', 'Adaptor', 'Stephen Perez', 'Room 105', '2026-11-17', '2026-11-17', NULL, NULL, NULL, NULL, 'Declined', '2026-11-17 16:33:45', 'Not reviewed before the borrow start time – automatically declined.', NULL, 'rule_expired_unreviewed', 'Von Resma', '', 'student', NULL, NULL, '18:00:00', '20:00:00', 1, 60, 'today', 0, 0, NULL, NULL, 0, NULL, NULL),
+(81, 'Stephen Perez', 'FA0011BN2026', 'AC Remote', 'Stephen Perez', 'Audio Visual Room 2', '2026-11-18', '2026-11-18', 'bfd84cdfd226cc8deab143e3a1dcd9a3f6fa960ea6407c1e4bfab1dfc1a5ee1f', NULL, NULL, NULL, 'Declined', '2026-11-18 10:40:38', 'Not reviewed before the borrow start time – automatically declined.', NULL, 'rule_expired_unreviewed', 'AWW', '', 'student', '53a6e754-ae65-4c33-9083-e0aa2c13ab60', 'f8a46433fb1d4099aa927be629291470d6ec9fd512a3713048551191dad9425f', '13:00:00', '15:00:00', 1, 99, 'today', 0, 0, NULL, NULL, 0, NULL, '69f6beb4428cc0eb48b6dc91e48bb22571c310b52e8f4a6e'),
+(82, 'Stephen Perez', 'FA0011BN2026', 'Ammeter (0-5A)', 'Stephen Perez', 'Audio Visual Room 2', '2026-11-18', '2026-11-18', '81263b300880677ab276490289408332c2c464ef92cbb404bd4cc9d6cabafa3c', NULL, NULL, NULL, 'Declined', '2026-11-18 10:40:41', 'Not reviewed before the borrow start time – automatically declined.', NULL, 'rule_expired_unreviewed', 'AWW', '', 'student', '53a6e754-ae65-4c33-9083-e0aa2c13ab60', 'f8a46433fb1d4099aa927be629291470d6ec9fd512a3713048551191dad9425f', '13:00:00', '15:00:00', 1, 99, 'today', 0, 0, NULL, NULL, 0, NULL, '5b369c25a65c490198ec7c1a235e196b32e5db1b4e58db96'),
+(83, 'Edmundo Dela Cruz', 'FA0008BN2023', 'Active Speakers', 'Edmundo Dela Cruz', 'Audio Visual Room 2 · Building A (Old) · 1st Floor', '2026-11-19', '2026-11-19', NULL, NULL, NULL, NULL, 'Declined', '2026-11-18 21:48:33', 'Waiting for an admin to review it. If nobody decides, it is declined automatically at 12:01 AM on the borrow date.', NULL, 'override', '', '', 'personal', 'a487e104-8345-4e4c-a177-eed4c734a34b', NULL, '10:00:00', '16:00:00', 2, 99, 'future', 0, 0, NULL, NULL, 0, NULL, NULL),
+(84, 'Edmundo Dela Cruz', 'FA0008BN2023', 'Unterrupted Power Supply', 'Edmundo Dela Cruz', 'Audio Visual Room 2 · Building A (Old) · 1st Floor', '2026-11-19', '2026-11-19', '90897ae168907eec2eba7181fd16baf58edb14d1b3b747edb8727d3ef4eb0012', '3792f86a3695433db12ca1a8a91ca0f3bdfc65432227277855fed67397ba7199', NULL, NULL, 'Approved', '2026-11-18 21:48:33', 'Waiting for an admin to review it. If nobody decides, it is declined automatically at 12:01 AM on the borrow date.', NULL, 'override', '', '', 'personal', 'a487e104-8345-4e4c-a177-eed4c734a34b', NULL, '10:00:00', '16:00:00', 1, 99, 'future', 1, 0, NULL, NULL, 0, NULL, NULL),
+(85, 'Michael Anjelo Miguel', 'FA0005BN2016', 'Active Speakers', 'Michael Anjelo Miguel', 'Room 201 · Building A (Old) · 2nd Floor', '2026-11-19', '2026-11-19', 'c5b9860bc85f068a03ef6427015be16bb5a1a2a7de117d077b1c671eb8dee411', '47d39ce3ee8796abe3fd53d322f7f0b5b16d140cfd3c4d87f18d841d88606af9', NULL, NULL, 'Approved', '2026-11-19 12:25:20', 'Approved: the equipment is free for the requested schedule.', NULL, 'rule_1_fifo', 'Frederick', '', 'personal', NULL, NULL, '15:00:00', '21:00:00', 1, 7, 'today', 0, 0, NULL, NULL, 0, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -2204,7 +2282,10 @@ INSERT INTO `tbl_room_arbitration_log` (`id`, `reservation_id`, `room_id`, `room
 (13, 13, 76, 'Room 210', 'NOTSET-275A970376E5', 'Edmundo Dela Cruz', 'Approved', 'rule_1_fifo', 'Room reservation approved — no time conflict.', '2026-10-19 10:13:49'),
 (14, 14, 88, 'Room 308', 'NOTSET-275A970376E5', 'Edmundo Dela Cruz', 'Approved', 'rule_1_fifo', 'Facility reservation approved — no time conflict.', '2026-10-25 09:57:21'),
 (15, 15, 9, 'Room 203', 'FA0011BN2026', 'Stephen Perez', 'Approved', 'rule_1_fifo', 'Facility reservation approved — no time conflict.', '2026-11-10 15:28:39'),
-(16, 16, 99, 'Audio Visual Room 2', 'FA0011BN2026', 'Stephen Perez', 'Approved', 'rule_1_fifo', 'Facility reservation approved — no time conflict.', '2026-11-16 05:56:25');
+(16, 16, 99, 'Audio Visual Room 2', 'FA0011BN2026', 'Stephen Perez', 'Approved', 'rule_1_fifo', 'Facility reservation approved — no time conflict.', '2026-11-16 05:56:25'),
+(21, 21, 29, 'Room 202', 'FA0011BN2026', 'Stephen Perez', 'Approved', 'rule_1_fifo', 'Facility reservation approved — no time conflict.', '2026-11-18 10:42:26'),
+(22, 22, 60, 'Room 105', 'FA0011BN2026', 'Stephen Perez', 'Approved', 'override', 'dadwd', '2026-11-18 10:49:04'),
+(23, 23, 29, 'Room 202', 'FA0008BN2023', 'Edmundo Dela Cruz', 'Declined', 'rule_expired_unreviewed', 'Not reviewed in time – automatically declined at 12:01 AM on the reservation date.', '2026-11-19 09:03:45');
 
 -- --------------------------------------------------------
 
@@ -2245,7 +2326,7 @@ CREATE TABLE `tbl_room_reservations` (
   `end_time` time NOT NULL,
   `notes` text DEFAULT NULL,
   `document_path` varchar(255) DEFAULT NULL,
-  `status` enum('Approved','Declined','Cancelled') NOT NULL DEFAULT 'Approved',
+  `status` enum('Waiting','Approved','Declined','Cancelled') NOT NULL DEFAULT 'Approved',
   `reason` varchar(255) DEFAULT NULL,
   `request_date` datetime DEFAULT current_timestamp(),
   `cancelled_at` datetime DEFAULT NULL
@@ -2271,7 +2352,10 @@ INSERT INTO `tbl_room_reservations` (`id`, `room_id`, `faculty_id`, `faculty_nam
 (13, 76, 'NOTSET-275A970376E5', 'Edmundo Dela Cruz', 'personal', NULL, NULL, 'Lecture', 1, '2026-10-19', '14:00:00', '17:00:00', NULL, NULL, 'Approved', 'Room reservation approved — no time conflict.', '2026-10-19 10:13:48', NULL),
 (14, 88, 'NOTSET-275A970376E5', 'Edmundo Dela Cruz', 'personal', NULL, NULL, 'Lecture', 1, '2026-10-26', '14:00:00', '17:00:00', NULL, NULL, 'Cancelled', 'Facility reservation approved — no time conflict.', '2026-10-25 09:57:21', '2026-10-25 10:43:50'),
 (15, 9, 'FA0011BN2026', 'Stephen Perez', 'personal', NULL, NULL, 'Lecture', 1, '2026-11-10', '16:00:00', '19:00:00', NULL, NULL, 'Approved', 'Facility reservation approved — no time conflict.', '2026-11-10 15:28:39', NULL),
-(16, 99, 'FA0011BN2026', 'Stephen Perez', 'personal', NULL, NULL, 'Seminar', 1, '2026-11-16', '07:00:00', '13:00:00', NULL, NULL, 'Approved', 'Facility reservation approved — no time conflict.', '2026-11-16 05:56:25', NULL);
+(16, 99, 'FA0011BN2026', 'Stephen Perez', 'personal', NULL, NULL, 'Seminar', 1, '2026-11-16', '07:00:00', '13:00:00', NULL, NULL, 'Approved', 'Facility reservation approved — no time conflict.', '2026-11-16 05:56:25', NULL),
+(21, 29, 'FA0011BN2026', 'Stephen Perez', 'student', 'dawda', '', 'Lab session', 1, '2026-11-18', '11:00:00', '13:00:00', NULL, NULL, 'Approved', 'Facility reservation approved — no time conflict.', '2026-11-18 10:42:26', NULL),
+(22, 60, 'FA0011BN2026', 'Stephen Perez', 'student', 'dadddd', '', 'Exam', 1, '2026-11-18', '15:30:00', '18:30:00', NULL, NULL, 'Approved', 'dadwd', '2026-11-18 10:48:26', NULL),
+(23, 29, 'FA0008BN2023', 'Edmundo Dela Cruz', 'personal', NULL, NULL, 'Lab session', 1, '2026-11-19', '11:00:00', '12:00:00', NULL, NULL, 'Declined', 'Not reviewed in time – automatically declined at 12:01 AM on the reservation date.', '2026-11-18 21:53:03', NULL);
 
 -- --------------------------------------------------------
 
@@ -2331,12 +2415,17 @@ CREATE TABLE `tbl_service_survey_completions` (
 
 INSERT INTO `tbl_service_survey_completions` (`source_type`, `transaction_key`, `answered`, `consumed_at`) VALUES
 ('equipment', 'batch:9c3fa87e-ba96-4960-aaf8-d3fc071d6372', 1, '2026-11-13 06:30:18'),
+('equipment', 'batch:f46b09c1-cc5d-48ee-a6dd-dd85865092fc', 1, '2026-11-18 16:56:14'),
+('equipment', 'request:63', 0, '2026-11-19 11:18:51'),
+('equipment', 'request:64', 0, '2026-11-19 11:02:22'),
+('equipment', 'request:65', 0, '2026-11-19 11:35:28'),
 ('equipment', 'request:66', 1, '2026-11-13 06:23:58'),
 ('equipment', 'request:68', 1, '2026-11-13 06:23:23'),
 ('equipment', 'request:69', 1, '2026-11-13 06:33:22'),
 ('equipment', 'request:70', 1, '2026-11-13 06:35:53'),
 ('room', '15', 0, '2026-11-13 06:30:49'),
-('room', '16', 0, '2026-11-16 13:08:11');
+('room', '16', 0, '2026-11-16 13:08:11'),
+('room', '21', 0, '2026-11-18 16:24:01');
 
 -- --------------------------------------------------------
 
@@ -2398,7 +2487,7 @@ INSERT INTO `tbl_service_survey_periods` (`id`, `semester_start`, `semester_end`
 (163, '2026-09-01', '2027-12-17', '2026-09-29', '2026-10-12', 0, 0, 0, '2026-11-16 15:10:01'),
 (164, '2026-09-01', '2027-12-17', '2026-10-13', '2026-10-26', 0, 0, 0, '2026-11-16 15:10:01'),
 (165, '2026-09-01', '2027-12-17', '2026-10-27', '2026-11-09', 0, 0, 0, '2026-11-16 15:10:01'),
-(166, '2026-09-01', '2027-12-17', '2026-11-10', '2026-11-23', 0, 0, 0, '2026-11-16 15:10:01'),
+(166, '2026-09-01', '2027-12-17', '2026-11-10', '2026-11-23', 1, 3, 15, '2026-11-16 15:10:01'),
 (167, '2026-09-01', '2027-12-17', '2026-11-24', '2026-12-07', 0, 0, 0, '2026-11-16 15:10:01'),
 (168, '2026-09-01', '2027-12-17', '2026-12-08', '2026-12-21', 0, 0, 0, '2026-11-16 15:10:01'),
 (169, '2026-09-01', '2027-12-17', '2026-12-22', '2027-01-04', 0, 0, 0, '2026-11-16 15:10:01'),
@@ -2449,6 +2538,15 @@ CREATE TABLE `tbl_service_survey_period_questions` (
   `rating_5` int(10) UNSIGNED NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+--
+-- Dumping data for table `tbl_service_survey_period_questions`
+--
+
+INSERT INTO `tbl_service_survey_period_questions` (`period_id`, `question_id`, `question_version`, `question_text`, `sort_order`, `responses`, `total_score`, `rating_1`, `rating_2`, `rating_3`, `rating_4`, `rating_5`) VALUES
+(166, 1, 'c2071369ff38a10860608cee4fde1683aa94f0af70ec3bdb359b2498e8c2e177', 'How satisfied are you with the service you received?', 1, 1, 5, 0, 0, 0, 0, 1),
+(166, 3, '611d7183ae7d3aac91c5288fd288886c8a9e07b42c99c43d071f008fbbad2ca0', 'How clear was the information about your transaction?', 2, 1, 5, 0, 0, 0, 0, 1),
+(166, 5, 'db36d8922d5c3e8552b7581c72cc47598b58581b62a6a1e641f28edd1e5e39f1', 'How likely are you to use this service again?', 3, 1, 5, 0, 0, 0, 0, 1);
+
 -- --------------------------------------------------------
 
 --
@@ -2474,11 +2572,11 @@ CREATE TABLE `tbl_service_survey_questions` (
 --
 
 INSERT INTO `tbl_service_survey_questions` (`id`, `question_text`, `sort_order`, `active`, `responses`, `total_score`, `rating_1`, `rating_2`, `rating_3`, `rating_4`, `rating_5`) VALUES
-(1, 'How satisfied are you with the service you received?', 1, 1, 5, 18, 1, 1, 0, 0, 3),
+(1, 'How satisfied are you with the service you received?', 1, 1, 6, 23, 1, 1, 0, 0, 4),
 (2, 'How helpful and respectful was the staff who assisted you?', 2, 0, 0, 0, 0, 0, 0, 0, 0),
-(3, 'How clear was the information about your transaction?', 2, 1, 5, 19, 0, 0, 1, 4, 0),
+(3, 'How clear was the information about your transaction?', 2, 1, 6, 24, 0, 0, 1, 4, 1),
 (4, 'How satisfied are you with the time it took to complete your transaction?', 4, 0, 0, 0, 0, 0, 0, 0, 0),
-(5, 'How likely are you to use this service again?', 3, 1, 5, 20, 0, 0, 2, 1, 2);
+(5, 'How likely are you to use this service again?', 3, 1, 6, 25, 0, 0, 2, 1, 3);
 
 -- --------------------------------------------------------
 
@@ -2495,6 +2593,12 @@ CREATE TABLE `tbl_sync_config` (
 --
 -- Dumping data for table `tbl_sync_config`
 --
+
+INSERT INTO `tbl_sync_config` (`config_key`, `value`, `updated_at`) VALUES
+('gsheet_last_modified', '2026-11-15T14:55:18.998Z', '2026-11-15 22:55:21'),
+('gsheet_last_sync', '2026-11-15 16:25:05', '2026-11-15 23:25:05'),
+('gsheet_sync_enabled', '0', '2026-11-08 16:09:50'),
+('gsheet_url', 'https://docs.google.com/spreadsheets/d/1EYyWGgDsMwYSQIGQG_dZD5cwsWn0daJTLCItmkMvpBs/edit?gid=1579991349#gid=1579991349', '2026-11-15 19:04:24');
 
 -- --------------------------------------------------------
 
@@ -2538,6 +2642,7 @@ INSERT INTO `tbl_users` (`fullname`, `faculty_id`, `email`, `backup_email`, `pas
 ('Michael Anjelo Miguel', 'FA0005BN2016', 'michael.miguel@pupsync.edu', NULL, '$2y$10$cDg6QolF.l2mGo3v43go3e/fpglvD0WfWTxv3ifoAJ95wtEH4FGpC', NULL, NULL, NULL, 'Regular Faculty', 0),
 ('Arvin Nuñez', 'FA0005BN2026', 'arvin.nunez@pupsync.edu', NULL, '$2y$10$sU.v4llfJcWRZcx8QvFSYuOx3lJJH51TrkJ1TLNB/ID0IXCZaPmPO', '2026-11-14 17:09:34', NULL, 'Department of Information Technology/Computing', 'Regular Faculty', 0),
 ('Aaron Atienza', 'FA0006BN2024', 'aaron.atienza@pupsync.edu', NULL, '$2y$10$jhe4/CMvTgDYHbnB1XKaC.6NVO.di7gcuIk8cyQ8osmDIV.9uNs1.', NULL, NULL, NULL, 'Regular Faculty', 0),
+('Gio Marcos', 'FA0006BN2025', 'gio.marcos@pupsync.edu', NULL, '$2y$10$hpJ/fuJ7Wh7F6WMm./44tu0VsgTnW0bgYJuRY1Sclm65t4Dfc0Jom', '2026-11-17 12:02:04', NULL, 'Department of Information Technology/Computing; Department of Engineering Technology / Technical Programs', 'Regular Faculty', 0),
 ('Edmundo Dela Cruz', 'FA0008BN2023', 'edmundo.delacruz@pupsync.edu', NULL, '$2y$10$XdcZ7CBLZ6CvgSQtQ.oh0.S9VH91QWzR08IJLQexx4SMvgR5Bzl3S', NULL, NULL, NULL, 'Regular Faculty', 0),
 ('Stephen Perez', 'FA0011BN2026', 'stephen.perez@pupsync.edu', NULL, '$2y$10$YjDFkqM4Ap0nQguCXFhcAOcUmLbEiEVLxE18CItSQEiBolMyVTunK', NULL, NULL, 'Department of Information Technology/Computing; Department of Engineering Technology / Technical Programs', 'Regular Faculty', 0),
 ('Archie Arevalo', 'FA0143MN2016', 'archie.arevalo@pupsync.edu', 'archiearevalo@gmail.com', '$2y$10$uvhw5DCm0BaZaRQkO9nR2ezH.IsY7uXqGUqcWALfSpDf3eSobffcq', '2026-11-10 22:25:09', NULL, 'Department of General Education & Social Sciences', 'Regular Faculty', 0);
@@ -2859,13 +2964,13 @@ ALTER TABLE `tbl_accounts`
 -- AUTO_INCREMENT for table `tbl_admin_activity`
 --
 ALTER TABLE `tbl_admin_activity`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=199;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=246;
 
 --
 -- AUTO_INCREMENT for table `tbl_ai_chat_log`
 --
 ALTER TABLE `tbl_ai_chat_log`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=151;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=159;
 
 --
 -- AUTO_INCREMENT for table `tbl_arbitration_config`
@@ -2877,7 +2982,7 @@ ALTER TABLE `tbl_arbitration_config`
 -- AUTO_INCREMENT for table `tbl_arbitration_log`
 --
 ALTER TABLE `tbl_arbitration_log`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=85;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=92;
 
 --
 -- AUTO_INCREMENT for table `tbl_buildings`
@@ -2913,7 +3018,7 @@ ALTER TABLE `tbl_faculty_admin_notice`
 -- AUTO_INCREMENT for table `tbl_faculty_codes`
 --
 ALTER TABLE `tbl_faculty_codes`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=28;
 
 --
 -- AUTO_INCREMENT for table `tbl_faculty_item_codes`
@@ -2925,7 +3030,7 @@ ALTER TABLE `tbl_faculty_item_codes`
 -- AUTO_INCREMENT for table `tbl_faculty_notif_state`
 --
 ALTER TABLE `tbl_faculty_notif_state`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
 
 --
 -- AUTO_INCREMENT for table `tbl_faculty_registry`
@@ -2979,7 +3084,7 @@ ALTER TABLE `tbl_notif_state`
 -- AUTO_INCREMENT for table `tbl_requests`
 --
 ALTER TABLE `tbl_requests`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=79;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=86;
 
 --
 -- AUTO_INCREMENT for table `tbl_request_events`
@@ -3003,7 +3108,7 @@ ALTER TABLE `tbl_rooms_import_files`
 -- AUTO_INCREMENT for table `tbl_room_arbitration_log`
 --
 ALTER TABLE `tbl_room_arbitration_log`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=24;
 
 --
 -- AUTO_INCREMENT for table `tbl_room_issues`
@@ -3015,7 +3120,7 @@ ALTER TABLE `tbl_room_issues`
 -- AUTO_INCREMENT for table `tbl_room_reservations`
 --
 ALTER TABLE `tbl_room_reservations`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=24;
 
 --
 -- AUTO_INCREMENT for table `tbl_room_waitlist`
@@ -3033,7 +3138,7 @@ ALTER TABLE `tbl_service_survey_comments`
 -- AUTO_INCREMENT for table `tbl_service_survey_periods`
 --
 ALTER TABLE `tbl_service_survey_periods`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=229;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=263;
 
 --
 -- AUTO_INCREMENT for table `tbl_service_survey_questions`
