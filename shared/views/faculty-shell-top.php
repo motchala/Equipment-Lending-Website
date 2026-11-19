@@ -118,6 +118,7 @@ if (strpos($fac_cache_ctl, 'max-age=0') !== false && strpos($fac_cache_ctl, 'no-
 
     <link rel="stylesheet" href="dashboard/assets/css/faculty-dashboard.css?v=<?php echo @filemtime(PS_ROOT . '/dashboard/assets/css/faculty-dashboard.css'); ?>">
     <link rel="stylesheet" href="equipment-booking/assets/css/faculty-borrow-flow.css?v=<?php echo @filemtime(PS_ROOT . '/equipment-booking/assets/css/faculty-borrow-flow.css'); ?>">
+    <link rel="stylesheet" href="equipment-booking/assets/css/faculty-add-button.css?v=<?php echo @filemtime(PS_ROOT . '/equipment-booking/assets/css/faculty-add-button.css'); ?>">
 
     <!-- NOTE: faculty-code-card.css intentionally not loaded — it was a stale
          snapshot of this same stylesheet (predating several redesigns) that

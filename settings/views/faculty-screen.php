@@ -591,7 +591,7 @@
                                     <span class="material-symbols-outlined help-item-chevron">expand_more</span>
                                 </summary>
                                 <div class="help-item-a">
-                                    Your <strong>Dashboard</strong> shows your <strong>Student Access Code</strong>, and every equipment card has its own <strong>Item Code</strong> (open the small arrow on the card). A student opens the Student Portal, enters a code with their name, student ID and course, and then borrows equipment or reserves a facility.<br><br>Student borrows are approved right away and the student receives a Claim QR. Item codes work once, and a new one is created automatically. <strong>Generate New Code</strong> replaces your Student Access Code. Student room reservations count toward your limit of 2 active reservations.
+                                    Your <strong>Dashboard</strong> shows your <strong>Student Access Code</strong>. A student opens the Student Portal, enters a code with their name, student ID and course, and then borrows equipment or reserves a facility.<br><br>Student borrows are approved right away and the student receives a Claim QR. Item codes work once, and a new one is created automatically. <strong>Generate New Code</strong> replaces your Student Access Code. Student room reservations count toward your limit of 2 active reservations.
                                 </div>
                             </details>
 

@@ -5,13 +5,12 @@
      Home ─ pick a service   (a refresh keeps you on the same screen: see "KEEP THE SCREEN ON REFRESH")
        └─ Details ─ faculty code + name + course, in a pop-up (modal) over Home   (verify)
             ├─ Borrow, faculty code → photo grid → Continue → "Where and when" pop-up (room picker, date, time) → submit → receipt + QR
-            ├─ Borrow, item code    → item, qty / time, room picker → submit → receipt + QR
             └─ Facility             → building → floor → room  → reserve → result
 
    API contracts are unchanged:
-     equipment-booking/api/verify-faculty-code.php   verify-item-code.php
+     equipment-booking/api/verify-faculty-code.php
      equipment-booking/api/student-room-options.php
-     equipment-booking/api/submit-student-borrow.php submit-item-borrow.php
+     equipment-booking/api/submit-student-borrow.php
      room-reservation/api/verify-room-code.php       submit-student-reserve.php
 ================================================================ */
 (function () {
@@ -45,12 +44,10 @@
     var SNAP_KEY = 'pup_student_view';   /* sessionStorage: the screen + entries to bring back after a refresh */
     var URLS = {
         verifyFaculty: 'equipment-booking/api/verify-faculty-code.php',
-        verifyItem: 'equipment-booking/api/verify-item-code.php',
         verifyRoom: 'room-reservation/api/verify-room-code.php',
         studentRooms: 'equipment-booking/api/student-room-options.php',
         borrowRules: 'equipment-booking/api/borrow-rules.php',
         borrow: 'equipment-booking/api/submit-student-borrow.php',
-        itemBorrow: 'equipment-booking/api/submit-item-borrow.php',
         requestStatus: 'equipment-booking/api/student-request-status.php',
         reserve: 'room-reservation/api/submit-student-reserve.php',
         roomSchedule: 'room-reservation/api/student-room-schedule.php'
@@ -350,7 +347,7 @@
     function fresh() {
         return {
             service: null,      /* 'borrow' | 'facility'                          */
-            kind: null,         /* 'faculty' | 'item' | 'room' (what the code was) */
+            kind: null,         /* 'faculty' | 'room' (what the code was)           */
             verified: null,     /* verify response + the student's own details     */
             vKey: '',           /* identifies the inputs that produced `verified`  */
             inv: [],            /* equipment list (faculty-code borrow)            */
@@ -430,10 +427,8 @@
         var borrow = service === 'borrow';
         $('detailsTitle').textContent = borrow ? 'Borrow equipment' : 'Reserve a facility';
         $('detailsIcon').textContent = borrow ? 'inventory_2' : 'meeting_room';
-        $('codeLabel').textContent = borrow ? 'Faculty or item code' : 'Faculty code';
-        $('codeHint').textContent = borrow
-            ? 'Ask your faculty for their one-time code (faculty code or item code).'
-            : 'Ask your faculty for their one-time code.';
+        $('codeLabel').textContent = 'Faculty code';
+        $('codeHint').textContent = 'Ask your faculty for their one-time code.';
         $('stepChooseLabel').textContent = borrow ? 'Equipment' : 'Facility';
     }
 
@@ -449,16 +444,15 @@
         if (!name) return showAlert('detailsError', 'Please enter your name.');
         if (!course) return showAlert('detailsError', 'Please select your course.');
 
-        /* Code type: item codes are exactly 12 letters/digits (no hyphens); faculty codes are not.
-           Facilities only accept a faculty code. */
-        var kind = st.service === 'facility' ? 'room' : (/^[A-Za-z0-9]{12}$/.test(code) ? 'item' : 'faculty');
+        /* Facilities and equipment both take the faculty code (the facility one goes to its own check). */
+        var kind = st.service === 'facility' ? 'room' : 'faculty';
         var key = [kind, code, name, id, course].join('|');
 
         /* Coming back to this form and pressing Verify again with the same details re-uses the earlier
            result, so the faculty is not emailed a second "student is about to borrow" notice. */
         if (st.verified && st.vKey === key) { enterChoose(); return; }
 
-        var url = kind === 'room' ? URLS.verifyRoom : (kind === 'item' ? URLS.verifyItem : URLS.verifyFaculty);
+        var url = kind === 'room' ? URLS.verifyRoom : URLS.verifyFaculty;
         var btn = $('btnVerifyCode');
         setBusy(btn, true, 'Verifying…');
 
@@ -478,7 +472,6 @@
 
     function enterChoose() {
         if (st.kind === 'room') renderFacility();
-        else if (st.kind === 'item') renderItem();
         else renderBorrow();
     }
 
@@ -866,109 +859,6 @@
         st.verified = null; st.vKey = '';
         saveReceipt(receipt);
         showReceipt(receipt);
-    }
-
-    /* ══════════════════════════════════════════════════════════
-       BORROW — item code (one item, chosen by the faculty)
-    ══════════════════════════════════════════════════════════ */
-    function renderItem() {
-        nav = { screen: 'item' };
-        var v = st.verified;
-        var avail = toInt(v.quantity);
-        flow(
-            '<div class="st-pagehead st-narrow">' +
-            '<button type="button" class="st-link" data-action="back-details">' + icon('arrow_back') + 'Back</button>' +
-            '<h2 class="st-h2">Borrow equipment</h2>' +
-            '<p class="st-sub">Authorized by <strong>' + esc(v.faculty_name) + '</strong></p>' +
-            '</div>' +
-            '<form class="st-card st-narrow" id="itemForm" novalidate>' +
-            '<div class="st-item">' +
-            '<div class="st-eq-img">' + photo(v.image_path, v.item_name, 'inventory_2') + '</div>' +
-            '<div><p class="st-item-name">' + esc(v.item_name) + '</p>' +
-            '<p class="st-item-meta">' + esc(v.category || 'Equipment') + ' &middot; ' + avail + ' available</p>' +
-            '<p class="st-hint">Pre-selected by your faculty.</p></div></div>' +
-            '<div class="st-alert is-error" id="flowError" role="alert" hidden></div>' +
-            '<div class="st-field"><label for="itemQty">Quantity <span class="st-star">*</span></label>' +
-            '<input type="number" class="st-input" id="itemQty" min="1" max="' + avail + '" value="1" inputmode="numeric">' +
-            '<p class="st-hint">Maximum: ' + avail + '</p></div>' +
-            scheduleFields('item') +
-            '<div class="st-field"><label for="itemRoomPicker">Room / location <span class="st-star">*</span></label>' +
-            '<input type="hidden" id="itemRoomId"><input type="hidden" id="itemRoom">' +
-            '<button type="button" class="st-room-choice" id="itemRoomPicker" data-action="open-student-room-picker" data-target="item">' +
-            icon('location_on') + '<span id="itemRoomLabel">Choose a building and room</span>' + icon('expand_more') + '</button></div>' +
-            '<div class="st-actions">' +
-            '<button type="button" class="st-btn st-btn-ghost" data-action="back-details">Back</button>' +
-            '<button type="submit" class="st-btn st-btn-primary" id="btnSubmitItem">' + icon('send') + 'Submit request</button>' +
-            '</div>' + roomPickerHTML() + '</form>', 2);
-        refreshStudentSchedule('item');
-        syncStudentSchedule('item');
-    }
-
-    function submitItem() {
-        hideAlert('flowError');
-        var v = st.verified;
-        if (!v) return showAlert('flowError', 'Session expired. Please go back and verify again.');
-        var avail = toInt(v.quantity);
-        var qty = toInt($('itemQty').value, 0);
-        var borrow = $('itemDate').value;
-        var startTime = $('itemStartTime').value;
-        var duration = toInt($('itemDuration').value);
-        var room = $('itemRoom').value.trim();
-        var roomId = toInt($('itemRoomId').value);
-
-        if (!qty || qty < 1) return showAlert('flowError', 'Please enter a valid quantity.');
-        if (qty > avail) return showAlert('flowError', 'Quantity exceeds available stock (' + avail + ').');
-        if (!borrow || !startTime || !duration) return showAlert('flowError', 'Please choose a borrowing date, start time, and duration.');
-        if (!borrowDates().some(function (date) { return date.value === borrow; })) {
-            return showAlert('flowError', borrowAheadMsg());
-        }
-        var selectedDate = borrowDates().find(function (date) { return date.value === borrow; });
-        if (selectedDate && !selectedDate.available) {
-            return showAlert('flowError', isSunday(borrow)
-                ? 'Same-day borrowing is unavailable on Sundays. Choose a later date.'
-                : borrowClosedMsg());
-        }
-        if (!studentStartTimes(borrow, duration).includes(startTime)) {
-            return showAlert('flowError', 'Choose a start time that allows the selected borrowing duration.');
-        }
-        if (!roomId || !room) return showAlert('flowError', 'Please choose a building and room.');
-        var returnDate = scheduleReturn(borrow, startTime, duration);
-
-        var btn = $('btnSubmitItem');
-        setBusy(btn, true, 'Submitting…');
-        post(URLS.itemBorrow, {
-            code_db_id: v.code_db_id,
-            faculty_id: v.faculty_id,
-            faculty_name: v.faculty_name,
-            student_name: v.student_name,
-            student_id: v.student_id,
-            item_name: v.item_name,
-            item_id: v.item_id,
-            quantity: qty,
-            room_id: roomId,
-            booking_mode: scheduleMode(borrow),
-            borrow_date: borrow,
-            start_time: startTime,
-            duration: duration
-        }).then(function (d) {
-            if (!d.error && d.status === 'Declined') d = { error: d.reason || 'This request could not be accepted.' };
-            if (d.error) { setBusy(btn, false); return showAlert('flowError', d.error); }
-            var receipt = {
-                kind: 'borrow',
-                student_name: v.student_name, student_id: v.student_id, faculty_name: v.faculty_name,
-                room: room, borrow_date: borrow, return_date: returnDate,
-                requested_at: nowStamp(),
-                items: [{
-                    equipment: v.item_name, qty: qty, request_id: d.request_id,
-                    status: d.status || 'Waiting', reason: d.reason || '',
-                    claim_token: d.claim_token || '', return_token: d.return_token || '',
-                    status_key: d.status_key || ''
-                }]
-            };
-            st.verified = null; st.vKey = '';
-            saveReceipt(receipt);
-            showReceipt(receipt);
-        });
     }
 
     /* ══════════════════════════════════════════════════════════
@@ -2098,11 +1988,6 @@
                     restoreSchedule('borrow', f);
                     if (st.where) lockWhere(true);
                     if (n.modal) openBorrowModal();
-                } else if (n.screen === 'item') {
-                    renderItem();
-                    if ($('itemQty') && f.itemQty) $('itemQty').value = f.itemQty;
-                    restoreRoom('item', f);
-                    restoreSchedule('item', f);
                 } else if (n.screen === 'buildings') {
                     rebuildFacility();
                     renderBuildings();
@@ -2271,8 +2156,6 @@
             syncStudentSchedule('borrow');
         } else if (t.id === 'borrowStartTime' || t.id === 'borrowDuration') {
             syncStudentSchedule('borrow');
-        } else if (t.id === 'itemDate' || t.id === 'itemStartTime' || t.id === 'itemDuration') {
-            syncStudentSchedule('item');
         } else if (t.id === 'reserveDate' || t.id === 'reserveStart' || t.id === 'reserveDuration' || t.id === 'reserveEnd') {
             resOnChange(t);
         } else if (t.type === 'file') {
@@ -2284,7 +2167,6 @@
         var f = e.target;
         if (!f || !f.id) return;
         if (f.id === 'borrowForm') { e.preventDefault(); submitBorrow(); }
-        else if (f.id === 'itemForm') { e.preventDefault(); submitItem(); }
         else if (f.id === 'reserveForm') { e.preventDefault(); submitReserve(); }
     }
 
@@ -2337,7 +2219,6 @@
         document.addEventListener('keydown', onKeyDown);
         window.setInterval(function () {
             syncStudentSchedule('borrow');
-            syncStudentSchedule('item');
         }, 30000);
 
         /* A photo that fails to load removes itself; the placeholder icon underneath shows instead.

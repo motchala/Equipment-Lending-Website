@@ -149,7 +149,7 @@ $st_semester = ps_semester_label();
             <div class="st-alert is-error" id="detailsError" role="alert" hidden></div>
 
             <div class="st-field">
-                <label for="facultyCode" id="codeLabel">Faculty or item code</label>
+                <label for="facultyCode" id="codeLabel">Faculty code</label>
                 <div class="st-input-icon">
                     <span class="material-symbols-outlined" aria-hidden="true">key</span>
                     <input type="text" id="facultyCode" class="st-input st-mono" placeholder="Enter code"
