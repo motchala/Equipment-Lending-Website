@@ -8,9 +8,11 @@
  * (position: fixed breaks inside main#appMain).
  *
  * The dialog starts hidden. service-survey/assets/js/faculty-survey.js asks
- * service-survey/api/survey-status.php whether a completed transaction is waiting to be rated. The
- * transaction is claimed once before the questions are filled in and the dialog opens, so refreshing the
- * page cannot show the same transaction again. Nothing is rendered for the questions here, so a survey the
+ * service-survey/api/survey-status.php whether one of the FACULTY'S OWN completed transactions (not a
+ * student's, even one made with the faculty's code) is waiting to be rated. The dialog cannot be skipped:
+ * no Skip / X button, Esc and clicks outside do nothing, and a refresh brings it back a couple of seconds
+ * after the page loads until it is answered. Only a submitted answer uses the transaction up, so each
+ * transaction is surveyed exactly once. Nothing is rendered for the questions here, so a survey the
  * Super Admin has switched off or edited never needs a page change.
  *
  * Styles: service-survey/assets/css/faculty-survey.css  (all classes are svy-*)
