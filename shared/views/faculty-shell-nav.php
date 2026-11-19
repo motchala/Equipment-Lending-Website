@@ -45,22 +45,22 @@
         <div class="side-nav-links">
             <div class="side-nav-section" role="group" aria-labelledby="fnavg-overview">
                 <span class="side-nav-section-title" id="fnavg-overview">Overview</span>
-                <a class="side-nav-item active" id="nav-home" data-tab="home" href="#">
+                <a class="side-nav-item<?php echo ($fac_boot_tab ?? 'home') === 'home' ? ' active' : ''; ?>" id="nav-home" data-tab="home" href="#">
                     <span class="material-symbols-outlined">dashboard</span>
                     <span>Dashboard</span>
                 </a>
-                <a class="side-nav-item" id="nav-activity" data-tab="activity" href="#">
+                <a class="side-nav-item<?php echo ($fac_boot_tab ?? 'home') === 'activity' ? ' active' : ''; ?>" id="nav-activity" data-tab="activity" href="#">
                     <span class="material-symbols-outlined">history</span>
                     <span>My Activity</span>
                 </a>
             </div>
             <div class="side-nav-section" role="group" aria-labelledby="fnavg-operations">
                 <span class="side-nav-section-title" id="fnavg-operations">Operations</span>
-                <a class="side-nav-item" id="nav-lending" data-tab="lending" href="#">
+                <a class="side-nav-item<?php echo ($fac_boot_tab ?? 'home') === 'lending' ? ' active' : ''; ?>" id="nav-lending" data-tab="lending" href="#">
                     <span class="material-symbols-outlined">inventory_2</span>
                     <span>Equipment</span>
                 </a>
-                <a class="side-nav-item" id="nav-rooms" data-tab="rooms" href="#">
+                <a class="side-nav-item<?php echo ($fac_boot_tab ?? 'home') === 'rooms' ? ' active' : ''; ?>" id="nav-rooms" data-tab="rooms" href="#">
                     <span class="material-symbols-outlined">meeting_room</span>
                     <span>Facilities</span>
                 </a>
@@ -76,7 +76,7 @@
             </div>
             <!-- Settings: just under the divider line, directly above Log Out (opens the Settings overlay,
                  same as the Dashboard avatar). #nav-settings is what _openOverlayDOM() highlights. -->
-            <a class="side-nav-item" id="nav-settings" href="#" data-action="open-overlay" data-target="settingsOverlay">
+            <a class="side-nav-item<?php echo ($fac_boot_tab ?? 'home') === 'settings' ? ' active' : ''; ?>" id="nav-settings" href="#" data-action="open-overlay" data-target="settingsOverlay">
                 <span class="material-symbols-outlined">settings</span>
                 <span>Settings</span>
             </a>

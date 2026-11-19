@@ -49,7 +49,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             <!-- ============================================================
          TAB: FACILITIES (ROOMS)
     ============================================================ -->
-            <div class="tab-panel" id="panel-rooms">
+            <div class="tab-panel<?php echo ($fac_boot_tab ?? 'home') === 'rooms' ? ' active' : ''; ?>" id="panel-rooms">
 
 
                 <!-- ── Sub: Browse Facilities ─────────────────────────────── -->
@@ -77,6 +77,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
 <?php require __DIR__ . '/shared/views/faculty-shell-overlays.php'; ?>
 <?php require __DIR__ . '/shared/views/push-permission-modal.php'; ?>
 <?php require __DIR__ . '/service-survey/views/faculty-modal.php'; /* anonymous service survey pop-up */ ?>
+<?php require __DIR__ . '/shared/views/faculty-shell-bottom.php'; ?>
 <?php require __DIR__ . '/shared/views/faculty-shell-scripts.php'; ?>
 </body>
 

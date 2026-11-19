@@ -304,7 +304,7 @@
                                 <div class="hc-faq-a">
                                     Go to <strong>Equipment → Loans → Waiting</strong>, then click <strong>Approve</strong> or <strong>Decline</strong>. Both ask for a short note (at least 5 characters). When a faculty member requested several items at once, <strong>Approve all</strong> approves the whole bundle and gives them one Claim QR. Faculty see the result in their Notifications and My Activity.<br><br>
                                     A <strong>same-day</strong> request for a single item is decided by the system straight away, based on availability and the borrowing rules, so nothing waits for you. <strong>Later-date</strong> requests, and <strong>Borrow All</strong> requests for several items, wait here. If the faculty attached a request letter (recommended, not required), open it from the document chip before deciding. A request nobody decides before its borrow date has passed is declined automatically.<br><br>
-                                    Students who borrow with a faculty code or item code do not need approval. Those loans go straight to <strong>Pickup</strong>.
+                                    Students who borrow with a faculty code do not need approval. Those loans go straight to <strong>Pickup</strong>.
                                 </div>
                             </details>
 

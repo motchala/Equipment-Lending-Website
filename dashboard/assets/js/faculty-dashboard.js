@@ -197,9 +197,25 @@
     /* ── Browser Back/Forward Navigation ───────────────────────────────── */
     // We use a lightweight pushState approach: each tab switch or overlay open
     // pushes a state object onto the history stack. popstate restores the UI.
-    // Reload always lands on Home because initPage() calls replaceState with
-    // the home state and never reads the hash back on load.
+    // A soft refresh (F5) keeps the screen you are on: the head script in faculty-shell-top.php works out
+    // which screen that is (window._facRestoreTab) and initPage() puts it back. A hard refresh
+    // (Ctrl+Shift+R / Ctrl+F5) starts on the Dashboard.
     let _navSuppressed = false;
+
+    /* Remember the screen you are on, for a soft refresh. sessionStorage is the backup for the #tab- part of the URL,
+       and the cookie lets the server print this screen as the active one from the very first byte (see the top of
+       faculty-shell-top.php), so the Dashboard never shows for a split second. */
+    function _rememberScreen(name) {
+        try { sessionStorage.setItem('facultyCurrentTab', name); } catch (_) { }
+        try {
+            document.cookie = 'ps_fac_tab=' + name + '; path=/; SameSite=Lax' + (location.protocol === 'https:' ? '; Secure' : '');
+        } catch (_) { }
+    }
+
+    /* A real tab change ends the "restored screen" state, so the new screen slides in as usual. */
+    function _endRestoredState() {
+        document.documentElement.classList.remove('fac-restored');
+    }
 
     function _pushNav(state) {
         if (_navSuppressed) return;
@@ -250,6 +266,7 @@
         const el = document.getElementById(id);
         if (!el) return;
         el.classList.add('active');
+        if (id === 'settingsOverlay') _rememberScreen('settings');
         document.querySelectorAll('.overlay-page.active').forEach(o => {
             if (o !== el) o.classList.remove('active');
         });
@@ -267,6 +284,7 @@
     }
 
     function openOverlay(id) {
+        _endRestoredState();
         _pushNav({
             type: 'overlay',
             value: id
@@ -289,6 +307,7 @@
         document.querySelectorAll('.side-nav-item').forEach(b => b.classList.remove('active'));
         // Restore the active state to the current tab
         const activePanel = document.querySelector('.tab-panel.active');
+        _rememberScreen(activePanel ? activePanel.id.replace('panel-', '') : 'home');
         if (activePanel) {
             const tabName = activePanel.id.replace('panel-', '');
             const tabNavItem = document.querySelector('.side-nav-item[data-tab="' + tabName + '"]');
@@ -301,6 +320,7 @@
     function _switchTabDOM(tabName) {
         const panel = document.getElementById('panel-' + tabName);
         if (panel) panel.classList.add('active');
+        if (panel) _rememberScreen(tabName);
         // Legacy nav-tab support (kept for compatibility)
         document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
         const btn = document.querySelector('.nav-tab[data-tab="' + tabName + '"]');
@@ -395,6 +415,7 @@
     }
 
     function switchTab(tabName, sub) {
+        _endRestoredState();
         _pushNav({
             type: 'tab',
             value: tabName,
@@ -2699,6 +2720,23 @@
         });
     });
 
+    /* ── Screen restore after a soft refresh ───────────────────────────── */
+    function _restoreScreenAfterRefresh(tab) {
+        if (!tab || tab === 'home') return;
+        const url = window.location.pathname + window.location.search;
+        _navSuppressed = true;
+        if (tab === 'settings') {
+            _switchTabDOM('home');
+            _openOverlayDOM('settingsOverlay');
+            window.history.replaceState({ type: 'overlay', value: 'settingsOverlay' }, '', url + '#overlay-settingsOverlay');
+        } else {
+            _switchTabDOM(tab);
+            if (tab === 'lending') switchLendingSub('browse');
+            window.history.replaceState({ type: 'tab', value: tab, sub: tab === 'lending' ? 'browse' : null }, '', url + '#tab-' + tab);
+        }
+        _navSuppressed = false;
+    }
+
     /* ── Page Init ────────────────────────────────────────────────────── */
     function initPage() {
         // Restore settings, account edits, and notification state from localStorage
@@ -2706,7 +2744,10 @@
         restorePersistedState();
 
         // Ensure no overlay is visible by default on initial page load
-        document.querySelectorAll('.overlay-page.active').forEach(o => o.classList.remove('active'));
+        // (except Settings after a refresh: it is the screen you were on, already painted as active)
+        if (window._facRestoreTab !== 'settings') {
+            document.querySelectorAll('.overlay-page.active').forEach(o => o.classList.remove('active'));
+        }
 
         // URL slug
         // USER_SLUG is injected by PHP into window.USER_SLUG via the inline <script>
@@ -2742,6 +2783,10 @@
                 if (sa) sa.style.display = 'none';
             }, 5000);
         }
+        // Soft refresh: come back to the screen you were on (the HTML already shows it; this brings the
+        // JavaScript state in line, e.g. the Facilities data, the AI button and the browser history entry).
+        _restoreScreenAfterRefresh(window._facRestoreTab);
+
         checkOverdueState();
         const overdueToastEl = document.getElementById('overdue-alert');
         if (overdueToastEl && overdueToastEl.dataset.shouldShow === '1') showOverdueToast();
@@ -3357,13 +3402,13 @@
             waiting: data.filter(r => r.status === 'Waiting').length,
             total: data.length,
         };
-        // .fdb-kpi-item = the Dashboard key-figure items (combined card); .stat-tile = the older tiles (kept working)
-        document.querySelectorAll('.fdb-kpi-item[data-stat], .stat-tile[data-stat]').forEach(tile => {
+        // .fdb-kpi = the Dashboard key-figure cards; .stat-tile = the older tiles (kept working)
+        document.querySelectorAll('.fdb-kpi[data-stat], .stat-tile[data-stat]').forEach(tile => {
             const key = tile.dataset.stat;
             if (!(key in counts)) return;
             const val = tile.querySelector('.fdb-kpi-val, .stat-tile-value');
             if (val && val.textContent.trim() !== String(counts[key])) val.textContent = counts[key];
-            // Ready for pickup item: amber tone when there are items waiting, neutral when none
+            // Ready for pickup card: amber tone when there are items waiting, neutral when none
             if (key === 'approved') {
                 tile.className = tile.className.replace(/fdb-tone-\w+/, counts[key] > 0 ? 'fdb-tone-warn' : 'fdb-tone-ok');
             }
@@ -5323,215 +5368,4 @@
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startMyActivity);
     else startMyActivity();
-})();
-
-/* ================================================================
-   ITEM CODE — chevron reveal, copy, regenerate
-   Self-contained IIFE. No changes to any existing code above.
-================================================================ */
-(function () {
-    'use strict';
-
-    // The faculty pages carry the token in <meta name="csrf-token"> (faculty-shell-top.php). The hidden
-    // csrf_token <input> that this used to read only exists on admin screens, so the code request was sent
-    // with an empty token and rejected (403 "Invalid or expired session").
-    var CSRF = function () {
-        var meta = document.querySelector('meta[name="csrf-token"]');
-        if (meta && meta.content) return meta.content;
-        var el = document.querySelector('input[name="csrf_token"]');
-        return el ? el.value : '';
-    };
-
-    // Per-panel state: { loaded, code, revealed }
-    var _state = {};
-
-    function getPanel(itemId) {
-        return document.getElementById('eq-ic-panel-' + itemId);
-    }
-
-    function setState(itemId, patch) {
-        _state[itemId] = Object.assign(_state[itemId] || {}, patch);
-    }
-
-    function getState(itemId) {
-        return _state[itemId] || {};
-    }
-
-    function showLoading(panel) {
-        panel.querySelector('.eq-ic-loading').style.display = '';
-        panel.querySelector('.eq-ic-content').style.display = 'none';
-        panel.querySelector('.eq-ic-error').style.display = 'none';
-    }
-
-    function showContent(panel, code, isUsed, revealed) {
-        panel.querySelector('.eq-ic-loading').style.display = 'none';
-        panel.querySelector('.eq-ic-content').style.display = '';
-        panel.querySelector('.eq-ic-error').style.display = 'none';
-        var codeEl = panel.querySelector('.eq-ic-code');
-        codeEl.textContent = revealed ? code : '••••••••••••';
-        codeEl.dataset.code = code;
-        var revealBtn = panel.querySelector('.eq-ic-reveal-btn');
-        var revealIcon = revealBtn.querySelector('.material-symbols-outlined');
-        revealIcon.textContent = revealed ? 'visibility_off' : 'visibility';
-        var usedNotice = panel.querySelector('.eq-ic-used-notice');
-        if (usedNotice) usedNotice.style.display = isUsed ? '' : 'none';
-    }
-
-    function showError(panel, msg) {
-        panel.querySelector('.eq-ic-loading').style.display = 'none';
-        panel.querySelector('.eq-ic-content').style.display = 'none';
-        var errEl = panel.querySelector('.eq-ic-error');
-        errEl.textContent = msg;
-        errEl.style.display = '';
-    }
-
-    /* The code panel floats over its card (see faculty-dashboard.css). Only one is open at a time, and it
-       closes when you click anywhere else or press Esc. */
-    function closeCodePanel(card) {
-        var p = card.querySelector('.eq-ic-panel');
-        if (p) p.style.display = 'none';
-        var b = card.querySelector('[data-action="toggle-item-code"]');
-        if (b) {
-            b.setAttribute('aria-expanded', 'false');
-            var ch = b.querySelector('.eq-ic-chevron');
-            if (ch) ch.style.transform = '';
-        }
-        card.classList.remove('eq-ic-open');
-    }
-
-    function closeAllCodePanels(exceptCard) {
-        document.querySelectorAll('.eq-item-card.eq-ic-open').forEach(function (c) {
-            if (c !== exceptCard) closeCodePanel(c);
-        });
-    }
-
-    document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') closeAllCodePanels(null);
-    });
-
-    function loadCode(itemId, panel) {
-        showLoading(panel);
-        var body = new URLSearchParams({ csrf_token: CSRF(), item_id: itemId });
-        fetch('equipment-booking/api/get-item-code.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: body.toString()
-        })
-            .then(function (r) { return r.json(); })
-            .then(function (data) {
-                if (data.status !== 'success') {
-                    showError(panel, data.error || 'Could not load code.');
-                    return;
-                }
-                setState(itemId, { loaded: true, code: data.code, isUsed: data.is_used, revealed: false });
-                showContent(panel, data.code, data.is_used, false);
-            })
-            .catch(function () {
-                showError(panel, 'Network error. Please try again.');
-            });
-    }
-
-    document.addEventListener('click', function (e) {
-        // Click anywhere outside the code layer closes it
-        if (!e.target.closest('.eq-ic-panel, [data-action="toggle-item-code"]')) closeAllCodePanels(null);
-        // ── Toggle chevron ──────────────────────────────────────────
-        var toggleBtn = e.target.closest('[data-action="toggle-item-code"]');
-        if (toggleBtn && !toggleBtn.disabled) {
-            var itemId = toggleBtn.dataset.itemId;
-            var panel = getPanel(itemId);
-            if (!panel) return;
-
-            var card = toggleBtn.closest('.eq-item-card');
-            var isOpen = panel.style.display !== 'none';
-            if (isOpen) {
-                panel.style.display = 'none';
-                toggleBtn.setAttribute('aria-expanded', 'false');
-                toggleBtn.querySelector('.eq-ic-chevron').style.transform = '';
-                if (card) card.classList.remove('eq-ic-open');
-            } else {
-                closeAllCodePanels(card);
-                if (card) card.classList.add('eq-ic-open');
-                panel.style.display = '';
-                toggleBtn.setAttribute('aria-expanded', 'true');
-                toggleBtn.querySelector('.eq-ic-chevron').style.transform = 'rotate(180deg)';
-                // Load code on first open, or if not loaded yet
-                if (!getState(itemId).loaded) {
-                    loadCode(itemId, panel);
-                } else {
-                    var s = getState(itemId);
-                    showContent(panel, s.code, s.isUsed, s.revealed);
-                }
-            }
-            return;
-        }
-
-        // ── Reveal / hide code ──────────────────────────────────────
-        var revealBtn = e.target.closest('[data-action="reveal-item-code"]');
-        if (revealBtn) {
-            var panel = revealBtn.closest('.eq-ic-panel');
-            if (!panel) return;
-            var itemId = panel.id.replace('eq-ic-panel-', '');
-            var s = getState(itemId);
-            if (!s.code) return;
-            s.revealed = !s.revealed;
-            setState(itemId, { revealed: s.revealed });
-            showContent(panel, s.code, s.isUsed, s.revealed);
-            return;
-        }
-
-        // ── Copy code ───────────────────────────────────────────────
-        var copyBtn = e.target.closest('[data-action="copy-item-code"]');
-        if (copyBtn) {
-            var panel = copyBtn.closest('.eq-ic-panel');
-            if (!panel) return;
-            var itemId = panel.id.replace('eq-ic-panel-', '');
-            var code = getState(itemId).code;
-            if (!code) return;
-            navigator.clipboard.writeText(code).then(function () {
-                var icon = copyBtn.querySelector('.material-symbols-outlined');
-                icon.textContent = 'check';
-                setTimeout(function () { icon.textContent = 'content_copy'; }, 1500);
-            }).catch(function () {
-                // Fallback for older browsers
-                var ta = document.createElement('textarea');
-                ta.value = code;
-                ta.style.position = 'fixed';
-                ta.style.opacity = '0';
-                document.body.appendChild(ta);
-                ta.select();
-                document.execCommand('copy');
-                document.body.removeChild(ta);
-            });
-            return;
-        }
-
-        // ── Regenerate code ─────────────────────────────────────────
-        var regenBtn = e.target.closest('[data-action="regen-item-code"]');
-        if (regenBtn) {
-            if (!confirm('This will invalidate the current code. Any student who has it can no longer use it. Generate a new code?')) return;
-            var itemId = regenBtn.dataset.itemId;
-            var panel = getPanel(itemId);
-            if (!panel) return;
-            showLoading(panel);
-
-            var body = new URLSearchParams({ csrf_token: CSRF(), item_id: itemId });
-            fetch('equipment-booking/api/regenerate-item-code.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: body.toString()
-            })
-                .then(function (r) { return r.json(); })
-                .then(function (data) {
-                    if (data.status !== 'success') {
-                        showError(panel, data.error || 'Could not regenerate code.');
-                        return;
-                    }
-                    setState(itemId, { loaded: true, code: data.code, isUsed: false, revealed: true });
-                    showContent(panel, data.code, false, true);
-                })
-                .catch(function () {
-                    showError(panel, 'Network error. Please try again.');
-                });
-        }
-    });
 })();

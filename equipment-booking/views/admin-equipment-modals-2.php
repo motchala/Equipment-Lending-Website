@@ -142,6 +142,10 @@
                     <div class="ps-detail-label">Authorized by faculty</div>
                     <div class="ps-detail-value" id="detail-authorizer">—</div>
                 </div>
+                <div class="ps-detail-item" id="detail-pickup-item" hidden>
+                    <div class="ps-detail-label">Pick-up by (student)</div>
+                    <div class="ps-detail-value" id="detail-pickup">—</div>
+                </div>
                 <div class="ps-detail-item">
                     <div class="ps-detail-label">Facility</div>
                     <div class="ps-detail-value" id="detail-room" style="font-size:12px">—</div>

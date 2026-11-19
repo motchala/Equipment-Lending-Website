@@ -173,7 +173,7 @@
             if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
         });
         // red dot on Activity when something is overdue
-        var od = $('.fdb-kpi-item.fdb-tone-danger .fdb-kpi-val');
+        var od = $('.fdb-kpi.fdb-tone-danger .fdb-kpi-val');
         var n = od ? parseInt(od.textContent, 10) || 0 : 0;
         var dot = $('.rxm-tab[data-rxm-tab="activity"] .rxm-tab-dot', tabbar);
         if (dot) dot.hidden = n <= 0;
@@ -499,6 +499,8 @@
     function init() {
         buildBar(); buildTabbar(); buildSheet(); buildOverlayBars();
         buildCategoryChips(); buildFloorPicker(); buildPullToRefresh();
+        // highlight the current screen right away (not on the next frame), so the bar never appears without it
+        syncBar(); syncTabbar();
         refresh();
 
         if (window.MutationObserver) {
