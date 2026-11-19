@@ -414,6 +414,10 @@ admin_log_activity(
     ['action' => $new_status === 'Approved' ? 'request_approved' : 'request_declined', 'ref_type' => 'request', 'ref_id' => $request_id]
 );
 
+// Approval receipt: the faculty is notified now that the decision is saved (does nothing for a decline).
+require_once __DIR__ . '/../../notifications/core/approval-receipts.php';
+ps_receipts_sweep($conn);
+
 $conn->close();
 
 // ── Task 7.7: Return success response ────────────────────────────────────────

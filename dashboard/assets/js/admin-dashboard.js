@@ -4921,6 +4921,55 @@
         let scanning = false;
         let scannedCount = 0;
 
+        /* ---- Camera helpers (used by startScanner() and resumeCamera()) ----
+           Ask for a 1280x720 picture. It is averaged down to 640 wide before decoding, which smooths out sensor
+           noise: a default 640x480 stream reads the long Return/Claim QR far less reliably. Falls back to any camera. */
+        function requestCamera() {
+            return navigator.mediaDevices.getUserMedia({
+                video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+                audio: false
+            }).catch(function (err) {
+                if (err && (err.name === 'OverconstrainedError' || err.name === 'NotFoundError')) {
+                    return navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                }
+                throw err;
+            });
+        }
+
+        /* iPhones / Safari only play a camera stream inline when the video is muted + playsinline */
+        function playVideo() {
+            video.muted = true;
+            video.setAttribute('playsinline', '');
+            const p = video.play();
+            if (p && p.catch) p.catch(function (e) { console.warn('Video play blocked:', e); });
+        }
+
+        function cameraErrorText(err) {
+            const n = err && err.name;
+            if (n === 'NotAllowedError' || n === 'SecurityError') return '❌ Camera access denied. Please allow camera permission.';
+            if (n === 'NotFoundError') return '❌ No camera found on this device.';
+            if (n === 'NotReadableError') return '❌ The camera is in use by another app. Close it and try again.';
+            return '❌ Could not start the camera.';
+        }
+
+        /* Native QR reader (Chrome / Android, Samsung Internet ...). Far better than jsQR with blur and glare.
+           Where the browser has none this stays idle and jsQR does all the work, exactly as before. */
+        let nativeDetector = null, nativeBusy = false, nativeHit = null;
+        if ('BarcodeDetector' in window) {
+            try { nativeDetector = new window.BarcodeDetector({ formats: ['qr_code'] }); } catch (e) { nativeDetector = null; }
+        }
+        function runNativeDetect() {
+            if (!nativeDetector || nativeBusy) return;
+            nativeBusy = true;
+            nativeDetector.detect(video).then(function (found) {
+                if (found && found.length && found[0].rawValue) nativeHit = { data: found[0].rawValue, at: Date.now() };
+            }).catch(function () { }).then(function () { nativeBusy = false; });
+        }
+        function takeNativeHit() {
+            const h = nativeHit; nativeHit = null;
+            return (h && Date.now() - h.at < 700) ? { data: h.data } : null;   // ignore a stale sighting
+        }
+
         function stopScanner() {
             scanning = false;
             if (animFrame) cancelAnimationFrame(animFrame);
@@ -4953,19 +5002,19 @@
                 status.style.color = '#e53e3e';
                 return;
             }
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+            requestCamera()
                 .then(s => {
                     if (modal.style.display === 'none') { s.getTracks().forEach(t => t.stop()); return; }   // closed meanwhile
                     stream = s;
                     video.srcObject = s;
-                    video.play();
+                    playVideo();
                     scanning = true;
                     status.textContent = 'Point camera at the next QR code.';
                     status.style.color = '#888';
                     tick();
                 })
                 .catch(err => {
-                    status.textContent = '❌ Camera access denied. Please allow camera permission.';
+                    status.textContent = cameraErrorText(err);
                     status.style.color = '#e53e3e';
                     console.warn('Camera error:', err);
                 });
@@ -5008,9 +5057,12 @@
                     canvas.height = h;
                 }
 
+                ctx.imageSmoothingQuality = 'high';
                 ctx.drawImage(video, 0, 0, w, h);
                 const imageData = ctx.getImageData(0, 0, w, h);
-                const code = window.jsQR(imageData.data, w, h, { inversionAttempts: 'attemptBoth' });
+                let code = window.jsQR(imageData.data, w, h, { inversionAttempts: 'attemptBoth' });
+                if (!code) code = takeNativeHit();   // native reader's sighting from the previous frame, if any
+                runNativeDetect();
                 if (code) {
                     scanning = false;
                     status.textContent = '✅ QR detected — processing...';
@@ -5370,6 +5422,12 @@
                                             method: 'POST', credentials: 'same-origin', body: formData
                                         }).then(function (r) { return r.json(); })
                                             .then(function (result) {
+                                                if (!result || result.success === false) {
+                                                    showToast('❌ ' + ((result && (result.error || result.message)) || 'Could not save the return.'));
+                                                    confirmBtn.disabled = false;
+                                                    confirmBtn.textContent = 'Confirm';
+                                                    return;
+                                                }
                                                 const n = result.returned || 0;
                                                 showToast('✅ ' + n + ' item' + (n === 1 ? '' : 's') + ' marked as returned.');
                                                 const stillOut = Math.max(0, rowsTotal - n);
@@ -5443,8 +5501,10 @@
                             }
                     }
 
-                    function onScanFail() {
-                            status.textContent = '❌ Network error. Please try again.';
+                    function onScanFail(err) {
+                            status.textContent = (err && err.message === 'session')
+                                ? '❌ Your session expired. Refresh the page and sign in again.'
+                                : '❌ Network error. Please try again.';
                             status.style.color = '#e53e3e';
                             setTimeout(() => {
                                 status.textContent = 'Point camera at a valid QR code.';
@@ -5455,7 +5515,7 @@
                     }
 
                     fetch(endpoint, scanFetchOpts)
-                        .then(r => r.json())
+                        .then(r => { if (r.redirected) throw new Error('session'); return r.json(); })
                         .then(d => handleScanData(d, false))
                         .catch(onScanFail);
                     return;
@@ -5489,19 +5549,17 @@
                     status.style.color = '#e53e3e';
                     return;
                 }
-                navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'environment' } // rear cam on phone, webcam on laptop
-                })
+                requestCamera()   // rear cam on phone, webcam on laptop
                     .then(s => {
                         stream = s;
                         video.srcObject = s;
-                        video.play();
+                        playVideo();
                         scanning = true;
                         status.textContent = 'Point camera at the QR code.';
                         tick();
                     })
                     .catch(err => {
-                        status.textContent = '❌ Camera access denied. Please allow camera permission.';
+                        status.textContent = cameraErrorText(err);
                         status.style.color = '#e53e3e';
                         console.warn('Camera error:', err);
                     });
