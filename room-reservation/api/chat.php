@@ -1,5 +1,9 @@
 <?php
 declare(strict_types=1);
+ini_set('display_errors', '0');
+ini_set('display_startup_errors', '0');
+ini_set('log_errors', '1');
+error_reporting(E_ALL);
 
 /**
  * room-reservation/api/chat.php
@@ -710,28 +714,31 @@ $groq_request_body = json_encode([
     'temperature' => 0.7,
 ]);
 
-$ch = curl_init($groq_url);
-curl_setopt_array($ch, [
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_POST           => true,
-    CURLOPT_POSTFIELDS     => $groq_request_body,
-    CURLOPT_HTTPHEADER     => [
-        'Content-Type: application/json',
-        'Authorization: Bearer ' . $groq_key,
+$groq_context = stream_context_create([
+    'http' => [
+        'method'        => 'POST',
+        'header'        => "Content-Type: application/json\r\nAuthorization: Bearer " . $groq_key,
+        'content'       => $groq_request_body,
+        'timeout'       => 15,
+        'ignore_errors' => true,
     ],
-    CURLOPT_TIMEOUT        => 15,
-    CURLOPT_CONNECTTIMEOUT => 8,
-    CURLOPT_SSL_VERIFYPEER => true,
-    CURLOPT_SSL_VERIFYHOST => 2,
 ]);
 
-$response   = curl_exec($ch);
-$curl_error = curl_error($ch);
-$http_status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-curl_close($ch);
+$response    = @file_get_contents($groq_url, false, $groq_context);
+$curl_error  = ($response === false) ? 'file_get_contents failed' : '';
+$http_status = 0;
+
+if (isset($http_response_header) && is_array($http_response_header)) {
+    foreach ($http_response_header as $h) {
+        if (preg_match('#^HTTP/\S+\s+(\d+)#', $h, $m)) {
+            $http_status = (int)$m[1];
+            break;
+        }
+    }
+}
 
 if ($http_status !== 200) {
-    error_log('[PUPSync AI] Groq request failed. Status: ' . $http_status . ($curl_error ? ' cURL: ' . $curl_error : ''));
+    error_log('[PUPSync AI] Groq request failed. Status: ' . $http_status);
 }
 
 // ── 16. Error handling ────────────────────────────────────────────────────────

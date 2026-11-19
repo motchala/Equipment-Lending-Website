@@ -380,9 +380,13 @@
             // Refresh the rate-limit counter from the server every time the
             // Rooms tab becomes active — covers hard resets, tab switches, and
             // FAB opens, so the displayed count is always accurate.
-            fetch('room-reservation/api/chat-quota.php')
-                .then(function (r) { return r.json(); })
+            fetch('room-reservation/api/chat-quota.php', { credentials: 'same-origin' })
+                .then(function (r) {
+                    if (!r.headers.get('content-type') || !r.headers.get('content-type').includes('application/json')) return null;
+                    return r.json();
+                })
                 .then(function (d) {
+                    if (!d) return;
                     if (typeof d.remaining === 'number') {
                         var el = document.getElementById('actAiCounter');
                         var bar = document.getElementById('actAiCounterBar');
@@ -4461,8 +4465,15 @@
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ message: msg, csrf_token: csrfToken }),
+            credentials: 'same-origin',
         })
-            .then(function (r) { return r.json(); })
+            .then(function (r) {
+                if (r.status === 403 || r.headers.get('content-type') === null ||
+                    !r.headers.get('content-type').includes('application/json')) {
+                    throw new Error('session_expired');
+                }
+                return r.json();
+            })
             .then(function (data) {
                 typing.remove();
 
@@ -4522,9 +4533,13 @@
 
                 setSending(false);
             })
-            .catch(function () {
+            .catch(function (e) {
                 typing.remove();
-                appendAiBubble(body, 'Network error. Please check your connection and try again.');
+                if (e && e.message === 'session_expired') {
+                    appendAiBubble(body, 'Your session has expired. Please refresh the page (F5) and try again.');
+                } else {
+                    appendAiBubble(body, 'Network error. Please check your connection and try again.');
+                }
                 setSending(false);
             });
     }
