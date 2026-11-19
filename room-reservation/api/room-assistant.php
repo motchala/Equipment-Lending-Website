@@ -281,84 +281,36 @@ $ctx_assigned_rooms = empty($assigned_rooms_map)
         . ' — used by: ' . implode(', ', $r['faculty_names']),
         array_values($assigned_rooms_map)));
 
-// ── 12b. Faculty timetable rooms (class schedule assignments this semester) ──
-require_once __DIR__ . '/../../shared/core/arbitration-config.php';
-$arb            = ArbitrationConfig::all($conn);
-$semester_name  = (string)($arb['semester_name']  ?? '');
-$semester_start = (string)($arb['semester_start'] ?? '');
-$semester_end   = (string)($arb['semester_end']   ?? '');
 
-$semester_label = '';
-if ($semester_start !== '' && $semester_end !== '') {
-    $sem_names = ['first' => '1st Semester', 'second' => '2nd Semester', 'summer' => 'Summer', 'none' => 'No active semester'];
-    $semester_label = ($sem_names[$semester_name] ?? ucfirst($semester_name))
-        . ' (' . $semester_start . ' to ' . $semester_end . ')';
-} else {
-    $semester_label = 'No semester configured';
-}
-
-// Rooms where THIS faculty has timetable classes
-$my_rooms_stmt = $conn->prepare(
-    "SELECT DISTINCT cs.room_id, r.room_name, r.room_code, b.name AS building_name
-       FROM tbl_class_schedule cs
-       JOIN tbl_rooms     r ON r.room_id     = cs.room_id
+// ── 12c. All bookable rooms per campus (for room suggestions & name matching) ─
+// Fetched per campus only when known from the query to keep the prompt size down.
+// For general reservation requests, all rooms are included.
+$all_rooms_stmt = $conn->prepare(
+    "SELECT r.room_id, r.room_name, r.room_code, r.floor_number,
+            b.name AS building_name, c.campus_name
+       FROM tbl_rooms r
        JOIN tbl_buildings b ON b.building_id = r.building_id
-      WHERE cs.account_faculty_id = ?
-        AND cs.is_tba   = 0
-        AND cs.room_id IS NOT NULL"
+       JOIN tbl_campuses  c ON c.campus_id   = b.campus_id
+      WHERE r.status      = 'Available'
+        AND r.is_archived = 0
+      ORDER BY c.campus_id ASC, b.sort_order ASC, r.floor_number ASC, r.sort_order ASC"
 );
-$my_rooms_stmt->bind_param('s', $faculty_id);
-$my_rooms_stmt->execute();
-$my_timetable_rooms = $my_rooms_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-$my_rooms_stmt->close();
+$all_rooms_stmt->execute();
+$all_rooms_rows = $all_rooms_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$all_rooms_stmt->close();
 
-$ctx_my_timetable = empty($my_timetable_rooms)
-    ? 'None — no classes scheduled for this faculty this semester.'
-    : implode("\n", array_map(fn($r) =>
-        '- ' . $r['room_name'] . ' (' . $r['room_code'] . ') in ' . $r['building_name'],
-        $my_timetable_rooms));
-
-// All rooms that have ANY faculty timetable assignment (excluding this faculty)
-// Used to warn faculty when they try to reserve a room used by another faculty's timetable
-$all_assigned_stmt = $conn->prepare(
-    "SELECT DISTINCT cs.room_id, r.room_name, r.room_code, b.name AS building_name,
-            cs.faculty_name AS assigned_faculty
-       FROM tbl_class_schedule cs
-       JOIN tbl_rooms     r ON r.room_id     = cs.room_id
-       JOIN tbl_buildings b ON b.building_id = r.building_id
-      WHERE cs.account_faculty_id != ?
-        AND cs.is_tba   = 0
-        AND cs.room_id IS NOT NULL"
-);
-$all_assigned_stmt->bind_param('s', $faculty_id);
-$all_assigned_stmt->execute();
-$all_assigned_rows = $all_assigned_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-$all_assigned_stmt->close();
-
-// Group by room_id, collect unique faculty names per room
-$assigned_rooms_map = [];
-foreach ($all_assigned_rows as $row) {
-    $rid = $row['room_id'];
-    if (!isset($assigned_rooms_map[$rid])) {
-        $assigned_rooms_map[$rid] = [
-            'room_name'      => $row['room_name'],
-            'room_code'      => $row['room_code'],
-            'building_name'  => $row['building_name'],
-            'faculty_names'  => [],
-        ];
-    }
-    $fname = trim($row['assigned_faculty']);
-    if ($fname !== '' && !in_array($fname, $assigned_rooms_map[$rid]['faculty_names'], true)) {
-        $assigned_rooms_map[$rid]['faculty_names'][] = $fname;
-    }
+// Build a structured list grouped by building for the system prompt
+$rooms_by_building = [];
+foreach ($all_rooms_rows as $rm) {
+    $key = $rm['campus_name'] . ' — ' . $rm['building_name'];
+    $rooms_by_building[$key][] = $rm['room_name']
+        . ' (' . $rm['room_code'] . ', Floor ' . $rm['floor_number'] . ')';
 }
-
-$ctx_assigned_rooms = empty($assigned_rooms_map)
-    ? 'None — no rooms are assigned in another faculty\'s timetable this semester.'
-    : implode("\n", array_map(fn($r) =>
-        '- ' . $r['room_name'] . ' (' . $r['room_code'] . ') in ' . $r['building_name']
-        . ' — used by: ' . implode(', ', $r['faculty_names']),
-        array_values($assigned_rooms_map)));
+$ctx_all_rooms = empty($rooms_by_building) ? 'No bookable rooms found.' :
+    implode("\n", array_map(
+        fn($bname, $rms) => $bname . ":\n" . implode("\n", array_map(fn($r) => '  - ' . $r, $rms)),
+        array_keys($rooms_by_building), array_values($rooms_by_building)
+    ));
 
 $quota_used = count($res_rows);
 $quota_max  = RoomRules::maxActive();
@@ -649,13 +601,23 @@ Waitlist:
 {$semester_label}
 Room assignments below are scoped to this semester's timetable. They are not permanent — the super admin replaces the timetable each semester via import.
 
-## THIS FACULTY'S TIMETABLE ROOMS (rooms where they have scheduled classes this semester)
+## THIS FACULTY'S TIMETABLE ROOMS (rooms assigned to them this semester)
 {$ctx_my_timetable}
-If the faculty tries to reserve one of these rooms, remind them that this room is already in their timetable this semester — they do not need to reserve it. They can still proceed if they want, but flag it.
+IMPORTANT RULES for timetable rooms:
+1. When a faculty asks to reserve a room AND they have timetable rooms, PROACTIVELY suggest their timetable rooms first. Example: "You already have Room A301 in your timetable — do you need that room, or a different one?"
+2. If they confirm they want their timetable room, remind them they do NOT need to reserve it — it is already theirs during class hours. They only need to reserve if they want it outside their scheduled class times.
+3. If they want a different room, proceed normally.
 
-## OTHER FACULTY'S TIMETABLE ROOMS (rooms used by other faculty in the timetable this semester)
+## OTHER FACULTY'S TIMETABLE ROOMS (rooms that cannot be reserved — used by other faculty this semester)
 {$ctx_assigned_rooms}
-If the faculty tries to reserve one of these rooms, warn them that the room is currently used in another faculty member's timetable this semester. Mention the faculty name(s) using that room. Suggest they choose a different room, but allow them to proceed if they insist.
+STRICT RULE: A faculty member CANNOT reserve a room that is assigned in another faculty's timetable.
+- If they ask to reserve any room listed above, tell them it is unavailable and name the faculty who uses it.
+- Do NOT emit INTENT:reserve for any room on this list.
+- Suggest available rooms from the AVAILABLE ROOMS list below instead.
+
+## AVAILABLE ROOMS (all bookable rooms in the system)
+{$ctx_all_rooms}
+Use this list to suggest specific rooms when the faculty asks for available rooms or when redirecting them away from a blocked room. Only suggest rooms that are not in OTHER FACULTY'S TIMETABLE ROOMS above.
 
 ## HOW TO CANCEL VIA AI ASSISTANT
 ⚠️ MANDATORY: When a faculty member asks you to cancel any reservation, you MUST append a signal at the end of your message. Do NOT cancel anything yourself. Do NOT just say "Sure, I'll cancel it." Instead, respond naturally AND then add the signal so the system can show confirmation buttons.
