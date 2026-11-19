@@ -1,7 +1,7 @@
             <!-- ============================================================
          TAB: DASHBOARD (HOME)  — Redesigned v3
     ============================================================ -->
-            <div class="tab-panel active" id="panel-home">
+            <div class="tab-panel<?php echo in_array($fac_boot_tab ?? 'home', ['home', 'settings'], true) ? ' active' : ''; ?>" id="panel-home">
                 <?php
                 // ── Faculty Dashboard ──────────────────────────────────────────────────
                 // Built from this faculty member's own loans ($requests_js), room reservations
@@ -212,7 +212,7 @@
                 if ((int)$notif_count > 0) $fdb_attn[] = ['tone' => 'info', 'icon' => 'notifications',  'act' => 'notif',    'title' => (int)$notif_count . ' unread'];
 
                 $fdb_kpis = [
-                    ['tone' => $stat_approved > 0 ? 'warn' : 'ok',  'icon' => 'move_to_inbox',  'label' => 'For Pickup', 'val' => (int)$stat_approved, 'stat' => 'approved', 'id' => ''],
+                    ['tone' => $stat_approved > 0 ? 'warn' : 'ok',  'icon' => 'move_to_inbox',  'label' => 'Ready for pickup', 'val' => (int)$stat_approved, 'stat' => 'approved', 'id' => ''],
                     ['tone' => 'ok',                                 'icon' => 'swap_horiz',     'label' => 'Active loans',     'val' => (int)$stat_on_loan,  'stat' => 'on_loan',  'id' => ''],
                     ['tone' => $stat_overdue > 0 ? 'danger' : 'ok',  'icon' => 'schedule',       'label' => 'Overdue',          'val' => (int)$stat_overdue,  'stat' => 'overdue',  'id' => 'statOverdueVal'],
                     ['tone' => $stat_waiting > 0 ? 'warn' : 'ok',    'icon' => 'hourglass_top',  'label' => 'Pending',          'val' => (int)$stat_waiting,  'stat' => 'waiting',  'id' => ''],
@@ -260,28 +260,20 @@
                         </div>
                     </div>
 
-                    <!-- Key figures (combined card → activity tab) -->
-                    <div class="fdb-kpis-wrap" id="dashStats">
-                        <button type="button" class="fdb-kpis-card" data-action="go-tab" data-tab="activity"
-                            aria-label="View activity">
-                            <span class="fdb-kpis-items">
-                                <?php foreach ($fdb_kpis as $fdb_v_k): ?>
-                                    <span class="fdb-kpi-item fdb-tone-<?php echo $fdb_h($fdb_v_k['tone']); ?>"
-                                        <?php if ($fdb_v_k['stat'] !== '') echo 'data-stat="' . $fdb_h($fdb_v_k['stat']) . '"'; ?>>
-                                        <span class="fdb-kpi-icon" aria-hidden="true"><span class="material-symbols-outlined"><?php echo $fdb_h($fdb_v_k['icon']); ?></span></span>
-                                        <span class="fdb-kpi-body">
-                                            <span class="fdb-kpi-val"<?php if ($fdb_v_k['id'] !== '') echo ' id="' . $fdb_h($fdb_v_k['id']) . '"'; ?>><?php echo (int)$fdb_v_k['val']; ?></span>
-                                            <span class="fdb-kpi-label"><?php echo $fdb_h($fdb_v_k['label']); ?></span>
-                                        </span>
-                                    </span>
-                                <?php endforeach; ?>
-                            </span>
-                            <span class="fdb-kpis-cta" aria-hidden="true">
-                                <span>View activity</span>
-                                <span class="material-symbols-outlined">arrow_forward</span>
-                            </span>
-                        </button>
-                    </div>
+                    <!-- Key figures -->
+                    <section class="fdb-kpis" id="dashStats" aria-label="Key figures">
+                        <?php foreach ($fdb_kpis as $fdb_v_k): ?>
+                            <button type="button" class="fdb-kpi fdb-tone-<?php echo $fdb_h($fdb_v_k['tone']); ?>"
+                                <?php if ($fdb_v_k['stat'] !== '') echo 'data-stat="' . $fdb_h($fdb_v_k['stat']) . '"'; ?>
+                                data-action="go-tab" data-tab="activity">
+                                <span class="fdb-kpi-icon" aria-hidden="true"><span class="material-symbols-outlined"><?php echo $fdb_h($fdb_v_k['icon']); ?></span></span>
+                                <span class="fdb-kpi-body">
+                                    <span class="fdb-kpi-val" <?php if ($fdb_v_k['id'] !== '') echo ' id="' . $fdb_h($fdb_v_k['id']) . '"'; ?>><?php echo (int)$fdb_v_k['val']; ?></span>
+                                    <span class="fdb-kpi-label"><?php echo $fdb_h($fdb_v_k['label']); ?></span>
+                                </span>
+                            </button>
+                        <?php endforeach; ?>
+                    </section>
 
                     <div class="fdb-grid">
 

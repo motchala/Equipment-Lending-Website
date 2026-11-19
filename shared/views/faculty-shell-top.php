@@ -1,5 +1,23 @@
-<!DOCTYPE html>
-<html lang="en" data-theme="light">
+<?php
+/* First-paint bridge for a page refresh (same idea as the admin interface).
+   F5 / the reload button sends "Cache-Control: max-age=0" (a hard refresh sends no-cache, a normal visit neither),
+   and faculty-dashboard.js keeps the screen you are on in the cookie ps_fac_tab. When both say "refresh of screen X",
+   the server prints screen X as the active one right in the HTML (see $fac_boot_tab in the panels and the sidebar),
+   so the Dashboard is never painted, not even for one frame. It is only a guess: the head script below checks it
+   and, if it disagrees, hides the page and switches screens before anything shows. */
+$fac_boot_tab = 'home';
+$fac_cache_ctl = strtolower((string)($_SERVER['HTTP_CACHE_CONTROL'] ?? ''));
+if (strpos($fac_cache_ctl, 'max-age=0') !== false && strpos($fac_cache_ctl, 'no-cache') === false) {
+    $fac_cookie_tab = (string)($_COOKIE['ps_fac_tab'] ?? '');
+    if (in_array($fac_cookie_tab, ['activity', 'lending', 'rooms', 'settings'], true)) {
+        $fac_boot_tab = $fac_cookie_tab;
+    }
+}
+?><!DOCTYPE html>
+<html lang="en" data-theme="light"<?php
+    // fac-restored: the screen appears in place, no slide-in (same class the reveal script adds)
+    if ($fac_boot_tab !== 'home') echo ' class="fac-restored" data-fac-tab="' . $fac_boot_tab . '"';
+?>>
 
 <head>
     <meta charset="UTF-8">
@@ -14,12 +32,15 @@
     <!-- Refresh behaviour (faculty interface). Same rules as the admin interface:
          - Soft refresh (F5 / reload button): stay on the screen you are on.
          - Hard refresh (Ctrl+Shift+R / Ctrl+F5): back to the Dashboard.
-         While the screen is restored the page stays hidden (html.fac-tab-pending), so the Dashboard
-         and its sidebar highlight never show in between. faculty-dashboard.js reveals the page. -->
+         The server normally paints the right screen already (see the top of this file). If it guessed wrong, the page
+         stays hidden (html.fac-tab-pending) until faculty-shell-bottom.php has switched screens, so the Dashboard
+         and its sidebar highlight never show in between. -->
     <script nonce="<?php echo $csp_nonce; ?>">
         (function() {
-            var TABS = ['activity', 'lending', 'rooms'];
+            var TABS = ['activity', 'lending', 'rooms', 'settings'];
             var root = document.documentElement;
+            // the screen the server painted ('home' when it did not guess)
+            var served = root.getAttribute('data-fac-tab') || 'home';
 
             var nav = (window.performance && performance.getEntriesByType) ? performance.getEntriesByType('navigation')[0] : null;
             var isReload = nav ? nav.type === 'reload' : !!(performance.navigation && performance.navigation.type === 1);
@@ -46,16 +67,28 @@
                 stored = sessionStorage.getItem('facultyCurrentTab');
                 if (!isReload || hard) sessionStorage.removeItem('facultyCurrentTab');
             } catch (_) {}
-            if (hard) return;
 
-            var hash = window.location.hash;
-            var hashTab = hash.indexOf('#tab-') === 0 ? hash.slice(5).split('-')[0] : null;
-            var tab = isReload ? (hashTab || stored) : null;
-            if (TABS.indexOf(tab) === -1) return;
+            var tab = null;
+            if (isReload && !hard) {
+                var hash = window.location.hash;
+                var hashTab = null;
+                if (hash.indexOf('#tab-') === 0) hashTab = hash.slice(5).split('-')[0];
+                else if (hash.indexOf('#overlay-settingsOverlay') === 0) hashTab = 'settings';
+                tab = hashTab || stored;
+            }
+            if (TABS.indexOf(tab) === -1) tab = 'home';   // nothing to restore: the Dashboard is right
 
-            window._preJumpTab = tab;
+            // Tell the server which screen this page starts on, for the next refresh.
+            try {
+                document.cookie = 'ps_fac_tab=' + tab + '; path=/; SameSite=Lax' + (window.location.protocol === 'https:' ? '; Secure' : '');
+            } catch (_) {}
+
+            window._facRestoreTab = tab;   // 'home' = nothing to restore; faculty-dashboard.js finishes the job
+            if (tab === served) return;    // the server already painted this very screen: nothing to hide
+
+            // The server guessed wrong (or did not guess): hide the page until the right screen is in place.
             root.classList.add('fac-tab-pending');
-            // Safety net: never leave the page hidden if the reveal in faculty-dashboard.js fails to run.
+            // Safety net: never leave the page hidden if the reveal in faculty-shell-bottom.php fails to run.
             // It waits for the page to finish loading (a slow connection can take longer than any fixed
             // timeout, and lifting early would flash the Dashboard), then lifts after a short grace.
             var lift = function() { root.classList.remove('fac-tab-pending'); };
@@ -85,6 +118,7 @@
 
     <link rel="stylesheet" href="dashboard/assets/css/faculty-dashboard.css?v=<?php echo @filemtime(PS_ROOT . '/dashboard/assets/css/faculty-dashboard.css'); ?>">
     <link rel="stylesheet" href="equipment-booking/assets/css/faculty-borrow-flow.css?v=<?php echo @filemtime(PS_ROOT . '/equipment-booking/assets/css/faculty-borrow-flow.css'); ?>">
+    <link rel="stylesheet" href="equipment-booking/assets/css/faculty-add-button.css?v=<?php echo @filemtime(PS_ROOT . '/equipment-booking/assets/css/faculty-add-button.css'); ?>">
 
     <!-- NOTE: faculty-code-card.css intentionally not loaded — it was a stale
          snapshot of this same stylesheet (predating several redesigns) that

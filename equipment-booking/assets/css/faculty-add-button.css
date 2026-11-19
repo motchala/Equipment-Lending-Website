@@ -1,0 +1,323 @@
+/* ==========================================================================
+   faculty-add-button.css — look of the "Add" buttons on the faculty Equipment screen
+   (catalog cards, the two "Most Borrowed" cards) and of the quantity stepper that
+   replaces the button once an item is picked.
+
+   Purely a look: no markup, no script, no sizes of the layout around the button change.
+   It is loaded after the other faculty stylesheets and uses a longer selector than they do
+   (html body #panel-lending ...), so it wins over their !important rules without editing them.
+   To go back to the old look, remove the <link> to this file in shared/views/faculty-shell-top.php.
+
+   Not touched on purpose: the phone app layout (html.rx-mobile, round icon buttons) and
+   screens 600px wide or less (compact buttons) keep their own design.
+   Colours: maroon + gold like the rest of the faculty interface; dark and high-contrast
+   themes are handled at the bottom.
+   ========================================================================== */
+
+@media (min-width: 601px) {
+
+    /* ── Add button on a card ──────────────────────────────────────────── */
+    html:not(.rx-mobile) body #panel-lending .bf-slot .btn-borrow.bf-add:not(:disabled):not(.btn-borrow-ahead),
+    html:not(.rx-mobile) body #panel-lending .bf-slot .btn-borrow-primary.bf-add:not(:disabled):not(.btn-borrow-ahead) {
+        position: relative;
+        background: linear-gradient(135deg, #7d1414 0%, #5c0606 55%, #430000 100%) !important;
+        color: #fff !important;
+        border: 1px solid rgba(236, 212, 143, .45) !important;
+        border-radius: 12px !important;
+        font-weight: 700 !important;
+        letter-spacing: .02em;
+        box-shadow: 0 4px 12px rgba(87, 0, 0, .26), inset 0 1px 0 rgba(255, 255, 255, .18) !important;
+        transition: transform .18s ease, box-shadow .18s ease, filter .18s ease, border-color .18s ease !important;
+    }
+
+    /* the "+" sits in a small round chip that turns gold and spins a quarter turn on hover */
+    html:not(.rx-mobile) body #panel-lending .bf-slot .bf-add:not(:disabled) .material-symbols-outlined {
+        flex: none;
+        display: inline-grid;
+        place-items: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        font-size: 17px !important;
+        line-height: 1;
+        background: rgba(255, 255, 255, .18);
+        color: inherit;
+        transition: transform .28s cubic-bezier(.3, 1.4, .5, 1), background .18s ease, color .18s ease;
+    }
+
+    html:not(.rx-mobile) body #panel-lending .bf-slot .btn-borrow.bf-add:not(:disabled):not(.btn-borrow-ahead):hover,
+    html:not(.rx-mobile) body #panel-lending .bf-slot .btn-borrow-primary.bf-add:not(:disabled):not(.btn-borrow-ahead):hover {
+        transform: translateY(-2px) !important;
+        filter: brightness(1.1);
+        border-color: rgba(236, 212, 143, .85) !important;
+        box-shadow: 0 8px 20px rgba(87, 0, 0, .34), 0 0 0 3px rgba(236, 212, 143, .22), inset 0 1px 0 rgba(255, 255, 255, .22) !important;
+    }
+
+    html:not(.rx-mobile) body #panel-lending .bf-slot .bf-add:not(:disabled):not(.btn-borrow-ahead):hover .material-symbols-outlined {
+        background: var(--accent-gold-light, #ecd48f);
+        color: #4a0000;
+        transform: rotate(90deg);
+    }
+
+    html:not(.rx-mobile) body #panel-lending .bf-slot .btn-borrow.bf-add:not(:disabled):not(.btn-borrow-ahead):active,
+    html:not(.rx-mobile) body #panel-lending .bf-slot .btn-borrow-primary.bf-add:not(:disabled):not(.btn-borrow-ahead):active {
+        transform: translateY(0) scale(.98) !important;
+        filter: brightness(.96);
+        box-shadow: 0 2px 6px rgba(87, 0, 0, .3), inset 0 1px 3px rgba(0, 0, 0, .25) !important;
+    }
+
+    html:not(.rx-mobile) body #panel-lending .bf-slot .bf-add:focus-visible,
+    html:not(.rx-mobile) body #panel-lending .bf-slot .bf-step-btn:focus-visible,
+    html:not(.rx-mobile) body #panel-lending .bf-slot .bf-icon-btn:focus-visible {
+        outline: 2px solid var(--accent-gold-deep, #b8913a);
+        outline-offset: 2px;
+    }
+
+    /* ── "Book ahead" (out right now, can be booked for later): outlined version ───── */
+    html:not(.rx-mobile) body #panel-lending .bf-slot .btn-borrow.bf-add.btn-borrow-ahead:not(:disabled),
+    html:not(.rx-mobile) body #panel-lending .bf-slot .btn-borrow-primary.bf-add.btn-borrow-ahead:not(:disabled) {
+        background: rgba(87, 0, 0, .05) !important;
+        color: #570000 !important;
+        border: 1.5px solid #570000 !important;
+        border-radius: 12px !important;
+        font-weight: 700 !important;
+        letter-spacing: .02em;
+        box-shadow: none !important;
+        transition: background .18s ease, color .18s ease, transform .18s ease, box-shadow .18s ease !important;
+    }
+
+    html:not(.rx-mobile) body #panel-lending .bf-slot .bf-add.btn-borrow-ahead:not(:disabled) .material-symbols-outlined {
+        background: rgba(87, 0, 0, .10);
+    }
+
+    html:not(.rx-mobile) body #panel-lending .bf-slot .btn-borrow.bf-add.btn-borrow-ahead:not(:disabled):hover,
+    html:not(.rx-mobile) body #panel-lending .bf-slot .btn-borrow-primary.bf-add.btn-borrow-ahead:not(:disabled):hover {
+        background: linear-gradient(135deg, #7d1414 0%, #5c0606 100%) !important;
+        color: #fff !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 8px 20px rgba(87, 0, 0, .28) !important;
+    }
+
+    html:not(.rx-mobile) body #panel-lending .bf-slot .bf-add.btn-borrow-ahead:not(:disabled):hover .material-symbols-outlined {
+        background: rgba(255, 255, 255, .2);
+        transform: scale(1.1);
+    }
+
+    /* ── Unavailable / Overdue Block: same shape, clearly inactive ─────────────────── */
+    html:not(.rx-mobile) body #panel-lending .bf-slot .bf-add:disabled {
+        border-radius: 12px !important;
+        font-weight: 600 !important;
+        letter-spacing: .02em;
+        border-style: dashed !important;
+        box-shadow: none !important;
+        transform: none !important;
+    }
+
+    /* ── The big "Add to request" on the first Most Borrowed card ──────────────────── */
+    html:not(.rx-mobile) body #panel-lending .bf-slot--hero .btn-borrow-primary.bf-add {
+        border-radius: 14px !important;
+        letter-spacing: .02em;
+    }
+
+    html:not(.rx-mobile) body #panel-lending .bf-slot--hero .bf-add:not(:disabled) .material-symbols-outlined {
+        width: 30px;
+        height: 30px;
+        font-size: 22px !important;
+    }
+
+    /* ── Quantity stepper (what the button turns into once the item is picked) ─────── */
+    html:not(.rx-mobile) body #panel-lending .bf-slot .bf-stepper-row {
+        gap: 8px;
+    }
+
+    html:not(.rx-mobile) body #panel-lending .bf-slot .bf-stepper {
+        align-items: center;
+        min-height: 42px;
+        padding: 0 5px;
+        border: 1.5px solid color-mix(in srgb, var(--color-primary) 55%, transparent);
+        border-radius: 12px;
+        background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface-lowest));
+        box-shadow: inset 0 1px 2px rgba(87, 0, 0, .06);
+    }
+
+    html:not(.rx-mobile) body #panel-lending .bf-slot .bf-step-btn {
+        flex: 0 0 30px;
+        width: 30px;
+        height: 30px;
+        min-height: 30px;
+        padding: 0;
+        border-radius: 50%;
+        background: var(--color-primary);
+        color: #fff;
+        font-size: 1.05rem;
+        line-height: 1;
+        display: grid;
+        place-items: center;
+        transition: transform .15s ease, background .15s ease, box-shadow .15s ease;
+    }
+
+    html:not(.rx-mobile) body #panel-lending .bf-slot .bf-step-btn:hover:not(:disabled) {
+        background: var(--color-primary);
+        filter: brightness(1.15);
+        transform: scale(1.08);
+        box-shadow: 0 0 0 3px rgba(236, 212, 143, .35);
+    }
+
+    html:not(.rx-mobile) body #panel-lending .bf-slot .bf-step-btn:active:not(:disabled) {
+        transform: scale(.94);
+    }
+
+    html:not(.rx-mobile) body #panel-lending .bf-slot .bf-step-btn:disabled {
+        background: var(--color-surface-high, #e7e2e2);
+        color: var(--color-on-surface-variant, #6b6363);
+        opacity: .6;
+    }
+
+    html:not(.rx-mobile) body #panel-lending .bf-slot .bf-step-input {
+        border-inline: 0;
+        font-size: 1rem;
+        font-weight: 800;
+        color: var(--color-primary);
+    }
+
+    html:not(.rx-mobile) body #panel-lending .bf-slot .bf-icon-btn {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        border: 1.5px solid var(--color-outline-variant);
+        transition: background .15s ease, color .15s ease, border-color .15s ease;
+    }
+
+    html:not(.rx-mobile) body #panel-lending .bf-slot .bf-icon-btn:hover {
+        border-color: var(--color-error);
+    }
+}
+
+/* ── Quantity box: no square outline + the big card's stepper matches its Add button ───── */
+@media (min-width: 601px) {
+
+    /* On a computer the script puts the cursor in the quantity box the moment "Add" is clicked, and the
+       site-wide keyboard-focus rule then drew a square outline around that box. The box now shows no
+       outline of its own; focus is shown as a soft gold edge on the rounded stepper instead. */
+    html:not(.rx-mobile) body #panel-lending .bf-slot .bf-step-input:focus,
+    html:not(.rx-mobile) body #panel-lending .bf-slot .bf-step-input:focus-visible {
+        outline: none;
+        box-shadow: none;
+        background: transparent;
+    }
+
+    html:not(.rx-mobile) body #panel-lending .bf-slot .bf-stepper:focus-within {
+        border-color: var(--accent-gold-deep, #b8913a);
+        box-shadow: 0 0 0 3px rgba(236, 212, 143, .38), inset 0 1px 2px rgba(87, 0, 0, .06);
+    }
+
+    /* Big "Most Borrowed" card on the left: stepper row = the same width and height as its Add button
+       (280px wide, 52px tall), with a bigger quantity box and bigger minus / plus */
+    /* the slot only shrink-wraps its content; while it holds the stepper it takes the card column's width,
+       so the row can be as wide as the Add button was */
+    html:not(.rx-mobile) body #panel-lending .feat-hero .bf-slot--hero:has(.bf-stepper-row) {
+        width: 100%;
+    }
+
+    html:not(.rx-mobile) body #panel-lending .feat-hero .bf-slot--hero .bf-stepper-row {
+        width: min(100%, 280px);
+        max-width: none;
+        gap: 10px;
+    }
+
+    html:not(.rx-mobile) body #panel-lending .feat-hero .bf-slot--hero .bf-stepper {
+        min-height: 52px;
+        padding: 0 8px;
+        border-radius: 14px;
+    }
+
+    html:not(.rx-mobile) body #panel-lending .feat-hero .bf-slot--hero .bf-step-btn {
+        flex: 0 0 38px;
+        width: 38px;
+        height: 38px;
+        min-height: 38px;
+        font-size: 1.4rem;
+    }
+
+    html:not(.rx-mobile) body #panel-lending .feat-hero .bf-slot--hero .bf-step-input {
+        font-size: 1.25rem;
+        /* width 0 + grow: the box fills what is left of the row, but its default width no longer
+           pushes the card wider than the Add button it replaces */
+        flex: 1 1 0;
+        width: 0;
+        min-width: 0;
+    }
+
+    html:not(.rx-mobile) body #panel-lending .feat-hero .bf-slot--hero .bf-icon-btn {
+        width: 52px;
+        height: 52px;
+        border-radius: 14px;
+    }
+
+    html:not(.rx-mobile) body #panel-lending .feat-hero .bf-slot--hero .bf-icon-btn .material-symbols-outlined {
+        font-size: 24px;
+    }
+}
+
+/* ── Dark theme (the theme attribute sits on <html>) ──────────────────────────── */
+@media (min-width: 601px) {
+
+    html:not(.rx-mobile)[data-theme="dark"] body #panel-lending .bf-slot .btn-borrow.bf-add:not(:disabled):not(.btn-borrow-ahead),
+    html:not(.rx-mobile)[data-theme="dark"] body #panel-lending .bf-slot .btn-borrow-primary.bf-add:not(:disabled):not(.btn-borrow-ahead) {
+        background: linear-gradient(135deg, #b02525 0%, #9b1c1c 55%, #7c1414 100%) !important;
+        border-color: rgba(236, 212, 143, .4) !important;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .16) !important;
+    }
+
+    html:not(.rx-mobile)[data-theme="dark"] body #panel-lending .bf-slot .btn-borrow.bf-add.btn-borrow-ahead:not(:disabled),
+    html:not(.rx-mobile)[data-theme="dark"] body #panel-lending .bf-slot .btn-borrow-primary.bf-add.btn-borrow-ahead:not(:disabled) {
+        background: rgba(255, 180, 180, .06) !important;
+        color: #ffb4b4 !important;
+        border-color: #ffb4b4 !important;
+    }
+
+    html:not(.rx-mobile)[data-theme="dark"] body #panel-lending .bf-slot .bf-add.btn-borrow-ahead:not(:disabled) .material-symbols-outlined {
+        background: rgba(255, 180, 180, .14);
+    }
+
+    html:not(.rx-mobile)[data-theme="dark"] body #panel-lending .bf-slot .btn-borrow.bf-add.btn-borrow-ahead:not(:disabled):hover,
+    html:not(.rx-mobile)[data-theme="dark"] body #panel-lending .bf-slot .btn-borrow-primary.bf-add.btn-borrow-ahead:not(:disabled):hover {
+        background: linear-gradient(135deg, #b02525 0%, #8f1a1a 100%) !important;
+        color: #fff !important;
+    }
+
+    html:not(.rx-mobile)[data-theme="dark"] body #panel-lending .bf-slot .bf-stepper {
+        border-color: rgba(244, 160, 160, .55);
+        background: rgba(244, 160, 160, .07);
+    }
+
+    html:not(.rx-mobile)[data-theme="dark"] body #panel-lending .bf-slot .bf-step-btn:not(:disabled) {
+        background: #9b1c1c;
+    }
+
+    html:not(.rx-mobile)[data-theme="dark"] body #panel-lending .bf-slot .bf-step-input {
+        color: #f4a0a0;
+    }
+}
+
+/* ── High-contrast theme: solid colours, strong edges, no glow ───────────────────── */
+@media (min-width: 601px) {
+
+    html:not(.rx-mobile)[data-theme="high-contrast"] body #panel-lending .bf-slot .btn-borrow.bf-add:not(:disabled):not(.btn-borrow-ahead),
+    html:not(.rx-mobile)[data-theme="high-contrast"] body #panel-lending .bf-slot .btn-borrow-primary.bf-add:not(:disabled):not(.btn-borrow-ahead) {
+        background: var(--color-primary-container) !important;
+        border: 2px solid #fff !important;
+        box-shadow: none !important;
+        filter: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    html body #panel-lending .bf-slot .bf-add,
+    html body #panel-lending .bf-slot .bf-add .material-symbols-outlined,
+    html body #panel-lending .bf-slot .bf-step-btn {
+        transition: none !important;
+        transform: none !important;
+    }
+}

@@ -440,70 +440,64 @@
         }
 
         #panel-home .fdb-btn:focus-visible,
-        #panel-home .fdb-kpis-card:focus-visible,
+        #panel-home .fdb-kpi:focus-visible,
         #panel-home .fdb-link:focus-visible {
             outline: 2px solid var(--color-primary);
             outline-offset: 2px;
         }
 
-        /* key figures: single combined card → activity tab */
-        #panel-home .fdb-kpis-wrap {
-            width: 75%;
+        /* key figures: icon + number + one-word label */
+        #panel-home .fdb-kpis {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 14px;
             margin-bottom: 18px;
         }
 
-        #panel-home .fdb-kpis-card {
-            display: grid;
-            grid-template-columns: repeat(5, minmax(0, 1fr)) 64px;
+        #panel-home .fdb-kpi {
+            position: relative;
+            display: flex;
             align-items: center;
-            width: 100%;
-            padding: 0;
+            gap: 14px;
+            min-width: 0;
+            padding: 16px 18px 16px 22px;
+            text-align: left;
             background: var(--fdb-surface);
             border: 1px solid var(--fdb-line);
             border-radius: 16px;
             color: var(--fdb-ink);
             cursor: pointer;
-            text-align: left;
             overflow: hidden;
             transition: transform 0.16s, box-shadow 0.16s, border-color 0.16s;
         }
 
-        #panel-home .fdb-kpis-card:hover {
+        #panel-home .fdb-kpi::before {
+            content: '';
+            position: absolute;
+            inset: 0 auto 0 0;
+            width: 4px;
+            background: var(--tone);
+        }
+
+        #panel-home .fdb-kpi:hover {
             transform: translateY(-2px);
-            border-color: color-mix(in srgb, var(--color-primary) 40%, var(--fdb-line));
-            box-shadow: 0 8px 22px color-mix(in srgb, var(--color-primary) 10%, transparent);
-        }
-
-        #panel-home .fdb-kpis-items {
-            display: contents;
-        }
-
-        #panel-home .fdb-kpi-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 16px 14px 16px 18px;
-            min-width: 0;
-            border-right: 1px solid var(--fdb-line);
-        }
-
-        #panel-home .fdb-kpis-sep {
-            display: none;
+            border-color: color-mix(in srgb, var(--tone) 55%, var(--fdb-line));
+            box-shadow: 0 8px 22px color-mix(in srgb, var(--tone) 14%, transparent);
         }
 
         #panel-home .fdb-kpi-icon {
             flex-shrink: 0;
             display: grid;
             place-items: center;
-            width: 38px;
-            height: 38px;
-            border-radius: 11px;
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
             background: color-mix(in srgb, var(--tone) 13%, transparent);
             color: var(--tone);
         }
 
         #panel-home .fdb-kpi-icon .material-symbols-outlined {
-            font-size: 20px;
+            font-size: 22px;
         }
 
         #panel-home .fdb-kpi-body {
@@ -513,7 +507,7 @@
         }
 
         #panel-home .fdb-kpi-val {
-            font-size: 1.65rem;
+            font-size: 1.9rem;
             font-weight: 700;
             line-height: 1.1;
             font-variant-numeric: tabular-nums;
@@ -522,41 +516,9 @@
 
         #panel-home .fdb-kpi-label {
             margin-top: 2px;
-            font-size: 11.5px;
+            font-size: 12px;
             font-weight: 600;
             color: var(--fdb-muted);
-            white-space: normal;
-            line-height: 1.25;
-        }
-
-        #panel-home .fdb-kpis-cta {
-            display: grid;
-            place-items: center;
-            width: 40px;
-            height: 40px;
-            flex-shrink: 0;
-            border-radius: 50%;
-            background: var(--fdb-surface);
-            border: 1.5px solid var(--fdb-line);
-            color: var(--color-primary);
-            box-shadow: 0 1px 3px rgba(96, 3, 2, 0.06);
-            margin: 0 auto;
-            transition: background 0.16s, border-color 0.16s;
-            border-right: none;
-        }
-
-        #panel-home .fdb-kpis-card:hover .fdb-kpis-cta {
-            background: var(--color-surface-container);
-            border-color: var(--color-primary);
-        }
-
-        #panel-home .fdb-kpis-cta > span {
-            display: none;
-        }
-
-        #panel-home .fdb-kpis-cta .material-symbols-outlined {
-            font-size: 20px;
-            display: block;
         }
 
         /* grid + cards */
@@ -1111,8 +1073,8 @@
         }
 
         @media (max-width: 1180px) {
-            #panel-home .fdb-kpis-wrap {
-                width: 100%;
+            #panel-home .fdb-kpis {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
             }
 
             #panel-home .fdb-area-chart {
@@ -1174,38 +1136,20 @@
         }
 
         @media (max-width: 520px) {
-            #panel-home .fdb-kpis-wrap {
-                width: 100%;
+            #panel-home .fdb-kpis {
+                gap: 10px;
             }
 
-            #panel-home .fdb-kpis-card {
-                grid-template-columns: 1fr 1fr;
-            }
-
-            #panel-home .fdb-kpi-item:nth-child(odd) {
-                border-right: 1px solid var(--fdb-line);
-            }
-
-            #panel-home .fdb-kpi-item {
-                border-bottom: 1px solid var(--fdb-line);
-                border-right: none;
-            }
-
-            #panel-home .fdb-kpis-cta {
-                grid-column: span 2;
-                width: 40px;
-                height: 40px;
-                margin: 8px auto;
-                padding: 0;
-                border-right: none;
-                border-top: 1px solid var(--fdb-line);
+            #panel-home .fdb-kpi {
+                padding: 14px 12px 14px 18px;
+                gap: 10px;
             }
         }
 
         @media (prefers-reduced-motion: reduce) {
 
             #panel-home .fdb *,
-            #panel-home .fdb-kpis-card {
+            #panel-home .fdb-kpi {
                 transition: none !important;
             }
         }
@@ -2144,7 +2088,10 @@
         html.fac-tab-pending .mobile-menu-btn,
         html.fac-tab-pending .nav-backdrop,
         html.fac-tab-pending .act-ai-fab,
-        html.fac-tab-pending .act-ai-chat {
+        html.fac-tab-pending .act-ai-chat,
+        html.fac-tab-pending .rxm-bar,
+        html.fac-tab-pending .rxm-tabbar,
+        html.fac-tab-pending .rxm-sheet {
             visibility: hidden !important;
         }
 
