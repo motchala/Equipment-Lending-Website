@@ -380,7 +380,7 @@
             // Refresh the rate-limit counter from the server every time the
             // Rooms tab becomes active — covers hard resets, tab switches, and
             // FAB opens, so the displayed count is always accurate.
-            fetch('room-reservation/api/chat-quota.php', { credentials: 'same-origin' })
+            fetch('room-reservation/api/room-assistant-quota.php', { credentials: 'same-origin' })
                 .then(function (r) {
                     if (!r.headers.get('content-type') || !r.headers.get('content-type').includes('application/json')) return null;
                     return r.json();
@@ -4461,7 +4461,7 @@
         var csrfMeta = document.querySelector('meta[name="csrf-token"]');
         var csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
 
-        fetch('room-reservation/api/chat.php', {
+        fetch('room-reservation/api/room-assistant.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ message: msg, csrf_token: csrfToken }),
