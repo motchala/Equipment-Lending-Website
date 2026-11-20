@@ -213,9 +213,20 @@ if (!function_exists('ps_push_send_vapid')) {
             'ssl' => ['verify_peer' => false],
         ]);
 
-        $result = @file_get_contents($endpoint, false, $ctx);
-        if ($result === false) {
-            error_log('[ps_push] HTTP call to push endpoint failed: ' . $endpoint);
+        $result     = @file_get_contents($endpoint, false, $ctx);
+        $pushStatus = 0;
+        if (isset($http_response_header) && is_array($http_response_header)) {
+            foreach ($http_response_header as $h) {
+                if (preg_match('#^HTTP/\S+\s+(\d+)#', $h, $m)) {
+                    $pushStatus = (int)$m[1];
+                    break;
+                }
+            }
+        }
+        if ($result === false || ($pushStatus !== 0 && $pushStatus !== 201)) {
+            error_log('[ps_push] Push delivery failed. Status: ' . $pushStatus . ' | Endpoint: ' . substr($endpoint, 0, 60));
+        } else {
+            error_log('[ps_push] Push delivered OK. Status: ' . $pushStatus);
         }
     }
 }
