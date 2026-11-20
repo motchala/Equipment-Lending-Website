@@ -14,8 +14,8 @@ self.addEventListener('push', function (event) {
     var title   = data.title || 'PUPSync';
     var options = {
         body:    data.body  || '',
-        icon:    data.icon  || '/Equipment-Lending-Website/assets/images/logo.png',
-        badge:   data.badge || '/Equipment-Lending-Website/assets/images/logo.png',
+        icon:    data.icon  || '/shared/assets/images/favicon-192.png',
+        badge:   data.badge || '/shared/assets/images/favicon-192.png',
         data:    { url: data.url || '/' },
         requireInteraction: false,
     };

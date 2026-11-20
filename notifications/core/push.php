@@ -139,7 +139,8 @@ if (!function_exists('ps_push_send')) {
                 'title' => $title,
                 'body'  => $body,
                 'url'   => $full_url,
-                'icon'  => $scheme . '://' . $host . $base . '/assets/images/logo.png',
+                'icon'  => $scheme . '://' . $host . $base . '/shared/assets/images/favicon-192.png',
+                'badge' => $scheme . '://' . $host . $base . '/shared/assets/images/favicon-192.png',
             ]);
 
             ps_push_send_vapid($sub['endpoint'], $sub['auth_key'], $sub['p256dh_key'], $payload, $vapidPub, $vapidPriv, $vapidSubject);
