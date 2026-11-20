@@ -820,6 +820,7 @@ function ss_completed_transactions(mysqli $conn, string $facultyId): array
              MAX(COALESCE(r.returned_at, TIMESTAMP(r.return_date, COALESCE(r.return_time, '23:59:59')))) AS completed_at
          FROM tbl_requests r
          WHERE r.faculty_id = ? AND r.status = 'Returned'
+           " . ss_submitter_filter($conn, 'tbl_requests', 'r') . "
            AND (COALESCE(r.batch_id, '') = '' OR NOT EXISTS (
                SELECT 1 FROM tbl_requests pending
                WHERE pending.batch_id = r.batch_id AND pending.status IN ('Waiting', 'Approved', 'On Loan', 'Overdue')
@@ -852,6 +853,7 @@ function ss_completed_transactions(mysqli $conn, string $facultyId): array
          FROM tbl_room_reservations rr
          LEFT JOIN tbl_rooms rm ON rm.room_id = rr.room_id
          WHERE rr.faculty_id = ? AND rr.status = 'Approved'
+           " . ss_submitter_filter($conn, 'tbl_room_reservations', 'rr') . "
            AND TIMESTAMP(rr.reservation_date, rr.end_time) <= NOW()"
     );
     if (!$rooms) {
@@ -881,6 +883,29 @@ function ss_completed_transactions(mysqli $conn, string $facultyId): array
     return $transactions;
 }
 
+/**
+ * SQL fragment that keeps a faculty's survey to the faculty's OWN transactions.
+ * Borrows and reservations a student submitted with the faculty's code are stored under the faculty's
+ * faculty_id with submitted_as = 'student'; those never earn the faculty a survey.
+ * Returns '' when the column does not exist yet (very old databases), so the survey keeps working.
+ */
+function ss_submitter_filter(mysqli $conn, string $table, string $alias = ''): string
+{
+    static $hasColumn = [];
+    if (!isset($hasColumn[$table])) {
+        $result = $conn->query("SHOW COLUMNS FROM `$table` LIKE 'submitted_as'");
+        $hasColumn[$table] = $result && $result->num_rows > 0;
+        if ($result) {
+            $result->free();
+        }
+    }
+    if (!$hasColumn[$table]) {
+        return '';
+    }
+    $column = $alias === '' ? 'submitted_as' : $alias . '.submitted_as';
+    return " AND COALESCE($column, '') <> 'student'";
+}
+
 function ss_is_consumed(mysqli $conn, string $type, string $transactionKey): bool
 {
     $stmt = $conn->prepare(
@@ -900,25 +925,6 @@ function ss_is_consumed(mysqli $conn, string $type, string $transactionKey): boo
     return $consumed;
 }
 
-function ss_claim_presentation(mysqli $conn, string $type, string $transactionKey): bool
-{
-    $stmt = $conn->prepare(
-        'INSERT IGNORE INTO tbl_service_survey_completions (source_type, transaction_key, answered)
-         VALUES (?, ?, 0)'
-    );
-    if (!$stmt) {
-        throw new RuntimeException('Could not prepare survey presentation claim: ' . $conn->error);
-    }
-    $stmt->bind_param('ss', $type, $transactionKey);
-    if (!$stmt->execute()) {
-        $stmt->close();
-        throw new RuntimeException('Could not claim survey presentation: ' . $stmt->error);
-    }
-    $claimed = $stmt->affected_rows === 1;
-    $stmt->close();
-    return $claimed;
-}
-
 function ss_find_owned_transaction(mysqli $conn, string $type, string $transactionKey, string $facultyId): ?array
 {
     if ($type === 'room') {
@@ -930,6 +936,7 @@ function ss_find_owned_transaction(mysqli $conn, string $type, string $transacti
              FROM tbl_room_reservations rr
              LEFT JOIN tbl_rooms rm ON rm.room_id = rr.room_id
              WHERE rr.id = ? AND rr.faculty_id = ? AND rr.status = 'Approved'
+               " . ss_submitter_filter($conn, 'tbl_room_reservations', 'rr') . "
                AND TIMESTAMP(rr.reservation_date, rr.end_time) <= NOW()
              LIMIT 1"
         );
@@ -964,6 +971,7 @@ function ss_find_owned_transaction(mysqli $conn, string $type, string $transacti
             "SELECT equipment_name
              FROM tbl_requests
              WHERE id = ? AND faculty_id = ? AND status = 'Returned' AND COALESCE(batch_id, '') = ''
+               " . ss_submitter_filter($conn, 'tbl_requests') . "
              LIMIT 1"
         );
         if (!$stmt) {
@@ -980,6 +988,7 @@ function ss_find_owned_transaction(mysqli $conn, string $type, string $transacti
             "SELECT GROUP_CONCAT(DISTINCT r.equipment_name ORDER BY r.equipment_name SEPARATOR ', ') AS label
              FROM tbl_requests r
              WHERE r.batch_id = ? AND r.faculty_id = ? AND r.status = 'Returned'
+               " . ss_submitter_filter($conn, 'tbl_requests', 'r') . "
                AND NOT EXISTS (
                    SELECT 1 FROM tbl_requests pending
                    WHERE pending.batch_id = r.batch_id AND pending.status IN ('Waiting', 'Approved', 'On Loan', 'Overdue')

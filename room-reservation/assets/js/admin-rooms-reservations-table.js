@@ -72,7 +72,7 @@
             empty: 'No reservations yet.'
         },
         Waiting: {
-            hint: 'Later-date requests waiting for an admin decision, soonest first. Anything undecided is declined automatically at 12:01 AM on the reservation day.',
+            hint: 'Requests waiting for an admin decision, soonest first. A same-day request has a short review window and is decided automatically when it ends; any other undecided request is declined at 12:01 AM on the reservation day.',
             sort: 'date',
             dir: 'asc',
             empty: 'Nothing is waiting for review.'
@@ -268,6 +268,14 @@
        Submitted before 12:01 AM of the reservation day -> decide by 12:01 AM that day;
        submitted on the day itself -> decide before it starts. */
     function deadlineOf(d) {
+        // Same-day request in its 10-minute review buffer: the system decides when it ends.
+        if (d.bufferEnd) {
+            return {
+                onDay: true,
+                buffered: true,
+                ms: Date.parse(d.bufferEnd)
+            };
+        }
         var onDay = !!d.submittedRaw && d.submittedRaw >= (d.isoDate + ' 00:01:00');
         var hhmm = onDay ? (d.startTime || '00:01:00') : '00:01:00';
         if (/^\d{1,2}:\d{2}$/.test(hhmm)) hhmm += ':00';
@@ -318,6 +326,15 @@
         if (phase === 'pending') {
             var dl = deadlineOf(d);
             var left = dl.ms - now.ms;
+            if (dl.buffered) {
+                // Admin can approve/decline at once; otherwise the system approves it (no conflicts) or declines it.
+                out.push(left > 0 ?
+                    ctx('Review window \u00b7 ' + (window.PSRoomBuffer ? window.PSRoomBuffer.fmt(left / 1000) : humanDur(left)) + ' left \u00b7 confirms automatically if the room is free', 'warn') :
+                    ctx('Review window ended \u00b7 deciding automatically', 'muted'));
+                if (ov && ov.approved > 0) out.push(ctx('Overlaps an approved booking \u2013 it cannot be approved as is', 'danger'));
+                out.push(docChip(d));
+                return out;
+            }
             var text = dl.onDay ? 'Decide before it starts (' + fmtTime(d.startTime) + ')' : 'Decide by ' + fmtDay(d.isoDate) + ', 12:01 AM';
             if (isNaN(left)) {
                 out.push(ctx(text));
@@ -644,6 +661,45 @@
         d.canReview = '0';
         refreshAll();
     });
+
+    // Same-day requests in their 10-minute review buffer: tick the countdown every second and, once a
+    // buffer has run out, ask the server to settle it (it approves or declines) and show the result at once.
+    var settling = false,
+        lastSettle = 0;
+    setInterval(function() {
+        if (document.hidden) return;
+        var list = Array.prototype.filter.call(tbody.querySelectorAll('tr.ps-rr-row'), function(r) {
+            return r.dataset.status === 'Waiting' && r.dataset.bufferEnd;
+        });
+        if (!list.length) return;
+        var now = manilaNow(),
+            idx = buildOverlapIndex(rows()),
+            due = [];
+        list.forEach(function(r) {
+            renderRow(r, now, idx);
+            if (Date.parse(r.dataset.bufferEnd) <= Date.now()) due.push(r.dataset.rrId);
+        });
+        if (!due.length || settling || Date.now() - lastSettle < 5000 || !window.PSRoomBuffer) return;
+        settling = true;
+        lastSettle = Date.now();
+        window.PSRoomBuffer.settle(due, function(res) {
+            settling = false;
+            var changed = false;
+            res.forEach(function(x) {
+                if (x.status === 'Waiting') return;
+                var row = tbody.querySelector('tr.ps-rr-row[data-rr-id="' + String(x.id).replace(/[^0-9]/g, '') + '"]');
+                if (!row) return;
+                row.dataset.status = x.status;
+                row.dataset.reason = x.reason || '';
+                row.dataset.arbReason = x.reason || '';
+                row.dataset.arbRule = x.status === 'Declined' ? 'rule_buffer_declined' : 'rule_buffer_approved';
+                row.dataset.canReview = '0';
+                row.dataset.bufferEnd = '';
+                changed = true;
+            });
+            if (changed) document.dispatchEvent(new CustomEvent('rr:rows-changed'));
+        });
+    }, 1000);
 
     // Time passes: Upcoming -> In use now -> Completed, deadlines tick down. Re-check twice a minute and on return to the tab.
     setInterval(function() {

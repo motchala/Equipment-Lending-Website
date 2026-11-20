@@ -13,10 +13,10 @@
  * "overdue-12" or "roomapproved-7".
  *
  * Sources (all filtered to the logged-in faculty_id):
- *   tbl_requests            → submitted / approved / declined / booking cancelled /
+ *   tbl_requests            → submitted / approved (stays while the item is On Loan) / declined / booking cancelled /
  *                             due soon / overdue / returned   (+ tbl_arbitration_log
  *                             for the decision rule, reason and admin notes)
- *   tbl_room_reservations   → confirmed / reminder / declined / cancelled
+ *   tbl_room_reservations   → submitted (waiting) / confirmed / reminder / declined / cancelled
  *                             (+ tbl_room_arbitration_log for the rule)
  *   tbl_room_waitlist       → on waitlist / slot now available
  *   tbl_room_issues         → issue received / resolved / dismissed
@@ -36,6 +36,7 @@
 
 require_once __DIR__ . '/preferences.php';
 require_once __DIR__ . '/datetime.php';
+require_once __DIR__ . '/approval-receipts.php';
 
 if (!function_exists('fnotif_ensure_table')) {
     /** Idempotent guard — creates tbl_faculty_notif_state on first use. */
@@ -360,6 +361,10 @@ if (!function_exists('fnotif_build_list')) {
         $HISTORY_DAYS = 30;     // one-off events (approved/declined/returned/...) age out after this
         $FEED_LIMIT   = 200;
 
+        // Push the approval receipt for anything of this faculty's that was approved and not announced yet
+        // (the in-app receipts below are built live from the same rows). Never throws.
+        ps_receipts_sweep($conn, $facultyId);
+
         $state    = fnotif_state_map($conn, $facultyId);
         $now      = time();
         $todayTs  = strtotime('today', $now);
@@ -423,11 +428,14 @@ if (!function_exists('fnotif_build_list')) {
                 $borrowStr = date('M j, Y', fnotif_date_ts($conn, $r['borrow_date']));
                 $returnStr = date('M j, Y', fnotif_date_ts($conn, $r['return_date']));
                 $override  = !empty($r['log_override_by']);
+                // A student who borrowed with this faculty member's code (the faculty is still the borrower of record)
+                $studentBy = ((string)($r['submitted_as'] ?? '') === 'student') ? trim((string)($r['submitted_by_name'] ?? '')) : '';
                 $common = [
                     $d('Equipment', $equip),
                     $d('Borrow Date', $borrowStr),
                     $d('Return Date', $returnStr),
                     $d('Room / Instructor', (($r['room'] ?? '') !== '' ? $r['room'] : '—') . ' / ' . (($r['instructor'] ?? '') !== '' ? $r['instructor'] : '—')),
+                    $d('Requested By (Student)', $studentBy),
                 ];
                 switch ($status) {
                     case 'Waiting':
@@ -447,22 +455,48 @@ if (!function_exists('fnotif_build_list')) {
                         break;
 
                     case 'Approved':
+                    case 'On Loan':
+                        // The approval receipt: same number the admin sees (#R-0123) and the push carries.
+                        // It stays in the feed while the item is out (On Loan) so the borrow never drops out of the
+                        // notifications between pick-up and return; the return reminder below follows it too.
+                        $qty       = max(1, (int)($r['borrow_qty'] ?? 1));
+                        $equipLbl  = $equip . ($qty > 1 ? ' ×' . $qty : '');
+                        $recNo     = ps_receipt_no('equipment', $id);
+                        $fromStamp = ps_receipts_stamp($r['borrow_date'] ?? '', $r['borrow_time'] ?? '');
+                        $toStamp   = ps_receipts_stamp($r['return_date'] ?? '', $r['return_time'] ?? '');
+                        $ruleText  = fnotif_rule_label($r['log_rule'] ?? $r['arbitration_rule'] ?? null);
+                        $approvedBy = $override
+                            ? 'Admin — ' . trim((string)$r['log_override_by'])
+                            : 'Automatic' . ($ruleText ? ' — ' . $ruleText : '');
+                        // A student named to collect the items (the faculty is still the borrower)
+                        $pickupBy  = ((string)($r['submitted_as'] ?? '') !== 'student') ? trim((string)($r['submitted_by_name'] ?? '')) : '';
                         $add([
                             'key' => 'reqapproved-' . $id,
                             'cat' => 'borrow',
                             'icon' => 'check_circle',
                             'icon_class' => 'ni-success',
-                            'title' => 'Borrow Request Approved: ' . $equip,
-                            'body'  => 'Your request for <strong>' . $e($equip) . '</strong> was approved. Borrow on <strong>'
+                            'title' => 'Approval Receipt: ' . $equip,
+                            'body'  => 'You are approved to borrow <strong>' . $e($equipLbl) . '</strong>. Borrow on <strong>'
                                 . $e(date('M j', fnotif_date_ts($conn, $r['borrow_date']))) . '</strong>, return by <strong>'
-                                . $e(date('M j', fnotif_date_ts($conn, $r['return_date']))) . '</strong>.',
+                                . $e(date('M j', fnotif_date_ts($conn, $r['return_date']))) . '</strong>. Receipt <strong>'
+                                . $e($recNo) . '</strong>.',
                             'ts'    => $decidedTs,
-                            'detail' => array_merge([$d('Status', 'Approved')], $common, [
-                                $d('Decision Rule', fnotif_rule_label($r['log_rule'] ?? $r['arbitration_rule'] ?? null)),
+                            'detail' => [
+                                $d('Receipt No.', $recNo),
+                                $d('Status', $status === 'On Loan' ? 'On loan (collected)' : 'Approved'),
+                                $d('Approved On', date('M j, Y g:i A', $decidedTs)),
+                                $d('Approved By', $approvedBy),
+                                $d('Equipment', $equip),
+                                $d('Quantity', (string)$qty),
+                                $d('Borrow', $fromStamp !== '' ? $fromStamp : $borrowStr),
+                                $d('Return', $toStamp !== '' ? $toStamp : $returnStr),
+                                $d('Room / Instructor', (($r['room'] ?? '') !== '' ? $r['room'] : '—') . ' / ' . (($r['instructor'] ?? '') !== '' ? $r['instructor'] : '—')),
+                                $d('Pick-up By (Student)', $pickupBy),
+                                $d('Requested By (Student)', $studentBy),
                                 $d('Admin Note', $r['log_override_reason'] ?? ''),
                                 $d('Return QR', !empty($r['return_token']) ? 'Available in My Requests' : ''),
                                 $d('Requested On', date('M j, Y g:i A', $reqTs)),
-                            ]),
+                            ],
                             'link' => $lendingLink,
                         ]);
 
@@ -665,7 +699,7 @@ if (!function_exists('fnotif_build_list')) {
                                r.room_name, b.name AS building_name,
                                COALESCE(r.floor_label, CONCAT(r.floor_number, 'F')) AS floor_label"
                     . ($hasCancelled ? ", rr.cancelled_at" : ", NULL AS cancelled_at")
-                    . ($hasRoomLog   ? ", rl.rule_applied AS log_rule" : ", NULL AS log_rule")
+                    . ($hasRoomLog   ? ", rl.rule_applied AS log_rule, rl.created_at AS log_at" : ", NULL AS log_rule, NULL AS log_at")
                     . " FROM tbl_room_reservations rr
                          JOIN tbl_rooms     r ON r.room_id     = rr.room_id
                          JOIN tbl_buildings b ON b.building_id = r.building_id"
@@ -687,6 +721,8 @@ if (!function_exists('fnotif_build_list')) {
                     $dateStr = date('M j, Y', fnotif_date_ts($conn, $r['reservation_date']));
                     $timeStr = date('g:i A', $startTs) . ' – ' . date('g:i A', $endTs);
                     $slot    = date('M j', fnotif_date_ts($conn, $r['reservation_date'])) . ', ' . $timeStr;
+                    // A student who reserved with this faculty member's code
+                    $roomStudentBy = ((string)($r['submitted_as'] ?? '') === 'student') ? trim((string)($r['submitted_by_name'] ?? '')) : '';
                     $common = [
                         $d('Room', $room),
                         $d('Location', $r['floor_label'] . ', ' . $r['building_name']),
@@ -694,20 +730,28 @@ if (!function_exists('fnotif_build_list')) {
                         $d('Time', $timeStr),
                         $d('Purpose', $r['purpose']),
                         $d('Attendees', $r['attendees']),
+                        $d('Requested By (Student)', $roomStudentBy),
                     ];
 
                     if ($status === 'Approved') {
                         $upcoming = $endTs >= $now;
-                        if ($upcoming || $reqTs >= $windowTs) {
+                        // When the approval happened (a reservation for a later date can wait days for an admin)
+                        $roomDecidedTs = !empty($r['log_at']) ? fnotif_db_timestamp($conn, $r['log_at'], $reqTs) : $reqTs;
+                        if ($upcoming || $roomDecidedTs >= $windowTs) {
                             $add([
                                 'key' => 'roomapproved-' . $id,
                                 'cat' => 'room',
                                 'icon' => 'meeting_room',
                                 'icon_class' => 'ni-success',
-                                'title' => 'Room Reserved: ' . $room,
-                                'body'  => 'Your reservation for <strong>' . $e($room) . '</strong> on <strong>' . $e($slot) . '</strong> is confirmed.',
-                                'ts'    => $reqTs,
-                                'detail' => array_merge([$d('Status', 'Confirmed')], $common, [
+                                'title' => 'Approval Receipt: ' . $room,
+                                'body'  => 'Your reservation for <strong>' . $e($room) . '</strong> on <strong>' . $e($slot) . '</strong> is approved. Receipt <strong>'
+                                    . $e(ps_receipt_no('room', $id)) . '</strong>.',
+                                'ts'    => $roomDecidedTs,
+                                'detail' => array_merge([
+                                    $d('Receipt No.', ps_receipt_no('room', $id)),
+                                    $d('Status', 'Approved'),
+                                    $d('Approved On', date('M j, Y g:i A', $roomDecidedTs)),
+                                ], $common, [
                                     $d('Decision Rule', fnotif_rule_label($r['log_rule'] ?? null)),
                                     $d('Reserved On', date('M j, Y g:i A', $reqTs)),
                                 ]),
@@ -732,6 +776,23 @@ if (!function_exists('fnotif_build_list')) {
                                 'link'   => $resvLink,
                             ]);
                         }
+                    } elseif ($status === 'Waiting') {
+                        // Still waiting for an admin (a later-date reservation, or any student reservation made with
+                        // this faculty member's code). Leaves the feed on its own once it is approved or declined.
+                        $add([
+                            'key' => 'roompending-' . $id,
+                            'cat' => 'room',
+                            'icon' => 'hourglass_top',
+                            'icon_class' => 'ni-alert',
+                            'title' => 'Reservation Submitted: ' . $room,
+                            'body'  => 'Your reservation for <strong>' . $e($room) . '</strong> on <strong>' . $e($slot)
+                                . '</strong> is awaiting admin approval.',
+                            'ts'    => $reqTs,
+                            'detail' => array_merge([$d('Status', 'Waiting for approval')], $common, [
+                                $d('Submitted On', date('M j, Y g:i A', $reqTs)),
+                            ]),
+                            'link' => $resvLink,
+                        ]);
                     } elseif ($status === 'Declined') {
                         if ($reqTs < $windowTs) continue;
                         $reason = trim((string)($r['reason'] ?? ''));

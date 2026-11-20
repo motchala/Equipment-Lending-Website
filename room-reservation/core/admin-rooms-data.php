@@ -109,8 +109,10 @@ if ($_rr_ca_chk && $_rr_ca_chk->num_rows > 0) {
     $rr_cancelled_col = 'rr.cancelled_at';
 }
 
+$rr_buffer_col = ps_room_buffer_ensure_column($conn) ? 'rr.buffer_until' : 'NULL';   // same-day 10-minute review buffer
+
 $admin_room_reservations_result = $conn->query(
-    "SELECT rr.id, rr.room_id, rr.reservation_date,
+    "SELECT rr.id, rr.room_id, rr.reservation_date, " . $rr_buffer_col . " AS buffer_until,
             rr.start_time, rr.end_time,
             TIME_FORMAT(rr.start_time, '%h:%i %p') AS start_fmt,
             TIME_FORMAT(rr.end_time,   '%h:%i %p') AS end_fmt,

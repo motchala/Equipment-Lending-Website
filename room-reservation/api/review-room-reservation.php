@@ -8,6 +8,11 @@
  *
  * Approving needs no reason; declining requires one (at least 5 characters).
  *
+ *   - A SAME-DAY faculty request sits in a 10-minute review buffer (core/room-buffer.php): the admin
+ *     can approve or decline it at once here. Approving it is refused when a class is assigned to the
+ *     room at that time or the room is no longer available, so an instant approval can never
+ *     double-book. If nobody acts, the system decides when the buffer ends.
+ *
  * Anything undecided past its deadline (12:01 AM on the reservation date, see
  * core/room-expiry.php) is declined automatically before a decision is taken,
  * so an expired request can no longer be approved.
@@ -56,13 +61,15 @@ if ($decision === 'Approved' && $reason === '') {
 }
 
 $conn = getDB();
+ps_room_buffer_ensure_column($conn);   // buffer_until is read below
 ps_room_expire_unreviewed($conn);   // an overdue request is declined first, so it can't be approved late
 
 $conn->begin_transaction();
 try {
     $stmt = $conn->prepare(
         "SELECT rr.id, rr.room_id, rr.faculty_id, rr.faculty_name, rr.reservation_date,
-                rr.start_time, rr.end_time, rr.status, r.room_name
+                rr.start_time, rr.end_time, rr.status, rr.buffer_until,
+                r.room_name, r.status AS room_status, r.is_archived
            FROM tbl_room_reservations rr
            JOIN tbl_rooms r ON r.room_id = rr.room_id
           WHERE rr.id = ?
@@ -77,6 +84,21 @@ try {
     if (!$reservation || (string)$reservation['status'] !== 'Waiting') {
         $conn->rollback();
         room_review_reply(409, 'This reservation is no longer waiting for review.');
+    }
+
+    if ($decision === 'Approved' && $reservation['buffer_until'] !== null) {
+        // Same-day buffered request: the room must still be bookable and free of classes.
+        if ((int)$reservation['is_archived'] === 1 || (string)$reservation['room_status'] !== 'Available') {
+            $conn->rollback();
+            room_review_reply(409, 'This facility is no longer available for reservation. Decline this request.');
+        }
+        require_once __DIR__ . '/../core/class-schedule.php';
+        $class_hits = cs_room_conflicts($conn, (int)$reservation['room_id'], (string)$reservation['reservation_date'], (string)$reservation['start_time'], (string)$reservation['end_time']);
+        if ($class_hits) {
+            $c = $class_hits[0];
+            $conn->rollback();
+            room_review_reply(409, 'This facility is assigned to a class at that time (' . cs_class_label($c) . ', ' . $c['start_hm'] . '-' . $c['end_hm'] . '). Decline this request.');
+        }
     }
 
     if ($decision === 'Approved') {
@@ -136,6 +158,9 @@ try {
         ['action' => $decision === 'Approved' ? 'room_approved' : 'room_declined', 'ref_type' => 'reservation', 'ref_id' => $reservation_id]
     );
     $conn->commit();
+    // Approval receipt: notify the faculty now that the decision is saved (does nothing for a decline).
+    require_once __DIR__ . '/../../notifications/core/approval-receipts.php';
+    ps_receipts_sweep($conn);
     room_review_reply(200, $decision === 'Approved' ? 'Reservation approved.' : 'Reservation declined.');
 } catch (Throwable $e) {
     if ($conn->errno === 0) {

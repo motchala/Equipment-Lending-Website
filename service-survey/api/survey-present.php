@@ -45,5 +45,7 @@ if (ss_find_owned_transaction($conn, $parsed['type'], $parsed['transaction_key']
     ss_fail(409, 'This transaction is no longer eligible for a survey.', 'not_eligible');
 }
 
-$presented = ss_claim_presentation($conn, $parsed['type'], $parsed['transaction_key']);
-ss_json(['status' => 'success', 'presented' => $presented]);
+// Showing the survey no longer uses the transaction up: only a submitted answer does (survey-submit.php).
+// So a refresh while the pop-up is open simply shows it again. This endpoint now only confirms that the
+// transaction is still eligible and writes nothing; it is kept so an already-open older tab does not break.
+ss_json(['status' => 'success', 'presented' => true]);

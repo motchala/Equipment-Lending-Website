@@ -16,6 +16,5 @@
 
     <!-- Modal helpers (inline for guaranteed global scope) -->
     <script src="shared/assets/js/admin-shell.js?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/js/admin-shell.js'); ?>"></script>
-    <script src="shared/assets/js/push-init.js?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/js/push-init.js'); ?>"></script>
 
 

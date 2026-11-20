@@ -47,7 +47,11 @@ if ($owned === null) {
     ss_fail(409, 'This transaction is no longer eligible for a survey.', 'not_eligible');
 }
 
-$skipped = !empty($body['skipped']);
+// The survey cannot be skipped: submitting an answer is the only way a transaction's survey is completed.
+if (!empty($body['skipped'])) {
+    ss_fail(400, 'This survey cannot be skipped.', 'required');
+}
+$skipped = false;
 $questions = ss_questions($conn);
 $ratings = $body['ratings'] ?? null;
 if (!$skipped) {

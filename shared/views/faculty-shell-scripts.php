@@ -30,8 +30,8 @@
     <script src="dashboard/assets/js/faculty-dashboard.js?v=<?php echo @filemtime(PS_ROOT . '/dashboard/assets/js/faculty-dashboard.js'); ?>"></script>
     <script src="notifications/assets/js/notif-prefs.js?v=<?php echo @filemtime(PS_ROOT . '/notifications/assets/js/notif-prefs.js'); ?>"></script>
     <script src="equipment-booking/assets/js/faculty-borrow-flow.js?v=<?php echo @filemtime(PS_ROOT . '/equipment-booking/assets/js/faculty-borrow-flow.js'); ?>"></script>
+    <script src="room-reservation/assets/js/room-buffer-countdown.js?v=<?php echo @filemtime(PS_ROOT . '/room-reservation/assets/js/room-buffer-countdown.js'); ?>"></script>
     <script src="room-reservation/assets/js/fcty-facilities.js?v=<?php echo @filemtime(PS_ROOT . '/room-reservation/assets/js/fcty-facilities.js'); ?>"></script>
     <script src="room-reservation/assets/js/fcty-class-schedule.js?v=<?php echo @filemtime(PS_ROOT . '/room-reservation/assets/js/fcty-class-schedule.js'); ?>"></script>
     <script src="dashboard/assets/js/faculty-dashboard-responsive.js?v=<?php echo @filemtime(PS_ROOT . '/dashboard/assets/js/faculty-dashboard-responsive.js'); ?>" defer></script>
     <script src="dashboard/assets/js/faculty-dashboard-mobile.js?v=<?php echo @filemtime(PS_ROOT . '/dashboard/assets/js/faculty-dashboard-mobile.js'); ?>" defer></script>
-    <script src="shared/assets/js/push-init.js?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/js/push-init.js'); ?>"></script>

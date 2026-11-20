@@ -49,14 +49,18 @@ function rw_week(mysqli $conn, int $room_id, string $monday, string $audience = 
     $week   = ['mon' => [], 'tue' => [], 'wed' => [], 'thu' => [], 'fri' => [], 'sat' => [], 'sun' => []];
     $by_dow = [1 => 'mon', 2 => 'tue', 3 => 'wed', 4 => 'thu', 5 => 'fri', 6 => 'sat', 7 => 'sun'];
 
-    // ── Approved reservations in that week ─────────────────────────────────
+    // ── Approved reservations in that week (+ same-day requests in their 10-minute review buffer) ──
+    require_once __DIR__ . '/room-buffer.php';
+    $holds_sql = ps_room_buffer_ensure_column($conn)
+        ? "(status = 'Approved' OR (status = 'Waiting' AND buffer_until IS NOT NULL))"
+        : "status = 'Approved'";
     $st = $conn->prepare(
         "SELECT reservation_date,
                 TIME_FORMAT(start_time, '%H:%i') AS start,
                 TIME_FORMAT(end_time,   '%H:%i') AS end,
                 faculty_name, submitted_by_name, purpose, submitted_as
            FROM tbl_room_reservations
-          WHERE room_id = ? AND reservation_date BETWEEN ? AND ? AND status = 'Approved'
+          WHERE room_id = ? AND reservation_date BETWEEN ? AND ? AND " . $holds_sql . "
           ORDER BY reservation_date ASC, start_time ASC"
     );
     $st->bind_param('iss', $room_id, $monday, $sunday);

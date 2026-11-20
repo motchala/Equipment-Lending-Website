@@ -1446,6 +1446,16 @@
                 });
         });
 
+        /* Same-day request in its short review buffer: say what happens, with a live countdown. */
+        function bufferNote(data) {
+            var secs = Math.max(0, parseInt(data.buffer_seconds, 10) || 0);
+            var t = window.PSRoomBuffer ? window.PSRoomBuffer.fmt(secs) : '';
+            return '<p>An admin can approve or decline this right away. If nobody acts, it is confirmed automatically in ' +
+                '<span class="rb-chip" data-buffer-until="' + esc(data.buffer_until || '') + '" data-buffer-id="' + esc(String(data.reservation_id || '')) + '">' +
+                icon('timer') + '<b class="rb-time">' + t + '</b></span>' +
+                ' if the room is still free. You\u2019ll see the result in My Activity.</p>';
+        }
+
         function showDone(data) {
             /* Same-day reservations are accepted immediately. A reservation for a later date is "Waiting"
                until an admin decides it. */
@@ -1459,7 +1469,7 @@
                 '<h4>' + (pending ? 'Request sent' : 'You\u2019re all set') + '</h4>' +
                 '<p>' + esc(data.room_name || room.name) + ' \u00b7 ' + longDate(parseYmd(st.date)) + '<br>' +
                 minToLabel(st.start) + ' \u2013 ' + minToLabel(st.end) + '</p>' +
-                (pending ? '<p>An admin will review this reservation. You\u2019ll see the decision in My Activity. If it isn\u2019t reviewed in time, it is automatically declined at 12:01 AM on the reservation day.</p>' : '') +
+                (pending && data.buffered ? bufferNote(data) : pending ? '<p>An admin will review this reservation. You\u2019ll see the decision in My Activity. If it isn\u2019t reviewed in time, it is automatically declined at 12:01 AM on the reservation day.</p>' : '') +
                 (!pending && data.reason ? '<p>' + esc(data.reason) + '</p>' : '') +
                 (data.attached ? '<p class="fcty-done-note">' + icon('attach_file') + 'Request letter attached</p>' : '') +
                 (data.max ? '<p class="fcty-done-note">' + icon('meeting_room') + data.active + ' of ' + data.max + ' rooms reserved</p>' : '') +

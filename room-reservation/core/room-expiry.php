@@ -34,6 +34,7 @@
  */
 
 require_once __DIR__ . '/room-rules.php';   // Settings → Arbitration → "Undecided later-date requests"
+require_once __DIR__ . '/room-buffer.php';  // 10-minute review buffer for same-day faculty requests
 
 if (!defined('PS_ROOM_EXPIRY_RULE')) {
     // Stored in tbl_room_arbitration_log.rule_applied so the admin Activity feed and the
@@ -56,9 +57,14 @@ if (!defined('PS_ROOM_EXPIRY_REASON_START')) {
 function ps_room_expire_unreviewed(mysqli $conn, ?DateTimeInterface $now = null): int
 {
     RoomRules::load($conn);
+
+    // Same-day faculty requests whose 10-minute buffer has ended are decided first (approve / decline).
+    // This runs whatever the "undecided requests" setting below says, and its declines are counted too.
+    $settled = ps_room_settle_buffers($conn, $now);
+
     $mode = RoomRules::expiryMode();
     if ($mode === 'never') {
-        return 0;   // the Super Admin turned automatic declining off
+        return $settled['declined'];   // the Super Admin turned automatic declining off
     }
 
     $tz  = new DateTimeZone('Asia/Manila');
@@ -84,10 +90,11 @@ function ps_room_expire_unreviewed(mysqli $conn, ?DateTimeInterface $now = null)
                FROM tbl_room_reservations rr
                JOIN tbl_rooms r ON r.room_id = rr.room_id
               WHERE rr.status = 'Waiting'
+                AND rr.buffer_until IS NULL   /* a buffered same-day request is decided by ps_room_settle_buffers() */
                 AND " . $deadline_sql
         );
         if (!$sel) {
-            return 0;
+            return $settled['declined'];
         }
         if ($mode === 'start') {
             $sel->bind_param('s', $now_s);
@@ -135,7 +142,7 @@ function ps_room_expire_unreviewed(mysqli $conn, ?DateTimeInterface $now = null)
         // Housekeeping must never take a page down.
         error_log('[PUPSync] ps_room_expire_unreviewed: ' . $e->getMessage());
     }
-    return $declined;
+    return $declined + $settled['declined'];
 }
 
 /**

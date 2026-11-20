@@ -58,7 +58,6 @@ require __DIR__ . '/equipment-booking/core/admin-equipment-return.php';
 <?php require __DIR__ . '/equipment-booking/views/admin-equipment-modals-3.php'; ?>
 <?php require __DIR__ . '/notifications/views/admin-modals.php'; ?>
 <?php require __DIR__ . '/shared/views/admin-shell-overlays.php'; ?>
-<?php require __DIR__ . '/shared/views/push-permission-modal.php'; ?>
 <?php require __DIR__ . '/settings/views/admin-modals.php'; ?>
 <?php require __DIR__ . '/room-reservation/views/admin-rooms-modals-2.php'; ?>
 <?php require __DIR__ . '/equipment-booking/views/admin-equipment-modals-4.php'; ?>

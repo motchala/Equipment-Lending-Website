@@ -1,5 +1,20 @@
 # Service survey reporting and export handoff
 
+## When a faculty member is surveyed
+
+- A survey is offered once per **successful transaction of the faculty member's own**: an equipment borrow
+  that has been fully returned (a cart/batch counts as one transaction), or a room reservation that was
+  approved and has ended.
+- Borrows and reservations a **student made with the faculty member's code** (`submitted_as = 'student'`)
+  never trigger a survey for the faculty member.
+- The pop-up cannot be skipped. There is no Skip/X button, Escape and clicks outside do nothing, and a page
+  refresh brings it back a couple of seconds after the page loads. Showing it writes nothing; the transaction
+  is only used up when an answer is submitted (`tbl_service_survey_completions`, `answered = 1`), after which
+  it is never offered again. `survey-submit.php` rejects the old `skipped` flag.
+- It closes by itself only if the Super Admin turns the survey off or the transaction stops being eligible.
+- Rows in `tbl_service_survey_completions` with `answered = 0` come from the older skippable behaviour; they
+  stay used up and are not offered again.
+
 ## Reporting windows
 
 The Super Admin configures `semester_start` and `semester_end` in

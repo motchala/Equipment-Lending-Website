@@ -99,6 +99,8 @@ if (!function_exists('dash_decline_label')) {
             'rule_missing_doc_hold'      => 'Supporting document missing',
             'rule_past_datetime'         => 'Date/time already passed',
             'rule_expired_unreviewed'    => 'Not reviewed in time',
+            'rule_buffer_approved'       => 'Auto-approved after the review window',
+            'rule_buffer_declined'       => 'Auto-declined after the review window',
             'rule_schedule_conflict'     => 'Schedule conflict',
             'override'                   => 'Declined manually by an admin',
         ];

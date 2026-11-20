@@ -24,6 +24,10 @@
  *     in document_path for the reviewing admin. A same-day reservation never needs one and
  *     is still decided on availability alone.
  *   • Every reservation from this endpoint is filed as 'personal'.
+ *   • SAME-DAY requests get a 10-minute review buffer (core/room-buffer.php): saved as Waiting so an
+ *     admin can approve/decline at once; if nobody acts, the system approves it when the buffer ends
+ *     (no conflicts) or declines it (any overlap or assigned class). Overlapping an existing
+ *     reservation or pending request is refused up front: first come, first served.
  */
 
 ini_set('display_errors', '0');
@@ -47,6 +51,7 @@ date_default_timezone_set('Asia/Manila');
 require_once __DIR__ . '/../../config/csrf.php';
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../core/room-quota.php';
+require_once __DIR__ . '/../core/room-buffer.php';   // 10-minute review buffer for same-day requests
 
 // ── Read the body (multipart or JSON) ─────────────────────────────────────
 $is_multipart = stripos($_SERVER['CONTENT_TYPE'] ?? '', 'multipart/form-data') === 0;
@@ -208,6 +213,18 @@ if (count($active_now) >= RoomRules::maxActive()) {
     exit();
 }
 
+// ── Same-day buffer: refuse an overlap up front (first come, first served) ──
+// Any Approved reservation or Waiting request for this room that overlaps even slightly blocks it.
+$buffered = ps_room_is_buffered_same_day($res_date);
+if ($buffered) {
+    $overlap_err = ps_room_overlap_error($conn, $room_id, $res_date, $start_time, $end_time);
+    if ($overlap_err !== null) {
+        fcty_quota_unlock($conn, $faculty_id);
+        echo json_encode(['error' => $overlap_err]);
+        exit();
+    }
+}
+
 // ── Store the document (after the limit check, before the insert) ─────────
 $document_path = null;
 $submitted_as  = 'personal';
@@ -248,7 +265,7 @@ $notes_val = $notes !== '' ? $notes : null;
 // A reservation for a LATER DATE always waits for an admin's decision, with or without a letter.
 // A same-day one is decided on the spot, unless the Super Admin turned "same-day confirmation" off
 // (then it waits like a later-date one). See core/room-expiry.php for the deadline rule.
-$hold_for_review = RoomRules::holdsForReview($res_date);   // validated by the engine, never auto-approved
+$hold_for_review = RoomRules::holdsForReview($res_date) || $buffered;   // validated by the engine, never approved on the spot
 $initial_status  = $hold_for_review ? 'Waiting' : 'Approved';
 
 // The legacy schema used an ENUM without Waiting even though the application
@@ -321,9 +338,18 @@ $status_stmt->close();
 $final_status = $status_row['status'] ?? 'Approved';
 $final_reason = $status_row['reason'] ?? '';
 
+// Same-day request that passed every check: start its review buffer (admin can act; otherwise the
+// system decides when it ends).
+$buffer_info = [];
+if ($buffered && $final_status === 'Waiting') {
+    $buffer_deadline = ps_room_buffer_deadline($res_date, $start_time);
+    ps_room_buffer_mark($conn, $reservation_id, $buffer_deadline);
+    $buffer_info = ps_room_buffer_payload($buffer_deadline);
+}
+
 fcty_quota_unlock($conn, $faculty_id);
 
-echo json_encode([
+echo json_encode($buffer_info + [
     'success'        => true,
     'reservation_id' => $reservation_id,
     'status'         => $final_status,
