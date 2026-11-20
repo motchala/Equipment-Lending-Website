@@ -136,3 +136,4 @@ if (strpos($fac_cache_ctl, 'max-age=0') !== false && strpos($fac_cache_ctl, 'no-
     <!-- Shared logout confirmation dialog + loading state -->
     <link rel="stylesheet" href="shared/assets/css/logout-modal.css?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/css/logout-modal.css'); ?>">
     <link rel="stylesheet" href="shared/assets/css/semester-tag.css?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/css/semester-tag.css'); ?>">
+    <link rel="stylesheet" href="shared/assets/css/push-permission-modal.css?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/css/push-permission-modal.css'); ?>">
