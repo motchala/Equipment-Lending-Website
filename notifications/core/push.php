@@ -224,13 +224,6 @@ if (!function_exists('ps_push_send_vapid')) {
             }
         }
 
-        // Write to a file because InfinityFree routes error_log() to /dev/null.
-        // TEMPORARY — delete push-debug.log and remove this block after diagnosis.
-        $logFile = __DIR__ . '/../../push-debug.log';
-        $logLine = date('[Y-m-d H:i:s] ') . 'Push status: ' . $pushStatus
-            . ' | result_len: ' . ($result !== false ? strlen($result) : 'FALSE')
-            . ' | endpoint: ' . substr($endpoint, 0, 60) . "\n";
-        @file_put_contents($logFile, $logLine, FILE_APPEND | LOCK_EX);
     }
 }
 
