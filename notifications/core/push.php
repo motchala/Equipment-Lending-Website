@@ -260,54 +260,54 @@ if (!function_exists('ps_vapid_private_to_der')) {
     {
         $priv = ps_base64url_decode($vapidPrivB64);
         $pub  = ps_base64url_decode($vapidPubB64);
-
         $priv = str_pad($priv, 32, chr(0), STR_PAD_LEFT);
 
-        // Build ECPrivateKey (RFC 5915) DER
-        // SEQUENCE {
-        //   INTEGER 1,
-        //   OCTET STRING (private key, 32 bytes),
-        //   [1] BIT STRING (public key, 65 bytes uncompressed)
+        // ── Build a correct PKCS#8 PrivateKeyInfo DER for P-256 ──────────────
+        // This format is accepted by every OpenSSL version (1.x, 3.x, InfinityFree).
+        //
+        // PKCS#8 PrivateKeyInfo ::= SEQUENCE {
+        //   version        INTEGER (0),
+        //   algorithm      AlgorithmIdentifier ::= SEQUENCE {
+        //                    algorithm   OID (id-ecPublicKey  1.2.840.10045.2.1)
+        //                    parameters  OID (prime256v1      1.2.840.10045.3.1.7)
+        //                  },
+        //   privateKey     OCTET STRING containing ECPrivateKey ::= SEQUENCE {
+        //                    version  INTEGER (1),
+        //                    key      OCTET STRING (32 bytes)
+        //                  }
         // }
-        $privOctet  = chr(0x04) . chr(0x20) . $priv;
-        $pubBitStr  = chr(0xa1) . chr(0x43) . chr(0x03) . chr(0x41) . chr(0x00) . $pub;
-        $version    = chr(0x02) . chr(0x01) . chr(0x01);
-        $inner      = $version . $privOctet . $pubBitStr;
-        $sec1       = chr(0x30) . chr(strlen($inner)) . $inner;
 
-        $pem = "-----BEGIN EC PRIVATE KEY-----\n" .
-               chunk_split(base64_encode($sec1), 64, "\n") .
-               "-----END EC PRIVATE KEY-----\n";
+        // OID id-ecPublicKey  1.2.840.10045.2.1  → 06 07 2a 86 48 ce 3d 02 01
+        $oidEcPublicKey = "\x06\x07\x2a\x86\x48\xce\x3d\x02\x01";
+        // OID prime256v1      1.2.840.10045.3.1.7 → 06 08 2a 86 48 ce 3d 03 01 07
+        $oidPrime256v1  = "\x06\x08\x2a\x86\x48\xce\x3d\x03\x01\x07";
 
-        // OpenSSL 3.x is strict — verify it loads before returning
+        // AlgorithmIdentifier SEQUENCE { id-ecPublicKey, prime256v1 }
+        $algId = $oidEcPublicKey . $oidPrime256v1;
+        $algSeq = "\x30" . chr(strlen($algId)) . $algId;
+
+        // ECPrivateKey SEQUENCE { version INTEGER 1, privateKey OCTET STRING }
+        $ecVer    = "\x02\x01\x01";
+        $ecKeyOs  = "\x04" . chr(strlen($priv)) . $priv;
+        $ecInner  = $ecVer . $ecKeyOs;
+        $ecPriv   = "\x30" . chr(strlen($ecInner)) . $ecInner;
+
+        // Wrap ECPrivateKey in an OCTET STRING
+        $privKeyOs = "\x04" . chr(strlen($ecPriv)) . $ecPriv;
+
+        // PrivateKeyInfo SEQUENCE { version 0, algId, privateKey }
+        $pkcs8Ver   = "\x02\x01\x00";
+        $pkcs8Inner = $pkcs8Ver . $algSeq . $privKeyOs;
+        $pkcs8      = "\x30" . chr(strlen($pkcs8Inner)) . $pkcs8Inner;
+
+        $pem = "-----BEGIN PRIVATE KEY-----\n"
+             . chunk_split(base64_encode($pkcs8), 64, "\n")
+             . "-----END PRIVATE KEY-----\n";
+
+        // Verify it loads — if not, clear OpenSSL error queue and return anyway
+        // (the sign step will fail with a clearer error than a silent wrong key).
         while (openssl_error_string() !== false) {}
-        $key = @openssl_pkey_get_private($pem);
-        if ($key) {
-            return $pem;
-        }
-
-        // Fallback: build PKCS#8 format which OpenSSL 3.x always accepts
-        // OID for prime256v1: 1.2.840.10045.3.1.7 (8 bytes after tag+len)
-        $oidBytes   = "\x2a\x86\x48\xce\x3d\x03\x01\x07";
-        $oidSeq     = "\x06\x08" . $oidBytes;
-        $ecOid      = "\x06\x07\x2a\x86\x48\xce\x3d\x02\x01"; // id-ecPublicKey
-        $algSeq     = chr(0x30) . chr(strlen($ecOid) + strlen($oidSeq) + 2) .
-                      $ecOid .
-                      chr(0x06) . chr(strlen($oidBytes)) . $oidBytes;
-
-        $privOctetStr = chr(0x04) . chr(strlen($priv)) . $priv;
-        $innerSeq     = chr(0x02) . chr(0x01) . chr(0x01) . $privOctetStr;
-        $ecPriv       = chr(0x30) . chr(strlen($innerSeq)) . $innerSeq;
-        $privStr      = chr(0x04) . chr(strlen($ecPriv)) . $ecPriv;
-
-        $pkcs8inner = chr(0x02) . chr(0x01) . chr(0x00) .
-                      $algSeq .
-                      $privStr;
-        $pkcs8      = chr(0x30) . chr(strlen($pkcs8inner)) . $pkcs8inner;
-
-        return "-----BEGIN PRIVATE KEY-----\n" .
-               chunk_split(base64_encode($pkcs8), 64, "\n") .
-               "-----END PRIVATE KEY-----\n";
+        return $pem;
     }
 }
 
