@@ -17,6 +17,12 @@ declare(strict_types=1);
  *      A request that is declined LATER (by an admin, or by the deadline below) stays in My Activity history.
  *
  *   2. SAME-DAY request (booking_mode = 'today')
+ *      NOW GOES THROUGH THE 10-MINUTE APPROVAL BUFFER (core/request-buffer.php): after the checks that
+ *      make a request impossible (step a below) it is saved as Waiting with buffer_until = submitted + 10
+ *      minutes. An admin can approve or decline it at any time during the buffer; if nobody does, the
+ *      system approves it when every item has stock and NO overlapping booking, otherwise declines it.
+ *      The auto-approve rules described in b / c below (faculty only, stock-health caps, cart rule...) are
+ *      no longer applied to 'today' requests; they only remain for old rows without a booking mode.
  *      Decided immediately, in this order:
  *        a. Not possible at all (out right now, not enough free units): Declined with the reason.
  *        b. Possible, but not an automatic approval: left WAITING for an admin to approve or decline
@@ -61,6 +67,7 @@ date_default_timezone_set('Asia/Manila');
 
 require_once __DIR__ . '/booking-schedule.php';
 require_once __DIR__ . '/arbitration-engine.php';
+require_once __DIR__ . '/request-buffer.php';   // the 10-minute buffer every same-day request now goes through
 
 if (!defined('EQ_EXPIRY_RULE')) {
     // Same rule id the room reservations use, so the admin Activity feed already knows its label.
@@ -443,6 +450,10 @@ function equipment_waiting_meets_auto_rules(mysqli $conn, int $id): bool
     if (!$r || $r['status'] !== 'Waiting' || !in_array($r['booking_mode'], ['today', ''], true)) {
         return false;
     }
+    if ($r['booking_mode'] === 'today') {
+        // Same day: "meets the rules" = the automatic check at the end of the buffer would approve it right now
+        return eq_buffer_ids_pass($conn, [$id]);
+    }
     $gate = equipment_same_day_gate($conn, $id);
     return $gate['block'] === null && $gate['review'] === null;
 }
@@ -472,6 +483,22 @@ function equipment_cart_meets_auto_rules(mysqli $conn, string $batch_id): bool
             $rows[] = $row;
         }
         $stmt->close();
+
+        // Same-day cart (10-minute buffer): it meets the rules when the automatic check would approve the whole cart now
+        $wait_ids  = [];
+        $all_today = true;
+        foreach ($rows as $row) {
+            if ($row['status'] === 'Waiting') {
+                $wait_ids[] = (int)$row['id'];
+                if ($row['booking_mode'] !== 'today') {
+                    $all_today = false;
+                }
+            }
+        }
+        if ($wait_ids && $all_today) {
+            return $cache[$batch_id] = eq_buffer_ids_pass($conn, $wait_ids);
+        }
+
         $ok = $rows !== [] && count($rows) <= EQ_SAMEDAY_MAX_CART_ITEMS;
         $waiting = 0;
         foreach ($rows as $row) {
@@ -574,7 +601,13 @@ function equipment_decide_on_submit(mysqli $conn, array $request_ids): array
                 $out[$id] = ['status' => 'Declined', 'reason' => $gate['block']['reason']];
                 continue;
             }
-            // Possible: remember it. Whether it is approved depends on the WHOLE cart (see below).
+            // Same day: into the 10-minute buffer (core/request-buffer.php). It stays Waiting; an admin may decide it
+            // meanwhile, otherwise eq_buffer_settle() approves or declines it when the buffer ends.
+            if ($row['booking_mode'] === 'today') {
+                $out[$id] = eq_buffer_enter($conn, $id);
+                continue;
+            }
+            // Old rows without a booking mode only: remember it. Whether it is approved depends on the WHOLE cart (see below).
             $sameDay[$id] = ['review' => $gate['review'], 'batch' => $row['batch_id'], 'personal' => !empty($gate['personal']), 'one_day' => !empty($gate['one_day'])];
         } catch (\Throwable $e) {
             error_log('equipment_decide_on_submit[' . $id . '] - ' . $e->getMessage());
@@ -732,6 +765,7 @@ function equipment_expire_unreviewed(mysqli $conn, ?DateTimeInterface $now = nul
                       OR COALESCE(booking_mode, '') <> 'future') AS submitted_on_the_day
                FROM tbl_requests
               WHERE status = 'Waiting' AND borrow_date IS NOT NULL
+                AND buffer_until IS NULL   /* a buffered same-day request is decided by eq_buffer_settle() */
                 AND (
                       (COALESCE(request_date, '1970-01-01 00:00:00') <  TIMESTAMP(borrow_date, '00:01:00')
                         AND COALESCE(booking_mode, '') = 'future'
@@ -794,6 +828,7 @@ function equipment_decide_stuck(mysqli $conn): void
         $stmt   = $conn->prepare(
             "SELECT id FROM tbl_requests
               WHERE status = 'Waiting'
+                AND buffer_until IS NULL   /* a buffered same-day request is decided by eq_buffer_settle() */
                 AND COALESCE(booking_mode, '') <> 'future'
                 AND COALESCE(arbitration_rule, '') <> '" . EQ_SAMEDAY_REVIEW_RULE . "'
                 AND request_date < ?

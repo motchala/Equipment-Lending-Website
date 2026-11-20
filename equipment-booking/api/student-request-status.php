@@ -50,7 +50,7 @@ equipment_auto_approve_tick($conn);
 $stmt = $conn->prepare(
     "SELECT status, COALESCE(batch_id, '') AS batch_id, COALESCE(reason, '') AS reason, COALESCE(student_key, '') AS student_key,
             COALESCE(NULLIF(claim_token, ''), NULLIF(bundle_claim_token, '')) AS claim,
-            NULLIF(return_token, '') AS ret
+            NULLIF(return_token, '') AS ret, buffer_until
        FROM tbl_requests WHERE id = ? LIMIT 1"
 );
 if (!$stmt) {
@@ -89,6 +89,9 @@ foreach ($asked as $it) {
         'batch_id'     => (string)$row['batch_id'],
         'status'       => $status,
         'reason'       => (string)$row['reason'],
+        // same-day request still in its 10-minute approval buffer: when the system decides it (ISO time), else null
+        'buffer_until' => ($status === 'Waiting' && !empty($row['buffer_until']))
+            ? (new DateTimeImmutable((string)$row['buffer_until'], new DateTimeZone('Asia/Manila')))->format('c') : null,
         // Both QRs are shown from the start. The Claim QR only works once Approved (claim_confirm.php); the Return QR
         // only works while the item is On Loan / Overdue (return_confirm.php, partial-return.php).
         'claim_token'  => in_array($status, ['Waiting', 'Approved'], true) ? ($row['claim'] ?: null) : null,

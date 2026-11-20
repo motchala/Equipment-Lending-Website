@@ -198,6 +198,8 @@ final class BookingSchedule
             // secret handed only to the student who submitted the request, so the Student Portal can ask
             // "was it approved yet?" and receive the Claim QR without a login (see student-request-status.php)
             'student_key'   => 'VARCHAR(64) NULL DEFAULT NULL',
+            // end of the 10-minute approval buffer of a same-day request (see core/request-buffer.php)
+            'buffer_until'  => 'DATETIME NULL DEFAULT NULL',
         ];
 
         try {

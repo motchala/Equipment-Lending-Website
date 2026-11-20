@@ -834,7 +834,8 @@
                     equipment: cur.name, qty: cur.qty, request_id: d.request_id,
                     status: d.status || 'Waiting', reason: d.reason || '',
                     claim_token: d.claim_token || '', return_token: d.return_token || '',
-                    status_key: d.status_key || '', batch_id: st.batchId || ''
+                    status_key: d.status_key || '', batch_id: st.batchId || '',
+                    buffer_until: d.buffer_until || ''   /* same-day request: when the system decides it if no admin does */
                 });
                 st.where = { room: room, roomId: roomId, borrow: borrow, startTime: startTime, duration: duration, ret: ret };
                 i++;
@@ -1617,11 +1618,20 @@
 
         /* Compact request rows. Items that share one set of QR codes live together in ONE card (rows on top, the
            QR codes once at the bottom); any other item gets a small card of its own. */
+        /* Same-day request in its 10-minute approval buffer: live countdown (equipment-buffer-countdown.js) */
+        function bufferChip(it) {
+            var until = Date.parse(it.buffer_until || '');
+            if (isNaN(until)) return '';
+            var left = Math.max(0, Math.ceil((until - Date.now()) / 1000));
+            return '<span class="eqb-chip" data-eqbuf-until="' + esc(it.buffer_until) + '" title="An admin can approve or decline it now; otherwise it is decided automatically.">' +
+                icon('timer') + 'Decided automatically in <b class="eqb-time">' + Math.floor(left / 60) + ':' + (left % 60 < 10 ? '0' : '') + (left % 60) + '</b></span>';
+        }
         function itemRowHtml(it) {
             var status = itemStatus(it), v = statusView(status);
             return '<div class="st-rq-row"><div class="st-rq-main"><span class="st-rq-name">' +
                 (it.qty > 1 ? esc(it.qty) + '× ' : '') + esc(it.equipment) + '</span>' +
-                '<span class="st-rq-id">Request #' + esc(String(it.request_id)) + '</span></div>' +
+                '<span class="st-rq-id">Request #' + esc(String(it.request_id)) + '</span>' +
+                (status === 'Waiting' && it.buffer_until ? bufferChip(it) : '') + '</div>' +
                 '<span class="st-rq-pill is-' + v.tone + '">' + icon(v.icon) + esc(PILL_LABEL[status] || v.label) + '</span></div>';
         }
         function claimBox(tok, sub) {
@@ -1709,8 +1719,11 @@
                 (nWaiting ? ' The rest are still waiting for an admin to review.' : '');
             tone = nWaiting ? 'wait' : 'ok'; ic = nWaiting ? 'hourglass_top' : 'check_circle';
         } else if (nWaiting) {
-            title = 'Request sent — pending admin review';
-            lead = r.items.some(function (it) { return it.claim_token; })
+            var buffered = r.items.some(function (it) { return itemStatus(it) === 'Waiting' && it.buffer_until; });
+            title = buffered ? 'Request sent — decided within 10 minutes' : 'Request sent — pending admin review';
+            lead = buffered
+                ? 'An admin can approve or decline ' + (many ? 'these requests' : 'this request') + ' right away. If nobody does within 10 minutes, ' + (many ? 'they are' : 'it is') + ' approved automatically when the equipment is free for that time, otherwise declined. This page updates by itself.'
+                : r.items.some(function (it) { return it.claim_token; })
                 ? 'Your Claim QR is below. Show it to the admin to pick up your ' + (many ? 'items' : 'item') + ' once ' + (many ? 'they are' : 'it is') + ' approved.'
                 : 'An admin will approve or decline ' + (many ? 'these requests' : 'this request') + '. Check with your faculty or the admin office for the decision.';
         } else {
@@ -1783,6 +1796,7 @@
                     if (String(it.request_id) !== String(u.request_id)) return;
                     var tok = u.claim_token || '', ret = u.return_token || '';
                     if (u.batch_id) it.batch_id = u.batch_id;
+                    if ((it.buffer_until || '') !== (u.buffer_until || '')) { it.buffer_until = u.buffer_until || ''; changed = true; }
                     if (it.status !== u.status || (it.claim_token || '') !== tok || (it.return_token || '') !== ret ||
                         (u.reason && it.reason !== u.reason)) {
                         it.status = u.status;

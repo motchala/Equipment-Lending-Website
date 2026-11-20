@@ -38,6 +38,7 @@ $st_semester = ps_semester_label();
     <!-- PUPSync Student Styles -->
     <link rel="stylesheet" href="dashboard/assets/css/student-dashboard.css?v=<?php echo @filemtime(__DIR__ . '/dashboard/assets/css/student-dashboard.css'); ?>">
     <link rel="stylesheet" href="shared/assets/css/letter-camera.css">
+    <link rel="stylesheet" href="equipment-booking/assets/css/equipment-buffer.css?v=<?php echo @filemtime(__DIR__ . '/equipment-booking/assets/css/equipment-buffer.css'); ?>">
     <link rel="stylesheet" href="shared/assets/css/semester-tag.css?v=<?php echo @filemtime(__DIR__ . '/shared/assets/css/semester-tag.css'); ?>">
     <?php role_splash_head(); ?>
 </head>
@@ -183,6 +184,7 @@ $st_semester = ps_semester_label();
 
     <!-- PUPSync Student JS -->
     <script src="shared/assets/js/letter-camera.js"></script>
+    <script src="equipment-booking/assets/js/equipment-buffer-countdown.js?v=<?php echo @filemtime(__DIR__ . '/equipment-booking/assets/js/equipment-buffer-countdown.js'); ?>"></script>
     <script src="dashboard/assets/js/student-dashboard.js?v=<?php echo @filemtime(__DIR__ . '/dashboard/assets/js/student-dashboard.js'); ?>"></script>
 
 </body>

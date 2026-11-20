@@ -130,6 +130,8 @@ if (strpos($fac_cache_ctl, 'max-age=0') !== false && strpos($fac_cache_ctl, 'no-
     <link rel="stylesheet" href="room-reservation/assets/css/fcty-facilities.css?v=<?php echo @filemtime(PS_ROOT . '/room-reservation/assets/css/fcty-facilities.css'); ?>">
     <!-- same-day room request: review-buffer countdown chip -->
     <link rel="stylesheet" href="room-reservation/assets/css/room-buffer.css?v=<?php echo @filemtime(PS_ROOT . '/room-reservation/assets/css/room-buffer.css'); ?>">
+    <!-- same-day equipment request: approval-buffer countdown chip -->
+    <link rel="stylesheet" href="equipment-booking/assets/css/equipment-buffer.css?v=<?php echo @filemtime(PS_ROOT . '/equipment-booking/assets/css/equipment-buffer.css'); ?>">
 
     <!-- Shared logout confirmation dialog + loading state -->
     <link rel="stylesheet" href="shared/assets/css/logout-modal.css?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/css/logout-modal.css'); ?>">

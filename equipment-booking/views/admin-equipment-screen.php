@@ -763,6 +763,12 @@
                                         <td data-col="equipment">
                                             <div class="eq-cell-name"><?php echo htmlspecialchars($r['equipment_name']); ?><?php if ($lqty > 1): ?> <span class="ps-appr-qty">&times;<?php echo $lqty; ?></span><?php endif; ?></div>
                                             <button type="button" class="ps-appr-id" data-action="ps-open-modal" data-modal="ps-req-detail-modal">#<?php echo str_pad($r['id'], 4, '0', STR_PAD_LEFT); ?></button><?php if ($lbundle !== '' && ($eq_bundle_counts[$lbundle] ?? 0) > 1): ?><span class="eq-bundle-tag"><span class="material-symbols-outlined" aria-hidden="true">link</span><?php echo (int)$eq_bundle_counts[$lbundle]; ?></span><?php endif; ?>
+                                            <?php if ($lst === 'waiting' && !empty($r['buffer_until'])):
+                                                // same-day request in its 10-minute approval buffer: live countdown (equipment-buffer-countdown.js)
+                                                $lbuf_ts   = (int)strtotime((string)$r['buffer_until']);
+                                                $lbuf_left = max(0, $lbuf_ts - time()); ?>
+                                            <div class="eq-cell-sub"><span class="eqb-chip" data-eqbuf-until="<?php echo htmlspecialchars(date('c', $lbuf_ts)); ?>" data-eqbuf-id="<?php echo (int)$r['id']; ?>" title="Approve or decline now. If nobody does, the system approves it when the equipment is free for that time, otherwise declines it."><span class="material-symbols-outlined" aria-hidden="true">timer</span>Auto-decides in <b class="eqb-time"><?php echo sprintf('%d:%02d', intdiv($lbuf_left, 60), $lbuf_left % 60); ?></b></span></div>
+                                            <?php endif; ?>
                                         </td>
                                         <td data-col="col3">
                                             <?php if ($lst === 'waiting' || $lst === 'scheduled'): ?>

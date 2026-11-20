@@ -815,7 +815,11 @@
                     var nWaiting = done.length - nApproved;
                     var parts = [];
                     if (nApproved) parts.push(nApproved + (nApproved === 1 ? ' request' : ' requests') + ' approved \u2013 show your Claim QR to the admin');
-                    if (nWaiting) parts.push(nWaiting + ' waiting for admin review');
+                    /* a same-day request waits in a short buffer (an admin may decide it, otherwise the system does);
+                       a later-date one waits for an admin */
+                    var nBuffered = done.filter(function (d) { return d.status === 'Waiting' && d.buffer_minutes; }).length;
+                    if (nBuffered) parts.push(nBuffered + ' pending \u2013 decided automatically within ' + done.filter(function (d) { return d.buffer_minutes; })[0].buffer_minutes + ' minutes unless an admin acts first');
+                    if (nWaiting - nBuffered > 0) parts.push((nWaiting - nBuffered) + ' waiting for admin review');
                     toast(parts.join(' \u00b7 ') || 'Borrow request submitted.');
                     resetForm();
                     closeModal();

@@ -7,7 +7,9 @@ declare(strict_types=1);
  * then fill in the Borrow modal). Checks each item against BookingSchedule (time window,
  * availability, room conflicts), files each one as 'Waiting', then decides them right away with the
  * same rules as every other way of borrowing (core/request-decision.php):
- *   - same day   : decided on the spot. Items approved together share ONE Claim QR.
+ *   - same day   : waits in a 10-minute approval buffer (core/request-buffer.php): an admin may decide it
+ *                  meanwhile, otherwise the system approves it (stock + no overlapping booking) or declines it.
+ *                  Items approved together share ONE Claim QR.
  *   - later date : waits for an admin; declined automatically at 12:01 AM on the borrow date if
  *                  nobody decides.
  * Returns JSON - no page redirect, enabling live UI updates.
@@ -31,6 +33,8 @@ declare(strict_types=1);
  * Returns:
  *   { ok: true,  submitted: [{name, request_id, status, reason}], failed: [{name, error}] }
  *                status is the real outcome: Approved | Waiting | Declined
+ *                a same-day item in its buffer is Waiting and also carries
+ *                buffer_until (ISO time), buffer_seconds, buffer_minutes
  *   { ok: false, error: string }
  *
  * Depth 2 → config prefix: __DIR__ . '/../../config/…'
@@ -250,6 +254,11 @@ foreach ($submitted as &$s) {
     if ($d) {
         $s['status'] = $d['status'];
         $s['reason'] = $d['reason'];
+        if (!empty($d['buffered'])) {
+            $s['buffer_until']   = $d['buffer_until'];
+            $s['buffer_seconds'] = $d['buffer_seconds'];
+            $s['buffer_minutes'] = $d['buffer_minutes'];
+        }
     }
 }
 unset($s);

@@ -152,7 +152,7 @@ function fact_eq_load(mysqli $conn, string $faculty_id): array
         $images = fact_eq_image_map($conn);
 
         $cols = "r.id, r.equipment_name, r.borrow_qty, r.room, r.room_id, r.batch_id, r.bundle_claim_token, r.booking_mode, r.borrow_date, r.borrow_time, $extCol,
-                 r.return_date, r.return_time, r.returned_at, r.status, r.reason, r.arbitration_rule,
+                 r.return_date, r.return_time, r.returned_at, r.status, r.reason, r.arbitration_rule, r.buffer_until,
                  r.request_date, r.return_token, r.claim_token, r.submitted_as, r.submitted_by_name, r.submitted_by_id,
                  rm.room_name, b.building_key, b.name AS building_name,
                  COALESCE(rm.floor_label, CONCAT(rm.floor_number, 'F')) AS floor_label
@@ -199,6 +199,9 @@ function fact_eq_load(mysqli $conn, string $faculty_id): array
                     'status'      => $status,
                     'reason'      => trim(fact_s($row, 'reason')),
                     'rule'        => fact_s($row, 'arbitration_rule'),
+                    // same-day request still in its 10-minute approval buffer: when the system decides it (ISO time)
+                    'buffer_until' => ($status === 'Waiting' && fact_s($row, 'buffer_until') !== '')
+                        ? (new DateTimeImmutable(fact_s($row, 'buffer_until'), $tz))->format('c') : '',
                     'token'       => fact_s($row, 'return_token'),
                     'claim_token' => fact_s($row, 'claim_token'),
                     'student'     => fact_s($row, 'submitted_as') === 'student' ? trim(fact_s($row, 'submitted_by_name')) : '',
@@ -522,6 +525,13 @@ function fact_eq_render_item(array $it, string $kind, string $rootUrl, DateTimeI
     }
     if (fact_eq_extended_label($it) !== '') {
         $sub[] = fact_h(fact_eq_extended_label($it));
+    }
+    // 10-minute approval buffer (same-day request): live countdown, ticked by equipment-buffer-countdown.js
+    if ($status === 'Waiting' && fact_s($it, 'buffer_until') !== '') {
+        $left  = max(0, (int)strtotime(fact_s($it, 'buffer_until')) - time());
+        $sub[] = '<span class="eqb-chip" data-eqbuf-until="' . fact_h(fact_s($it, 'buffer_until')) . '" data-eqbuf-id="' . fact_i($it, 'id')
+            . '" title="An admin can approve or decline now; otherwise it is approved automatically if the equipment is free for that time, or declined.">'
+            . fact_icon('timer') . 'Decided automatically in <b class="eqb-time">' . sprintf('%d:%02d', intdiv($left, 60), $left % 60) . '</b></span>';
     }
 
     $isBundle = fact_i($it, 'bundle_count') > 1;
@@ -863,7 +873,7 @@ function fact_eq_todo(array $d): array
         $out[]  = fact_todo_item(
             'equipment', 4, 'wait', 'hourglass_top',
             $n === 1 ? $names($groups[0]) . ' is waiting for review' : $n . ' equipment requests are waiting for review',
-            'Waiting for an admin',
+            fact_s($firstR, 'buffer_until') !== '' ? 'Decided automatically within 10 minutes' : 'Waiting for an admin',
             'eq:' . fact_i($firstR, 'id'),
             fact_i($firstR, 'start_ts')
         );
