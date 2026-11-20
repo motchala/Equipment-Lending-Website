@@ -462,6 +462,7 @@
                                                 data-arb-rule="<?php echo htmlspecialchars($ar['arb_rule'] ?? ''); ?>"
                                                 data-arb-reason="<?php echo htmlspecialchars($ar_arb_reason_out); ?>"
                                                 data-submitted-ts="<?php echo !empty($ar['request_date']) ? (int)strtotime($ar['request_date']) : 0; ?>"
+                                                data-buffer-end="<?php echo ($ar['status'] === 'Waiting' && !empty($ar['buffer_until'])) ? htmlspecialchars((new DateTimeImmutable((string)$ar['buffer_until'], new DateTimeZone('Asia/Manila')))->format('c')) : ''; ?>"
                                                 data-can-review="<?php echo $ar_reviewable ? '1' : '0'; ?>"
                                                 data-cancellable="<?php echo $ar_cancellable ? '1' : '0'; ?>"
                                                 data-room-id="<?php echo (int)$ar['room_id']; ?>"
@@ -529,6 +530,7 @@
                             </div>
                         </div>
                     </div>
+                    <script src="room-reservation/assets/js/room-buffer-countdown.js?v=<?php echo @filemtime(PS_ROOT . '/room-reservation/assets/js/room-buffer-countdown.js'); ?>"></script>
                     <script src="room-reservation/assets/js/admin-rooms-reservations-table.js?v=<?php echo @filemtime(PS_ROOT . '/room-reservation/assets/js/admin-rooms-reservations-table.js'); ?>"></script>
                 </div><!-- /#rooms-reservations-panel -->
 

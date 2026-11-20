@@ -177,12 +177,18 @@ $room_ids     = array_column($all_rooms, 'room_id');
 $placeholders = implode(',', array_fill(0, count($room_ids), '?'));
 $types        = str_repeat('i', count($room_ids));
 
+// A same-day request still in its 10-minute review buffer holds the slot too (core/room-buffer.php).
+require_once __DIR__ . '/../core/room-buffer.php';
+$holds_sql = ps_room_buffer_ensure_column($conn)
+    ? "(status = 'Approved' OR (status = 'Waiting' AND buffer_until IS NOT NULL))"
+    : "status = 'Approved'";
+
 $conflict_stmt = $conn->prepare(
     "SELECT DISTINCT room_id
        FROM tbl_room_reservations
       WHERE room_id IN ({$placeholders})
         AND reservation_date = ?
-        AND status           = 'Approved'
+        AND {$holds_sql}
         AND start_time       < ?
         AND end_time         > ?"
 );

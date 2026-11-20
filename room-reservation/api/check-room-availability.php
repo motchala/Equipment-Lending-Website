@@ -134,10 +134,16 @@ if ($closed_err !== null) {
 // bind_param order: room_id (i), reservation_date (s),
 //                  end_time (s) — bound to "start_time < ?" placeholder,
 //                  start_time (s) — bound to "end_time > ?" placeholder
+// A same-day request still in its 10-minute review buffer holds the slot too (core/room-buffer.php).
+require_once __DIR__ . '/../core/room-buffer.php';
+$holds_sql = ps_room_buffer_ensure_column($conn)
+    ? "(status = 'Approved' OR (status = 'Waiting' AND buffer_until IS NOT NULL))"
+    : "status = 'Approved'";
+
 $sql = "SELECT COUNT(*) FROM tbl_room_reservations
         WHERE room_id          = ?
           AND reservation_date = ?
-          AND status           = 'Approved'
+          AND {$holds_sql}
           AND start_time       < ?
           AND end_time         > ?";
 

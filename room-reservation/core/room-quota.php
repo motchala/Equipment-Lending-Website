@@ -232,11 +232,12 @@ function fact_load_rooms(mysqli $conn, string $faculty_id): array
 
     try {
         ps_room_expire_unreviewed($conn);   // so an overdue request shows as Declined, not Pending
+        $buf_col = ps_room_buffer_ensure_column($conn) ? 'rr.buffer_until' : 'NULL';   // same-day review buffer
 
         $stmt = $conn->prepare(
             "SELECT rr.id, rr.room_id, rr.reservation_date, rr.start_time, rr.end_time,
                     rr.purpose, rr.submitted_as, rr.submitted_by_name, rr.submitted_by_id,
-                    rr.document_path, rr.status, rr.reason,
+                    rr.document_path, rr.status, rr.reason, " . $buf_col . " AS buffer_until,
                     r.room_name, b.building_key, b.name AS building_name,
                     COALESCE(r.floor_label, CONCAT(r.floor_number, 'F')) AS floor_label
                FROM tbl_room_reservations rr
@@ -291,6 +292,11 @@ function fact_load_rooms(mysqli $conn, string $faculty_id): array
                     // withdrawn at any time; it is never shown as Declined.
                     $item['state']      = 'pending';
                     $item['can_cancel'] = true;
+                    // Same-day request in its 10-minute review buffer: the screen shows a live countdown.
+                    $buf = fact_s($row, 'buffer_until');
+                    if ($buf !== '') {
+                        $item['buffer_until'] = (new DateTimeImmutable($buf, $tz))->format('c');
+                    }
                     $out['pending'][]   = $item;
                 } else {
                     $item['state'] = $status === 'Cancelled' ? 'cancelled' : 'declined';
@@ -585,6 +591,13 @@ function fact_render_room_item(array $it, string $kind): string
         }
         if (!empty($it['letter'])) {
             $sub[] = '<span class="fact-attach" title="Letter attached">' . fact_icon('attach_file') . 'Letter</span>';
+        }
+        // 10-minute review buffer (same-day request): live countdown, ticked by room-buffer-countdown.js
+        if ($kind === 'pending' && fact_s($it, 'buffer_until') !== '') {
+            $left  = max(0, (int)strtotime(fact_s($it, 'buffer_until')) - time());
+            $sub[] = '<span class="rb-chip" data-buffer-until="' . fact_h(fact_s($it, 'buffer_until')) . '" data-buffer-id="' . fact_i($it, 'id')
+                . '" title="An admin can approve or decline now; otherwise it is confirmed automatically if the room is free.">'
+                . fact_icon('timer') . 'Auto-confirms in <b class="rb-time">' . sprintf('%d:%02d', intdiv($left, 60), $left % 60) . '</b></span>';
         }
     }
 

@@ -138,6 +138,7 @@ $room_name = (string)$room_row['room_name'];
 
 // ── Quota check ───────────────────────────────────────────────────────────────
 require_once __DIR__ . '/../core/room-quota.php';
+require_once __DIR__ . '/../core/room-buffer.php';   // 10-minute review buffer for same-day requests
 fcty_quota_lock($conn, $faculty_id);
 
 $active_now = fcty_active_room_reservations($conn, $faculty_id);
@@ -149,13 +150,23 @@ if (count($active_now) >= RoomRules::maxActive()) {
     );
 }
 
+// ── Same-day buffer: refuse an overlap up front (first come, first served) ────
+$buffered = ps_room_is_buffered_same_day($res_date);
+if ($buffered) {
+    $overlap_err = ps_room_overlap_error($conn, $room_id, $res_date, $start_time, $end_time);
+    if ($overlap_err !== null) {
+        fcty_quota_unlock($conn, $faculty_id);
+        reserve_respond(409, 'error', $overlap_err);
+    }
+}
+
 // ── Filed as the faculty member's own reservation ─────────────────────────────
 $submitted_as = 'personal';
 
 // ── Insert reservation ────────────────────────────────────────────────────────
 // Same-day: Approved at once. A LATER DATE waits for an admin's decision.
 $is_future_day   = ps_room_is_future_date($res_date);
-$hold_for_review = RoomRules::holdsForReview($res_date);   // later date, or same-day when auto-confirm is off
+$hold_for_review = RoomRules::holdsForReview($res_date) || $buffered;   // later date, same-day buffer, or same-day when auto-confirm is off
 $initial_status = $hold_for_review ? 'Waiting' : 'Approved';
 if ($hold_for_review) {
     ps_room_ensure_waiting_status($conn);
@@ -194,10 +205,18 @@ $sel->execute();
 $final = $sel->get_result()->fetch_assoc();
 $sel->close();
 
-fcty_quota_unlock($conn, $faculty_id);
-
 $final_status = (string)($final['status'] ?? 'Approved');
 $final_reason = (string)($final['reason'] ?? '');
+
+// Same-day request that passed every check: start its review buffer.
+$buffer_info = [];
+if ($buffered && $final_status === 'Waiting') {
+    $buffer_deadline = ps_room_buffer_deadline($res_date, $start_time);
+    ps_room_buffer_mark($conn, $reservation_id, $buffer_deadline);
+    $buffer_info = ps_room_buffer_payload($buffer_deadline);
+}
+
+fcty_quota_unlock($conn, $faculty_id);
 
 // If declined, remove the row (same as submit-student-reserve.php behaviour)
 if ($final_status === 'Declined') {
@@ -212,9 +231,11 @@ if ($final_status === 'Declined') {
 // ── Success ───────────────────────────────────────────────────────────────────
 ob_end_clean();
 http_response_code(200);
-echo json_encode([
+echo json_encode($buffer_info + [
     'status'         => 'success',
-    'message'        => $final_status === 'Waiting' ? 'Reservation request sent – waiting for admin approval.' : 'Reservation confirmed.',
+    'message'        => $buffer_info
+        ? 'Reservation request sent – an admin has a few minutes to review it; if nobody acts it is confirmed automatically when the room is still free.'
+        : ($final_status === 'Waiting' ? 'Reservation request sent – waiting for admin approval.' : 'Reservation confirmed.'),
     'reservation_id' => $reservation_id,
     'room_name'      => $room_name,
     'final_status'   => $final_status,

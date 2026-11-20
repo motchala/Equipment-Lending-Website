@@ -1,0 +1,36 @@
+/*
+   room-reservation/assets/css/room-buffer.css
+   The "Auto-confirms in 8:41" chip for a same-day room request in its 10-minute review buffer
+   (faculty My Activity + the "Request sent" screen). Behaviour: assets/js/room-buffer-countdown.js
+*/
+.rb-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 9px 2px 6px;
+    border-radius: 999px;
+    background: rgba(220, 184, 98, 0.2);
+    border: 1px solid rgba(184, 145, 58, 0.35);
+    color: #6b4f0e;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.5;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+.rb-chip .material-symbols-outlined {
+    font-size: 15px;
+    line-height: 1;
+}
+.rb-chip .rb-time {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+.rb-chip.is-due {
+    opacity: 0.85;
+}
+[data-theme="dark"] .rb-chip {
+    background: rgba(220, 184, 98, 0.16);
+    border-color: rgba(220, 184, 98, 0.35);
+    color: #ecd48f;
+}
