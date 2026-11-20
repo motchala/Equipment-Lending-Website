@@ -4547,7 +4547,11 @@
             if (arbEl) {
                 arbEl.textContent = ctx.arbRule === 'override'
                     ? 'Manually overridden by an admin.'
-                    : (ctx.status === 'Waiting' ? 'Pending review.' : 'Processed — rule: ' + (ctx.arbRule || 'n/a'));
+                    : (ctx.status === 'Waiting'
+                        ? (ctx.arbRule === 'rule_eq_buffer_hold'
+                            ? 'Pending \u2013 decided automatically after 10 minutes unless an admin decides first.'
+                            : 'Pending review.')
+                        : 'Processed — rule: ' + (ctx.arbRule || 'n/a'));
             }
 
             // Only a Waiting request can be approved/declined from the detail view

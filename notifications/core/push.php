@@ -371,7 +371,7 @@ if (!function_exists('ps_push_encrypt')) {
             $ikm        = hash_hmac('sha256', $prk, $keyInfo . chr(1), true);
 
             $cekInfo    = 'Content-Encoding: aes128gcm' . chr(0);
-            $cekPrk     = hash_hmac('sha256', $salt, $ikm, true);
+            $cekPrk     = hash_hmac('sha256', $ikm, $salt, true);
             $cek        = substr(hash_hmac('sha256', $cekPrk, $cekInfo . chr(1), true), 0, 16);
 
             $nonceInfo  = 'Content-Encoding: nonce' . chr(0);

@@ -55,6 +55,8 @@ if (
     <link rel="stylesheet" href="dashboard/assets/css/admin-dashboard.css?v=<?php echo filemtime('dashboard/assets/css/admin-dashboard.css'); ?>">
     <!-- Mobile/tablet adaptations; must load after admin-dashboard.css -->
     <link rel="stylesheet" href="dashboard/assets/css/admin-dashboard-responsive.css?v=<?php echo @filemtime('dashboard/assets/css/admin-dashboard-responsive.css'); ?>">
+    <!-- same-day equipment request: approval-buffer countdown chip -->
+    <link rel="stylesheet" href="equipment-booking/assets/css/equipment-buffer.css?v=<?php echo @filemtime('equipment-booking/assets/css/equipment-buffer.css'); ?>">
     <link rel="stylesheet" href="settings/assets/css/admin-imports.css?v=<?php echo @filemtime('settings/assets/css/admin-imports.css'); ?>">
     <link rel="stylesheet" href="settings/assets/css/admin-arbitration.css?v=<?php echo @filemtime('settings/assets/css/admin-arbitration.css'); ?>">
     <link rel="stylesheet" href="settings/assets/css/admin-clear-history.css?v=<?php echo @filemtime('settings/assets/css/admin-clear-history.css'); ?>">
@@ -207,6 +209,8 @@ if (
         })();
     </script>
     <link rel="stylesheet" href="shared/assets/css/admin-shell.css?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/css/admin-shell.css'); ?>">
+    <link rel="stylesheet" href="shared/assets/css/push-permission-modal.css?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/css/push-permission-modal.css'); ?>">
+
 </head>
 
 <body>

@@ -64,6 +64,8 @@ require __DIR__ . '/equipment-booking/core/admin-equipment-return.php';
 <?php require __DIR__ . '/shared/views/admin-shell-scripts.php'; ?>
 <?php require __DIR__ . '/equipment-booking/views/admin-equipment-modals-5.php'; ?>
 <?php require __DIR__ . '/equipment-booking/views/admin-equipment-scripts.php'; ?>
+<?php require __DIR__ . '/shared/views/push-permission-modal.php'; ?>
+<script src="shared/assets/js/push-init.js?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/js/push-init.js'); ?>"></script>
 <?php require __DIR__ . '/room-reservation/views/admin-rooms-modals-3.php'; ?>
 <?php require __DIR__ . '/equipment-booking/views/admin-equipment-modals-6.php'; ?>
 <?php require __DIR__ . '/account-management/views/modals-2.php'; ?>

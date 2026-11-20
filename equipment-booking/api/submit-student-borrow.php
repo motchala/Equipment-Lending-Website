@@ -196,7 +196,8 @@ if ($letter_path !== null) {
 }
 
 // Decide it now, same rules as every other way of submitting (core/request-decision.php):
-//   same day   -> Approved (with its QR codes) or Declined, on the spot
+//   same day   -> Waiting in a 10-minute approval buffer (an admin may decide it; otherwise the system approves
+//                 or declines it), or Declined on the spot when it is impossible
 //   later date -> Waiting for an admin; declined automatically at 12:01 AM on the borrow date if nobody decides
 require_once __DIR__ . '/../core/request-decision.php';
 $decision   = equipment_decide_on_submit($conn, [(int)$request_id])[(int)$request_id] ?? ['status' => 'Waiting', 'reason' => ''];
@@ -251,8 +252,13 @@ if ($req_status === 'Approved') {
     $email_status_color = '#c62828';
 } else {
     $email_subject_word = 'Request Submitted';
-    $email_sentence     = 'The equipment borrowing request you authorized was submitted. It is for a later date, so an admin will review it. If nobody decides, it is declined automatically at 12:01 AM on the borrow date.';
-    $email_status_label = 'Waiting for admin review';
+    if (!empty($decision['buffered'])) {
+        $email_sentence     = 'The equipment borrowing request you authorized was submitted. An admin can approve or decline it within ' . (int)$decision['buffer_minutes'] . ' minutes. If nobody does, it is approved automatically when the equipment is free for that time, otherwise declined.';
+        $email_status_label = 'Pending – decided within ' . (int)$decision['buffer_minutes'] . ' minutes';
+    } else {
+        $email_sentence     = 'The equipment borrowing request you authorized was submitted. It is for a later date, so an admin will review it. If nobody decides, it is declined automatically at 12:01 AM on the borrow date.';
+        $email_status_label = 'Waiting for admin review';
+    }
     $email_status_color = '#b26a00';
 }
 
@@ -331,4 +337,7 @@ echo json_encode([
     'return_token' => $tokens['return_token'],
     'claim_token'  => $tokens['claim_token'],
     'status_key'   => $status_key,   // lets the portal fetch the Claim QR once an admin approves
+    // same-day request in its 10-minute approval buffer: when the system decides it (null otherwise)
+    'buffer_until'   => !empty($decision['buffered']) ? $decision['buffer_until'] : null,
+    'buffer_seconds' => !empty($decision['buffered']) ? (int)$decision['buffer_seconds'] : null,
 ]);
