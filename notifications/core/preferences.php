@@ -69,6 +69,7 @@ if (!function_exists('notif_pref_family_map')) {
                 'reqcancelled'    => 'equipment',
                 'reqselfcancelled' => 'equipment',
                 'returned'        => 'equipment',
+                'roompending'     => 'facilities',
                 'roomapproved'    => 'facilities',
                 'roomdeclined'    => 'facilities',
                 'roomcancelled'   => 'facilities',
