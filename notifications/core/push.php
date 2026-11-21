@@ -26,19 +26,34 @@ if (!function_exists('ps_push_ensure_table')) {
         if ($done) return;
         $done = true;
         try {
+            // Create table with per-device unique key (audience + user_id + endpoint hash).
             $conn->query(
                 "CREATE TABLE IF NOT EXISTS `tbl_push_subscriptions` (
-                    `id`         int(11)      NOT NULL AUTO_INCREMENT,
-                    `audience`   varchar(10)  NOT NULL,
-                    `user_id`    varchar(64)  NOT NULL,
-                    `player_id`  text         NOT NULL,
-                    `auth_key`   varchar(255) DEFAULT NULL,
-                    `p256dh_key` varchar(255) DEFAULT NULL,
-                    `created_at` datetime     DEFAULT current_timestamp(),
+                    `id`           int(11)      NOT NULL AUTO_INCREMENT,
+                    `audience`     varchar(10)  NOT NULL,
+                    `user_id`      varchar(64)  NOT NULL,
+                    `player_id`    text         NOT NULL,
+                    `endpoint_hash` varchar(64) NOT NULL DEFAULT '',
+                    `auth_key`     varchar(255) DEFAULT NULL,
+                    `p256dh_key`   varchar(255) DEFAULT NULL,
+                    `created_at`   datetime     DEFAULT current_timestamp(),
                     PRIMARY KEY (`id`),
-                    UNIQUE KEY `uq_push_sub` (`audience`, `user_id`)
+                    UNIQUE KEY `uq_push_sub` (`audience`, `user_id`, `endpoint_hash`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
             );
+            // Migrate existing tables: drop the old single-subscription unique key,
+            // add endpoint_hash column, and add the new per-device unique key.
+            $cols = [];
+            $res  = @$conn->query("SHOW COLUMNS FROM tbl_push_subscriptions");
+            if ($res) { while ($r = $res->fetch_assoc()) $cols[] = $r['Field']; }
+            if (!in_array('endpoint_hash', $cols, true)) {
+                $conn->query("ALTER TABLE tbl_push_subscriptions ADD COLUMN `endpoint_hash` varchar(64) NOT NULL DEFAULT ''");
+                // Populate hash for existing rows
+                $conn->query("UPDATE tbl_push_subscriptions SET endpoint_hash = LEFT(MD5(player_id), 32) WHERE endpoint_hash = ''");
+                // Drop old unique key and add new one
+                @$conn->query("ALTER TABLE tbl_push_subscriptions DROP INDEX uq_push_sub");
+                $conn->query("ALTER TABLE tbl_push_subscriptions ADD UNIQUE KEY `uq_push_sub` (`audience`, `user_id`, `endpoint_hash`)");
+            }
         } catch (Throwable $e) {
             error_log('[ps_push] ensure_table: ' . $e->getMessage());
         }
@@ -76,28 +91,28 @@ if (!function_exists('ps_push_ensure_columns')) {
     }
 }
 
-if (!function_exists('ps_push_get_subscription')) {
-    function ps_push_get_subscription(mysqli $conn, string $audience, string $user_id): ?array
+if (!function_exists('ps_push_get_subscriptions')) {
+    /** Returns all active subscriptions for a user (all devices/browsers). */
+    function ps_push_get_subscriptions(mysqli $conn, string $audience, string $user_id): array
     {
         try {
             ps_push_ensure_table($conn);
             $st = $conn->prepare(
                 'SELECT player_id AS endpoint, auth_key, p256dh_key
                    FROM tbl_push_subscriptions
-                  WHERE audience = ? AND user_id = ? LIMIT 1'
+                  WHERE audience = ? AND user_id = ?'
             );
-            if (!$st) return null;
+            if (!$st) return [];
             $st->bind_param('ss', $audience, $user_id);
             $st->execute();
-            $row = $st->get_result()->fetch_assoc();
+            $rows = $st->get_result()->fetch_all(MYSQLI_ASSOC);
             $st->close();
-            if (!$row || empty($row['endpoint']) || empty($row['auth_key']) || empty($row['p256dh_key'])) {
-                return null;
-            }
-            return $row;
+            return array_values(array_filter($rows, fn($r) =>
+                !empty($r['endpoint']) && !empty($r['auth_key']) && !empty($r['p256dh_key'])
+            ));
         } catch (Throwable $e) {
-            error_log('[ps_push] get_subscription: ' . $e->getMessage());
-            return null;
+            error_log('[ps_push] get_subscriptions: ' . $e->getMessage());
+            return [];
         }
     }
 }
@@ -115,8 +130,8 @@ if (!function_exists('ps_push_send')) {
         try {
             if (!notif_family_enabled($conn, $audience, $user_id, $family)) return;
 
-            $sub = ps_push_get_subscription($conn, $audience, $user_id);
-            if ($sub === null) return;
+            $subs = ps_push_get_subscriptions($conn, $audience, $user_id);
+            if (empty($subs)) return;
 
             require_once __DIR__ . '/../../config/env.php';
             load_env();
@@ -143,7 +158,9 @@ if (!function_exists('ps_push_send')) {
                 'badge' => $scheme . '://' . $host . $base . '/shared/assets/images/favicon-192.png',
             ]);
 
-            ps_push_send_vapid($sub['endpoint'], $sub['auth_key'], $sub['p256dh_key'], $payload, $vapidPub, $vapidPriv, $vapidSubject);
+            foreach ($subs as $sub) {
+                ps_push_send_vapid($sub['endpoint'], $sub['auth_key'], $sub['p256dh_key'], $payload, $vapidPub, $vapidPriv, $vapidSubject);
+            }
 
         } catch (Throwable $e) {
             error_log('[ps_push] send: ' . $e->getMessage());

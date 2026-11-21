@@ -64,11 +64,27 @@ require_once __DIR__ . '/../core/push.php';
 ps_push_ensure_table($conn);
 
 try {
-    $st = $conn->prepare(
-        'DELETE FROM tbl_push_subscriptions WHERE audience = ? AND user_id = ?'
-    );
-    if (!$st) throw new RuntimeException('Prepare failed.');
-    $st->bind_param('ss', $audience, $user_id);
+    // Delete only this device's subscription, not all devices for this user.
+    // The endpoint identifies the specific browser/device.
+    $endpoint      = trim((string)($body['endpoint'] ?? ''));
+    $endpoint_hash = $endpoint !== '' ? substr(md5($endpoint), 0, 32) : '';
+    if ($endpoint_hash !== '') {
+        $st = $conn->prepare(
+            'DELETE FROM tbl_push_subscriptions WHERE audience = ? AND user_id = ? AND endpoint_hash = ?'
+        );
+        if (!$st) throw new RuntimeException('Prepare failed.');
+    } else {
+        // No endpoint provided — fall back to removing all for this user (old behaviour)
+        $st = $conn->prepare(
+            'DELETE FROM tbl_push_subscriptions WHERE audience = ? AND user_id = ?'
+        );
+        if (!$st) throw new RuntimeException('Prepare failed.');
+    }
+    if ($endpoint_hash !== '') {
+        $st->bind_param('sss', $audience, $user_id, $endpoint_hash);
+    } else {
+        $st->bind_param('ss', $audience, $user_id);
+    }
     $st->execute();
     $st->close();
     $conn->close();

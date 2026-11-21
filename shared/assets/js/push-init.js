@@ -193,18 +193,23 @@
     }
 
     function removeSub() {
-        fetch(CSRF_EP, { credentials: 'same-origin' })
-            .then(function (r) { return r.json(); })
-            .then(function (data) {
-                if (!data.token) return;
-                fetch(UNSUB_EP, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ csrf_token: data.token }),
-                    credentials: 'same-origin',
-                });
-            })
-            .catch(function () {});
+        navigator.serviceWorker.ready.then(function (reg) {
+            return reg.pushManager.getSubscription();
+        }).then(function (sub) {
+            var endpoint = sub ? sub.endpoint : '';
+            fetch(CSRF_EP, { credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (!data.token) return;
+                    fetch(UNSUB_EP, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ csrf_token: data.token, endpoint: endpoint }),
+                        credentials: 'same-origin',
+                    });
+                })
+                .catch(function () {});
+        }).catch(function () {});
     }
 
     function showModal() {

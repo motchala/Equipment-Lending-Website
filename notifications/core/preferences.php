@@ -256,7 +256,9 @@ if (!function_exists('notif_family_enabled')) {
     function notif_family_enabled(mysqli $conn, string $audience, string $userKey, string $family): bool
     {
         $prefs = notif_prefs_get($conn, $audience, $userKey);
-        return !empty($prefs['all']) && ($prefs[$family] ?? true);
+        // A missing row means notifications are ON (fail-open, as documented).
+        // $prefs['all'] defaults to true when no preference row exists.
+        return ($prefs['all'] ?? true) && ($prefs[$family] ?? true);
     }
 }
 

@@ -93,9 +93,12 @@ try {
     // Store endpoint + keys; reuse player_id column for endpoint, add auth+p256dh columns lazily
     ps_push_ensure_columns($conn);
 
+    // Each device/browser gets its own row identified by an MD5 of the endpoint URL.
+    // This allows one faculty member to receive notifications on all their devices.
+    $endpoint_hash = substr(md5($endpoint), 0, 32);
     $st = $conn->prepare(
-        'INSERT INTO tbl_push_subscriptions (audience, user_id, player_id, auth_key, p256dh_key)
-         VALUES (?, ?, ?, ?, ?)
+        'INSERT INTO tbl_push_subscriptions (audience, user_id, player_id, endpoint_hash, auth_key, p256dh_key)
+         VALUES (?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
              player_id  = VALUES(player_id),
              auth_key   = VALUES(auth_key),
@@ -103,7 +106,7 @@ try {
              created_at = NOW()'
     );
     if (!$st) throw new RuntimeException('Prepare failed: ' . $conn->error);
-    $st->bind_param('sssss', $audience, $user_id, $endpoint, $auth, $p256dh);
+    $st->bind_param('ssssss', $audience, $user_id, $endpoint, $endpoint_hash, $auth, $p256dh);
     $st->execute();
     $st->close();
     $conn->close();
