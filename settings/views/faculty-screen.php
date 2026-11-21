@@ -507,6 +507,16 @@
 
                         <div class="sov-help-list">
 
+                            <?php
+                            // Open days / hours / booking windows for the answers below come from Settings → Arbitration,
+                            // so this text always matches what the Super Admin saved (equipment and rooms are separate).
+                            require_once PS_ROOT . '/shared/core/operating-hours.php';
+                            $hh = ps_operating_hours(isset($conn) && $conn instanceof mysqli ? $conn : null);
+                            $hh_n   = static function (array $a): string { $l = array_pop($a); return $a ? implode(', ', $a) . ' or ' . $l : (string)$l; };
+                            $hh_dur = $hh_n($hh['equip']['durations']) . ' hours';
+                            $hh_len = $hh['equip']['maxDays'] === 1 ? '1 day' : $hh_n(range(1, $hh['equip']['maxDays'])) . ' days';
+                            ?>
+
                             <details class="help-item">
                                 <summary class="help-item-q">
                                     <span class="material-symbols-outlined">help_outline</span>
@@ -514,7 +524,7 @@
                                     <span class="material-symbols-outlined help-item-chevron">expand_more</span>
                                 </summary>
                                 <div class="help-item-a">
-                                    Open <strong>Equipment</strong>, find an item and click <strong>Borrow</strong>. To borrow several items at once, tick them and click <strong>Borrow All</strong> (these are always borrowed today).<br><br>Then choose where the equipment is going (a room from Facilities, or <em>Outside</em>) and when you need it: <strong>Today</strong> (pick a start time and 1, 2, 3 or 5 hours) or <strong>Later date</strong> (up to 3 weeks ahead, for 1, 2 or 3 days). Bookings run from 7:00 AM to 9:00 PM, and an item that is out right now can still be booked for later. Finally, choose who will collect it: you or a student.<br><br>For a <strong>later date</strong> you can attach a request letter (PDF, JPG, PNG or WEBP, up to 5 MB). It is recommended but not required, and you do not need one for a same-day request.
+                                    Open <strong>Equipment</strong>, find an item and click <strong>Borrow</strong>. To borrow several items at once, tick them and click <strong>Borrow All</strong> (these are always borrowed today).<br><br>Then choose where the equipment is going (a room from Facilities, or <em>Outside</em>) and when you need it: <strong>Today</strong> (pick a start time and <?= htmlspecialchars($hh_dur) ?>) or <strong>Later date</strong> (up to <?= htmlspecialchars($hh['equip']['aheadLabel']) ?> ahead, for <?= htmlspecialchars($hh_len) ?>). Bookings run from <?= htmlspecialchars($hh['equip']['hoursTo']) ?>, <?= htmlspecialchars($hh['equip']['daysLong']) ?>, and an item that is out right now can still be booked for later. Finally, choose who will collect it: you or a student.<br><br>For a <strong>later date</strong> you can attach a request letter (PDF, JPG, PNG or WEBP, up to 5 MB). It is recommended but not required, and you do not need one for a same-day request.
                                 </div>
                             </details>
 
@@ -580,7 +590,7 @@
                                     <span class="material-symbols-outlined help-item-chevron">expand_more</span>
                                 </summary>
                                 <div class="help-item-a">
-                                    Common reasons: you have an overdue item; the item is already booked or out for that time (the form suggests the next free start); you asked for more than the stock; another faculty member has reserved that room for an overlapping time; the time is outside 7:00 AM to 9:00 PM or more than 3 weeks ahead; or nobody decided before the borrow date passed. The admin's reason, if any, appears in your Notifications and My Activity.
+                                    Common reasons: you have an overdue item; the item is already booked or out for that time (the form suggests the next free start); you asked for more than the stock; another faculty member has reserved that room for an overlapping time; the time is outside the booking hours (equipment: <?= htmlspecialchars($hh['equip']['hoursTo']) ?>; rooms: <?= htmlspecialchars($hh['room']['hoursTo']) ?>) or further ahead than allowed (equipment: <?= htmlspecialchars($hh['equip']['aheadLabel']) ?>; rooms: <?= htmlspecialchars($hh['room']['aheadLabel']) ?>); or nobody decided before the borrow date passed. The admin's reason, if any, appears in your Notifications and My Activity.
                                 </div>
                             </details>
 
@@ -602,7 +612,7 @@
                                     <span class="material-symbols-outlined help-item-chevron">expand_more</span>
                                 </summary>
                                 <div class="help-item-a">
-                                    Open <strong>Facilities</strong>, choose a building, then a floor and a room, and click <strong>Reserve</strong> (or ask the room assistant). Pick the date, start and end time, purpose and number of attendees. Rooms can be booked from 7:00 AM to 8:00 PM, Monday to Saturday, up to 3 weeks ahead. The room's dialog lists today's and this week's reservations so you can spot free times.<br><br>A <strong>same-day</strong> reservation is confirmed immediately if the slot is free. A <strong>later-date</strong> reservation stays Pending until an admin decides. If nobody decides by 12:01 AM on that date, it is declined automatically, and you will be notified. Overdue equipment does not stop you from reserving a room.
+                                    Open <strong>Facilities</strong>, choose a building, then a floor and a room, and click <strong>Reserve</strong> (or ask the room assistant). Pick the date, start and end time, purpose and number of attendees. Rooms can be booked from <?= htmlspecialchars($hh['room']['hoursTo']) ?>, <?= htmlspecialchars($hh['room']['daysLong']) ?>, up to <?= htmlspecialchars($hh['room']['aheadLabel']) ?> ahead. The room's dialog lists today's and this week's reservations so you can spot free times.<br><br>A <strong>same-day</strong> reservation is confirmed immediately if the slot is free. A <strong>later-date</strong> reservation stays Pending until an admin decides. If nobody decides by 12:01 AM on that date, it is declined automatically, and you will be notified. Overdue equipment does not stop you from reserving a room.
                                 </div>
                             </details>
 

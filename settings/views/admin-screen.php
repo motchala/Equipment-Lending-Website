@@ -385,7 +385,8 @@
                                 <div class="hc-faq-a">
                                     Go to <strong>Facilities → Reservations</strong>. You can filter by All, Active, Waiting, Approved, Cancelled or Declined.<br><br>
                                     <strong>Same-day</strong> reservations are confirmed automatically when the slot is free, so there is nothing to approve. <strong>Later-date</strong> reservations wait for an admin. Open the reservation and click <strong>Approve</strong> or <strong>Decline</strong> with a reason (at least 5 characters). If nobody decides by 12:01 AM on the reservation date, it is declined automatically. A request letter, when the faculty attached one, opens from the reservation details. Any admin can decide these.<br><br>
-                                    Faculty can book from 7:00 AM to 8:00 PM, Monday to Saturday, up to 3 weeks ahead, and can hold at most 2 active reservations at a time.
+                                    <?php require_once PS_ROOT . '/shared/core/operating-hours.php'; $hh = ps_operating_hours(isset($conn) && $conn instanceof mysqli ? $conn : null); /* live values from Settings → Arbitration */ ?>
+                                    Faculty can book from <?= htmlspecialchars($hh['room']['hoursTo']) ?>, <?= htmlspecialchars($hh['room']['daysLong']) ?>, up to <?= htmlspecialchars($hh['room']['aheadLabel']) ?> ahead, and can hold at most <?= (int)$hh['room']['maxActive'] ?> active reservation<?= (int)$hh['room']['maxActive'] === 1 ? '' : 's' ?> at a time.
                                 </div>
                             </details>
 

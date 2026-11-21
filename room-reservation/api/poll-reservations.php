@@ -40,6 +40,8 @@ require_once __DIR__ . '/../../config/db.php';
 $conn = getDB();
 require_once __DIR__ . '/../core/room-rules.php';
 RoomRules::load($conn);   // Settings → Arbitration: cancellation cutoff
+require_once __DIR__ . '/../../shared/core/pseudo-cron.php';
+ps_pseudo_cron_tick($conn);   // scheduled work: this poll doubles as the clock when SSE is not in use
 
 $faculty_id = $_SESSION['faculty_id'];
 

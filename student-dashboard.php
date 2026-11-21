@@ -15,6 +15,8 @@ require_once __DIR__ . '/config/session.php';      // needed to read the one-sho
 require_once __DIR__ . '/auth/core/role-splash.php';
 require_once __DIR__ . '/shared/core/semester-label.php';   // current semester name (no DB connection needed here)
 $st_semester = ps_semester_label();
+require_once __DIR__ . '/shared/core/operating-hours.php';   // equipment + room open days/hours exactly as set in Settings → Arbitration
+$st_hours = ps_operating_hours();
 ?>
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
@@ -32,7 +34,7 @@ $st_semester = ps_semester_label();
     <!-- Fonts & Icons -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
 
     <!-- PUPSync Student Styles -->
@@ -59,7 +61,7 @@ $st_semester = ps_semester_label();
                     </svg>
                 </span>
                 <span class="st-brand-text">
-                    <span class="st-brand-name"><strong>PUP</strong>SYNC</span>
+                    <span class="st-brand-name"><strong>PUP</strong><span class="snt-light">SYNC</span></span>
                     <span class="st-brand-sub">Student Services</span>
                 </span>
             </a>
@@ -122,7 +124,12 @@ $st_semester = ps_semester_label();
             </div>
 
             <ul class="st-info">
-                <li><span class="material-symbols-outlined" aria-hidden="true">schedule</span>Mon &ndash; Fri &middot; 7:00 AM &ndash; 5:00 PM</li>
+                <?php if ($st_hours['same']): ?>
+                    <li><span class="material-symbols-outlined" aria-hidden="true">schedule</span><?= htmlspecialchars($st_hours['equip']['days'] . ' · ' . $st_hours['equip']['hours']) ?></li>
+                <?php else: ?>
+                    <li><span class="material-symbols-outlined" aria-hidden="true">schedule</span>Equipment: <?= htmlspecialchars($st_hours['equip']['days'] . ' · ' . $st_hours['equip']['hours']) ?></li>
+                    <li><span class="material-symbols-outlined" aria-hidden="true">schedule</span>Facilities: <?= htmlspecialchars($st_hours['room']['days'] . ' · ' . $st_hours['room']['hours']) ?></li>
+                <?php endif; ?>
                 <li><span class="material-symbols-outlined" aria-hidden="true">location_on</span>PUP Bi&ntilde;an Campus, Laguna</li>
                 <li><span class="material-symbols-outlined" aria-hidden="true">help</span>Visit the Admin Office for assistance</li>
             </ul>

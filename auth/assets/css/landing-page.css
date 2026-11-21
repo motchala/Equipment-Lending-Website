@@ -95,6 +95,8 @@ body {
     filter: sepia(0.22) saturate(1.22) hue-rotate(-6deg) brightness(0.96) contrast(1.04);
     animation: photoDrift 32s var(--ease-out) infinite alternate;
     transform-origin: center;
+    will-change: transform;
+    backface-visibility: hidden;
 }
 
 .strip-photo:not(:first-child) {
@@ -121,17 +123,45 @@ body {
 
 .strip-photo-1 {
     background-image: url('../images/landing-page/1-hero-page.jpg');
+    background-image: image-set(url('../images/landing-page/1-hero-page.webp') type('image/webp'), url('../images/landing-page/1-hero-page.jpg') type('image/jpeg'));
     background-position: center 32%;
 }
 
 .strip-photo-2 {
     background-image: url('../images/landing-page/2-hero-page.jpg');
+    background-image: image-set(url('../images/landing-page/2-hero-page.webp') type('image/webp'), url('../images/landing-page/2-hero-page.jpg') type('image/jpeg'));
     background-position: center 58%;
 }
 
 .strip-photo-3 {
     background-image: url('../images/landing-page/6-hero-page.jpg');
+    background-image: image-set(url('../images/landing-page/6-hero-page.webp') type('image/webp'), url('../images/landing-page/6-hero-page.jpg') type('image/jpeg'));
     background-position: center 38%;
+}
+
+/* Reveal the three photos together once all have loaded (landing-page.js adds
+   .is-ready). Until then the maroon backdrop shows instead of photos popping in
+   one by one. The animation is a fail-safe: if JS never runs, the strip still
+   appears after 8s. */
+.gateway-visual {
+    background: #4a0f15;
+}
+
+.visual-strip {
+    opacity: 0;
+    animation: stripFailsafe 0.01ms 8s forwards;
+}
+
+.visual-strip.is-ready {
+    opacity: 1;
+    animation: none;
+    transition: opacity 0.7s ease;
+}
+
+@keyframes stripFailsafe {
+    to {
+        opacity: 1;
+    }
 }
 
 .visual-overlay {

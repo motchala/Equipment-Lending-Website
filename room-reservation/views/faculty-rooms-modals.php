@@ -1,8 +1,9 @@
     <!-- ── Choose a Room Modal ─────────────────────────────────────────────
          Opened from the Room field of the Borrow modal. Same steps as the student portal:
-         pick a building (with its photo), then a floor, then a room. Only rooms the admin
-         left Available are listed; a room another faculty has reserved for the chosen date
-         and time stays visible but cannot be picked. "Outside" and the faculty's own room
+         pick a building (with its photo), then a floor, then a room. Every room is listed.
+         Rooms the admin set to Maintenance (yellow) or Not Bookable (gray) and rooms another
+         faculty has reserved for the chosen date and time stay visible but cannot be picked.
+         "Outside" and the faculty's own room
          reservations are offered on the first step. Content is built by faculty-borrow-flow.js. -->
     <div class="modal-backdrop bf-rp-backdrop" id="bfRoomPicker" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="bfRpTitle">
         <div class="modal-box bf-rp-box">
@@ -21,6 +22,8 @@
                 <div class="bf-rp-legend" aria-hidden="true">
                     <span><i class="bf-dot bf-dot--free"></i>Free</span>
                     <span><i class="bf-dot bf-dot--taken"></i>Reserved</span>
+                    <span><i class="bf-dot bf-dot--maint"></i>Maintenance</span>
+                    <span><i class="bf-dot bf-dot--nobk"></i>Not bookable</span>
                 </div>
                 <button type="button" class="btn-cancel-acc" data-bf="rp-close">Cancel</button>
             </div>

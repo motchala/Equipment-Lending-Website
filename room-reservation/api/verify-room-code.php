@@ -36,6 +36,11 @@ if (!$code || !$student_name) {
     echo json_encode(['error' => 'Code and student name are required.']);
     exit();
 }
+require_once __DIR__ . '/../../shared/core/student-name.php';
+if (($name_err = student_name_error($student_name)) !== null) {
+    echo json_encode(['error' => $name_err]);
+    exit();
+}
 
 require_once __DIR__ . '/../../config/db.php';
 $conn = getDB();

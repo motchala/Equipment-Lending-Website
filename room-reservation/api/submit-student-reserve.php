@@ -49,6 +49,11 @@ if (
     echo json_encode(['error' => 'All required fields must be filled in.']);
     exit();
 }
+require_once __DIR__ . '/../../shared/core/student-name.php';
+if (($name_err = student_name_error($student_name)) !== null) {
+    echo json_encode(['error' => $name_err]);
+    exit();
+}
 // Past datetime check — compare full date+time in Asia/Manila timezone
 $now_manila   = new DateTime('now', new DateTimeZone('Asia/Manila'));
 $req_datetime = DateTime::createFromFormat(

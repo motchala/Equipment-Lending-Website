@@ -152,43 +152,67 @@ h2:focus {
 }
 
 .st-brand-mark {
-    width: 40px;
-    height: 40px;
-    border-radius: 11px;
-    background: rgba(255, 255, 255, .14);
-    border: 1px solid rgba(255, 255, 255, .22);
+    /* Shared PUPSYNC mark (same as admin / faculty): maroon rounded square +
+       layered-cube icon. The white ring keeps it visible on the maroon bar. */
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background: #800000;
+    box-shadow: 0 0 0 1.5px rgba(255, 255, 255, .42), 0 0 0 5px rgba(255, 255, 255, .07);
     display: grid;
     place-items: center;
+    flex-shrink: 0;
 }
 
 .st-brand-mark svg {
-    width: 22px;
-    height: 22px;
-    color: var(--st-gold-light);
+    width: 18px;
+    height: 18px;
+    color: #fff;
+    stroke: #fff;
 }
 
 .st-brand-text {
     display: flex;
     flex-direction: column;
-    line-height: 1.15;
+    line-height: 1.2;
+    min-width: 0;
 }
 
+/* PUPSYNC wordmark — same type treatment as the faculty / admin sidebar:
+   bold "PUP" + smaller "SYNC" (white here for contrast on the maroon bar). */
 .st-brand-name {
-    font-family: var(--st-display);
-    font-weight: 600;
-    font-size: 1.1rem;
-    letter-spacing: .08em;
+    font-family: var(--st-font);
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: 0;
+    line-height: 1.2;
+    white-space: nowrap;
+    color: #fff;
 }
 
 .st-brand-name strong {
+    font-weight: 800;
+    font-size: 1em;
+    color: #fff;
+}
+
+.st-brand-name .snt-light {
     font-weight: 700;
-    color: var(--st-gold-light);
+    font-size: 0.72em;
+    vertical-align: baseline;
+    position: relative;
+    top: 0.12em;
+    color: #fff;
+    letter-spacing: 0.2px;
 }
 
 .st-brand-sub {
-    font-size: .72rem;
-    opacity: .8;
-    letter-spacing: .04em;
+    font-size: 12px;
+    font-weight: 400;
+    letter-spacing: 0;
+    line-height: 1;
+    margin-top: 2px;
+    color: rgba(255, 255, 255, .64);
 }
 
 .st-back-link {
@@ -2460,22 +2484,22 @@ select.st-input option:disabled {
     }
 
     .st-brand-mark {
-        width: 34px;
-        height: 34px;
-        border-radius: 10px;
+        width: 32px;
+        height: 32px;
+        border-radius: 9px;
     }
 
     .st-brand-mark svg {
-        width: 19px;
-        height: 19px;
+        width: 17px;
+        height: 17px;
     }
 
     .st-brand-name {
-        font-size: 1rem;
+        font-size: 17px;
     }
 
     .st-brand-sub {
-        font-size: .66rem;
+        font-size: 11px;
     }
 
     .st-back-link {

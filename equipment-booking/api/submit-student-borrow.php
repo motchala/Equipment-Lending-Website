@@ -35,6 +35,11 @@ if (
     echo json_encode(['error' => 'All fields are required.']);
     exit();
 }
+require_once __DIR__ . '/../../shared/core/student-name.php';
+if (($name_err = student_name_error($student_name)) !== null) {
+    echo json_encode(['error' => $name_err]);
+    exit();
+}
 
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../shared/core/student-room-options.php';

@@ -90,6 +90,11 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name'])) {
     if ($collector_type_p === 'student' && $collector_name_p === '') {
         bm_fail('Please enter the student\'s name.');
     }
+    // Length limit for the student's name (validation only, shared with the Student Portal)
+    require_once __DIR__ . '/../../shared/core/student-name.php';
+    if ($collector_type_p === 'student' && student_name_error($collector_name_p) !== null) {
+        bm_fail('The student name is too long. Please check it and try again.');
+    }
     $collector_id_p = ''; // ID field removed from this form
 
     $stmt_ins_p = $conn->prepare(

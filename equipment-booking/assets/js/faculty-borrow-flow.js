@@ -26,8 +26,13 @@
 (function () {
     'use strict';
 
+    /* Longest student name accepted for "a student will collect" (spaces count, runs of spaces count once).
+       Validation only: the form shows no hint. Keep equal to STUDENT_NAME_MAX_LENGTH in shared/core/student-name.php. */
+    var STUDENT_NAME_MAX = 50;
+
     var URL_SUBMIT = 'equipment-booking/api/submit-cart-borrow.php';
     var URL_CHECK = 'equipment-booking/api/check-booking-availability.php';
+    var URL_ROOM_STATUS = 'room-reservation/api/poll-room-status.php';
 
     /* ── helpers ─────────────────────────────────────────────── */
     function $(id) { return document.getElementById(id); }
@@ -512,11 +517,20 @@
     ══════════════════════════════════════════════════════════ */
     var rp = { bid: null, floor: 0, buildings: null, index: null, timer: null, lastFocus: null };
 
+    /* The two states equipment cannot go to. They stay visible in the picker but are never selectable:
+       Maintenance (yellow) = a normal room that is temporarily down; Not bookable (gray) = admin / staff only.
+       Same wording and colours as the Facilities tab. */
+    var LOCKED = {
+        'Maintenance': { cls: 'is-maint', icon: 'construction', text: 'Maintenance', note: 'Temporarily unavailable' },
+        'Not Bookable': { cls: 'is-nobk', icon: 'block', text: 'Not bookable', note: 'Admin / staff only' }
+    };
+    function lockedOf(r) { return (r && LOCKED[r.status]) || null; }
+
     function buildBuildings() {
         var list = [], idx = {};
         (meta().rooms || []).forEach(function (b) {
             var floors = (b.floors || []).map(function (f) {
-                var rooms = (f.rooms || []).filter(function (r) { return !r.status || r.status === 'Available'; });
+                var rooms = f.rooms || [];
                 return { num: toInt(f.floor), label: f.label || (f.floor + 'F'), rooms: rooms };
             }).filter(function (f) { return f.rooms.length; }).sort(function (a, c) { return a.num - c.num; });
             if (!floors.length) return;
@@ -530,7 +544,7 @@
                 image: b.image || '', floors: floors,
                 rooms: floors.reduce(function (s, f) { return s + f.rooms.length; }, 0)
             };
-            floors.forEach(function (f) { f.rooms.forEach(function (r) { idx[r.room_id] = { id: r.room_id, name: r.name, building: name, floor: f.label }; }); });
+            floors.forEach(function (f) { f.rooms.forEach(function (r) { if (!lockedOf(r)) idx[r.room_id] = { id: r.room_id, name: r.name, building: name, floor: f.label }; }); });
             list.push(bld);
         });
         rp.buildings = list; rp.index = idx;
@@ -551,8 +565,10 @@
         var body = $('bfRpBody'); if (body) body.scrollTop = 0;
         var c = modal.querySelector('[data-bf="rp-close"]'); if (c) c.focus({ preventScroll: true });
         refreshRooms();
+        refreshRoomStatuses();
         clearInterval(rp.timer);
-        rp.timer = setInterval(refreshRooms, 10000);   /* somebody else may reserve a room while this is open */
+        /* somebody else may reserve a room, or an admin may change a room's status, while this is open */
+        rp.timer = setInterval(function () { refreshRooms(); refreshRoomStatuses(); }, 10000);
     }
     function closePicker(restoreFocus) {
         var modal = $('bfRoomPicker');
@@ -573,6 +589,34 @@
             .then(function (j) {
                 if (token !== avail.rtok || !j || j.ok !== true || !j.rooms) return;
                 applyRooms(j.rooms);
+            }).catch(function () { });
+    }
+
+    /* An admin can switch a room to / from Maintenance or Not Bookable at any time: keep the picker's tiles current
+       (the server re-checks on submit either way). "Booked" is only a right-now display state, so it counts as open. */
+    function refreshRoomStatuses() {
+        fetch(URL_ROOM_STATUS, { credentials: 'same-origin' })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (st) {
+                if (!st || typeof st !== 'object') return;
+                var changed = false;
+                (meta().rooms || []).forEach(function (b) {
+                    (b.floors || []).forEach(function (f) {
+                        (f.rooms || []).forEach(function (r) {
+                            var s = st[String(r.room_id)];
+                            if (!s) return;
+                            if (s === 'Booked') s = 'Available';
+                            if (r.status !== s) { r.status = s; changed = true; }
+                        });
+                    });
+                });
+                if (!changed) return;
+                buildBuildings();
+                var cur = $('bfRoomId').value;
+                if (cur && cur !== 'outside' && !(rp.index && rp.index[cur])) {
+                    clearRoom(); setRoomHint('That room is no longer open for equipment. Pick another room.', 'bad');
+                }
+                if (isOpen('bfRoomPicker')) renderPicker();
             }).catch(function () { });
     }
 
@@ -632,6 +676,13 @@
             '<p>' + plural(b.rooms, 'room') + ' &middot; ' + plural(b.floors.length, 'floor') + '</p></div></header>' +
             tabs +
             '<div class="bf-rooms" role="tabpanel" aria-label="Rooms on this floor">' + floor.rooms.map(function (r) {
+                var lk = lockedOf(r);
+                if (lk) {   /* visible, but not clickable and not part of the picking logic (no data-bf) */
+                    return '<button type="button" class="bf-room ' + lk.cls + '" disabled aria-disabled="true" title="' + esc(lk.note) + '">' +
+                        '<span class="bf-room-name">' + esc(r.name) + '</span>' +
+                        '<span class="bf-room-meta bf-room-meta--lock">' + icon(lk.icon) + '<span>' + lk.text + '</span></span>' +
+                        '<span class="bf-room-note">' + esc(lk.note) + '</span></button>';
+                }
                 return '<button type="button" class="bf-room" data-bf="rp-room" data-id="' + toInt(r.room_id) + '">' +
                     '<span class="bf-room-name">' + esc(r.name) + '</span>' +
                     '<span class="bf-room-meta"><span class="bf-dot" data-bf-dot></span><span data-bf-status>Free</span></span>' +
@@ -743,6 +794,7 @@
         }
         var type = (document.querySelector('input[name="bf_collector_type"]:checked') || {}).value || 'faculty';
         if (type === 'student' && !$('bfStudentName').value.trim()) return 'Please enter the student\u2019s name before submitting.';
+        if (type === 'student' && Array.from($('bfStudentName').value.trim().replace(/\s+/g, ' ')).length > STUDENT_NAME_MAX) return 'The student name is too long. Please check it and try again.';
         if (w.mode === 'future') {
             var f = $('request_document') && $('request_document').files && $('request_document').files[0];
             if (!f && r.letterRequired) return 'A request letter is required for later-date requests. Please attach one.';
