@@ -29,7 +29,13 @@ final class ArbitrationConfig
         // ── Equipment: borrowing rules ──────────────────────────────────────
         'rule_overdue_block_enabled'     => ['type' => 'bool', 'default' => false],
         'rule_missing_doc_block_enabled' => ['type' => 'bool', 'default' => false],
-        'max_items_per_borrower'         => ['type' => 'int', 'default' => 3,  'min' => 1, 'max' => 20],
+        // Shared borrowing points: a faculty member and the students they authorize share ONE allowance.
+        // Every different item the faculty borrows costs 1 point (any quantity), every student they authorize
+        // for a day costs 1 point. See BookingSchedule::shareLimitError().
+        'max_items_per_borrower'         => ['type' => 'int', 'default' => 5,  'min' => 1, 'max' => 20],   // different items a faculty holds at a time (quantity is not limited)
+        'max_student_slots'              => ['type' => 'int', 'default' => 3,  'min' => 1, 'max' => 10],   // students a faculty can authorize per day (a student's cart = 1)
+        'max_shared_points'              => ['type' => 'int', 'default' => 7,  'min' => 1, 'max' => 30],   // the combined ceiling: items held + students authorized that day
+        'max_items_per_student'          => ['type' => 'int', 'default' => 2,  'min' => 1, 'max' => 10],   // different items in one student request
         'max_borrow_days'                => ['type' => 'int', 'default' => 3,  'min' => 1, 'max' => 3],
         'max_extensions'                 => ['type' => 'int', 'default' => 1,  'min' => 0, 'max' => 1],
         'low_stock_threshold'            => ['type' => 'int', 'default' => 2,  'min' => 0, 'max' => 20],
