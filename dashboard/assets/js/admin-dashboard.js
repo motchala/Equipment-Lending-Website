@@ -1323,6 +1323,8 @@
     const inventoryListState = {
         rows: [],
         query: '',
+        parsed: null,
+        parsedFor: null,
         page: 1,
         initialized: false,
         render: null
@@ -1356,12 +1358,70 @@
             if (img.complete && img.naturalWidth === 0) broken();
         });
 
+        /* The search box is also a filter. A row matches when EVERY word of the query matches something on it:
+             name / category / condition  - the text itself        (laptop, cables, good, fair, "for repair")
+             stock status                 - the Stock column pill  ("in stock", "low stock", "no stock", "out of stock")
+             stock number                 - the quantity            (0, 5, or <3  <=2  >5  >=10  =4)
+           so "low stock", "for repair", "projector good" or "cables no stock" all narrow the list.
+           Stock status follows the pill in the Stock column: 0 = No stock, 1-2 = Low stock, 3+ = In stock
+           (same rule as admin-equipment-screen.php / admin-equipment-fragment.php). */
+        function stockStatus(qty) { return qty <= 0 ? 'no stock' : (qty <= 2 ? 'low stock' : 'in stock'); }
+
+        const STATUS_PHRASES = [
+            ['out of stock', 'no stock'], ['out-of-stock', 'no stock'],
+            ['no stock', 'no stock'], ['low stock', 'low stock'], ['in stock', 'in stock']
+        ];
+
+        // "low stock no stock" = either status (same filter), everything else must match as well
+        function parseQuery(q) {
+            let rest = ' ' + q.replace(/\s+/g, ' ').trim() + ' ';
+            const statuses = [];
+            let repair = false;
+            STATUS_PHRASES.forEach(function (p) {
+                const needle = ' ' + p[0] + ' ';
+                if (rest.indexOf(needle) !== -1) { statuses.push(p[1]); rest = rest.replace(needle, ' '); }
+            });
+            if (rest.indexOf(' for repair ') !== -1) { repair = true; rest = rest.replace(' for repair ', ' '); }
+            return { statuses: statuses, repair: repair, tokens: rest.split(' ').filter(Boolean) };
+        }
+
+        function parsedQuery() {
+            if (state.parsedFor !== state.query) {
+                state.parsed = parseQuery(state.query);
+                state.parsedFor = state.query;
+            }
+            return state.parsed;
+        }
+
+        function tokenMatches(t, name, cat, cond, qty, status) {
+            const cmp = /^(<=|>=|<|>|=)(\d+)$/.exec(t);
+            if (cmp) {
+                const n = parseInt(cmp[2], 10);
+                switch (cmp[1]) {
+                    case '<': return qty < n;
+                    case '<=': return qty <= n;
+                    case '>': return qty > n;
+                    case '>=': return qty >= n;
+                    default: return qty === n;
+                }
+            }
+            if (name.indexOf(t) !== -1 || cat.indexOf(t) !== -1 || cond.indexOf(t) !== -1) return true;
+            if (/^\d+$/.test(t) && qty === parseInt(t, 10)) return true;
+            return status.split(' ').some(function (w) { return w.indexOf(t) === 0; });
+        }
+
         function matches(row) {
             if (!state.query) return true;
+            const q = parsedQuery();
             const d = row.dataset;
-            return [d.itemName, d.itemCategory, d.itemCondition].some(function (v) {
-                return (v || '').toLowerCase().includes(state.query);
-            });
+            const name = (d.itemName || '').toLowerCase();
+            const cat = (d.itemCategory || '').toLowerCase();
+            const cond = (d.itemCondition || '').toLowerCase();
+            const qty = parseInt(d.itemQuantity, 10) || 0;
+            const status = stockStatus(qty);
+            if (q.statuses.length && q.statuses.indexOf(status) === -1) return false;
+            if (q.repair && cond.indexOf('for repair') === -1) return false;
+            return q.tokens.every(function (t) { return tokenMatches(t, name, cat, cond, qty, status); });
         }
 
         // 1 … 4 5 6 … 12 — always first, last and the current page ±1.
