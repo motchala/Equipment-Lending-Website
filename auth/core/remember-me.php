@@ -20,6 +20,10 @@ function remember_me_ensure_schema(mysqli $conn): void
         expires_at DATETIME NOT NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         last_used_at DATETIME DEFAULT NULL,
+        prev_selector CHAR(32) DEFAULT NULL,
+        prev_validator_hash CHAR(64) DEFAULT NULL,
+        prev_valid_until DATETIME DEFAULT NULL,
+        INDEX idx_remember_prev_selector (prev_selector),
         INDEX idx_remember_expiry (expires_at),
         INDEX idx_remember_account (account_type, account_email)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci";
@@ -27,8 +31,62 @@ function remember_me_ensure_schema(mysqli $conn): void
     if (!$conn->query($sql)) {
         throw new RuntimeException('Could not initialize remember-me tokens: ' . $conn->error);
     }
+
+    // Self-heal: tables created before the "previous token grace window" existed
+    // do not have the prev_* columns yet. Add them once. If the host refuses the
+    // ALTER, the grace window is simply switched off and everything else works
+    // exactly as before.
+    $hasGrace = false;
+    try {
+        $col = $conn->query("SHOW COLUMNS FROM tbl_remember_tokens LIKE 'prev_selector'");
+        $hasGrace = $col && $col->num_rows > 0;
+        if ($col) {
+            $col->free();
+        }
+        if (!$hasGrace) {
+            $hasGrace = (bool)$conn->query(
+                'ALTER TABLE tbl_remember_tokens '
+                . 'ADD COLUMN prev_selector CHAR(32) DEFAULT NULL, '
+                . 'ADD COLUMN prev_validator_hash CHAR(64) DEFAULT NULL, '
+                . 'ADD COLUMN prev_valid_until DATETIME DEFAULT NULL, '
+                . 'ADD INDEX idx_remember_prev_selector (prev_selector)'
+            );
+        }
+    } catch (Throwable $e) {
+        // Several requests can reach the ALTER at the same moment right after a
+        // deploy (the loser gets "duplicate column"). Re-check before giving up.
+        $hasGrace = false;
+        try {
+            $col = $conn->query("SHOW COLUMNS FROM tbl_remember_tokens LIKE 'prev_selector'");
+            $hasGrace = $col && $col->num_rows > 0;
+            if ($col) {
+                $col->free();
+            }
+        } catch (Throwable $ignored) {
+            $hasGrace = false;
+        }
+        if (!$hasGrace) {
+            error_log('[PUPSync] remember-me grace columns unavailable: ' . $e->getMessage());
+        }
+    }
+    remember_me_grace_state($hasGrace);
+
     $done = true;
 }
+
+// Whether the prev_* columns exist (set by remember_me_ensure_schema()).
+function remember_me_grace_state(?bool $set = null): bool
+{
+    static $state = false;
+    if ($set !== null) {
+        $state = $set;
+    }
+    return $state;
+}
+
+// Seconds the previous cookie keeps working after a rotation. This covers a
+// browser restoring several tabs at once, where every tab sends the same old cookie.
+const REMEMBER_ME_GRACE_SECONDS = 60;
 
 function remember_me_cookie_options(int $expires): array
 {
@@ -40,7 +98,7 @@ function remember_me_cookie_options(int $expires): array
         'path' => '/',
         'secure' => $isHttps,
         'httponly' => true,
-        'samesite' => 'Strict',
+        'samesite' => 'Lax', // Lax so the first visit from an outside link (email, Facebook) still restores the login
     ];
 }
 
@@ -117,6 +175,64 @@ function remember_me_issue(mysqli $conn, string $accountType, string $email, str
     }
 }
 
+// Looks a cookie up in tbl_remember_tokens. Returns the row with two extra keys:
+//   live_selector - the selector the token has RIGHT NOW (differs from the cookie's
+//                   selector when the cookie is the previous, already-rotated one)
+//   via_grace     - true when the cookie matched only the previous token, inside
+//                   its short grace window
+// 'validator_hash' always holds the hash that the cookie's validator must match.
+function remember_me_find_token(mysqli $conn, string $selector): ?array
+{
+    $stmt = $conn->prepare(
+        'SELECT selector AS live_selector, validator_hash, account_type, account_email, credential_hash, auth_time, expires_at '
+        . 'FROM tbl_remember_tokens WHERE selector = ? AND expires_at > UTC_TIMESTAMP() LIMIT 1'
+    );
+    if (!$stmt) {
+        throw new RuntimeException('Could not prepare remember-me lookup: ' . $conn->error);
+    }
+    $stmt->bind_param('s', $selector);
+    if (!$stmt->execute()) {
+        $error = $stmt->error;
+        $stmt->close();
+        throw new RuntimeException('Could not look up remember-me token: ' . $error);
+    }
+    $result = $stmt->get_result();
+    $token = ($result && $result->num_rows === 1) ? $result->fetch_assoc() : null;
+    $stmt->close();
+
+    if ($token) {
+        $token['via_grace'] = false;
+        return $token;
+    }
+
+    if (!remember_me_grace_state()) {
+        return null;
+    }
+
+    $stmt = $conn->prepare(
+        'SELECT selector AS live_selector, prev_validator_hash AS validator_hash, account_type, account_email, credential_hash, auth_time, expires_at '
+        . 'FROM tbl_remember_tokens WHERE prev_selector = ? AND prev_valid_until > UTC_TIMESTAMP() '
+        . 'AND expires_at > UTC_TIMESTAMP() LIMIT 1'
+    );
+    if (!$stmt) {
+        throw new RuntimeException('Could not prepare remember-me grace lookup: ' . $conn->error);
+    }
+    $stmt->bind_param('s', $selector);
+    if (!$stmt->execute()) {
+        $error = $stmt->error;
+        $stmt->close();
+        throw new RuntimeException('Could not look up previous remember-me token: ' . $error);
+    }
+    $result = $stmt->get_result();
+    $token = ($result && $result->num_rows === 1) ? $result->fetch_assoc() : null;
+    $stmt->close();
+
+    if ($token) {
+        $token['via_grace'] = true;
+    }
+    return $token;
+}
+
 function remember_me_restore(mysqli $conn): void
 {
     if (isset($_SESSION['admin']) || isset($_SESSION['faculty_id'])) {
@@ -137,28 +253,21 @@ function remember_me_restore(mysqli $conn): void
     $selector = $matches[1];
     $validator = $matches[2];
 
-    $stmt = $conn->prepare(
-        'SELECT validator_hash, account_type, account_email, credential_hash, auth_time, expires_at '
-        . 'FROM tbl_remember_tokens WHERE selector = ? AND expires_at > UTC_TIMESTAMP() LIMIT 1'
-    );
-    if (!$stmt) {
-        throw new RuntimeException('Could not prepare remember-me lookup: ' . $conn->error);
-    }
-    $stmt->bind_param('s', $selector);
-    if (!$stmt->execute()) {
-        $error = $stmt->error;
-        $stmt->close();
-        throw new RuntimeException('Could not look up remember-me token: ' . $error);
-    }
-    $result = $stmt->get_result();
-    $token = ($result && $result->num_rows === 1) ? $result->fetch_assoc() : null;
-    $stmt->close();
+    $token = remember_me_find_token($conn, $selector);
 
     if (!$token || !hash_equals((string)$token['validator_hash'], hash('sha256', $validator))) {
-        remember_me_delete_selector($conn, $selector);
+        // A real mismatch (or an unknown selector): drop the token and the cookie.
+        remember_me_delete_selector($conn, $token ? (string)$token['live_selector'] : $selector);
         remember_me_clear_cookie();
         return;
     }
+
+    // true when this cookie is the previous one, rotated away moments ago by
+    // another request (e.g. several tabs restoring at once). In that case the
+    // newer cookie is already on its way to / in the browser, so this request
+    // signs the user in but neither rotates the token nor touches the cookie.
+    $viaGrace = (bool)$token['via_grace'];
+    $liveSelector = (string)$token['live_selector'];
 
     $accountType = (string)$token['account_type'];
     $email = (string)$token['account_email'];
@@ -200,7 +309,7 @@ function remember_me_restore(mysqli $conn): void
     }
 
     if (!$validAccount) {
-        remember_me_delete_selector($conn, $selector);
+        remember_me_delete_selector($conn, $liveSelector);
         remember_me_clear_cookie();
         return;
     }
@@ -219,48 +328,74 @@ function remember_me_restore(mysqli $conn): void
         error_log('[PUPSync] remember_me_restore: session_regenerate_id(true) failed; fell back to no-delete regeneration.');
     }
 
-    $newSelector = bin2hex(random_bytes(16));
-    $newValidator = bin2hex(random_bytes(32));
-    $newValidatorHash = hash('sha256', $newValidator);
-    $rotate = $conn->prepare(
-        'UPDATE tbl_remember_tokens SET selector = ?, validator_hash = ?, last_used_at = UTC_TIMESTAMP() '
-        . 'WHERE selector = ? AND validator_hash = ? AND expires_at > UTC_TIMESTAMP()'
-    );
-    if (!$rotate) {
-        throw new RuntimeException('Could not prepare remember-me token rotation: ' . $conn->error);
-    }
-    $rotate->bind_param('ssss', $newSelector, $newValidatorHash, $selector, $token['validator_hash']);
-    if (!$rotate->execute()) {
-        $error = $rotate->error;
-        $rotate->close();
-        throw new RuntimeException('Could not rotate remember-me token: ' . $error);
-    }
-    $rotated = $rotate->affected_rows === 1;
-    $rotate->close();
+    if (!$viaGrace) {
+        $newSelector = bin2hex(random_bytes(16));
+        $newValidator = bin2hex(random_bytes(32));
+        $newValidatorHash = hash('sha256', $newValidator);
 
-    if (!$rotated) {
-        remember_me_clear_cookie();
-        return;
-    }
-
-    $expiresAt = strtotime((string)$token['expires_at'] . ' UTC');
-    // setcookie() can silently return false on some shared hosts even when
-    // headers have not been sent yet.  Treat failure as non-fatal: the
-    // session variables are already set so this page-load succeeds; the
-    // next page-load will just re-issue from the now-rotated token stored in
-    // the DB (the old cookie value will fail the validator check, which is
-    // the normal theft-detection path, so a new remember_me_issue() will be
-    // needed on the next full login).
-    if ($expiresAt !== false) {
-        $cookieSent = setcookie(
-            REMEMBER_ME_COOKIE,
-            $newSelector . '.' . $newValidator,
-            remember_me_cookie_options($expiresAt)
-        );
-        if ($cookieSent) {
-            $_COOKIE[REMEMBER_ME_COOKIE] = $newSelector . '.' . $newValidator;
+        // With the grace columns available, the token being replaced is kept for
+        // REMEMBER_ME_GRACE_SECONDS so that sibling requests still carrying the old
+        // cookie are not mistaken for theft. (MySQL evaluates SET left to right, so
+        // the prev_* values copy the OLD selector/validator before they are replaced.)
+        if (remember_me_grace_state()) {
+            $rotate = $conn->prepare(
+                'UPDATE tbl_remember_tokens SET prev_selector = selector, prev_validator_hash = validator_hash, '
+                . 'prev_valid_until = DATE_ADD(UTC_TIMESTAMP(), INTERVAL ' . (int)REMEMBER_ME_GRACE_SECONDS . ' SECOND), '
+                . 'selector = ?, validator_hash = ?, last_used_at = UTC_TIMESTAMP() '
+                . 'WHERE selector = ? AND validator_hash = ? AND expires_at > UTC_TIMESTAMP()'
+            );
         } else {
-            error_log('[PUPSync] remember_me_restore: setcookie() returned false during token rotation.');
+            $rotate = $conn->prepare(
+                'UPDATE tbl_remember_tokens SET selector = ?, validator_hash = ?, last_used_at = UTC_TIMESTAMP() '
+                . 'WHERE selector = ? AND validator_hash = ? AND expires_at > UTC_TIMESTAMP()'
+            );
+        }
+        if (!$rotate) {
+            throw new RuntimeException('Could not prepare remember-me token rotation: ' . $conn->error);
+        }
+        $rotate->bind_param('ssss', $newSelector, $newValidatorHash, $selector, $token['validator_hash']);
+        if (!$rotate->execute()) {
+            $error = $rotate->error;
+            $rotate->close();
+            throw new RuntimeException('Could not rotate remember-me token: ' . $error);
+        }
+        $rotated = $rotate->affected_rows === 1;
+        $rotate->close();
+
+        if (!$rotated) {
+            // Another request rotated this very token between our lookup and our
+            // update (e.g. two tabs restoring at the same moment). That is not theft:
+            // if the old cookie is still inside its grace window, sign this request
+            // in too, and leave the cookie alone so the winner's new cookie survives.
+            $retry = remember_me_find_token($conn, $selector);
+            if (!$retry || !$retry['via_grace'] || !hash_equals((string)$retry['validator_hash'], hash('sha256', $validator))) {
+                // Never clear the cookie here: the browser may already hold the winner's new one.
+                return;
+            }
+            $viaGrace = true;
+        }
+    }
+
+    if (!$viaGrace) {
+        $expiresAt = strtotime((string)$token['expires_at'] . ' UTC');
+        // setcookie() can silently return false on some shared hosts even when
+        // headers have not been sent yet.  Treat failure as non-fatal: the
+        // session variables are already set so this page-load succeeds; the
+        // next page-load will just re-issue from the now-rotated token stored in
+        // the DB (the old cookie value will fail the validator check, which is
+        // the normal theft-detection path, so a new remember_me_issue() will be
+        // needed on the next full login).
+        if ($expiresAt !== false) {
+            $cookieSent = setcookie(
+                REMEMBER_ME_COOKIE,
+                $newSelector . '.' . $newValidator,
+                remember_me_cookie_options($expiresAt)
+            );
+            if ($cookieSent) {
+                $_COOKIE[REMEMBER_ME_COOKIE] = $newSelector . '.' . $newValidator;
+            } else {
+                error_log('[PUPSync] remember_me_restore: setcookie() returned false during token rotation.');
+            }
         }
     }
 

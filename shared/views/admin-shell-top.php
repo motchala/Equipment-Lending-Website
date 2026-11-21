@@ -41,33 +41,15 @@ if (
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#600302">
-    <!-- Phone detection (same rule as the Faculty portal). Runs BEFORE first paint so a phone never flashes the desktop
-         layout. Sets class "rx-mobile" on <html> when the device is a phone (also in landscape), or the window is
-         600px wide or less. Tablets and desktops do not get it and keep the layout they have today.
-         Everything phone-specific lives in admin-dashboard-mobile.css / .js and is scoped to html.rx-mobile. -->
-    <script nonce="<?php echo $csp_nonce; ?>">
-        (function() {
-            var d = document.documentElement;
-
-            function phoneUA() {
-                var u = navigator.userAgentData;
-                if (u && typeof u.mobile === "boolean") return u.mobile;
-                return /iPhone|iPod|Android.+Mobile|Windows Phone|IEMobile|BlackBerry|Opera Mini|Mobile.+Firefox/i.test(navigator.userAgent || "");
-            }
-
-            function apply() {
-                var narrow = (window.innerWidth || 0) <= 600;
-                var shortSide = Math.min(screen.width || 9999, screen.height || 9999);
-                var phone = phoneUA() && shortSide <= 540; // phones stay in phone mode in landscape too
-                d.classList.toggle("rx-mobile", narrow || phone);
-            }
-            apply();
-            window.addEventListener("resize", apply);
-            window.addEventListener("orientationchange", apply);
-        })();
-    </script>
+    <!-- Phone detection (same rule as the Faculty portal). Runs BEFORE first paint so a phone never flashes the
+         responsive layout. Sets class "rx-mobile" on <html> when the device is a phone (phone-sized touch screen,
+         also in landscape) or the window is <= 600px wide. Tablets/desktops do not get it and keep the layout they
+         have today. Everything phone-specific lives in admin-dashboard-mobile.css / .js and is scoped to html.rx-mobile.
+         External file on purpose (not inline): it judges the real screen size, not only window.innerWidth or the
+         browser's "mobile" flag, which real phones can get wrong. Add ?rxdebug=1 to the URL to see what it reads. -->
+    <script src="dashboard/assets/js/admin-phone-detect.js?v=<?php echo @filemtime(PS_ROOT . '/dashboard/assets/js/admin-phone-detect.js'); ?>"></script>
     <title>PUP Sync | Admin Portal</title>
     <!-- Favicon: the PUPSync logo mark (maroon square + layers) -->
     <link rel="icon" href="shared/assets/images/favicon.ico" sizes="32x32">
