@@ -1,3 +1,4 @@
+    <script src="sse/assets/js/sse-client.js?v=<?php echo @filemtime(PS_ROOT . '/sse/assets/js/sse-client.js'); ?>"></script>
     <script type="application/json" id="bookingMetaData"><?php echo $bk_meta_json; ?></script>
     <script nonce="<?php echo $csp_nonce; ?>">
         window.REQUESTS_DATA = <?php echo $requests_json; ?>;

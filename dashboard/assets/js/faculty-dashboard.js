@@ -2809,6 +2809,12 @@
         }
 
 
+        // SSE notification refresh stub — overridden by startInventoryPolling's SSE init
+        window._sseNotifRefresh = function () {
+            if (typeof refreshNotifs === 'function') refreshNotifs();
+        };
+        window._sseReservationsDoPoll = function () {};   // placeholder until startReservationsPolling runs
+
         startRequestsPolling();
         initCodePanel();
         startInventoryPolling();
@@ -3456,8 +3462,27 @@
                 .catch(function () { });
         }
 
+        // ── SSE: register all three faculty streams here, guard the interval ─
+        if (window.PupSyncSSE && !window.PupSyncSSE.fallback) {
+            PupSyncSSE.init({
+                streams: [
+                    { url: 'sse/api/faculty-equipment.php',     onUpdate: doPoll },
+                    // Use an indirection wrapper so the SSE client always calls whatever
+                    // window._sseReservationsDoPoll points to at event-fire time, not the
+                    // stub that existed when startInventoryPolling ran (before
+                    // startReservationsPolling had a chance to install the real doPoll).
+                    { url: 'sse/api/faculty-reservations.php',  onUpdate: function() { window._sseReservationsDoPoll(); } },
+                    { url: 'sse/api/faculty-notifications.php', onUpdate: function() { window._sseNotifRefresh(); } }
+                ]
+            });
+            document.addEventListener('pupsync:sse-fallback', function () {
+                setInterval(doPoll, INTERVAL);
+            }, { once: true });
+        } else {
+            setInterval(doPoll, INTERVAL);
+        }
+
         doPoll();                        // run immediately on page load
-        setInterval(doPoll, INTERVAL);   // then every 8 seconds
     }
 
     /* ── Real-time Requests Polling ────────────────────────────────────── */
@@ -3470,6 +3495,7 @@
             lastStatuses[r.id] = r.status;
         });
 
+        if (!window.PupSyncSSE || window.PupSyncSSE.fallback) {
         setInterval(function () {
             fetch('equipment-booking/api/poll-requests.php', { method: 'GET' })
                 .then(r => r.json())
@@ -3519,6 +3545,22 @@
                 })
                 .catch(() => { }); // silently ignore network errors
         }, INTERVAL);
+        } // end SSE guard
+        // SSE fallback listener for requests polling
+        if (window.PupSyncSSE && !window.PupSyncSSE.fallback) {
+            document.addEventListener('pupsync:sse-fallback', function () {
+                setInterval(function () {
+                    fetch('equipment-booking/api/poll-requests.php', { method: 'GET' })
+                        .then(r => r.json())
+                        .then(fresh => {
+                            if (!Array.isArray(fresh)) return;
+                            let changed = false;
+                            fresh.forEach(r => { if (lastStatuses[r.id] !== r.status) { changed = true; lastStatuses[r.id] = r.status; } });
+                            if (changed) { window.REQUESTS_DATA = fresh; window.OVERDUE_COUNT = fresh.filter(r => r.status === 'Overdue').length; checkOverdueState(); _updateFacultyStatCards(fresh); document.dispatchEvent(new CustomEvent('pupsync:requests-changed')); }
+                        }).catch(() => {});
+                }, INTERVAL);
+            }, { once: true });
+        }
     }
 
     /* -- Room Reservation Notices ---------------------------------------- */
@@ -3551,8 +3593,18 @@
                 .catch(function () { /* silently ignore network errors */ });
         }
 
+        // Expose for SSE client to call when reservations stream triggers
+        window._sseReservationsDoPoll = doPoll;
+
         doPoll();                       // establish the baseline immediately
-        setInterval(doPoll, INTERVAL);  // then every 10 seconds
+
+        if (!window.PupSyncSSE || window.PupSyncSSE.fallback) {
+            setInterval(doPoll, INTERVAL);
+        } else {
+            document.addEventListener('pupsync:sse-fallback', function () {
+                setInterval(doPoll, INTERVAL);
+            }, { once: true });
+        }
 
         /* Re-baseline right after the user submits or cancels a reservation so
            the change is never mistaken for an admin action. */

@@ -4459,11 +4459,13 @@
         const declinePicker = document.getElementById('decline-reason-picker');   // one-tap reasons (shared/assets/js/admin-decline-reasons.js)
 
         function rowCtx(el) {
+            // Fast path: Approve/Decline buttons carry data-req-id directly
+            const directId = el.dataset && el.dataset.reqId;
             const tr = el.closest('tr[data-id]');
-            if (!tr) return null;
-            const d = tr.dataset;
+            if (!tr && !directId) return null;
+            const d = tr ? tr.dataset : {};
             return {
-                id: d.id, status: d.status, condition: d.condition, borrower: d.borrower, idNumber: d.idNumber,
+                id: directId || d.id, status: d.status, condition: d.condition, borrower: d.borrower, idNumber: d.idNumber,
                 reqType: d.reqType, equipment: d.equipment, instructor: d.instructor,
                 submittedAs: d.submittedAs, studentName: d.studentName, studentId: d.studentId,
                 pickupName: d.pickupName,
@@ -4491,8 +4493,9 @@
         }
 
         function fillApprove(ctx) {
-            document.getElementById('approve-request-id').value = ctx.id;
-            document.getElementById('ps-approve-reqno').textContent = reqNo(ctx.id);
+            var safeId = (ctx.id && ctx.id !== '0') ? ctx.id : '';
+            document.getElementById('approve-request-id').value = safeId;
+            document.getElementById('ps-approve-reqno').textContent = reqNo(safeId);
             document.getElementById('approve-borrower').textContent =
                 ctx.submittedAs === 'student' && ctx.studentName ? ctx.studentName : (ctx.borrower || '—');
             document.getElementById('approve-equipment').textContent = ctx.equipment || '—';
@@ -4585,7 +4588,7 @@
         }
 
         document.addEventListener('click', function (e) {
-            const trigger = e.target.closest('[data-modal="ps-approve-modal"], [data-modal="ps-decline-modal"], [data-modal="ps-req-detail-modal"]');
+            const trigger = e.target.closest('[data-modal="ps-approve-modal"], [data-modal="ps-decline-modal"], [data-modal="ps-req-detail-modal"], [data-open="ps-approve-modal"], [data-open="ps-decline-modal"]');
             if (!trigger) return;
 
             // Row click carries fresh context; the detail modal's own footer
@@ -4595,11 +4598,13 @@
             if (!ctx) return;
             reqCtx = ctx;
 
-            const modalId = trigger.dataset.modal;
+            // Normalise: data-open (ps-switch-modal) and data-modal both name the target modal
+            const modalId = trigger.dataset.modal || trigger.dataset.open;
             if (modalId === 'ps-approve-modal') fillApprove(ctx);
             else if (modalId === 'ps-decline-modal') fillDecline(ctx);
             else if (modalId === 'ps-req-detail-modal') fillDetail(ctx);
         });
+
 
         if (declinePicker && declineConfirmBtn) {
             declinePicker.addEventListener('psreason:change', function (e) {
@@ -4688,13 +4693,15 @@
 
         if (approveConfirmBtn) {
             approveConfirmBtn.addEventListener('click', function () {
-                const id = document.getElementById('approve-request-id').value;
+                const id = document.getElementById('approve-request-id').value
+                    || (reqCtx && reqCtx.id && reqCtx.id !== '0' ? reqCtx.id : '');
                 submitDecision(id, 'Approved', '', 'ps-approve-alert', approveConfirmBtn, 'Approving…');
             });
         }
         if (declineConfirmBtn) {
             declineConfirmBtn.addEventListener('click', function () {
-                const id = document.getElementById('decline-request-id').value;
+                const id = document.getElementById('decline-request-id').value
+                    || (reqCtx && reqCtx.id && reqCtx.id !== '0' ? reqCtx.id : '');
                 const pick = window.PSReasonPicker ? window.PSReasonPicker.read(declinePicker) : { ok: false, error: 'Please pick a reason.' };
                 if (!pick.ok) {
                     showAlert('ps-decline-alert', pick.error || 'Please pick a reason.');
@@ -7631,6 +7638,7 @@ function psSelectFmt(btn) {
         var mcReasonInp = document.getElementById('mc-reason');
         var mcConfirm = document.getElementById('manual-claim-confirm-btn');
         var mcMaxQty = 1;
+        var mcCurrentId = '';
 
         function mcUpdateUI() {
             if (!mcQtyInp) return;
@@ -7654,6 +7662,7 @@ function psSelectFmt(btn) {
                 var d = tr.dataset;
                 if (mcReqId) mcReqId.value = d.id || '';
                 mcMaxQty = Math.max(1, parseInt(d.qty, 10) || 1);
+                mcCurrentId = d.id || '';   // closure-level backup
                 if (mcBorrower) mcBorrower.textContent = d.borrower || '—';
                 if (mcEquipment) mcEquipment.textContent = d.equipment + (mcMaxQty > 1 ? ' \u00d7' + mcMaxQty : '');
                 if (mcDue) mcDue.textContent = d.dueLabel || '—';
@@ -7683,7 +7692,7 @@ function psSelectFmt(btn) {
             // Submit
             if (mcConfirm) {
                 mcConfirm.addEventListener('click', function () {
-                    var id = mcReqId ? mcReqId.value : '';
+                    var id = (mcReqId && mcReqId.value) ? mcReqId.value : mcCurrentId;
                     if (!id) { if (typeof window.showToast === 'function') window.showToast('No loan selected.'); return; }
                     var give = Math.max(0, Math.min(mcMaxQty, parseInt(mcQtyInp ? mcQtyInp.value : '1', 10) || 0));
                     var keep = mcMaxQty - give;

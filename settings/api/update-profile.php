@@ -371,16 +371,27 @@ if ($action === 'change_password') {
         exit;
     }
 
-    $hashed = mysqli_real_escape_string($conn, password_hash($new_pw, PASSWORD_DEFAULT));
+    $hashed = password_hash($new_pw, PASSWORD_BCRYPT);
     $now_timestamp = date('Y-m-d H:i:s');
 
-    if (mysqli_query($conn, "UPDATE tbl_users SET password='$hashed', last_password_change='$now_timestamp' WHERE faculty_id='$uid'")) {
+    $stmt = $conn->prepare("UPDATE tbl_users SET password = ?, last_password_change = ? WHERE faculty_id = ?");
+    if (!$stmt) {
+        error_log('[PUPSync] update-profile password change prepare failed: ' . $conn->error);
+        echo json_encode(['success' => false, 'msg' => 'Failed to update password.']);
+        exit;
+    }
+
+    $stmt->bind_param('sss', $hashed, $now_timestamp, $uid);
+    if ($stmt->execute()) {
+        $stmt->close();
         echo json_encode([
             'success' => true,
             'msg' => 'Password changed successfully! Keep it safe.',
             'last_pw_change' => $now_timestamp,
         ]);
     } else {
+        error_log('[PUPSync] update-profile password change execute failed: ' . $stmt->error);
+        $stmt->close();
         echo json_encode(['success' => false, 'msg' => 'Failed to update password.']);
     }
     exit;

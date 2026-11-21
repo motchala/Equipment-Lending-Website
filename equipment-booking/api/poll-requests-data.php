@@ -53,12 +53,19 @@ $_has_sa = $_sa_col && $_sa_col->num_rows > 0;
 $_bid_col = $conn->query("SHOW COLUMNS FROM tbl_requests LIKE 'batch_id'");
 $_has_bid = $_bid_col && $_bid_col->num_rows > 0;
 
-$_extra_cols = '';
-if ($_has_sa)  $_extra_cols .= ', submitted_as';
-if ($_has_bid) $_extra_cols .= ', batch_id';
+// Build column lists as arrays for safe concatenation
+$base_cols = ['id', 'faculty_name', 'faculty_id', 'equipment_name', 'instructor', 'room',
+              'borrow_date', 'return_date', 'return_token', 'returned_at', 'status',
+              'request_date', 'reason', 'document_path', 'arbitration_rule',
+              'submitted_by_name', 'submitted_by_id'];
+$extra_cols = [];
+if ($_has_sa)  $extra_cols[] = 'submitted_as';
+if ($_has_bid) $extra_cols[] = 'batch_id';
+$all_cols = array_merge($base_cols, $extra_cols);
+$col_list = implode(', ', $all_cols);
 
 $waiting = [];
-$r = mysqli_query($conn, "SELECT id, faculty_name, faculty_id, equipment_name, instructor, room, borrow_date, return_date, return_token, returned_at, status, request_date, reason, document_path, arbitration_rule, submitted_by_name, submitted_by_id{$_extra_cols} FROM tbl_requests WHERE status='Waiting' ORDER BY request_date DESC");
+$r = mysqli_query($conn, "SELECT {$col_list} FROM tbl_requests WHERE status='Waiting' ORDER BY request_date DESC");
 while ($row = mysqli_fetch_assoc($r)) {
     if (!$_has_sa) $row['submitted_as'] = null;
     if (!$_has_bid) $row['batch_id'] = null;
@@ -70,8 +77,10 @@ $approved = [];
 // Extension info (only once the columns exist, i.e. after the first extension anywhere)
 $_ext_col = mysqli_query($conn, "SHOW COLUMNS FROM tbl_requests LIKE 'extension_count'");
 $_has_ext = $_ext_col && $_ext_col->num_rows > 0;
-$_ext_cols = $_has_ext ? ', extension_count, original_return_date, original_return_time' : '';
-$r = mysqli_query($conn, "SELECT id, faculty_name, faculty_id, equipment_name, instructor, room, borrow_date, return_date, return_token, returned_at, status, request_date, reason, document_path, arbitration_rule, submitted_by_name, submitted_by_id{$_extra_cols}{$_ext_cols} FROM tbl_requests WHERE status IN ('Approved','Overdue') ORDER BY request_date DESC");
+$ext_cols = $_has_ext ? ['extension_count', 'original_return_date', 'original_return_time'] : [];
+$all_cols_ext = array_merge($all_cols, $ext_cols);
+$col_list_ext = implode(', ', $all_cols_ext);
+$r = mysqli_query($conn, "SELECT {$col_list_ext} FROM tbl_requests WHERE status IN ('Approved','Overdue') ORDER BY request_date DESC");
 while ($row = mysqli_fetch_assoc($r)) {
     if (!$_has_sa) $row['submitted_as'] = null;
     if (!$_has_bid) $row['batch_id'] = null;
@@ -80,7 +89,7 @@ while ($row = mysqli_fetch_assoc($r)) {
 
 // ── Declined ───────────────────────────────────────────────────────────────
 $declined = [];
-$r = mysqli_query($conn, "SELECT id, faculty_name, faculty_id, equipment_name, instructor, room, borrow_date, return_date, return_token, returned_at, status, request_date, reason, document_path, arbitration_rule, submitted_by_name, submitted_by_id{$_extra_cols} FROM tbl_requests WHERE status='Declined' AND COALESCE(arbitration_rule,'')='override' ORDER BY request_date DESC");
+$r = mysqli_query($conn, "SELECT {$col_list} FROM tbl_requests WHERE status='Declined' AND COALESCE(arbitration_rule,'')='override' ORDER BY request_date DESC");
 while ($row = mysqli_fetch_assoc($r)) {
     if (!$_has_sa) $row['submitted_as'] = null;
     if (!$_has_bid) $row['batch_id'] = null;
@@ -89,8 +98,10 @@ while ($row = mysqli_fetch_assoc($r)) {
 
 // ── Recent activity (dashboard feed) ──────────────────────────────────────
 $activity = [];
-$_sa_activity = $_has_sa ? ', submitted_as' : '';
-$r = mysqli_query($conn, "SELECT faculty_name, equipment_name, status, request_date{$_sa_activity} FROM tbl_requests WHERE NOT (status='Declined' AND COALESCE(arbitration_rule,'')<>'override') ORDER BY request_date DESC LIMIT 6");
+$activity_cols = ['faculty_name', 'equipment_name', 'status', 'request_date'];
+if ($_has_sa) $activity_cols[] = 'submitted_as';
+$activity_col_list = implode(', ', $activity_cols);
+$r = mysqli_query($conn, "SELECT {$activity_col_list} FROM tbl_requests WHERE NOT (status='Declined' AND COALESCE(arbitration_rule,'')<>'override') ORDER BY request_date DESC LIMIT 6");
 while ($row = mysqli_fetch_assoc($r)) {
     if (!$_has_sa) $row['submitted_as'] = null;
     $activity[] = $row;

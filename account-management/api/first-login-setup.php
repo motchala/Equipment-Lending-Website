@@ -120,7 +120,7 @@ if ($cur_dept !== '') {
 }
 
 // ── Save everything at once ──────────────────────────────────────────────────
-$hash = password_hash($new_pw, PASSWORD_DEFAULT);
+$hash = password_hash($new_pw, PASSWORD_BCRYPT);
 $now  = date('Y-m-d H:i:s');
 try {
     $upd = $conn->prepare(

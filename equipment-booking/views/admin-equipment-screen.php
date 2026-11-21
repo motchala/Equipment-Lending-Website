@@ -820,8 +820,8 @@
                                         <td data-col="actions">
                                             <div class="eq-act-wrap">
                                                 <?php if ($lst === 'waiting'): ?>
-                                                    <button type="button" class="ps-btn ps-btn--success ps-btn--sm" data-action="ps-open-modal" data-modal="ps-approve-modal"><span class="material-symbols-outlined">check</span> Approve</button>
-                                                    <button type="button" class="ps-btn ps-btn--danger ps-btn--sm" data-action="ps-open-modal" data-modal="ps-decline-modal"><span class="material-symbols-outlined">close</span> Decline</button>
+                                                    <button type="button" class="ps-btn ps-btn--success ps-btn--sm" data-action="ps-open-modal" data-modal="ps-approve-modal" data-req-id="<?php echo (int)$r['id']; ?>"><span class="material-symbols-outlined">check</span> Approve</button>
+                                                    <button type="button" class="ps-btn ps-btn--danger ps-btn--sm" data-action="ps-open-modal" data-modal="ps-decline-modal" data-req-id="<?php echo (int)$r['id']; ?>"><span class="material-symbols-outlined">close</span> Decline</button>
                                                 <?php elseif ($lst === 'scheduled'): ?>
                                                     <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-action="eq-open-loan-detail">View</button>
                                                     <button type="button" class="ps-btn ps-btn--danger ps-btn--sm" data-action="ps-open-modal" data-modal="ps-cancel-booking-modal"><span class="material-symbols-outlined">event_busy</span> Cancel</button>

@@ -2850,6 +2850,7 @@ ALTER TABLE `tbl_remember_tokens`
 -- Indexes for table `tbl_requests`
 --
 ALTER TABLE `tbl_requests`
+  ADD PRIMARY KEY (`id`),
   ADD KEY `idx_batch_id` (`batch_id`),
   ADD KEY `idx_bundle_claim_token` (`bundle_claim_token`);
 
@@ -2862,20 +2863,208 @@ ALTER TABLE `tbl_request_events`
   ADD KEY `idx_time` (`created_at`);
 
 --
+-- Indexes for table `tbl_room_arbitration_log`
+--
+ALTER TABLE `tbl_room_arbitration_log`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_rral_reservation` (`reservation_id`),
+  ADD KEY `idx_rral_room` (`room_id`);
+
+--
+-- Indexes for table `tbl_room_issues`
+--
+ALTER TABLE `tbl_room_issues`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_ri_room` (`room_id`);
+
+--
+-- Indexes for table `tbl_room_reservations`
+--
+ALTER TABLE `tbl_room_reservations`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_rr_room_date` (`room_id`,`reservation_date`),
+  ADD KEY `idx_rr_faculty` (`faculty_id`),
+  ADD KEY `idx_rr_status` (`status`);
+
+--
+-- Indexes for table `tbl_room_waitlist`
+--
+ALTER TABLE `tbl_room_waitlist`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_rw_slot` (`room_id`,`reservation_date`,`start_time`,`end_time`);
+
+--
+-- Indexes for table `tbl_rooms_import_files`
+--
+ALTER TABLE `tbl_rooms_import_files`
+  ADD PRIMARY KEY (`id`);
+
+--
 -- Indexes for table `tbl_service_survey_comments`
 --
 ALTER TABLE `tbl_service_survey_comments`
   ADD KEY `idx_service_survey_comment_period` (`period_id`);
 
 --
+-- Indexes for table `tbl_sync_pending_deletions`
+--
+ALTER TABLE `tbl_sync_pending_deletions`
+  ADD PRIMARY KEY (`id`);
+
+--
 -- AUTO_INCREMENT for dumped tables
 --
+
+--
+-- AUTO_INCREMENT for table `tbl_accounts`
+--
+ALTER TABLE `tbl_accounts`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_admin_activity`
+--
+ALTER TABLE `tbl_admin_activity`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `tbl_ai_chat_log`
 --
 ALTER TABLE `tbl_ai_chat_log`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=165;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_arbitration_config`
+--
+ALTER TABLE `tbl_arbitration_config`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_arbitration_log`
+--
+ALTER TABLE `tbl_arbitration_log`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_class_schedule`
+--
+ALTER TABLE `tbl_class_schedule`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_faculty_admin_notice`
+--
+ALTER TABLE `tbl_faculty_admin_notice`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_faculty_codes`
+--
+ALTER TABLE `tbl_faculty_codes`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_faculty_item_codes`
+--
+ALTER TABLE `tbl_faculty_item_codes`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_faculty_notif_state`
+--
+ALTER TABLE `tbl_faculty_notif_state`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_faculty_registry`
+--
+ALTER TABLE `tbl_faculty_registry`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_faculty_registry_files`
+--
+ALTER TABLE `tbl_faculty_registry_files`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_ip_login_attempts`
+--
+ALTER TABLE `tbl_ip_login_attempts`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_item_code_attempts`
+--
+ALTER TABLE `tbl_item_code_attempts`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_login_attempts`
+--
+ALTER TABLE `tbl_login_attempts`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_notif_prefs`
+--
+ALTER TABLE `tbl_notif_prefs`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_notif_state`
+--
+ALTER TABLE `tbl_notif_state`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_request_events`
+--
+ALTER TABLE `tbl_request_events`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_requests`
+--
+ALTER TABLE `tbl_requests`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_room_arbitration_log`
+--
+ALTER TABLE `tbl_room_arbitration_log`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_room_issues`
+--
+ALTER TABLE `tbl_room_issues`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_room_reservations`
+--
+ALTER TABLE `tbl_room_reservations`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_room_waitlist`
+--
+ALTER TABLE `tbl_room_waitlist`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_rooms_import_files`
+--
+ALTER TABLE `tbl_rooms_import_files`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_sync_pending_deletions`
+--
+ALTER TABLE `tbl_sync_pending_deletions`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
