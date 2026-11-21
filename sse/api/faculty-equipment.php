@@ -39,6 +39,7 @@ sse_send_headers();
 
 require_once __DIR__ . '/../../config/db.php';
 $conn = getDB();
+require_once __DIR__ . '/../../shared/core/pseudo-cron.php';   // scheduled work (see that file): the stream doubles as the clock
 
 // ─── Snapshot ────────────────────────────────────────────────────────────────
 
@@ -75,6 +76,7 @@ $lastSig = '';
 
 while (!sse_should_close($start) && sse_connection_open()) {
     sse_maybe_heartbeat($lastHb);
+    ps_pseudo_cron_tick($conn);   // decides due buffered requests (throttled, shared by every open stream)
 
     try {
         $sig = sse_faculty_equipment_snapshot($conn, $uid);

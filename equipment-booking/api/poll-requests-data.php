@@ -22,6 +22,10 @@ $conn = getDB();
 require_once __DIR__ . '/../core/auto-approve-tick.php';
 equipment_auto_approve_tick($conn);
 
+// The admin poll also runs the room side of the scheduled work (same-day room buffers), see shared/core/pseudo-cron.php.
+require_once __DIR__ . '/../../shared/core/pseudo-cron.php';
+ps_pseudo_cron_tick($conn);
+
 $today = date('Y-m-d');
 
 // -- Status housekeeping (one shared routine, see core/request-decision.php) ----
