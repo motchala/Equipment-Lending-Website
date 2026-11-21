@@ -14,8 +14,10 @@
     <!-- Performance: preconnect to font origins -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <!-- Preload the leftmost gateway photo for faster LCP -->
-    <link rel="preload" as="image" href="auth/assets/images/landing-page/1-hero-page.jpg">
+    <!-- Preload all three gateway photos (WebP) so they download in parallel and appear together -->
+    <link rel="preload" as="image" type="image/webp" href="auth/assets/images/landing-page/1-hero-page.webp" fetchpriority="high" data-hero>
+    <link rel="preload" as="image" type="image/webp" href="auth/assets/images/landing-page/2-hero-page.webp" fetchpriority="high" data-hero>
+    <link rel="preload" as="image" type="image/webp" href="auth/assets/images/landing-page/6-hero-page.webp" fetchpriority="high" data-hero>
     <!-- Fonts with display=swap to avoid FOIT -->
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400;1,600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">

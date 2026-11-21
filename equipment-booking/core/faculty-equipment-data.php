@@ -1,7 +1,7 @@
 <?php
 // ── Borrow Request modal data ─────────────────────────────────────────────
 BookingSchedule::loadRules($conn);                      // Settings → Arbitration values for the rules below
-$bk_rooms  = BookingSchedule::roomsTree($conn, true);   // Available rooms only (no Maintenance / Not Bookable)
+$bk_rooms  = BookingSchedule::roomsTree($conn);         // every room + its status: Maintenance / Not Bookable stay visible in the picker but cannot be chosen
 $bk_totals = BookingSchedule::totalStockMap($conn);
 $bk_items  = [];
 // One entry per item NAME: the same name can exist once per campus, so the shelf quantities are added up

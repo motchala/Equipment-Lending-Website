@@ -49,3 +49,28 @@ Options -Indexes
     php_value session.cookie_path /
     php_value session.use_strict_mode 1
 </IfModule>
+
+
+# ---------------------------------------------------------------
+# PUPSync performance: browser caching for images + gzip for text.
+# Both blocks are wrapped in <IfModule>, so if the host lacks the
+# module they are skipped silently. If this ever causes an HTTP 500,
+# delete from this comment down to the end of the file.
+# CSS/JS are intentionally NOT cached long-term (unversioned file
+# names would make updates look "stuck" for returning visitors).
+# ---------------------------------------------------------------
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/webp "access plus 30 days"
+    ExpiresByType image/jpeg "access plus 30 days"
+    ExpiresByType image/png "access plus 30 days"
+    ExpiresByType image/gif "access plus 30 days"
+    ExpiresByType image/svg+xml "access plus 30 days"
+    ExpiresByType image/x-icon "access plus 30 days"
+    ExpiresByType image/vnd.microsoft.icon "access plus 30 days"
+    ExpiresByType font/woff2 "access plus 30 days"
+</IfModule>
+
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css text/plain text/xml application/javascript text/javascript application/json image/svg+xml
+</IfModule>

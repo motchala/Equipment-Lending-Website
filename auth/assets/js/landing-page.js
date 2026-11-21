@@ -148,3 +148,45 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 });
+
+
+/* ================================================================
+   GATEWAY PHOTOS — reveal all three together
+   The preload links in landing.php (data-hero) are the single source of
+   the image URLs. Wait until every photo is loaded + decoded, then fade
+   the strip in at once. A timeout reveals it anyway on very slow links.
+================================================================ */
+(function () {
+    'use strict';
+
+    var strip = document.querySelector('.visual-strip');
+    if (!strip) return;
+
+    var revealed = false;
+    function reveal() {
+        if (revealed) return;
+        revealed = true;
+        strip.classList.add('is-ready');
+    }
+
+    var urls = Array.prototype.map.call(
+        document.querySelectorAll('link[rel="preload"][data-hero]'),
+        function (l) { return l.href; }
+    );
+    if (!urls.length) { reveal(); return; }
+
+    var loads = urls.map(function (url) {
+        return new Promise(function (resolve) {
+            var img = new Image();
+            img.onload = function () {
+                // decode() avoids a paint hitch when the photos first appear
+                if (img.decode) { img.decode().then(resolve, resolve); } else { resolve(); }
+            };
+            img.onerror = resolve; // never block the reveal on one failure
+            img.src = url;
+        });
+    });
+
+    Promise.all(loads).then(reveal);
+    setTimeout(reveal, 6000);
+})();

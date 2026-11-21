@@ -1130,6 +1130,29 @@
         [1, 2, 3, 4, 5, 6, 0].forEach(function (n) { if (ROOM_OPEN_DOW.indexOf(n) === -1) closed.push(names[n]); });
         return closed.length > 1 ? closed.slice(0, -1).join(', ') + ' and ' + closed[closed.length - 1] : (closed[0] || '');
     }
+    /* "Open 7:00 AM – 8:00 PM, Monday to Saturday." — built from the saved room schedule, never typed by hand */
+    function roomOpenDaysLabel() {
+        var names = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        var days = [1, 2, 3, 4, 5, 6, 0].filter(function (n) { return ROOM_OPEN_DOW.indexOf(n) !== -1; });
+        var runs = [];
+        days.forEach(function (n, i) {
+            var prev = days[i - 1];
+            var next = n === 0 ? 7 : n;   /* Sunday sits after Saturday */
+            var prevN = i && (prev === 0 ? 7 : prev);
+            if (i && next === prevN + 1) runs[runs.length - 1][1] = n; else runs.push([n, n]);
+        });
+        var parts = [];
+        runs.forEach(function (r) {
+            var a = r[0], b = r[1], an = a === 0 ? 7 : a, bn = b === 0 ? 7 : b;
+            if (a === b) parts.push(names[a]);
+            else if (bn === an + 1) { parts.push(names[a]); parts.push(names[b]); }
+            else parts.push(names[a] + ' to ' + names[b]);
+        });
+        return parts.length > 1 ? parts.slice(0, -1).join(', ') + ' and ' + parts[parts.length - 1] : (parts[0] || '');
+    }
+    function roomOpenHint() {
+        return 'Open ' + minToLabel(OPEN_MIN) + ' \u2013 ' + minToLabel(ROOM_END_MIN) + ', ' + roomOpenDaysLabel() + '.';
+    }
     function roomMaxLengthMsg() {
         var h = ROOM_MAX_MIN / 60;
         return 'A reservation can be at most ' + h + (h === 1 ? ' hour' : ' hours') + ' long.';
@@ -1413,7 +1436,7 @@
             '<button type="button" class="st-gear" id="reserveGear" data-action="res-gear" aria-pressed="false" aria-label="Pick a custom end time" title="Pick a custom end time">' + icon('settings') + '</button>' +
             '</div></div>' +
             '</div>' +
-            '<p class="st-hint" style="margin:-8px 0 16px">Open 7:00 AM &ndash; 8:00 PM, Monday to Saturday.</p>' +
+            '<p class="st-hint" style="margin:-8px 0 16px">' + esc(roomOpenHint()) + '</p>' +
             '<div class="st-field"><span class="st-label">Purpose <span class="st-star">*</span></span>' +
             '<div class="st-chiprow" id="reservePurposeChips">' + PURPOSES.concat(['Other']).map(function (p) {
                 return '<button type="button" class="st-chip" aria-pressed="false" data-action="res-purpose" data-v="' + esc(p) + '">' + esc(p) + '</button>';
