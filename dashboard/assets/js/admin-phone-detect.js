@@ -65,6 +65,13 @@
     }
 
     apply();
+
+    /* The Dashboard's "Best viewed on a desktop" note is printed by the server. If it was dismissed in this
+       session (admin-dashboard-mobile.js stores that in sessionStorage), hide it from the first frame too. */
+    try {
+        if (sessionStorage.getItem('rxmAdminNoteDismissed') === '1') d.classList.add('rxm-note-off');
+    } catch (e) { }
+
     window.addEventListener('resize', apply);
     window.addEventListener('orientationchange', apply);
 

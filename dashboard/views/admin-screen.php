@@ -56,10 +56,19 @@
                         </div>
                     </header>
 
+                    <!-- Phone only (hidden by CSS unless <html class="rx-mobile">): desktop notice + "show more" button.
+                         Printed here so they are in the first frame; admin-dashboard-mobile.js adopts them (same ids). -->
+                    <aside class="rxm-note" id="rxmNote" role="note">
+                        <span class="material-symbols-outlined rxm-note-ico" aria-hidden="true">desktop_windows</span>
+                        <div class="rxm-note-text"><strong>Best viewed on a desktop</strong><span>Some features are not available on mobile. Switch to desktop view in your browser to use everything.</span><button type="button" class="rxm-note-link" data-rxm-note-more>See what is desktop-only</button></div>
+                        <button type="button" class="rxm-iconbtn rxm-note-x" aria-label="Dismiss" data-rxm-note-x><span class="material-symbols-outlined" aria-hidden="true">close</span></button>
+                    </aside>
+
                     <!-- Live region: stat cards + panels. Re-rendered by the dashboard block at the end of admin-dashboard.js. -->
                     <div id="dashLive">
                         <?php dash_render($dash_data); ?>
                     </div>
+                    <button type="button" class="rxm-more-btn" id="rxmMore" aria-expanded="false"><span class="rxm-more-label">Show trends &amp; recent activity</span><span class="material-symbols-outlined" aria-hidden="true">expand_more</span></button>
 
                 </div><!-- /dash -->
 

@@ -46,7 +46,11 @@ html.rx-mobile {
     --rxm-tab-h: 64px;
     --rxm-gutter: 16px;
     --rxm-st: env(safe-area-inset-top, 0px);
-    --rxm-sb: env(safe-area-inset-bottom, 0px);
+    /* Bottom inset is pinned to 0 on purpose. On Chrome for Android the live env(safe-area-inset-bottom) changes
+       whenever the browser toolbar shows/hides, which made the bottom tab bar grow upward and jump. The page no longer
+       opts into edge-to-edge (viewport-fit=cover was removed from the shell <meta viewport>), so the browser keeps the
+       page clear of the system bars itself and the tab bar keeps one fixed height. */
+    --rxm-sb: 0px;
     --rxm-sl: env(safe-area-inset-left, 0px);
     --rxm-sr: env(safe-area-inset-right, 0px);
     --rxm-r: 22px;
@@ -576,6 +580,10 @@ html.rx-mobile .rxm-sheet[hidden] {
 /* ---------------------------------------------------------------
    5. DESKTOP NOTICE BANNER (top of the Dashboard)
 --------------------------------------------------------------- */
+html.rxm-note-off .rxm-note {
+    display: none !important;
+}
+
 html.rx-mobile .rxm-note {
     display: flex;
     align-items: flex-start;
