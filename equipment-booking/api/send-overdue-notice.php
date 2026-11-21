@@ -136,15 +136,7 @@ try {
     );
 
     // Push notification — mirrors the in-app overdue notice
-    ps_push_send(
-        $conn,
-        'faculty',
-        (string)$loan['faculty_id'],
-        'overdue',
-        'Overdue Return Notice',
-        $loan['equipment_name'] . ' is overdue. Please return it to the admin office.',
-        'faculty-dashboard.php?tab=activity'
-    );
+    
 
     // The On Loan screen calls this with fetch() and updates the row in place (no page reload).
     // A plain form post (no JavaScript) still gets the old redirect.

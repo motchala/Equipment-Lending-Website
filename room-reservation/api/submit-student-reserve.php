@@ -226,8 +226,7 @@ $final_reason = $status_row['reason'] ?? '';
 
 // Approved on the spot: the faculty (who is not on the page) gets their approval receipt now.
 if ($final_status === 'Approved') {
-    require_once __DIR__ . '/../../notifications/core/approval-receipts.php';
-    ps_receipts_sweep($conn);
+
 }
 
 // ── Mark code as used ─────────────────────────────────────────────────────

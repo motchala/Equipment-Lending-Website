@@ -674,8 +674,7 @@ function equipment_decide_on_submit(mysqli $conn, array $request_ids): array
     if ($approved) {
         equipment_issue_tokens($conn, $approved);
         // Approved by the automatic rules: send the faculty their approval receipt.
-        require_once __DIR__ . '/../../notifications/core/approval-receipts.php';
-        ps_receipts_sweep($conn);
+
     }
     return $out;
 }

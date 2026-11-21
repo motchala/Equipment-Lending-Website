@@ -231,8 +231,6 @@ foreach ($waiting as $row) {
 }
 
 // Approval receipt: one notification for the whole bundle, now that it is saved.
-require_once __DIR__ . '/../../notifications/core/approval-receipts.php';
-ps_receipts_sweep($conn);
 
 send_bundle_json(200, 'success', 'Approved ' . count($waiting) . ' bundled requests. The faculty member will have one Claim Bundle QR.', [
     'approved_count' => count($waiting),

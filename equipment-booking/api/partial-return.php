@@ -178,12 +178,7 @@ foreach ($conditions as $req_id_raw => $condition_raw) {
 
         // Push notification for Damaged / Missing condition flag
         if (in_array($condition, ['Damaged', 'Missing'], true)) {
-            ps_push_send(
-                $conn, 'faculty', (string)$row['faculty_id'], 'equipment',
-                ($condition === 'Missing' ? 'Missing Item Reported' : 'Damaged Item Reported'),
-                $eq_name . ' was recorded as ' . strtolower($condition) . ' on return.',
-                'faculty-dashboard.php?tab=activity'
-            );
+           
         }
 
     } catch (Throwable $e) {

@@ -270,8 +270,7 @@ function ps_room_settle_buffers(mysqli $conn, ?DateTimeInterface $now = null): a
         if ($out['approved'] > 0) {
             // The faculty is probably not on the page: send the approval receipt now.
             try {
-                require_once __DIR__ . '/../../notifications/core/approval-receipts.php';
-                ps_receipts_sweep($conn);
+               
             } catch (Throwable $e) {
                 error_log('[PUPSync] ps_room_settle_buffers receipts: ' . $e->getMessage());
             }

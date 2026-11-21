@@ -361,9 +361,6 @@ if (!function_exists('fnotif_build_list')) {
         $HISTORY_DAYS = 30;     // one-off events (approved/declined/returned/...) age out after this
         $FEED_LIMIT   = 200;
 
-        // Push the approval receipt for anything of this faculty's that was approved and not announced yet
-        // (the in-app receipts below are built live from the same rows). Never throws.
-        ps_receipts_sweep($conn, $facultyId);
 
         $state    = fnotif_state_map($conn, $facultyId);
         $now      = time();

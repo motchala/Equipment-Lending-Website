@@ -3,9 +3,9 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Nov 19, 2026 at 05:32 AM
+-- Generation Time: Nov 21, 2026 at 08:52 AM
 -- Server version: 10.4.32-MariaDB
--- PHP Version: 8.2.12
+-- PHP Version: 8.4.27
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -47,7 +47,7 @@ CREATE TABLE `tbl_accounts` (
 --
 
 INSERT INTO `tbl_accounts` (`id`, `fullName`, `email`, `password`, `role`, `admin_no`, `created_at`, `last_login`, `dormant_until`, `session_epoch`, `last_password_change`, `backup_email`) VALUES
-(1, 'Redg Abelida', 'main@admin.edu', '$2y$10$dLNCtd5IGqTMf7VUHFYyEOPI00YWyd9h9n4uj6dTptlcKwFNcw57e', 'Super Admin', 1, '2026-01-01 00:00:00', '2026-11-19 11:54:05', NULL, 0, NULL, ''),
+(1, 'Redg Abelida', 'main@admin.edu', '$2y$10$dLNCtd5IGqTMf7VUHFYyEOPI00YWyd9h9n4uj6dTptlcKwFNcw57e', 'Super Admin', 1, '2026-01-01 00:00:00', '2026-11-19 17:38:00', NULL, 0, NULL, ''),
 (2, 'Chico Ramos', 'chico@admin.edu', '$2y$10$w.G7jIE6r6iSsVyn/T/G2OAhoqpyxgu4kkWKbHIhOky/CJk94xLGC', 'Admin', 2, '2026-10-02 11:05:03', '2026-11-09 23:25:05', NULL, 0, NULL, NULL),
 (3, 'Jell Alagon', 'jell@admin.edu', '$2y$10$Q2ZyDvxioT548b/LuPKdEe7XYwf3bh3t//5dN/mX2bNIKEQ3buhf6', 'Admin', 3, '2026-11-10 06:01:18', NULL, NULL, 0, NULL, NULL);
 
@@ -75,6 +75,7 @@ CREATE TABLE `tbl_admin_activity` (
 --
 
 INSERT INTO `tbl_admin_activity` (`id`, `admin_id`, `admin_name`, `category`, `action`, `summary`, `ref_type`, `ref_id`, `ref`, `created_at`) VALUES
+(0, 1, 'Redg Abelida', 'login', NULL, 'Signed in', NULL, NULL, NULL, '2026-11-19 17:38:00'),
 (1, 1, 'Redg Admin', 'request', 'request_returned', 'Marked AC Remote as returned (Sandy Napiza)', 'request', 17, 'arb:1', '2026-06-04 13:47:37'),
 (2, 1, 'Redg Admin', 'request', 'request_returned', 'Marked AC Remote as returned (Sandy Napiza)', 'request', 18, 'arb:2', '2026-06-06 21:43:09'),
 (3, 1, 'Redg Admin', 'request', 'request_returned', 'Marked AC Remote as returned (Frederick Rosales)', 'request', 19, 'arb:4', '2026-06-06 21:59:40'),
@@ -338,23 +339,14 @@ CREATE TABLE `tbl_ai_chat_log` (
 --
 
 INSERT INTO `tbl_ai_chat_log` (`id`, `faculty_id`, `sent_at`) VALUES
-(153, 'FA0008BN2023', '2026-11-18 16:56:51'),
-(154, 'FA0008BN2023', '2026-11-18 18:28:29'),
-(155, 'FA0008BN2023', '2026-11-18 18:30:02'),
-(156, 'FA0008BN2023', '2026-11-18 18:30:40'),
-(157, 'FA0008BN2023', '2026-11-18 18:41:57'),
 (158, 'FA0008BN2023', '2026-11-18 20:10:00'),
-(151, 'FA0011BN2026', '2026-11-18 16:24:25'),
-(152, 'FA0011BN2026', '2026-11-18 16:29:25'),
-(142, 'NOTSET-275A970376E5', '2026-10-24 17:28:30'),
-(143, 'NOTSET-275A970376E5', '2026-10-24 17:28:52'),
-(144, 'NOTSET-275A970376E5', '2026-10-25 09:26:43'),
-(145, 'NOTSET-275A970376E5', '2026-10-25 09:27:01'),
-(146, 'NOTSET-275A970376E5', '2026-10-25 09:38:32'),
-(147, 'NOTSET-275A970376E5', '2026-10-25 09:56:00'),
-(148, 'NOTSET-275A970376E5', '2026-10-25 09:57:47'),
-(149, 'NOTSET-275A970376E5', '2026-10-25 10:27:26'),
-(150, 'NOTSET-275A970376E5', '2026-10-25 10:42:34');
+(1, 'FA0008BN2023', '2026-11-19 18:29:32'),
+(159, 'FA0008BN2023', '2026-11-19 18:45:01'),
+(160, 'FA0008BN2023', '2026-11-19 18:45:29'),
+(161, 'FA0008BN2023', '2026-11-19 18:51:35'),
+(162, 'FA0008BN2023', '2026-11-19 19:30:58'),
+(163, 'FA0008BN2023', '2026-11-19 19:50:42'),
+(164, 'FA0008BN2023', '2026-11-19 20:11:52');
 
 -- --------------------------------------------------------
 
@@ -1594,7 +1586,7 @@ INSERT INTO `tbl_inventory` (`item_id`, `campus_id`, `synced_from_sheet`, `item_
 (30, 1, 0, 'Table', 'Others', 4, 'Good', NULL, 'uploads/1790901156_item_table2.jpg', '2026-10-02 08:32:36', 1, 0),
 (31, 1, 0, 'Projector', 'Audio/Visual', 3, 'Good', NULL, 'uploads/1790901270_images.jpg', '2026-10-02 08:34:30', 1, 0),
 (32, 1, 0, 'Double A Batter', 'Power', 16, 'Fair', NULL, 'uploads/1790910199_batteryAA.jpg', '2026-10-02 11:03:19', 1, 0),
-(33, 2, 1, 'Unterrupted Power Supply', 'Computer Laboratories', 29, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:55', 0, 0),
+(33, 2, 1, 'Unterrupted Power Supply', 'Computer Laboratories', 30, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:55', 0, 0),
 (34, 2, 1, 'Automatic Voltage Regulator', 'Computer Laboratories', 30, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:55', 0, 0),
 (35, 2, 1, 'Data Comm Cabinet', 'Computer Laboratories', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:55', 0, 0),
 (36, 2, 1, 'D-Link Switch/Hub', 'Computer Laboratories', 1, 'Good', NULL, 'uploads/default.png', '2026-11-08 16:22:55', 0, 0),
@@ -1863,7 +1855,7 @@ CREATE TABLE `tbl_ip_login_attempts` (
 
 INSERT INTO `tbl_ip_login_attempts` (`id`, `ip_address`, `fail_count`, `window_start`, `locked_until`) VALUES
 (1, '::1', 0, '2026-11-19 11:53:58', NULL),
-(19, '127.0.0.1', 0, '2026-11-15 17:27:29', NULL);
+(19, '127.0.0.1', 0, '2026-11-21 15:48:05', NULL);
 
 -- --------------------------------------------------------
 
@@ -2049,8 +2041,8 @@ INSERT INTO `tbl_requests` (`id`, `faculty_name`, `faculty_id`, `equipment_name`
 (81, 'Stephen Perez', 'FA0011BN2026', 'AC Remote', 'Stephen Perez', 'Audio Visual Room 2', '2026-11-18', '2026-11-18', 'bfd84cdfd226cc8deab143e3a1dcd9a3f6fa960ea6407c1e4bfab1dfc1a5ee1f', NULL, NULL, NULL, 'Declined', '2026-11-18 10:40:38', 'Not reviewed before the borrow start time – automatically declined.', NULL, 'rule_expired_unreviewed', 'AWW', '', 'student', '53a6e754-ae65-4c33-9083-e0aa2c13ab60', 'f8a46433fb1d4099aa927be629291470d6ec9fd512a3713048551191dad9425f', '13:00:00', '15:00:00', 1, 99, 'today', 0, 0, NULL, NULL, 0, NULL, '69f6beb4428cc0eb48b6dc91e48bb22571c310b52e8f4a6e'),
 (82, 'Stephen Perez', 'FA0011BN2026', 'Ammeter (0-5A)', 'Stephen Perez', 'Audio Visual Room 2', '2026-11-18', '2026-11-18', '81263b300880677ab276490289408332c2c464ef92cbb404bd4cc9d6cabafa3c', NULL, NULL, NULL, 'Declined', '2026-11-18 10:40:41', 'Not reviewed before the borrow start time – automatically declined.', NULL, 'rule_expired_unreviewed', 'AWW', '', 'student', '53a6e754-ae65-4c33-9083-e0aa2c13ab60', 'f8a46433fb1d4099aa927be629291470d6ec9fd512a3713048551191dad9425f', '13:00:00', '15:00:00', 1, 99, 'today', 0, 0, NULL, NULL, 0, NULL, '5b369c25a65c490198ec7c1a235e196b32e5db1b4e58db96'),
 (83, 'Edmundo Dela Cruz', 'FA0008BN2023', 'Active Speakers', 'Edmundo Dela Cruz', 'Audio Visual Room 2 · Building A (Old) · 1st Floor', '2026-11-19', '2026-11-19', NULL, NULL, NULL, NULL, 'Declined', '2026-11-18 21:48:33', 'Waiting for an admin to review it. If nobody decides, it is declined automatically at 12:01 AM on the borrow date.', NULL, 'override', '', '', 'personal', 'a487e104-8345-4e4c-a177-eed4c734a34b', NULL, '10:00:00', '16:00:00', 2, 99, 'future', 0, 0, NULL, NULL, 0, NULL, NULL),
-(84, 'Edmundo Dela Cruz', 'FA0008BN2023', 'Unterrupted Power Supply', 'Edmundo Dela Cruz', 'Audio Visual Room 2 · Building A (Old) · 1st Floor', '2026-11-19', '2026-11-19', '90897ae168907eec2eba7181fd16baf58edb14d1b3b747edb8727d3ef4eb0012', '3792f86a3695433db12ca1a8a91ca0f3bdfc65432227277855fed67397ba7199', NULL, NULL, 'Approved', '2026-11-18 21:48:33', 'Waiting for an admin to review it. If nobody decides, it is declined automatically at 12:01 AM on the borrow date.', NULL, 'override', '', '', 'personal', 'a487e104-8345-4e4c-a177-eed4c734a34b', NULL, '10:00:00', '16:00:00', 1, 99, 'future', 1, 0, NULL, NULL, 0, NULL, NULL),
-(85, 'Michael Anjelo Miguel', 'FA0005BN2016', 'Active Speakers', 'Michael Anjelo Miguel', 'Room 201 · Building A (Old) · 2nd Floor', '2026-11-19', '2026-11-19', 'c5b9860bc85f068a03ef6427015be16bb5a1a2a7de117d077b1c671eb8dee411', '47d39ce3ee8796abe3fd53d322f7f0b5b16d140cfd3c4d87f18d841d88606af9', NULL, NULL, 'Approved', '2026-11-19 12:25:20', 'Approved: the equipment is free for the requested schedule.', NULL, 'rule_1_fifo', 'Frederick', '', 'personal', NULL, NULL, '15:00:00', '21:00:00', 1, 7, 'today', 0, 0, NULL, NULL, 0, NULL, NULL);
+(84, 'Edmundo Dela Cruz', 'FA0008BN2023', 'Unterrupted Power Supply', 'Edmundo Dela Cruz', 'Audio Visual Room 2 · Building A (Old) · 1st Floor', '2026-11-19', '2026-11-19', '90897ae168907eec2eba7181fd16baf58edb14d1b3b747edb8727d3ef4eb0012', '3792f86a3695433db12ca1a8a91ca0f3bdfc65432227277855fed67397ba7199', NULL, NULL, 'Cancelled', '2026-11-18 21:48:33', 'Not collected – the borrow period ended before it was picked up.', NULL, 'rule_no_show', '', '', 'personal', 'a487e104-8345-4e4c-a177-eed4c734a34b', NULL, '10:00:00', '16:00:00', 1, 99, 'future', 0, 0, NULL, NULL, 0, NULL, NULL),
+(85, 'Michael Anjelo Miguel', 'FA0005BN2016', 'Active Speakers', 'Michael Anjelo Miguel', 'Room 201 · Building A (Old) · 2nd Floor', '2026-11-19', '2026-11-19', 'c5b9860bc85f068a03ef6427015be16bb5a1a2a7de117d077b1c671eb8dee411', '47d39ce3ee8796abe3fd53d322f7f0b5b16d140cfd3c4d87f18d841d88606af9', NULL, NULL, 'Cancelled', '2026-11-19 12:25:20', 'Not collected – the borrow period ended before it was picked up.', NULL, 'rule_no_show', 'Frederick', '', 'personal', NULL, NULL, '15:00:00', '21:00:00', 1, 7, 'today', 0, 0, NULL, NULL, 0, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -2447,7 +2439,39 @@ CREATE TABLE `tbl_service_survey_config` (
 --
 
 INSERT INTO `tbl_service_survey_config` (`id`, `enabled`, `comment_enabled`, `updated_at`, `semester_start`, `semester_end`) VALUES
-(1, 1, 1, '2026-11-13 07:10:45', '2026-09-01', '2027-01-08');
+(1, 1, 1, '2026-11-13 07:10:45', '2026-09-01', '2027-01-08'),
+(1, 1, 1, '2026-11-19 18:29:28', NULL, NULL),
+(1, 1, 1, '2026-11-19 18:31:23', NULL, NULL),
+(1, 1, 1, '2026-11-19 18:33:23', NULL, NULL),
+(1, 1, 1, '2026-11-19 18:36:16', NULL, NULL),
+(1, 1, 1, '2026-11-19 18:37:53', NULL, NULL),
+(1, 1, 1, '2026-11-19 18:39:50', NULL, NULL),
+(1, 1, 1, '2026-11-19 18:41:53', NULL, NULL),
+(1, 1, 1, '2026-11-19 18:44:25', NULL, NULL),
+(1, 1, 1, '2026-11-19 18:44:46', NULL, NULL),
+(1, 1, 1, '2026-11-19 18:45:06', NULL, NULL),
+(1, 1, 1, '2026-11-19 18:45:14', NULL, NULL),
+(1, 1, 1, '2026-11-19 18:47:12', NULL, NULL),
+(1, 1, 1, '2026-11-19 18:49:20', NULL, NULL),
+(1, 1, 1, '2026-11-19 18:50:30', NULL, NULL),
+(1, 1, 1, '2026-11-19 18:52:28', NULL, NULL),
+(1, 1, 1, '2026-11-19 18:54:27', NULL, NULL),
+(1, 1, 1, '2026-11-19 18:56:33', NULL, NULL),
+(1, 1, 1, '2026-11-19 18:58:33', NULL, NULL),
+(1, 1, 1, '2026-11-19 19:00:28', NULL, NULL),
+(1, 1, 1, '2026-11-19 19:30:31', NULL, NULL),
+(1, 1, 1, '2026-11-19 19:30:39', NULL, NULL),
+(1, 1, 1, '2026-11-19 19:30:55', NULL, NULL),
+(1, 1, 1, '2026-11-19 19:31:36', NULL, NULL),
+(1, 1, 1, '2026-11-19 19:48:48', NULL, NULL),
+(1, 1, 1, '2026-11-19 19:48:52', NULL, NULL),
+(1, 1, 1, '2026-11-19 19:49:04', NULL, NULL),
+(1, 1, 1, '2026-11-19 19:50:02', NULL, NULL),
+(1, 1, 1, '2026-11-19 19:52:06', NULL, NULL),
+(1, 1, 1, '2026-11-19 20:10:28', NULL, NULL),
+(1, 1, 1, '2026-11-19 20:10:32', NULL, NULL),
+(1, 1, 1, '2026-11-19 20:10:35', NULL, NULL),
+(1, 1, 1, '2026-11-19 20:11:37', NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -2826,11 +2850,6 @@ ALTER TABLE `tbl_remember_tokens`
 -- Indexes for table `tbl_requests`
 --
 ALTER TABLE `tbl_requests`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `return_token` (`return_token`),
-  ADD UNIQUE KEY `claim_token` (`claim_token`),
-  ADD KEY `idx_return_token` (`return_token`),
-  ADD KEY `idx_claim_token` (`claim_token`),
   ADD KEY `idx_batch_id` (`batch_id`),
   ADD KEY `idx_bundle_claim_token` (`bundle_claim_token`);
 
@@ -2843,366 +2862,20 @@ ALTER TABLE `tbl_request_events`
   ADD KEY `idx_time` (`created_at`);
 
 --
--- Indexes for table `tbl_rooms`
---
-ALTER TABLE `tbl_rooms`
-  ADD PRIMARY KEY (`room_id`),
-  ADD KEY `fk_rooms_building` (`building_id`),
-  ADD KEY `idx_rooms_code` (`room_code`);
-
---
--- Indexes for table `tbl_rooms_import_files`
---
-ALTER TABLE `tbl_rooms_import_files`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uq_rooms_import_stored` (`stored_name`),
-  ADD KEY `idx_rooms_import_uploaded` (`uploaded_at`);
-
---
--- Indexes for table `tbl_room_arbitration_log`
---
-ALTER TABLE `tbl_room_arbitration_log`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_reservation_id` (`reservation_id`);
-
---
--- Indexes for table `tbl_room_issues`
---
-ALTER TABLE `tbl_room_issues`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_issues_room` (`room_id`),
-  ADD KEY `idx_issues_status` (`status`);
-
---
--- Indexes for table `tbl_room_reservations`
---
-ALTER TABLE `tbl_room_reservations`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_room_date` (`room_id`,`reservation_date`);
-
---
--- Indexes for table `tbl_room_waitlist`
---
-ALTER TABLE `tbl_room_waitlist`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uq_waitlist_faculty_slot` (`room_id`,`reservation_date`,`start_time`,`end_time`,`faculty_id`),
-  ADD KEY `idx_waitlist_slot` (`room_id`,`reservation_date`,`start_time`,`end_time`);
-
---
 -- Indexes for table `tbl_service_survey_comments`
 --
 ALTER TABLE `tbl_service_survey_comments`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_service_survey_comment_date` (`created_at`),
   ADD KEY `idx_service_survey_comment_period` (`period_id`);
-
---
--- Indexes for table `tbl_service_survey_completions`
---
-ALTER TABLE `tbl_service_survey_completions`
-  ADD PRIMARY KEY (`source_type`,`transaction_key`),
-  ADD KEY `idx_service_survey_answered` (`answered`);
-
---
--- Indexes for table `tbl_service_survey_config`
---
-ALTER TABLE `tbl_service_survey_config`
-  ADD PRIMARY KEY (`id`);
-
---
--- Indexes for table `tbl_service_survey_periods`
---
-ALTER TABLE `tbl_service_survey_periods`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uq_service_survey_period` (`semester_start`,`semester_end`,`period_start`),
-  ADD KEY `idx_service_survey_semester` (`semester_start`,`semester_end`);
-
---
--- Indexes for table `tbl_service_survey_period_questions`
---
-ALTER TABLE `tbl_service_survey_period_questions`
-  ADD PRIMARY KEY (`period_id`,`question_id`,`question_version`),
-  ADD KEY `idx_service_survey_period_question` (`question_id`);
-
---
--- Indexes for table `tbl_service_survey_questions`
---
-ALTER TABLE `tbl_service_survey_questions`
-  ADD PRIMARY KEY (`id`);
-
---
--- Indexes for table `tbl_sync_config`
---
-ALTER TABLE `tbl_sync_config`
-  ADD PRIMARY KEY (`config_key`);
-
---
--- Indexes for table `tbl_sync_pending_deletions`
---
-ALTER TABLE `tbl_sync_pending_deletions`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uq_pending_item` (`item_id`);
-
---
--- Indexes for table `tbl_users`
---
-ALTER TABLE `tbl_users`
-  ADD PRIMARY KEY (`faculty_id`),
-  ADD UNIQUE KEY `email` (`email`);
 
 --
 -- AUTO_INCREMENT for dumped tables
 --
 
 --
--- AUTO_INCREMENT for table `tbl_accounts`
---
-ALTER TABLE `tbl_accounts`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
-
---
--- AUTO_INCREMENT for table `tbl_admin_activity`
---
-ALTER TABLE `tbl_admin_activity`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=246;
-
---
 -- AUTO_INCREMENT for table `tbl_ai_chat_log`
 --
 ALTER TABLE `tbl_ai_chat_log`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=159;
-
---
--- AUTO_INCREMENT for table `tbl_arbitration_config`
---
-ALTER TABLE `tbl_arbitration_config`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=34;
-
---
--- AUTO_INCREMENT for table `tbl_arbitration_log`
---
-ALTER TABLE `tbl_arbitration_log`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=92;
-
---
--- AUTO_INCREMENT for table `tbl_buildings`
---
-ALTER TABLE `tbl_buildings`
-  MODIFY `building_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
-
---
--- AUTO_INCREMENT for table `tbl_campuses`
---
-ALTER TABLE `tbl_campuses`
-  MODIFY `campus_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
-
---
--- AUTO_INCREMENT for table `tbl_class_schedule`
---
-ALTER TABLE `tbl_class_schedule`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1447;
-
---
--- AUTO_INCREMENT for table `tbl_equipment_categories`
---
-ALTER TABLE `tbl_equipment_categories`
-  MODIFY `category_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1413;
-
---
--- AUTO_INCREMENT for table `tbl_faculty_admin_notice`
---
-ALTER TABLE `tbl_faculty_admin_notice`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
-
---
--- AUTO_INCREMENT for table `tbl_faculty_codes`
---
-ALTER TABLE `tbl_faculty_codes`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=28;
-
---
--- AUTO_INCREMENT for table `tbl_faculty_item_codes`
---
-ALTER TABLE `tbl_faculty_item_codes`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=33;
-
---
--- AUTO_INCREMENT for table `tbl_faculty_notif_state`
---
-ALTER TABLE `tbl_faculty_notif_state`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
-
---
--- AUTO_INCREMENT for table `tbl_faculty_registry`
---
-ALTER TABLE `tbl_faculty_registry`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=650;
-
---
--- AUTO_INCREMENT for table `tbl_faculty_registry_files`
---
-ALTER TABLE `tbl_faculty_registry_files`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
-
---
--- AUTO_INCREMENT for table `tbl_inventory`
---
-ALTER TABLE `tbl_inventory`
-  MODIFY `item_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=281;
-
---
--- AUTO_INCREMENT for table `tbl_ip_login_attempts`
---
-ALTER TABLE `tbl_ip_login_attempts`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=23;
-
---
--- AUTO_INCREMENT for table `tbl_item_code_attempts`
---
-ALTER TABLE `tbl_item_code_attempts`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
-
---
--- AUTO_INCREMENT for table `tbl_login_attempts`
---
-ALTER TABLE `tbl_login_attempts`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=31;
-
---
--- AUTO_INCREMENT for table `tbl_notif_prefs`
---
-ALTER TABLE `tbl_notif_prefs`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
-
---
--- AUTO_INCREMENT for table `tbl_notif_state`
---
-ALTER TABLE `tbl_notif_state`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
-
---
--- AUTO_INCREMENT for table `tbl_requests`
---
-ALTER TABLE `tbl_requests`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=86;
-
---
--- AUTO_INCREMENT for table `tbl_request_events`
---
-ALTER TABLE `tbl_request_events`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
-
---
--- AUTO_INCREMENT for table `tbl_rooms`
---
-ALTER TABLE `tbl_rooms`
-  MODIFY `room_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=115;
-
---
--- AUTO_INCREMENT for table `tbl_rooms_import_files`
---
-ALTER TABLE `tbl_rooms_import_files`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
-
---
--- AUTO_INCREMENT for table `tbl_room_arbitration_log`
---
-ALTER TABLE `tbl_room_arbitration_log`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=24;
-
---
--- AUTO_INCREMENT for table `tbl_room_issues`
---
-ALTER TABLE `tbl_room_issues`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT for table `tbl_room_reservations`
---
-ALTER TABLE `tbl_room_reservations`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=24;
-
---
--- AUTO_INCREMENT for table `tbl_room_waitlist`
---
-ALTER TABLE `tbl_room_waitlist`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
-
---
--- AUTO_INCREMENT for table `tbl_service_survey_comments`
---
-ALTER TABLE `tbl_service_survey_comments`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
-
---
--- AUTO_INCREMENT for table `tbl_service_survey_periods`
---
-ALTER TABLE `tbl_service_survey_periods`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=263;
-
---
--- AUTO_INCREMENT for table `tbl_service_survey_questions`
---
-ALTER TABLE `tbl_service_survey_questions`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
-
---
--- AUTO_INCREMENT for table `tbl_sync_pending_deletions`
---
-ALTER TABLE `tbl_sync_pending_deletions`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- Constraints for dumped tables
---
-
---
--- Constraints for table `tbl_buildings`
---
-ALTER TABLE `tbl_buildings`
-  ADD CONSTRAINT `fk_buildings_campus` FOREIGN KEY (`campus_id`) REFERENCES `tbl_campuses` (`campus_id`);
-
---
--- Constraints for table `tbl_equipment_categories`
---
-ALTER TABLE `tbl_equipment_categories`
-  ADD CONSTRAINT `fk_cat_campus` FOREIGN KEY (`campus_id`) REFERENCES `tbl_campuses` (`campus_id`);
-
---
--- Constraints for table `tbl_inventory`
---
-ALTER TABLE `tbl_inventory`
-  ADD CONSTRAINT `fk_inventory_campus` FOREIGN KEY (`campus_id`) REFERENCES `tbl_campuses` (`campus_id`);
-
---
--- Constraints for table `tbl_rooms`
---
-ALTER TABLE `tbl_rooms`
-  ADD CONSTRAINT `fk_rooms_building` FOREIGN KEY (`building_id`) REFERENCES `tbl_buildings` (`building_id`);
-
---
--- Constraints for table `tbl_room_issues`
---
-ALTER TABLE `tbl_room_issues`
-  ADD CONSTRAINT `fk_issue_room` FOREIGN KEY (`room_id`) REFERENCES `tbl_rooms` (`room_id`);
-
---
--- Constraints for table `tbl_room_reservations`
---
-ALTER TABLE `tbl_room_reservations`
-  ADD CONSTRAINT `fk_rr_room` FOREIGN KEY (`room_id`) REFERENCES `tbl_rooms` (`room_id`);
-
---
--- Constraints for table `tbl_room_waitlist`
---
-ALTER TABLE `tbl_room_waitlist`
-  ADD CONSTRAINT `fk_wl_room` FOREIGN KEY (`room_id`) REFERENCES `tbl_rooms` (`room_id`);
-
---
--- Constraints for table `tbl_sync_pending_deletions`
---
-ALTER TABLE `tbl_sync_pending_deletions`
-  ADD CONSTRAINT `fk_pending_item` FOREIGN KEY (`item_id`) REFERENCES `tbl_inventory` (`item_id`) ON DELETE CASCADE;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=165;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

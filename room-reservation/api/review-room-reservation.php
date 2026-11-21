@@ -159,8 +159,7 @@ try {
     );
     $conn->commit();
     // Approval receipt: notify the faculty now that the decision is saved (does nothing for a decline).
-    require_once __DIR__ . '/../../notifications/core/approval-receipts.php';
-    ps_receipts_sweep($conn);
+
     room_review_reply(200, $decision === 'Approved' ? 'Reservation approved.' : 'Reservation declined.');
 } catch (Throwable $e) {
     if ($conn->errno === 0) {

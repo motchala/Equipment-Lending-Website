@@ -289,12 +289,7 @@ foreach ($items as $item) {
 
         // Push notification — mirrors the in-app withheld notice
         if ($give > 0 && $keep_qty > 0) {
-            ps_push_send(
-                $conn, 'faculty', $faculty_id, 'equipment',
-                'Pickup Update',
-                $keep_qty . ' unit(s) of ' . $eq_name . ' could not be handed over.',
-                'faculty-dashboard.php?tab=activity'
-            );
+            
         }
 
     } catch (Throwable $e) {

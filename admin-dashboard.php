@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/shared/core/site-paths.php'; ?>
+﻿<?php require_once __DIR__ . '/shared/core/site-paths.php'; ?>
 <?php require_once __DIR__ . '/equipment-booking/core/admin-functions.php'; ?>
 <?php require_once __DIR__ . '/room-reservation/core/admin-rooms-functions.php'; ?>
 <?php require_once __DIR__ . '/notifications/core/admin-data.php'; ?>
@@ -17,13 +17,13 @@ require __DIR__ . '/account-management/core/handlers.php';
 <?php
 // ================= NOTIFICATIONS (live feed) =================
 // Computed fresh on every load from tbl_requests / tbl_room_issues /
-// tbl_inventory — see notif-functions.php. $notif_unread drives every
+// tbl_inventory â€” see notif-functions.php. $notif_unread drives every
 // badge on the page (bell, dropdown item, sidebar) so they always agree
 // with what's inside the modal.
 $notifications = notif_build_list($conn);
 $notif_unread  = notif_count_unread($notifications);
 
-// Live count per category — drives which filter chips are worth
+// Live count per category â€” drives which filter chips are worth
 // showing at all (no point offering a "Rooms" filter with 0 items).
 $notif_cat_counts = ['request' => 0, 'overdue' => 0, 'room' => 0, 'system' => 0];
 foreach ($notifications as $n) {
@@ -64,8 +64,6 @@ require __DIR__ . '/equipment-booking/core/admin-equipment-return.php';
 <?php require __DIR__ . '/shared/views/admin-shell-scripts.php'; ?>
 <?php require __DIR__ . '/equipment-booking/views/admin-equipment-modals-5.php'; ?>
 <?php require __DIR__ . '/equipment-booking/views/admin-equipment-scripts.php'; ?>
-<?php require __DIR__ . '/shared/views/push-permission-modal.php'; ?>
-<script src="shared/assets/js/push-init.js?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/js/push-init.js'); ?>"></script>
 <?php require __DIR__ . '/room-reservation/views/admin-rooms-modals-3.php'; ?>
 <?php require __DIR__ . '/equipment-booking/views/admin-equipment-modals-6.php'; ?>
 <?php require __DIR__ . '/account-management/views/modals-2.php'; ?>
