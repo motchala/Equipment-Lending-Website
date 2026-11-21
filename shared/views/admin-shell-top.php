@@ -41,7 +41,7 @@ if (
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
     <meta name="theme-color" content="#600302">
     <!-- Phone detection (same rule as the Faculty portal). Runs BEFORE first paint so a phone never flashes the
          responsive layout. Sets class "rx-mobile" on <html> when the device is a phone (phone-sized touch screen,
@@ -247,6 +247,38 @@ if (
 <body>
 
     <?php render_role_splash(($_SESSION['admin_role'] ?? 'Admin') === 'Super Admin' ? 'Super Admin' : 'Admin'); ?>
+
+    <?php
+    /* Phone app chrome, painted by the server so it is in the very first frame (nothing waits for a script).
+       It is hidden by CSS unless <html class="rx-mobile"> (set in <head> by admin-phone-detect.js), so tablets and
+       desktops never see it. admin-dashboard-mobile.js adopts these elements (same ids) and keeps them in sync.
+       The screen shown is the one the first-paint bridge expects; desktop-only screens fall back to the Dashboard,
+       exactly like the phone rules in the head script. */
+    $rxm_tab = ($ps_bridge_tab !== '' && !in_array($ps_bridge_tab, ['faculty', 'admins', 'imports', 'reports'], true)) ? $ps_bridge_tab : 'dashboard';
+    $rxm_titles = ['dashboard' => 'PUPSync', 'activity' => 'Activity', 'inventory' => 'Equipment', 'rooms' => 'Facilities', 'settings' => 'Settings'];
+    $rxm_tabs = [
+        ['dashboard', 'Dashboard', 'dashboard'],
+        ['activity', 'Activity', 'history'],
+        ['inventory', 'Equipment', 'inventory_2'],
+        ['rooms', 'Facilities', 'meeting_room'],
+    ];
+    $rxm_unread = (int)($notif_unread ?? 0);
+    $rxm_initials = htmlspecialchars((string)($initials ?? 'A'));
+    ?>
+    <header class="rxm-bar<?php echo $rxm_tab === 'dashboard' ? ' is-home' : ''; ?><?php echo $rxm_tab === 'settings' ? ' has-back' : ''; ?>" id="rxmBar">
+        <button type="button" class="rxm-iconbtn rxm-back" id="rxmBack" aria-label="Back" <?php echo $rxm_tab === 'settings' ? '' : 'hidden'; ?>><span class="material-symbols-outlined" aria-hidden="true">arrow_back</span></button>
+        <span class="rxm-logo" aria-hidden="true"><span class="material-symbols-outlined" aria-hidden="true">layers</span></span>
+        <h1 class="rxm-title" id="rxmTitle"><?php echo htmlspecialchars($rxm_titles[$rxm_tab] ?? 'PUPSync'); ?></h1>
+        <div class="rxm-actions">
+            <button type="button" class="rxm-iconbtn rxm-bell" id="rxmBell" aria-label="Notifications"><span class="material-symbols-outlined" aria-hidden="true">notifications</span><b class="rxm-badge" id="rxmBadge"<?php echo $rxm_unread > 0 ? '' : ' hidden'; ?>><?php echo $rxm_unread > 0 ? ($rxm_unread > 99 ? '99+' : $rxm_unread) : ''; ?></b></button>
+            <button type="button" class="rxm-avatar" id="rxmAvatar" aria-label="Account menu" aria-haspopup="dialog"><?php echo $rxm_initials; ?></button>
+        </div>
+    </header>
+    <nav class="rxm-tabbar" id="rxmTabbar" aria-label="Main">
+        <?php foreach ($rxm_tabs as $rxm_t): ?>
+        <button type="button" class="rxm-tab" data-rxm-tab="<?php echo $rxm_t[0]; ?>"<?php echo $rxm_t[0] === $rxm_tab ? ' aria-current="page"' : ''; ?>><span class="rxm-tab-pill"><span class="material-symbols-outlined" aria-hidden="true"><?php echo $rxm_t[2]; ?></span></span><span class="rxm-tab-label"><?php echo $rxm_t[1]; ?></span></button>
+        <?php endforeach; ?>
+    </nav>
 
     <!-- ================================================================
      MOBILE MENU BUTTON

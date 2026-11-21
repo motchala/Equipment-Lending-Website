@@ -21,7 +21,7 @@ if (strpos($fac_cache_ctl, 'max-age=0') !== false && strpos($fac_cache_ctl, 'no-
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
     <meta name="theme-color" content="#800000">
     <!-- Phone detection. Runs BEFORE first paint so a phone never flashes the responsive layout.
          Sets class "rx-mobile" on <html> when the device is a phone (phone-sized touch screen) or the window

@@ -98,18 +98,23 @@
     var bar, barBack, barTitle, barBadge, barAvatar;
 
     function buildBar() {
-        bar = el('header', 'rxm-bar');
-        bar.id = 'rxmBar';
-        bar.innerHTML =
-            '<button type="button" class="rxm-iconbtn rxm-back" id="rxmBack" aria-label="Back" hidden>' + icon('arrow_back') + '</button>' +
-            '<span class="rxm-logo" aria-hidden="true">' + icon('layers') + '</span>' +
-            '<h1 class="rxm-title" id="rxmTitle">PUPSync</h1>' +
-            '<div class="rxm-actions">' +
-            '<button type="button" class="rxm-iconbtn rxm-bell" id="rxmBell" aria-label="Notifications">' + icon('notifications') +
-            '<b class="rxm-badge" id="rxmBadge" hidden></b></button>' +
-            '<button type="button" class="rxm-avatar" id="rxmAvatar" aria-label="Account menu" aria-haspopup="dialog"></button>' +
-            '</div>';
-        D.body.appendChild(bar);
+        // The server prints the bar in the first HTML (admin-shell-top.php) so it is painted in the very first
+        // frame; it is adopted here. It is only built from scratch if that markup is missing.
+        bar = D.getElementById('rxmBar');
+        if (!bar) {
+            bar = el('header', 'rxm-bar');
+            bar.id = 'rxmBar';
+            bar.innerHTML =
+                '<button type="button" class="rxm-iconbtn rxm-back" id="rxmBack" aria-label="Back" hidden>' + icon('arrow_back') + '</button>' +
+                '<span class="rxm-logo" aria-hidden="true">' + icon('layers') + '</span>' +
+                '<h1 class="rxm-title" id="rxmTitle">PUPSync</h1>' +
+                '<div class="rxm-actions">' +
+                '<button type="button" class="rxm-iconbtn rxm-bell" id="rxmBell" aria-label="Notifications">' + icon('notifications') +
+                '<b class="rxm-badge" id="rxmBadge" hidden></b></button>' +
+                '<button type="button" class="rxm-avatar" id="rxmAvatar" aria-label="Account menu" aria-haspopup="dialog"></button>' +
+                '</div>';
+            D.body.appendChild(bar);
+        }
         barBack = $('#rxmBack', bar); barTitle = $('#rxmTitle', bar);
         barBadge = $('#rxmBadge', bar); barAvatar = $('#rxmAvatar', bar);
 
@@ -166,15 +171,19 @@
     var tabbar;
 
     function buildTabbar() {
-        tabbar = el('nav', 'rxm-tabbar');
-        tabbar.id = 'rxmTabbar';
-        tabbar.setAttribute('aria-label', 'Main');
-        tabbar.innerHTML = TABS.map(function (t) {
-            return '<button type="button" class="rxm-tab" data-rxm-tab="' + t.tab + '">' +
-                '<span class="rxm-tab-pill">' + icon(t.icon) + '</span>' +
-                '<span class="rxm-tab-label">' + t.label + '</span></button>';
-        }).join('');
-        D.body.appendChild(tabbar);
+        // Adopt the tab bar the server printed (first-frame paint); build it only if it is missing.
+        tabbar = D.getElementById('rxmTabbar');
+        if (!tabbar) {
+            tabbar = el('nav', 'rxm-tabbar');
+            tabbar.id = 'rxmTabbar';
+            tabbar.setAttribute('aria-label', 'Main');
+            tabbar.innerHTML = TABS.map(function (t) {
+                return '<button type="button" class="rxm-tab" data-rxm-tab="' + t.tab + '">' +
+                    '<span class="rxm-tab-pill">' + icon(t.icon) + '</span>' +
+                    '<span class="rxm-tab-label">' + t.label + '</span></button>';
+            }).join('');
+            D.body.appendChild(tabbar);
+        }
 
         tabbar.addEventListener('click', function (e) {
             var b = e.target.closest('.rxm-tab');
@@ -331,18 +340,25 @@
     }
     function buildNote() {
         var panel = $('#panel-dashboard');
-        if (!panel || $('#rxmNote') || noteDismissed()) return;
-        var head = $('#dash > .dash-head');
-        var n = el('aside', 'rxm-note',
-            icon('desktop_windows', 'rxm-note-ico') +
-            '<div class="rxm-note-text"><strong>Best viewed on a desktop</strong>' +
-            '<span>Some features are not available on mobile. Switch to desktop view in your browser to use everything.</span>' +
-            '<button type="button" class="rxm-note-link" data-rxm-note-more>See what is desktop-only</button></div>' +
-            '<button type="button" class="rxm-iconbtn rxm-note-x" aria-label="Dismiss" data-rxm-note-x>' + icon('close') + '</button>');
-        n.id = 'rxmNote';
-        n.setAttribute('role', 'note');
-        if (head && head.parentNode) head.parentNode.insertBefore(n, head.nextSibling);
-        else panel.insertBefore(n, panel.firstChild);
+        if (!panel) return;
+        // The server prints the note in the Dashboard markup (first-frame paint); it is adopted here.
+        var n = $('#rxmNote');
+        if (n && n.getAttribute('data-rxm-wired')) return;
+        if (noteDismissed()) { if (n) n.remove(); return; }
+        if (!n) {
+            var head = $('#dash > .dash-head');
+            n = el('aside', 'rxm-note',
+                icon('desktop_windows', 'rxm-note-ico') +
+                '<div class="rxm-note-text"><strong>Best viewed on a desktop</strong>' +
+                '<span>Some features are not available on mobile. Switch to desktop view in your browser to use everything.</span>' +
+                '<button type="button" class="rxm-note-link" data-rxm-note-more>See what is desktop-only</button></div>' +
+                '<button type="button" class="rxm-iconbtn rxm-note-x" aria-label="Dismiss" data-rxm-note-x>' + icon('close') + '</button>');
+            n.id = 'rxmNote';
+            n.setAttribute('role', 'note');
+            if (head && head.parentNode) head.parentNode.insertBefore(n, head.nextSibling);
+            else panel.insertBefore(n, panel.firstChild);
+        }
+        n.setAttribute('data-rxm-wired', '1');
         n.addEventListener('click', function (e) {
             if (e.target.closest('[data-rxm-note-more]')) { openDesktopSheet(); return; }
             if (e.target.closest('[data-rxm-note-x]')) {
@@ -359,12 +375,18 @@
     ------------------------------------------------------------ */
     function buildMore() {
         var dash = $('#dash'), live = $('#dashLive');
-        if (!dash || !live || $('#rxmMore')) return;
-        var b = el('button', 'rxm-more-btn');
-        b.type = 'button'; b.id = 'rxmMore';
-        b.setAttribute('aria-expanded', 'false');
-        b.innerHTML = '<span class="rxm-more-label">Show trends &amp; recent activity</span>' + icon('expand_more');
-        live.parentNode.insertBefore(b, live.nextSibling);
+        if (!dash || !live) return;
+        // The server prints the button after #dashLive (first-frame paint); it is adopted here.
+        var b = $('#rxmMore');
+        if (b && b.getAttribute('data-rxm-wired')) return;
+        if (!b) {
+            b = el('button', 'rxm-more-btn');
+            b.type = 'button'; b.id = 'rxmMore';
+            b.setAttribute('aria-expanded', 'false');
+            b.innerHTML = '<span class="rxm-more-label">Show trends &amp; recent activity</span>' + icon('expand_more');
+            live.parentNode.insertBefore(b, live.nextSibling);
+        }
+        b.setAttribute('data-rxm-wired', '1');
         b.addEventListener('click', function () {
             var open = dash.classList.toggle('rxm-more');
             b.setAttribute('aria-expanded', open ? 'true' : 'false');
