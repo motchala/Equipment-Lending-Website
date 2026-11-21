@@ -55,8 +55,13 @@
     var STATUS_UI = {
         'Available': { cls: 'status-available', text: 'Available' },
         'Booked': { cls: 'status-booked', text: 'In use' },
-        'Maintenance': { cls: 'status-maintenance', text: 'Maintenance' },
-        'Not Bookable': { cls: 'status-static', text: 'Not bookable' }
+        /* The two "can't reserve" states look different on purpose:
+           Maintenance (yellow)  = a normal room that is temporarily down; it comes back.
+           Not bookable (gray)   = restricted to admin / staff; faculty never reserve it.
+           Both stay visible, neither can be reserved. icon + note make the difference clear
+           without relying on colour alone. */
+        'Maintenance': { cls: 'status-maintenance', text: 'Maintenance', icon: 'construction', note: 'Temporarily unavailable' },
+        'Not Bookable': { cls: 'status-static', text: 'Not bookable', icon: 'block', note: 'Admin / staff only' }
     };
 
     var PURPOSES = ['Lecture', 'Lab session', 'Meeting', 'Exam', 'Seminar'];
@@ -365,12 +370,19 @@
         var ui = uiFor(shown);
         var locked = shown === 'Not Bookable';
         return '<button type="button" class="fcty-room ' + ui.cls + '" data-room-id="' + room.room_id + '"' +
-            (locked ? ' disabled aria-disabled="true"' : '') + '>' +
+            (locked ? ' disabled aria-disabled="true"' : '') +
+            (ui.note ? ' title="' + esc(ui.note) + '"' : '') + '>' +
             '<span class="fcty-room-name">' + esc(room.name) + '</span>' +
-            '<span class="fcty-room-foot">' +
-            '<span class="fcty-room-status"><span class="fcty-dot"></span>' +
+            '<span class="fcty-room-foot">' + roomFootHTML(ui) + '</span></button>';
+    }
+
+    /* The chip (+ short note for the two unavailable states) at the bottom of a room tile.
+       Shared by the first render and by the live status poll so both always match. */
+    function roomFootHTML(ui) {
+        return '<span class="fcty-room-status">' +
+            (ui.icon ? icon(ui.icon) : '<span class="fcty-dot"></span>') +
             '<span class="fcty-room-status-text">' + ui.text + '</span></span>' +
-            '</span></button>';
+            (ui.note ? '<span class="fcty-room-note">' + esc(ui.note) + '</span>' : '');
     }
 
     function renderFloor(idx) {
@@ -450,8 +462,9 @@
     function applyStatus(card, status) {
         var ui = uiFor(status);
         card.className = 'fcty-room ' + ui.cls;
-        var txt = card.querySelector('.fcty-room-status-text');
-        if (txt) txt.textContent = ui.text;
+        var foot = card.querySelector('.fcty-room-foot');
+        if (foot) foot.innerHTML = roomFootHTML(ui);
+        if (ui.note) card.title = ui.note; else card.removeAttribute('title');
         var locked = status === 'Not Bookable';
         card.disabled = locked;
         if (locked) card.setAttribute('aria-disabled', 'true'); else card.removeAttribute('aria-disabled');
@@ -685,7 +698,8 @@
         var todays = isClosedDay(now) ? [] : sortByStart(week[DAY_KEYS[now.getDay()]]);   /* feeds the status pill ("Free until ...") */
 
         var monday = parseYmd(schedule.monday);
-        $('fcty-modal-weekly-grid').innerHTML = weekTimetableHTML(monday, week, now);
+        $('fcty-modal-weekly-grid').innerHTML = (schedule.blocked && currentRoom ? blockedNoteHTML(currentRoom.room) : '') +
+            weekTimetableHTML(monday, week, now);
 
         positionTimeline(roomOverlay);
         if (!schedule.blocked) applyAvailabilityBadge(todays);
@@ -748,6 +762,16 @@
     }
 
     function isBlocked(room) { return room.status === 'Maintenance' || room.status === 'Not Bookable'; }
+
+    /* Why a room in the details dialog has no Reserve button: yellow = temporary, gray = never for faculty */
+    function blockedNoteHTML(room) {
+        var maint = room.status === 'Maintenance';
+        return '<div class="fcty-block-note ' + (maint ? 'is-maint' : 'is-nobk') + '">' +
+            icon(maint ? 'construction' : 'block') +
+            '<span>' + (maint
+                ? 'Under maintenance. This room can\u2019t be reserved until an admin sets it back to available.'
+                : 'Reserved for admin and staff use. This room can\u2019t be reserved by faculty.') + '</span></div>';
+    }
 
     /* Clicking a room: a room that can be reserved opens the reservation form straight away; the room's weekly
        schedule is a secondary view (the form's "View weekly schedule" link). A room that cannot be reserved
