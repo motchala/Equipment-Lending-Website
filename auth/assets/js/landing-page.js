@@ -125,6 +125,13 @@ document.addEventListener('DOMContentLoaded', function () {
         const submitBtn = document.getElementById('loginSubmitBtn');
         if (submitBtn && submitBtn.hasAttribute('disabled')) return; // locked out
 
+        // Close the on-screen keyboard right away. Whichever field was being typed in
+        // (or was focused when Enter sent the form) would otherwise keep the keyboard
+        // open through the sign-in and the hand-off to the dashboard. This does not
+        // touch the form data, and the POST goes ahead exactly as before.
+        const typing = document.activeElement;
+        if (typing && typing !== document.body && typeof typing.blur === 'function') typing.blur();
+
         if (icon) {
             icon.classList.remove('fa-arrow-right-to-bracket');
             icon.classList.add('fa-circle-notch', 'is-spinning');
