@@ -445,8 +445,9 @@ class ArbitrationEngine
      *   - overdue block      (only when rule_overdue_block_enabled = 1)
      *   - duplicate block    (only when rule_duplicate_block_enabled = 1)
      *   - archived item      always: an archived item cannot be borrowed
-     *   - items per borrower (Settings → Arbitration): units this faculty already holds or has requested
-     *                        for the same time, counting requests filed before this one
+     *   - shared points      (Settings → Arbitration): the faculty's different items + the students they authorize
+     *                        share one allowance (see BookingSchedule::shareLimitError); requests are counted
+     *                        in the order they were filed, so a cart's later items are the ones refused
      *   - request letter     (only when rule_missing_doc_block_enabled = 1): a faculty member's own
      *                        later-date request must carry a letter
      *
@@ -477,7 +478,16 @@ class ArbitrationEngine
         BookingSchedule::loadRules($conn);
         $start = (string)$request['borrow_date'] . ' ' . ((string)($request['borrow_time'] ?? '') ?: '00:00:00');
         $end   = (string)$request['return_date'] . ' ' . ((string)($request['return_time'] ?? '') ?: '23:59:59');
-        $limit = BookingSchedule::itemsLimitError($conn, $faculty_id, max(1, (int)($request['borrow_qty'] ?? 1)), $start, $end, $request_id);
+        $limit = BookingSchedule::shareLimitError(
+            $conn,
+            $faculty_id,
+            $equipment_name,
+            (string)($request['submitted_as'] ?? 'personal') === 'student',
+            $start,
+            $end,
+            $request_id,
+            trim((string)($request['batch_id'] ?? ''))
+        );
         if ($limit !== null) {
             return ['rule' => self::RULE_ITEM_LIMIT, 'reason' => $limit];
         }

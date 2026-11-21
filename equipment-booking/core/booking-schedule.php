@@ -79,6 +79,9 @@ final class BookingSchedule
             'durations'       => array_values(array_map('intval', (array)$c['equip_durations'])),
             'maxBorrowDays'   => (int)$c['max_borrow_days'],
             'maxItems'        => (int)$c['max_items_per_borrower'],
+            'maxStudentSlots' => (int)$c['max_student_slots'],
+            'maxSharedPoints' => (int)$c['max_shared_points'],
+            'maxStudentItems' => (int)$c['max_items_per_student'],
             'maxExtensions'   => (int)$c['max_extensions'],
             'cancelCutoffMin' => (int)$c['equip_cancel_cutoff_min'],
             'overdueBlock'    => (bool)$c['rule_overdue_block_enabled'],
@@ -121,9 +124,25 @@ final class BookingSchedule
     {
         return (int)self::liveRules()['maxBorrowDays'];
     }
+    /** Different items a faculty member can hold at a time (their own points). */
     public static function maxItems(): int
     {
         return (int)self::liveRules()['maxItems'];
+    }
+    /** Students a faculty member can authorize per day. */
+    public static function maxStudentSlots(): int
+    {
+        return (int)self::liveRules()['maxStudentSlots'];
+    }
+    /** The combined ceiling: different items held + students authorized that day. */
+    public static function maxSharedPoints(): int
+    {
+        return (int)self::liveRules()['maxSharedPoints'];
+    }
+    /** Different items in ONE student request. */
+    public static function maxStudentItems(): int
+    {
+        return (int)self::liveRules()['maxStudentItems'];
     }
     public static function maxExtensions(): int
     {
@@ -925,32 +944,69 @@ final class BookingSchedule
         return $w;
     }
 
-    /**
-     * "Items per borrower" (Settings → Arbitration → Borrowing rules): the units this faculty already
-     * holds or has requested that overlap the new window, plus the new quantity, must not pass the
-     * limit. An Overdue loan still counts. $beforeId limits the count to requests filed BEFORE that
-     * request id, so the items of one cart are counted in the order they were filed.
-     * Returns the message to show, or null when it is within the limit.
-     */
-    public static function itemsLimitError(mysqli $conn, string $facultyId, int $qty, string $startTs, string $endTs, ?int $beforeId = null): ?string
+    // ═════════════════════════════════════════════════════════════════════════
+    // Shared borrowing points: a faculty member + the students they authorize
+    // ═════════════════════════════════════════════════════════════════════════
+    //
+    // The faculty member is always responsible for what their students borrow, so the two share one
+    // allowance instead of two separate ones. Each point is a whole thing, never a quantity:
+    //
+    //   - every DIFFERENT item the faculty borrows costs 1 point. Quantity is free (a class can need 20+),
+    //     so 25 projectors is still 1 point; it is limited by stock and, for a same-day request, by the
+    //     stock-health rules in request-decision.php;
+    //   - every student the faculty authorizes for a day costs 1 point. A student's cart (all the items
+    //     that share one batch_id) is ONE student, however many items are in it.
+    //
+    // Three numbers (Settings → Arbitration) decide how the points can be spent:
+    //   max_items_per_borrower  different items the faculty holds at a time        (default 5)
+    //   max_student_slots       students the faculty can authorize per day         (default 3)
+    //   max_shared_points       items held + students authorized that day, together (default 7)
+    // plus max_items_per_student (different items in one student's request, default 2) so a single
+    // student cannot take everything.
+    //
+    // What counts:
+    //   items    the faculty's OWN requests that are Waiting, Approved or On Loan and overlap the new time,
+    //            plus any Overdue item (it is still out, whatever the date). Returned frees the point.
+    //   students requests the students filed with this faculty's code on the same borrow DATE that are
+    //            Waiting, Approved, On Loan, Overdue or Returned. A Declined or Cancelled (including a
+    //            no-show) request frees its slot; a loan returned early keeps it for that day.
+    // Everything is counted in the order it was filed ($beforeId), so the items of one cart are judged one
+    // after another and a later one is the one that is refused.
+
+    /** The statuses that keep a student slot in use for its day. */
+    private const STUDENT_SLOT_STATUSES = "'Waiting','Approved','On Loan','Overdue','Returned'";
+
+    /** Dates (Y-m-d) the window touches, at most a week of them. @return list<string> */
+    private static function windowDates(string $startTs, string $endTs): array
     {
-        self::loadRules($conn);
-        $max = self::maxItems();
-        $sql = "SELECT COALESCE(SUM(borrow_qty), 0) AS held
-                  FROM tbl_requests
+        $from = strtotime(substr($startTs, 0, 10));
+        $to   = strtotime(substr(date('Y-m-d H:i:s', max(strtotime($startTs), strtotime($endTs) - 1)), 0, 10));
+        $out  = [];
+        for ($d = $from; $d !== false && $d <= $to && count($out) < 7; $d = strtotime('+1 day', $d)) {
+            $out[] = date('Y-m-d', $d);
+        }
+        return $out ?: [date('Y-m-d', $from)];
+    }
+
+    /**
+     * The different items this faculty holds in their OWN requests (not a student's) at the same time as the
+     * window: Waiting / Approved / On Loan and overlapping it, plus any Overdue item.
+     * @return list<string>
+     */
+    private static function ownItemsHeld(mysqli $conn, string $facultyId, string $startTs, string $endTs, ?int $beforeId): array
+    {
+        $sql = "SELECT DISTINCT equipment_name FROM tbl_requests
                  WHERE faculty_id = ?
+                   AND COALESCE(submitted_as, 'personal') <> 'student'
                    AND (
                          (status IN ('Waiting','Approved','On Loan')
                            AND TIMESTAMP(borrow_date, COALESCE(borrow_time, '00:00:00')) < ?
                            AND TIMESTAMP(return_date, COALESCE(return_time, '23:59:59')) > ?)
                       OR status = 'Overdue'
-                       )";
-        if ($beforeId !== null) {
-            $sql .= ' AND id < ?';
-        }
+                       )" . ($beforeId !== null ? ' AND id < ?' : '');
         $st = $conn->prepare($sql);
         if (!$st) {
-            return null;
+            return [];
         }
         if ($beforeId !== null) {
             $st->bind_param('sssi', $facultyId, $endTs, $startTs, $beforeId);
@@ -958,14 +1014,149 @@ final class BookingSchedule
             $st->bind_param('sss', $facultyId, $endTs, $startTs);
         }
         $st->execute();
-        $held = (int)($st->get_result()->fetch_assoc()['held'] ?? 0);
+        $out = [];
+        $res = $st->get_result();
+        while ($res && ($r = $res->fetch_assoc())) {
+            $out[] = (string)$r['equipment_name'];
+        }
         $st->close();
+        return $out;
+    }
 
-        if ($held + $qty > $max) {
-            $unitWord = $max === 1 ? 'item' : 'items';
-            return $held > 0
-                ? 'You can have at most ' . $max . ' ' . $unitWord . ' at a time, and you already have ' . $held . ' booked or requested for that time.'
-                : 'You can borrow at most ' . $max . ' ' . $unitWord . ' at a time.';
+    /**
+     * The student slots used on one day: one key per student request (a cart's items share a batch id and are
+     * one slot; a single item without a batch is its own slot).
+     * @return list<string>
+     */
+    private static function studentSlotsOn(mysqli $conn, string $facultyId, string $date, ?int $beforeId): array
+    {
+        $sql = "SELECT DISTINCT COALESCE(NULLIF(batch_id, ''), CONCAT('r', id)) AS slot
+                  FROM tbl_requests
+                 WHERE faculty_id = ? AND submitted_as = 'student' AND borrow_date = ?
+                   AND status IN (" . self::STUDENT_SLOT_STATUSES . ')'
+             . ($beforeId !== null ? ' AND id < ?' : '');
+        $st = $conn->prepare($sql);
+        if (!$st) {
+            return [];
+        }
+        if ($beforeId !== null) {
+            $st->bind_param('ssi', $facultyId, $date, $beforeId);
+        } else {
+            $st->bind_param('ss', $facultyId, $date);
+        }
+        $st->execute();
+        $out = [];
+        $res = $st->get_result();
+        while ($res && ($r = $res->fetch_assoc())) {
+            $out[] = (string)$r['slot'];
+        }
+        $st->close();
+        return $out;
+    }
+
+    /** The different items already in one student's cart (same batch id). @return list<string> */
+    private static function studentCartItems(mysqli $conn, string $facultyId, string $batchId, ?int $beforeId): array
+    {
+        $sql = "SELECT DISTINCT equipment_name FROM tbl_requests
+                 WHERE faculty_id = ? AND submitted_as = 'student' AND batch_id = ?
+                   AND status IN (" . self::STUDENT_SLOT_STATUSES . ')'
+             . ($beforeId !== null ? ' AND id < ?' : '');
+        $st = $conn->prepare($sql);
+        if (!$st) {
+            return [];
+        }
+        if ($beforeId !== null) {
+            $st->bind_param('ssi', $facultyId, $batchId, $beforeId);
+        } else {
+            $st->bind_param('ss', $facultyId, $batchId);
+        }
+        $st->execute();
+        $out = [];
+        $res = $st->get_result();
+        while ($res && ($r = $res->fetch_assoc())) {
+            $out[] = (string)$r['equipment_name'];
+        }
+        $st->close();
+        return $out;
+    }
+
+    /**
+     * Would this request go over the faculty member's shared points? Returns the message to show (written for
+     * whoever is asking: the faculty member, or the student), or null when it fits.
+     *
+     * @param bool   $isStudent a student's request (filed with the faculty's code) rather than the faculty's own
+     * @param ?int   $beforeId  count only requests filed BEFORE this one (the request being decided passes its own id)
+     * @param string $batchId   the student's cart id ('' for a single item or a faculty request)
+     */
+    public static function shareLimitError(
+        mysqli $conn,
+        string $facultyId,
+        string $item,
+        bool $isStudent,
+        string $startTs,
+        string $endTs,
+        ?int $beforeId = null,
+        string $batchId = ''
+    ): ?string {
+        self::loadRules($conn);
+        $maxOwn   = self::maxItems();
+        $maxSlots = self::maxStudentSlots();
+        $maxPts   = self::maxSharedPoints();
+        $maxStu   = self::maxStudentItems();
+        $own      = self::ownItemsHeld($conn, $facultyId, $startTs, $endTs, $beforeId);
+
+        if (!$isStudent) {
+            // The faculty member's own item. One they already hold at that time adds no variety.
+            foreach ($own as $held) {
+                if (strcasecmp($held, $item) === 0) {
+                    return null;
+                }
+            }
+            $ownAfter = count($own) + 1;
+            if ($ownAfter > $maxOwn) {
+                $word = $maxOwn === 1 ? 'item' : 'different items';
+                return count($own) > 0
+                    ? 'You can borrow at most ' . $maxOwn . ' ' . $word . ' at a time, and you already have ' . count($own) . ' booked or requested for that time.'
+                    : 'You can borrow at most ' . $maxOwn . ' ' . $word . ' at a time.';
+            }
+            foreach (self::windowDates($startTs, $endTs) as $day) {
+                $students = count(self::studentSlotsOn($conn, $facultyId, $day, $beforeId));
+                if ($ownAfter + $students > $maxPts) {
+                    return 'Your ' . $maxPts . '-point allowance for ' . date('D, M j', strtotime($day)) . ' would be over: '
+                        . $ownAfter . ' item' . ($ownAfter === 1 ? '' : 's') . ' + ' . $students . ' student' . ($students === 1 ? '' : 's')
+                        . ' you authorized (each item and each student uses 1 point).';
+                }
+            }
+            return null;
+        }
+
+        // A student's request. First: how many different items one student may take.
+        if ($batchId !== '') {
+            $cart = self::studentCartItems($conn, $facultyId, $batchId, $beforeId);
+            foreach ($cart as $held) {
+                if (strcasecmp($held, $item) === 0) {
+                    return null;
+                }
+            }
+            if (count($cart) + 1 > $maxStu) {
+                return 'One student request can include at most ' . $maxStu . ' different item' . ($maxStu === 1 ? '' : 's') . '.';
+            }
+        }
+        // Then: is there still a student slot that day? A cart whose earlier items are already counted is the
+        // same student, so it takes no new slot.
+        $date  = substr($startTs, 0, 10);
+        $slots = self::studentSlotsOn($conn, $facultyId, $date, $beforeId);
+        if ($batchId !== '' && in_array($batchId, $slots, true)) {
+            return null;
+        }
+        $label = date('D, M j', strtotime($date));
+        if (count($slots) + 1 > $maxSlots) {
+            return 'Your faculty has already authorized the most students allowed for ' . $label . ' (' . $maxSlots
+                . '). Please choose another date, or ask your faculty.';
+        }
+        if (count($own) + count($slots) + 1 > $maxPts) {
+            return 'Your faculty has used up their borrowing allowance for ' . $label
+                . ' (the items they hold plus the students they authorize). Please choose another date, or ask your faculty.';
         }
         return null;
     }

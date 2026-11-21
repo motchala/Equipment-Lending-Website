@@ -90,8 +90,8 @@ foreach ($items as $it) {
         } elseif ($qty > $total) {
             $row['message'] = 'Only ' . $total . ' in stock.';
         } elseif (!empty($_SESSION['faculty_id'])
-            && ($ruleErr = BookingSchedule::itemsLimitError($conn, (string)$_SESSION['faculty_id'], $qty, $win['start_ts'], $win['end_ts'])) !== null) {
-            // "Items per borrower" from Settings → Arbitration, shown before the faculty member submits
+            && ($ruleErr = BookingSchedule::shareLimitError($conn, (string)$_SESSION['faculty_id'], $name, false, $win['start_ts'], $win['end_ts'])) !== null) {
+            // The shared points (items + students) from Settings → Arbitration, shown before the faculty member submits
             $row['message'] = $ruleErr;
         } elseif ($free >= $qty) {
             $row['ok']      = true;
