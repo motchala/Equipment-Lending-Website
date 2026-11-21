@@ -4716,6 +4716,10 @@
                       Runs when the tab is opened, after a booking / cancellation,
                       the moment the 5 s requests poll sees a status change (e.g. admin
                       confirms a return), and every 30 s while the tab is visible.
+    4c. Key figures    the Home key figures (Ready for pickup, Active loans, Overdue, Pending, Reservations)
+                       open this tab and flash the rows they count, the same way a Next steps entry flashes
+                       its row (the card is paged to the first one). Waits for the tab's refresh so the rows
+                       are current. Rooms = approved reservations that are in progress or upcoming.
    5. Extend          the Extend button on a loan whose return time has been reached opens
                       a dialog (equipment-booking/api/extend-borrow.php): it lists each
                       extension length with live availability, and the server denies it when
@@ -4974,15 +4978,13 @@
         /* ── 4. Live refresh (equipment + rooms) ─────────────────── */
         var inFlight = { rooms: false, equipment: false };
 
-        /* ── Next steps: merge both halves, most urgent first ─────
+        /* ── Next steps: merge both halves, most urgent first, never more than data-max ─────
            Each half owns its own entries (data-src), so a refresh of one never loses the other's.
-           All of them stay in the list; only the first data-max are shown. */
+           The rest stay in the list (hidden) so the order is right after the next refresh, but only the
+           first data-max are ever shown. Order: urgency, then soonest, then equipment before rooms, then title. */
         var todoList = $('factTodoList');
         var todoClear = $('factTodoClear');
-        var todoMore = $('factTodoMore');
-        var todoMoreBtn = $('factTodoMoreBtn');
         var TODO_MAX = todoList ? (parseInt(todoList.dataset.max, 10) || 5) : 5;
-        var todoExpanded = false;
 
         function renderTodo(src, html) {
             if (!todoList) return;
@@ -4991,30 +4993,32 @@
                 todoList.insertAdjacentHTML('beforeend', html);
             }
             var items = Array.prototype.slice.call(todoList.querySelectorAll('li.fact-todo'));
+            function title(li) {
+                var el = li.querySelector('.fact-todo-title');
+                return el ? el.textContent : '';
+            }
             items.sort(function (a, b) {
                 return ((parseInt(a.dataset.prio, 10) || 9) - (parseInt(b.dataset.prio, 10) || 9))
-                    || ((parseInt(a.dataset.ts, 10) || 0) - (parseInt(b.dataset.ts, 10) || 0));
+                    || ((parseInt(a.dataset.ts, 10) || 0) - (parseInt(b.dataset.ts, 10) || 0))
+                    || (a.dataset.src === b.dataset.src ? 0 : (a.dataset.src < b.dataset.src ? -1 : 1))
+                    || (title(a) < title(b) ? -1 : (title(a) > title(b) ? 1 : 0));
             });
             items.forEach(function (li, i) {
-                li.hidden = !todoExpanded && i >= TODO_MAX;
+                li.hidden = i >= TODO_MAX;
                 todoList.appendChild(li);
             });
             todoList.hidden = items.length === 0;
             if (todoClear) todoClear.hidden = items.length > 0;
-            /* Never cut the list off silently: say how many more there are */
-            var extra = items.length - TODO_MAX;
-            if (todoMore) todoMore.hidden = extra <= 0;
-            if (todoMoreBtn) {
-                todoMoreBtn.textContent = todoExpanded ? 'Show fewer' : 'Show ' + Math.max(0, extra) + ' more';
-                todoMoreBtn.setAttribute('aria-expanded', todoExpanded ? 'true' : 'false');
-            }
         }
 
-        if (todoMoreBtn) {
-            todoMoreBtn.addEventListener('click', function () {
-                todoExpanded = !todoExpanded;
-                renderTodo('', undefined);
-            });
+        /* One-second gold flash. The CSS animation fades it out by itself, so it cannot stay on; the class is
+           taken off afterwards only to tidy up, and put back from scratch if the same row is flashed again. */
+        var FLASH_MS = 1200;
+        function flashEls(list) {
+            list.forEach(function (el) { el.classList.remove('is-flash'); });
+            void panel.offsetWidth;
+            list.forEach(function (el) { el.classList.add('is-flash'); });
+            setTimeout(function () { list.forEach(function (el) { el.classList.remove('is-flash'); }); }, FLASH_MS + 100);
         }
 
         /* An entry points at the row that has the button: page the card to it, scroll, flash */
@@ -5042,13 +5046,65 @@
             if (!el) return;
             var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
             el.scrollIntoView({ behavior: calm ? 'auto' : 'smooth', block: 'center' });
-            el.classList.add('is-flash');
-            setTimeout(function () { el.classList.remove('is-flash'); }, 1800);
+            flashEls([el]);
         }
 
         panel.addEventListener('click', function (e) {
             var go = e.target.closest('[data-fact-goto]');
             if (go) goToRow(go.dataset.factGoto);
+        });
+
+        /* ── 4c. Home key figures -> the rows they count ──────────
+           A key figure carries data-fact-focus (approved / on_loan / overdue / waiting / rooms). It opens this
+           tab through its own go-tab action; here we remember what it counted and, once the tab's refresh has
+           landed, page the right card to the first matching row and flash all the matching rows on that page. */
+        var FOCUS_KEYS = { approved: 1, on_loan: 1, overdue: 1, waiting: 1, rooms: 1 };
+        var pendingFocus = '';
+        var pendingTimer = null;
+
+        function focusStat(key) {
+            var rooms = key === 'rooms';
+            var card = rooms ? cards.rooms : cards.equipment;
+            var host = $(rooms ? 'factRooms' : 'factEquipment');
+            if (!card.body || !host) return;
+            var sel = rooms
+                ? '.fact-item[data-state="live"], .fact-item[data-state="upcoming"]'
+                : '.fact-item[data-status="' + key + '"]';
+            var hits = Array.prototype.slice.call(card.body.querySelectorAll(sel));
+            var target = host;
+            if (hits.length) {
+                var all = Array.prototype.slice.call(card.body.querySelectorAll('.fact-item'));
+                card.page = Math.floor(all.indexOf(hits[0]) / CARD_PER_PAGE) + 1;
+                paginateCard(card);
+                hits = hits.filter(function (el) { return !el.classList.contains('is-paged-out'); });
+                target = hits[0] || host;
+            } else {
+                hits = [host];   // the count and the rows disagree for a moment: at least point at the card
+            }
+            var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            target.scrollIntoView({ behavior: calm ? 'auto' : 'smooth', block: 'center' });
+            flashEls(hits);
+        }
+
+        function runPendingFocus() {
+            if (!pendingFocus || inFlight.rooms || inFlight.equipment) return;
+            var key = pendingFocus;
+            pendingFocus = '';
+            clearTimeout(pendingTimer);
+            focusStat(key);
+        }
+
+        document.addEventListener('click', function (e) {
+            var kpi = e.target.closest('[data-fact-focus]');
+            if (!kpi || !Object.prototype.hasOwnProperty.call(FOCUS_KEYS, kpi.dataset.factFocus)) return;
+            pendingFocus = kpi.dataset.factFocus;
+            /* Normally the refresh below triggers it; this only covers a refresh that never lands */
+            clearTimeout(pendingTimer);
+            pendingTimer = setTimeout(function () {
+                var key = pendingFocus;
+                pendingFocus = '';
+                if (key) focusStat(key);
+            }, 2500);
         });
 
         /* Swap a card's status line and rows, then page them again (the current page is kept) */
@@ -5077,7 +5133,7 @@
                     done(data);
                 })
                 .catch(function () { /* a failed refresh must never disturb the screen */ })
-                .then(function () { inFlight[key] = false; });
+                .then(function () { inFlight[key] = false; runPendingFocus(); });
         }
 
         function refreshRooms() {

@@ -296,6 +296,22 @@
                     <div class="info-card-body" style="padding:0.5rem 1.25rem 1.25rem;">
                         <div class="hc-faq-list">
 
+                            <details class="hc-faq-item rxm-phone-only">
+                                <summary class="hc-faq-q">
+                                    <span class="hc-faq-q-text">What is only available on a desktop?</span>
+                                    <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
+                                </summary>
+                                <div class="hc-faq-a">
+                                    The phone view covers the daily work: the Dashboard, Activity, Equipment, Facilities, Notifications and your Settings. A few things need a desktop or a larger screen:<br><br>
+                                    &bull; Reports and Service Ratings<br>
+                                    &bull; Exporting the Activity timeline<br>
+                                    &bull; Adding new equipment or facilities<?php if ($is_super_admin): ?><br>
+                                    &bull; Faculty and Admin accounts, and Imports<br>
+                                    &bull; Arbitration rules and the Data tools in Settings<br>
+                                    &bull; Delete All and permanent deletes<?php endif; ?>
+                                </div>
+                            </details>
+
                             <details class="hc-faq-item">
                                 <summary class="hc-faq-q">
                                     <span class="hc-faq-q-text">How do I review a borrow request?</span>
@@ -352,12 +368,12 @@
 
                             <details class="hc-faq-item">
                                 <summary class="hc-faq-q">
-                                    <span class="hc-faq-q-text">How do I add, edit or archive equipment?</span>
+                                    <span class="hc-faq-q-text"><span class="rxm-desktop-only">How do I add, edit or archive equipment?</span><span class="rxm-phone-only">How do I edit or archive equipment?</span></span>
                                     <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
                                 </summary>
                                 <div class="hc-faq-a">
-                                    Go to <strong>Equipment → Catalog</strong>. Fill in the item name, category, quantity and condition (Good, Fair or For Repair). A photo (JPG or PNG, up to 2 MB) is optional. Click <strong>Save Equipment</strong>.<br><br>
-                                    To change an item, click its edit button. <strong>Archive Item</strong> in the edit window hides it from faculty and keeps its history. Archived items are listed at the bottom of the Catalog, where you can <strong>Restore</strong> them or delete them permanently (this cannot be undone). The Dashboard's <strong>Stock watch</strong> lists items with 2 or fewer units.
+                                    Go to <strong>Equipment → Catalog</strong>.<span class="rxm-desktop-only"> Fill in the item name, category, quantity and condition (Good, Fair or For Repair). A photo (JPG or PNG, up to 2 MB) is optional. Click <strong>Save Equipment</strong>.<br><br></span><span class="rxm-phone-only"> Adding new equipment is done on a desktop or a larger screen.<br><br></span>
+                                    To change an item, tap its edit button. <strong>Archive Item</strong> in the edit window hides it from faculty and keeps its history. Archived items are listed at the bottom of the Catalog, where you can <strong>Restore</strong> them<span class="rxm-desktop-only"> or delete them permanently (this cannot be undone)</span>. The Dashboard's <strong>Stock watch</strong> lists items with 2 or fewer units.
                                 </div>
                             </details>
 
@@ -395,13 +411,13 @@
 
                             <details class="hc-faq-item">
                                 <summary class="hc-faq-q">
-                                    <span class="hc-faq-q-text">How do I add, lock or archive a facility?</span>
+                                    <span class="hc-faq-q-text"><span class="rxm-desktop-only">How do I add, lock or archive a facility?</span><span class="rxm-phone-only">How do I lock or archive a facility?</span></span>
                                     <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
                                 </summary>
                                 <div class="hc-faq-a">
-                                    In <strong>Facilities</strong>, a Super Admin can click <strong>Add Facility</strong> (building, name, floor, status and features). Admins and Super Admins can edit a facility. The status is Available, Maintenance or Not bookable, and the last two cannot be reserved.<br><br>
+                                    <span class="rxm-desktop-only">In <strong>Facilities</strong>, a Super Admin can click <strong>Add Facility</strong> (building, name, floor, status and features). Admins and Super Admins can edit a facility. The status is Available, Maintenance or Not bookable, and the last two cannot be reserved.<br><br></span><span class="rxm-phone-only">In <strong>Facilities</strong>, Admins and Super Admins can edit a facility. The status is Available, Maintenance or Not bookable, and the last two cannot be reserved. Adding a new facility is done on a desktop or a larger screen.<br><br></span>
                                     <strong>Lock Facility</strong> (in the Edit window) keeps a facility visible but stops its schedule from opening. Admins and Super Admins can lock and unlock.<br><br>
-                                    Only a Super Admin can <strong>Archive</strong> a facility. Archived facilities are hidden from new reservations but their history is kept, and they can be restored from <strong>Facilities → Archived</strong>. Only a Super Admin can delete an archived facility permanently, which removes its reservation history for good.
+                                    Only a Super Admin can <strong>Archive</strong> a facility. Archived facilities are hidden from new reservations but their history is kept, and they can be restored from <strong>Facilities → Archived</strong>.<span class="rxm-desktop-only"> Only a Super Admin can delete an archived facility permanently, which removes its reservation history for good.</span>
                                 </div>
                             </details>
 
@@ -411,7 +427,7 @@
                                     <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
                                 </summary>
                                 <div class="hc-faq-a">
-                                    The <strong>Dashboard</strong> shows what needs attention right now. The <strong>Activity</strong> tab is the full timeline of decisions and changes, and who made them. You can filter it by type (Requests, Facilities, Equipment, System, Sign-ins), by person, and by date, and export it. The bell on the Dashboard opens your Notifications. Choose which alerts you get (new requests, overdue items, stock alerts, facility issues and security emails), or switch them all off, in <strong>Settings → Preferences</strong>.
+                                    The <strong>Dashboard</strong> shows what needs attention right now. The <strong>Activity</strong> tab is the full timeline of decisions and changes, and who made them. You can filter it by type (Requests, Facilities, Equipment, System, Sign-ins), by person, and by date<span class="rxm-desktop-only">, and export it</span>. The bell on the Dashboard opens your Notifications. Choose which alerts you get (new requests, overdue items, stock alerts, facility issues and security emails), or switch them all off, in <strong>Settings → Preferences</strong>.
                                 </div>
                             </details>
 
@@ -426,7 +442,7 @@
                             </details>
 
                             <?php if ($is_super_admin): ?>
-                                <details class="hc-faq-item">
+                                <details class="hc-faq-item rxm-desktop-only">
                                     <summary class="hc-faq-q">
                                         <span class="hc-faq-q-text">How do I create and manage faculty accounts? (Super Admin)</span>
                                         <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
@@ -438,7 +454,7 @@
                                     </div>
                                 </details>
 
-                                <details class="hc-faq-item">
+                                <details class="hc-faq-item rxm-desktop-only">
                                     <summary class="hc-faq-q">
                                         <span class="hc-faq-q-text">How do I manage admin accounts? (Super Admin)</span>
                                         <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
@@ -448,7 +464,7 @@
                                     </div>
                                 </details>
 
-                                <details class="hc-faq-item">
+                                <details class="hc-faq-item rxm-desktop-only">
                                     <summary class="hc-faq-q">
                                         <span class="hc-faq-q-text">What are Imports for? (Super Admin)</span>
                                         <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
@@ -462,7 +478,7 @@
                                     </div>
                                 </details>
 
-                                <details class="hc-faq-item">
+                                <details class="hc-faq-item rxm-desktop-only">
                                     <summary class="hc-faq-q">
                                         <span class="hc-faq-q-text">How do I clear all loans or reservations? (Super Admin)</span>
                                         <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>

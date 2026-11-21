@@ -59,14 +59,10 @@
                     <header class="fact-card-head">
                         <div class="fact-card-heading">
                             <h3 class="fact-card-title" id="factTodoTitle">Next steps</h3>
-                            <p class="fact-card-sub">Most urgent first.</p>
+                            <p class="fact-card-sub">Most urgent first, up to <?php echo (int) FACT_TODO_MAX; ?>.</p>
                         </div>
                     </header>
                     <ul class="fact-todo-list" id="factTodoList" data-max="<?php echo (int) FACT_TODO_MAX; ?>"<?php echo $act_todo ? '' : ' hidden'; ?>><?php echo fact_todo_render($act_todo); ?></ul>
-                    <!-- More entries than fit: the list shows the most urgent few, this reveals the rest -->
-                    <footer class="fact-card-foot fact-todo-foot" id="factTodoMore"<?php echo count($act_todo) > FACT_TODO_MAX ? '' : ' hidden'; ?>>
-                        <button type="button" class="fact-linkbtn" id="factTodoMoreBtn" aria-expanded="false">Show <?php echo max(0, count($act_todo) - FACT_TODO_MAX); ?> more</button>
-                    </footer>
                     <!-- Shown by the page script whenever the list above is empty (also after a live refresh) -->
                     <div class="fact-todo-clear" id="factTodoClear"<?php echo $act_todo ? ' hidden' : ''; ?>>
                         <span class="material-symbols-outlined" aria-hidden="true">task_alt</span>

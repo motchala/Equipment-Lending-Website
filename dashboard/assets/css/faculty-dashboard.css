@@ -11265,17 +11265,36 @@ body .side-nav .side-nav-user .side-nav-user-name {
     gap: 8px;
 }
 
-/* The row (or card) a Next steps entry just pointed at */
+/* The row (or card) a Next steps entry or a Home key figure just pointed at: a gold glow for about a
+   second that fades away on its own. The gold lives only inside the animation, so even if the class
+   were left on the element nothing stays highlighted (the page script also removes it afterwards). */
 #panel-activity .fact-item.is-flash {
     border-radius: 10px;
-    background-color: color-mix(in srgb, var(--color-primary) 8%, transparent);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 20%, transparent);
-    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    animation: fact-flash-gold 1.2s ease-out both;
 }
 
 #panel-activity .fact-card.is-flash {
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 25%, transparent);
-    transition: box-shadow 0.3s ease;
+    animation: fact-flash-gold-ring 1.2s ease-out both;
+}
+
+@keyframes fact-flash-gold {
+    0%, 55% {
+        background-color: color-mix(in srgb, #e6a817 24%, transparent);
+        box-shadow: 0 0 0 3px color-mix(in srgb, #d99a1e 65%, transparent);
+    }
+    100% {
+        background-color: color-mix(in srgb, #e6a817 0%, transparent);
+        box-shadow: 0 0 0 3px color-mix(in srgb, #d99a1e 0%, transparent);
+    }
+}
+
+@keyframes fact-flash-gold-ring {
+    0%, 55% {
+        box-shadow: 0 0 0 3px color-mix(in srgb, #d99a1e 65%, transparent);
+    }
+    100% {
+        box-shadow: 0 0 0 3px color-mix(in srgb, #d99a1e 0%, transparent);
+    }
 }
 
 /* ── Cards (same gold-framed card as the Home tab) ───────────── */
