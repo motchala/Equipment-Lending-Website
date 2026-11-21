@@ -442,14 +442,31 @@
     line-height: 1.35;
 }
 
+/* Student name field, shown when "Student" is chosen (hidden is handled by the #bfModal [hidden] rule above) */
 #bfModal .bm-collector-student {
-    margin-top: 10px;
-    padding-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 2px;
+    padding-top: 14px;
     border-top: 1px solid var(--color-outline-variant);
 }
 
+#bfModal .bm-collector-student .form-label {
+    margin: 0;
+}
+
 #bfModal .bm-collector-student .form-input {
+    display: block;
     width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    text-overflow: ellipsis;
+}
+
+#bfModal .bm-collector-student .bm-hint {
+    margin: 0;
+    line-height: 1.4;
 }
 
 .bf-alert {

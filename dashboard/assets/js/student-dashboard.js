@@ -42,6 +42,10 @@
     var QR_SRC = 'https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js';
     var RECEIPT_KEY = 'pup_last_receipt';
     var SNAP_KEY = 'pup_student_view';   /* sessionStorage: the screen + entries to bring back after a refresh */
+    /* Longest name the Student Portal accepts (spaces count, runs of spaces count once). Validation only: the form
+       shows no hint. Keep equal to STUDENT_NAME_MAX_LENGTH in shared/core/student-name.php. */
+    var STUDENT_NAME_MAX = 50;
+
     var URLS = {
         verifyFaculty: 'equipment-booking/api/verify-faculty-code.php',
         verifyRoom: 'room-reservation/api/verify-room-code.php',
@@ -442,6 +446,7 @@
 
         if (!code) return showAlert('detailsError', 'Please enter the code.');
         if (!name) return showAlert('detailsError', 'Please enter your name.');
+        if (Array.from(name.replace(/\s+/g, ' ')).length > STUDENT_NAME_MAX) return showAlert('detailsError', 'Your name is too long. Please check it and try again.');
         if (!course) return showAlert('detailsError', 'Please select your course.');
 
         /* Facilities and equipment both take the faculty code (the facility one goes to its own check). */

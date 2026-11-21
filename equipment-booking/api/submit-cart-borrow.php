@@ -117,6 +117,12 @@ if ($collector_type === 'student' && $collector_name === '') {
     echo json_encode(['ok' => false, 'error' => 'Student name is required when a student will collect.']);
     exit;
 }
+// Length limit for the student's name (validation only, shared with the Student Portal)
+require_once __DIR__ . '/../../shared/core/student-name.php';
+if ($collector_type === 'student' && student_name_error($collector_name) !== null) {
+    echo json_encode(['ok' => false, 'error' => 'The student name is too long. Please check it and try again.']);
+    exit;
+}
 // Normalize: if faculty collecting, clear the student field
 if ($collector_type !== 'student') {
     $collector_name = '';

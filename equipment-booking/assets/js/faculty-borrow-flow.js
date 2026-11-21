@@ -26,6 +26,10 @@
 (function () {
     'use strict';
 
+    /* Longest student name accepted for "a student will collect" (spaces count, runs of spaces count once).
+       Validation only: the form shows no hint. Keep equal to STUDENT_NAME_MAX_LENGTH in shared/core/student-name.php. */
+    var STUDENT_NAME_MAX = 50;
+
     var URL_SUBMIT = 'equipment-booking/api/submit-cart-borrow.php';
     var URL_CHECK = 'equipment-booking/api/check-booking-availability.php';
 
@@ -743,6 +747,7 @@
         }
         var type = (document.querySelector('input[name="bf_collector_type"]:checked') || {}).value || 'faculty';
         if (type === 'student' && !$('bfStudentName').value.trim()) return 'Please enter the student\u2019s name before submitting.';
+        if (type === 'student' && Array.from($('bfStudentName').value.trim().replace(/\s+/g, ' ')).length > STUDENT_NAME_MAX) return 'The student name is too long. Please check it and try again.';
         if (w.mode === 'future') {
             var f = $('request_document') && $('request_document').files && $('request_document').files[0];
             if (!f && r.letterRequired) return 'A request letter is required for later-date requests. Please attach one.';
