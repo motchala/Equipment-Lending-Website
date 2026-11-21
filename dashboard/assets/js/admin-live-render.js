@@ -321,8 +321,21 @@
         }
 
         window.adminDoPoll = doPoll;   // expose globally for inventory/faculty AJAX callers
-        doPoll();              // ← fire immediately on page load
-        setInterval(doPoll, INTERVAL);  // ← then every 8 seconds
+
+        // ── SSE: replace setInterval when SSE is active ───────────────────
+        if (window.PupSyncSSE && !window.PupSyncSSE.fallback) {
+            PupSyncSSE.init({
+                streams: [{ url: 'sse/api/admin-equipment.php', onUpdate: doPoll }]
+            });
+            // If SSE falls back to polling later, start the interval at that point
+            document.addEventListener('pupsync:sse-fallback', function () {
+                setInterval(doPoll, INTERVAL);
+            }, { once: true });
+        } else {
+            setInterval(doPoll, INTERVAL);
+        }
+
+        doPoll();              // ← fire immediately on page load (always runs regardless of SSE)
     }
 
     /* ── Delegated handler for return-confirm buttons (rendered dynamically by renderReturnBody) ── */

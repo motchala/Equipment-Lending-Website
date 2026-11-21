@@ -1,3 +1,4 @@
+    <script src="sse/assets/js/sse-client.js?v=<?php echo @filemtime(PS_ROOT . '/sse/assets/js/sse-client.js'); ?>"></script>
     <script src="shared/assets/js/logout-modal.js?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/js/logout-modal.js'); ?>"></script>
     <script src="shared/assets/js/admin-decline-reasons.js?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/js/admin-decline-reasons.js'); ?>"></script>
     <script src="dashboard/assets/js/admin-dashboard.js?v=<?php echo @filemtime(PS_ROOT . '/dashboard/assets/js/admin-dashboard.js'); ?>"></script>
