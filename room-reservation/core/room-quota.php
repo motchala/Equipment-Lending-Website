@@ -625,7 +625,7 @@ function fact_render_room_item(array $it, string $kind): string
             ]);
     }
 
-    $html  = '<article class="fact-item fact-room" data-rr-id="' . fact_i($it, 'id') . '">';
+    $html  = '<article class="fact-item fact-room" data-rr-id="' . fact_i($it, 'id') . '" data-state="' . fact_h($kind) . '">';
     $html .= '<span class="fact-tile">' . fact_icon('meeting_room') . '</span>';
     $html .= '<div class="fact-item-main"><div class="fact-item-top"><h4 class="fact-item-title">' . fact_h($room) . '</h4>';
     $html .= fact_status_chip($kind === 'waitlist' ? 'Waitlisted' : ($kind === 'pending' ? 'Waiting' : 'Approved')) . '</div>';
@@ -826,7 +826,7 @@ function fact_room_stats(array $d): array
  * -------------------------------------------------------------------------- */
 
 if (!defined('FACT_TODO_MAX')) {
-    /** How many entries show at once (the page script reads the same number from the list's data-max). */
+    /** The most entries Next steps ever shows: the 5 most urgent, nothing more (the page script reads the same number from the list's data-max). */
     define('FACT_TODO_MAX', 5);
 }
 
@@ -866,14 +866,17 @@ function fact_todo_names(array $names): string
 }
 
 /**
- * Most urgent first; entries of the same urgency by whichever is soonest.
+ * Most urgent first; entries of the same urgency by whichever is soonest; anything still tied keeps a fixed
+ * order (equipment before rooms, then by title) so the list never reshuffles between live refreshes.
+ * The page script (renderTodo in faculty-dashboard.js) sorts by the same four keys.
  *
  * @param list<array<string, mixed>> $items
  * @return list<array<string, mixed>>
  */
 function fact_todo_sort(array $items): array
 {
-    usort($items, static fn(array $a, array $b): int => [fact_i($a, 'prio'), fact_i($a, 'ts')] <=> [fact_i($b, 'prio'), fact_i($b, 'ts')]);
+    usort($items, static fn(array $a, array $b): int => [fact_i($a, 'prio'), fact_i($a, 'ts'), fact_s($a, 'src'), fact_s($a, 'title')]
+        <=> [fact_i($b, 'prio'), fact_i($b, 'ts'), fact_s($b, 'src'), fact_s($b, 'title')]);
     return $items;
 }
 

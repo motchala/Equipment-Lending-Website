@@ -1,0 +1,3074 @@
+/* ================================================================
+   admin-dashboard-mobile.css
+   PHONE APP LAYOUT for the Super Admin / Admin portal.
+
+   Everything here is scoped to  html.rx-mobile  — a class set in <head>
+   (before first paint, see admin-shell-top.php) when the device is a phone
+   (also in landscape), or the window is 600px wide or less. Tablets and
+   desktops never get the class, so they keep today's layout from
+   admin-dashboard.css / admin-dashboard-responsive.css.
+
+   Loaded LAST on purpose: the desktop CSS uses !important in places, so
+   these overrides only win if they come after it.
+
+   Same design language as the Faculty phone layout
+   (faculty-dashboard-mobile.css), so both portals feel like one app:
+     - soft tinted page, content on rounded white surfaces
+     - top app bar, bottom tab bar, bottom sheets
+     - rows >= 56px tall, 16px gutters
+   Colours come from the admin theme variables, so Light / Dark and the
+   accent colour chosen in Settings keep working with no extra code.
+
+   Sections
+     0  tokens + "off" state
+     1  shell: hide the desktop chrome, make room for the new bars
+     2  top app bar
+     3  bottom tab bar
+     4  bottom sheet (account menu, desktop-only list)
+     5  desktop notice banner
+     6  desktop-only screens and controls (hidden on phones)
+     7  shared phone rules: page headers, toast, modals as bottom sheets
+     8  landscape phones
+================================================================ */
+
+/* ---------------------------------------------------------------
+   0. TOKENS + "OFF" STATE
+--------------------------------------------------------------- */
+.rxm-bar,
+.rxm-tabbar,
+.rxm-sheet,
+.rxm-note {
+    display: none;
+}
+
+html.rx-mobile {
+    --rxm-bar-h: 56px;
+    --rxm-tab-h: 64px;
+    --rxm-gutter: 16px;
+    --rxm-st: env(safe-area-inset-top, 0px);
+    --rxm-sb: env(safe-area-inset-bottom, 0px);
+    --rxm-sl: env(safe-area-inset-left, 0px);
+    --rxm-sr: env(safe-area-inset-right, 0px);
+    --rxm-r: 22px;
+    --rxm-primary: var(--accent-maroon, #600302);
+    --rxm-on-primary: #fff;
+    --rxm-grad: linear-gradient(145deg, var(--accent-maroon, #600302), var(--accent-dark, #4a0f15));
+    --rxm-card: var(--card-bg, #fff);
+    --rxm-bg: var(--secondary-cream, #f9f7f2);
+    --rxm-tonal: var(--accent-light, #f3e5e6);
+    --rxm-text: var(--text-dark, #2c2c2c);
+    --rxm-muted: var(--text-light, #666);
+    --rxm-line: var(--khaki-border, #e6e0d4);
+    --rxm-shadow: 0 1px 2px rgba(70, 12, 12, .05), 0 8px 24px rgba(70, 12, 12, .06);
+    --rxm-danger: #c62828;
+}
+
+html.rx-mobile[data-theme="dark"] {
+    --rxm-shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .28);
+    --rxm-danger: #ef7b7b;
+}
+
+html.rx-mobile,
+html.rx-mobile body {
+    background: var(--rxm-bg);
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
+}
+
+html.rx-mobile .rxm-trunc {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+/* ---------------------------------------------------------------
+   1. SHELL — hide the desktop chrome, make room for the new bars
+--------------------------------------------------------------- */
+html.rx-mobile nav.sidebar,
+html.rx-mobile .sidebar-backdrop,
+html.rx-mobile .sidebar-toggle-btn {
+    display: none !important;
+}
+
+html.rx-mobile .app-body {
+    display: block;
+    margin-top: 0;
+    height: 100vh;
+    height: 100dvh;
+}
+
+html.rx-mobile main#app-main {
+    height: 100%;
+    margin-left: 0 !important;
+    width: 100% !important;
+    background: var(--rxm-bg) !important;
+    padding: calc(var(--rxm-bar-h) + var(--rxm-st) + 12px) max(var(--rxm-gutter), var(--rxm-sr)) calc(var(--rxm-tab-h) + var(--rxm-sb) + 28px) max(var(--rxm-gutter), var(--rxm-sl)) !important;
+    scroll-padding-top: calc(var(--rxm-bar-h) + var(--rxm-st));
+    -webkit-overflow-scrolling: touch;
+}
+
+html.rx-mobile .tab-panel {
+    padding-top: 0;
+}
+
+/* ---------------------------------------------------------------
+   2. TOP APP BAR
+--------------------------------------------------------------- */
+html.rx-mobile .rxm-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    position: fixed;
+    inset: 0 0 auto 0;
+    z-index: 205;
+    height: calc(var(--rxm-bar-h) + var(--rxm-st));
+    padding: var(--rxm-st) max(12px, var(--rxm-sr)) 0 max(var(--rxm-gutter), var(--rxm-sl));
+    background: color-mix(in srgb, var(--rxm-bg) 90%, transparent);
+    -webkit-backdrop-filter: blur(16px) saturate(1.4);
+    backdrop-filter: blur(16px) saturate(1.4);
+    border-bottom: 1px solid transparent;
+    transition: border-color .2s;
+}
+
+html.rx-mobile .rxm-bar.is-scrolled {
+    border-bottom-color: var(--rxm-line);
+}
+
+.rxm-logo {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+    border-radius: 11px;
+    color: var(--rxm-on-primary);
+    background: var(--rxm-grad);
+}
+
+.rxm-logo .material-symbols-outlined {
+    font-size: 20px;
+}
+
+.rxm-bar.has-back .rxm-logo {
+    display: none;
+}
+
+.rxm-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: -.01em;
+    color: var(--rxm-text);
+}
+
+.rxm-bar.is-home .rxm-title {
+    font-size: 1.1rem;
+}
+
+.rxm-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+}
+
+.rxm-iconbtn {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--rxm-text);
+    cursor: pointer;
+}
+
+.rxm-iconbtn:active {
+    background: var(--rxm-tonal);
+}
+
+.rxm-iconbtn .material-symbols-outlined {
+    font-size: 24px;
+}
+
+.rxm-back {
+    margin-left: -8px;
+}
+
+.rxm-back[hidden] {
+    display: none;
+}
+
+.rxm-badge {
+    position: absolute;
+    top: 3px;
+    right: 0;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 4px;
+    border-radius: 9px;
+    background: #d32f2f;
+    color: #fff;
+    font-size: .62rem;
+    font-weight: 700;
+    line-height: 17px;
+    text-align: center;
+    box-shadow: 0 0 0 2px var(--rxm-bg);
+}
+
+.rxm-badge[hidden] {
+    display: none;
+}
+
+.rxm-avatar {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border: 2px solid color-mix(in srgb, var(--rxm-primary) 25%, transparent);
+    border-radius: 50%;
+    background: var(--rxm-grad);
+    color: var(--rxm-on-primary);
+    font-size: .8rem;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: .02em;
+    cursor: pointer;
+}
+
+.rxm-avatar:active {
+    transform: scale(.94);
+}
+
+/* ---------------------------------------------------------------
+   3. BOTTOM TAB BAR
+--------------------------------------------------------------- */
+html.rx-mobile .rxm-tabbar {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 210;
+    height: calc(var(--rxm-tab-h) + var(--rxm-sb));
+    padding: 6px max(6px, var(--rxm-sr)) calc(var(--rxm-sb) + 8px) max(6px, var(--rxm-sl));
+    /* same as the Faculty phone view: page-coloured, rounded top corners, soft lift */
+    background: var(--rxm-bg);
+    border-top: 1px solid var(--rxm-line);
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -6px 24px rgba(70, 12, 12, .16), 0 -1px 4px rgba(70, 12, 12, .10);
+}
+
+html[data-theme="dark"].rx-mobile .rxm-tabbar {
+    box-shadow: 0 -6px 24px rgba(0, 0, 0, .45), 0 -1px 4px rgba(0, 0, 0, .35);
+}
+
+.rxm-tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--rxm-muted);
+    font-size: .68rem;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.rxm-tab-pill {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 58px;
+    height: 30px;
+    border-radius: 15px;
+    transition: background .2s, transform .15s;
+}
+
+.rxm-tab .material-symbols-outlined {
+    font-size: 24px;
+}
+
+.rxm-tab:active .rxm-tab-pill {
+    transform: scale(.92);
+}
+
+.rxm-tab[aria-current="page"] {
+    color: var(--rxm-primary);
+    font-weight: 700;
+}
+
+.rxm-tab[aria-current="page"] .rxm-tab-pill {
+    background: color-mix(in srgb, var(--rxm-primary) 14%, transparent);
+}
+
+.rxm-tab[aria-current="page"] .material-symbols-outlined {
+    font-variation-settings: 'FILL' 1, 'wght' 500;
+}
+
+.rxm-tab-label {
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+/* Settings is a pushed screen (back arrow in the bar): no tab is highlighted, which is expected */
+
+/* ---------------------------------------------------------------
+   4. BOTTOM SHEET (account menu, desktop-only list)
+--------------------------------------------------------------- */
+html.rx-mobile .rxm-sheet {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 1050;
+    visibility: hidden;
+}
+
+html.rx-mobile .rxm-sheet.is-open {
+    visibility: visible;
+}
+
+html.rx-mobile .rxm-sheet[hidden] {
+    display: none;
+}
+
+.rxm-sheet-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(20, 8, 8, .45);
+    opacity: 0;
+    transition: opacity .22s;
+}
+
+.rxm-sheet.is-open .rxm-sheet-scrim {
+    opacity: 1;
+}
+
+.rxm-sheet-panel {
+    position: absolute;
+    inset: auto 0 0 0;
+    max-height: 86vh;
+    max-height: 86dvh;
+    display: flex;
+    flex-direction: column;
+    padding: 8px 0 calc(14px + var(--rxm-sb, 0px));
+    background: var(--rxm-card);
+    border-radius: 26px 26px 0 0;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, .18);
+    transform: translateY(100%);
+    transition: transform .26s cubic-bezier(.16, 1, .3, 1);
+}
+
+.rxm-sheet.is-open .rxm-sheet-panel {
+    transform: none;
+}
+
+.rxm-sheet-grip {
+    align-self: center;
+    width: 38px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--rxm-line);
+    margin-bottom: 4px;
+}
+
+.rxm-sheet-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 8px 0 20px;
+}
+
+.rxm-sheet-title {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--rxm-text);
+}
+
+.rxm-sheet-body {
+    overflow-y: auto;
+    padding: 4px 16px 6px;
+    overscroll-behavior: contain;
+}
+
+.rxm-acct {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 6px 16px;
+}
+
+.rxm-acct-avatar {
+    display: grid;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    flex: 0 0 56px;
+    border-radius: 50%;
+    background: var(--rxm-grad);
+    color: var(--rxm-on-primary);
+    font-size: 1.1rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.rxm-acct-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    gap: 2px;
+}
+
+.rxm-acct-text strong {
+    font-size: 1rem;
+    color: var(--rxm-text);
+}
+
+.rxm-acct-text span {
+    font-size: .8rem;
+    color: var(--rxm-muted);
+}
+
+.rxm-list {
+    list-style: none;
+    margin: 0 0 10px;
+    padding: 0;
+    background: var(--rxm-tonal);
+    border-radius: 18px;
+    overflow: hidden;
+}
+
+.rxm-list>li+li {
+    border-top: 1px solid var(--rxm-line);
+}
+
+.rxm-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    min-height: 56px;
+    padding: 8px 14px;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    color: var(--rxm-text);
+    font-size: inherit;
+    cursor: pointer;
+}
+
+.rxm-row:active {
+    background: color-mix(in srgb, var(--rxm-primary) 8%, transparent);
+}
+
+.rxm-row-icon {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    flex: 0 0 36px;
+    border-radius: 12px;
+    background: var(--rxm-card);
+    color: var(--rxm-primary);
+}
+
+.rxm-row-icon .material-symbols-outlined {
+    font-size: 20px;
+}
+
+.rxm-row-text {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 1px;
+}
+
+.rxm-row-label {
+    font-weight: 600;
+    font-size: .92rem;
+}
+
+.rxm-row-sub {
+    font-size: .74rem;
+    color: var(--rxm-muted);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.rxm-row-sub.rxm-wrap {
+    white-space: normal;
+}
+
+.rxm-row-go {
+    color: var(--rxm-muted);
+    font-size: 22px;
+}
+
+.rxm-row-badge {
+    min-width: 22px;
+    height: 22px;
+    padding: 0 7px;
+    border-radius: 11px;
+    background: #d32f2f;
+    color: #fff;
+    font-size: .72rem;
+    font-weight: 700;
+    line-height: 22px;
+    text-align: center;
+}
+
+.rxm-list--danger .rxm-row-label,
+.rxm-list--danger .rxm-row-icon {
+    color: var(--rxm-danger);
+}
+
+/* the "desktop only" list: plain rows, not tappable */
+.rxm-lead {
+    margin: 6px 6px 14px;
+    font-size: .86rem;
+    line-height: 1.5;
+    color: var(--rxm-muted);
+}
+
+.rxm-info {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-height: 56px;
+    padding: 8px 14px;
+}
+
+.rxm-tip {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    margin: 4px 6px 8px;
+    font-size: .8rem;
+    line-height: 1.5;
+    color: var(--rxm-muted);
+}
+
+.rxm-tip .material-symbols-outlined {
+    font-size: 20px;
+    color: var(--rxm-primary);
+    flex: 0 0 auto;
+}
+
+/* ---------------------------------------------------------------
+   5. DESKTOP NOTICE BANNER (top of the Dashboard)
+--------------------------------------------------------------- */
+html.rx-mobile .rxm-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin: 0 0 14px;
+    padding: 12px 4px 12px 14px;
+    background: var(--rxm-tonal);
+    border-radius: 18px;
+    color: var(--rxm-text);
+}
+
+.rxm-note-ico {
+    flex: 0 0 auto;
+    margin-top: 2px;
+    font-size: 22px;
+    color: var(--rxm-primary);
+}
+
+.rxm-note-text {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.rxm-note-text strong {
+    font-size: .88rem;
+    font-weight: 700;
+}
+
+.rxm-note-text span {
+    font-size: .78rem;
+    line-height: 1.45;
+    color: var(--rxm-muted);
+}
+
+.rxm-note-link {
+    align-self: flex-start;
+    margin-top: 4px;
+    padding: 6px 0;
+    border: 0;
+    background: none;
+    color: var(--rxm-primary);
+    font-size: .8rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.rxm-note-x {
+    flex: 0 0 auto;
+    width: 36px;
+    height: 36px;
+    margin-top: -2px;
+}
+
+.rxm-note-x .material-symbols-outlined {
+    font-size: 20px;
+}
+
+/* ---------------------------------------------------------------
+   6. DESKTOP-ONLY SCREENS AND CONTROLS
+   The guard in admin-dashboard.js already keeps these from opening;
+   this is the belt-and-braces layer (and hides their entry points).
+--------------------------------------------------------------- */
+html.rx-mobile #panel-faculty,
+html.rx-mobile #panel-admins,
+html.rx-mobile #panel-imports,
+html.rx-mobile #panel-reports {
+    display: none !important;
+}
+
+/* Settings: only My Account, Preferences and Help & FAQ */
+html.rx-mobile #settMainTabs [data-sett-panel="sett-arbitration"],
+html.rx-mobile #settMainTabs [data-sett-panel="sett-data"],
+html.rx-mobile #settMainTabs [data-sett-panel="sett-ratings"],
+html.rx-mobile #sett-arbitration,
+html.rx-mobile #sett-data,
+html.rx-mobile #sett-ratings {
+    display: none !important;
+}
+
+/* Activity export, adding a facility */
+html.rx-mobile .act-export,
+html.rx-mobile #addRoomBtn {
+    display: none !important;
+}
+
+/* handy for later passes: put this class on anything that should not exist on a phone */
+html.rx-mobile .rxm-desktop-only {
+    display: none !important;
+}
+
+/* ---------------------------------------------------------------
+   7. SHARED PHONE RULES
+--------------------------------------------------------------- */
+
+/* Screen titles live in the app bar, so the big page headers go.
+   (The Dashboard keeps its header: it is reworked in its own section.) */
+html.rx-mobile #panel-inventory .inv-redesign-header,
+html.rx-mobile #panel-rooms .pr-page-header-row,
+html.rx-mobile #panel-activity .act-head,
+html.rx-mobile #panel-settings .sett-page-header {
+    display: none !important;
+}
+
+/* the bell and avatar now live in the app bar (the originals stay in the page, hidden, as click targets) */
+html.rx-mobile .dash-head-user {
+    display: none !important;
+}
+
+/* Toast: above the tab bar */
+html.rx-mobile #app-toast {
+    bottom: calc(var(--rxm-tab-h) + var(--rxm-sb) + 14px);
+    width: calc(100% - 32px);
+}
+
+/* Dialogs (.ps-modal) become bottom sheets */
+html.rx-mobile .ps-modal-backdrop {
+    align-items: flex-end;
+    padding: 0;
+}
+
+html.rx-mobile .ps-modal {
+    width: 100%;
+    max-width: 100% !important;
+    max-height: 92vh;
+    max-height: 92dvh;
+    border-radius: 24px 24px 0 0;
+    padding-bottom: var(--rxm-sb);
+}
+
+html.rx-mobile .ps-modal-backdrop.ps-modal-open .ps-modal {
+    animation: rxmSheetUp .26s cubic-bezier(.16, 1, .3, 1) both;
+}
+
+@keyframes rxmSheetUp {
+    from {
+        transform: translateY(40px);
+        opacity: 0;
+    }
+
+    to {
+        transform: none;
+        opacity: 1;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    html.rx-mobile .ps-modal-backdrop.ps-modal-open .ps-modal,
+    .rxm-sheet-panel,
+    .rxm-sheet-scrim {
+        animation: none;
+        transition: none;
+    }
+}
+
+/* ---------------------------------------------------------------
+   8. LANDSCAPE PHONES — keep the phone layout, make the bars slimmer
+--------------------------------------------------------------- */
+@media (orientation: landscape) and (max-height: 500px) {
+    html.rx-mobile {
+        --rxm-bar-h: 48px;
+        --rxm-tab-h: 50px;
+    }
+
+    html.rx-mobile .rxm-tab {
+        flex-direction: row;
+        gap: 8px;
+        justify-content: center;
+        font-size: .74rem;
+    }
+
+    html.rx-mobile .rxm-tab-pill {
+        width: 34px;
+        height: 30px;
+    }
+
+    html.rx-mobile .rxm-sheet-panel {
+        max-height: 94dvh;
+    }
+}
+
+/* ---------------------------------------------------------------
+   9. DASHBOARD (simplified for a phone)
+   Order: stats, Needs attention, Latest requests, Facilities, Stock watch.
+   "Show trends & recent activity" (button built in admin-dashboard-mobile.js) reveals
+   Recent activity, Most requested and the trend chart. The state is a class on #dash
+   (.rxm-more), so the live refresh of #dashLive never resets it.
+--------------------------------------------------------------- */
+.rxm-more-btn {
+    display: none;
+}
+
+html.rx-mobile #dash {
+    max-width: none;
+}
+
+/* header: greeting, date, one big Scan QR button (bell + avatar live in the app bar) */
+html.rx-mobile #dash .dash-head {
+    display: block;
+    margin: 0 0 14px;
+    padding: 0;
+}
+
+html.rx-mobile #dash .dash-head-text h1 {
+    margin: 0;
+    font-size: 1.3rem;
+    line-height: 1.25;
+    color: var(--rxm-text);
+}
+
+html.rx-mobile #dash .dash-head-text p {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+    margin: 4px 0 0;
+    font-size: .76rem;
+    color: var(--rxm-muted);
+}
+
+html.rx-mobile #dash .dash-head-tools {
+    display: block;
+    margin: 12px 0 0;
+}
+
+html.rx-mobile #dash .dash-actions {
+    display: block;
+}
+
+html.rx-mobile #dash .dash-btn {
+    width: 100%;
+    min-height: 52px;
+    justify-content: center;
+    border-radius: 16px;
+    font-size: .95rem;
+}
+
+/* live area: one column, our own order */
+html.rx-mobile #dash #dashLive {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+html.rx-mobile #dash #dashLive .dash-grid {
+    display: contents;
+}
+
+html.rx-mobile #dash #dashLive .dash-kpis {
+    order: 1;
+}
+
+html.rx-mobile #dash #dashLive .dash-area-attn {
+    order: 2;
+}
+
+html.rx-mobile #dash #dashLive .dash-area-latest {
+    order: 3;
+}
+
+html.rx-mobile #dash #dashLive .dash-area-rooms {
+    order: 4;
+}
+
+html.rx-mobile #dash #dashLive .dash-area-stock {
+    order: 5;
+}
+
+html.rx-mobile #dash #dashLive .dash-area-log {
+    order: 6;
+}
+
+html.rx-mobile #dash #dashLive .dash-area-top {
+    order: 7;
+}
+
+html.rx-mobile #dash #dashLive .dash-area-chart {
+    order: 8;
+}
+
+/* collapsed by default */
+html.rx-mobile #dash:not(.rxm-more) #dashLive :is(.dash-area-log, .dash-area-top, .dash-area-chart) {
+    display: none;
+}
+
+html.rx-mobile #dash .rxm-more-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    min-height: 48px;
+    margin-top: 14px;
+    padding: 0 16px;
+    border: 0;
+    border-radius: 16px;
+    background: var(--rxm-tonal);
+    color: var(--rxm-primary);
+    font-size: .86rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+html.rx-mobile #dash .rxm-more-btn:active {
+    background: color-mix(in srgb, var(--rxm-primary) 14%, transparent);
+}
+
+/* every card: one flat surface, no outline */
+html.rx-mobile #dash .dash-card,
+html.rx-mobile #dash .dash-kpis {
+    background: var(--rxm-card);
+    border: 0;
+    border-radius: var(--rxm-r);
+    box-shadow: var(--rxm-shadow);
+}
+
+html.rx-mobile #dash .dash-card {
+    padding: 16px 16px 8px;
+}
+
+html.rx-mobile #dash .dash-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin: 0 0 6px;
+    padding: 0;
+}
+
+html.rx-mobile #dash .dash-card-title h2 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--rxm-text);
+}
+
+html.rx-mobile #dash .dash-card-title p {
+    display: none;
+}
+
+html.rx-mobile #dash .dash-link {
+    min-height: 40px;
+    padding: 0 4px;
+    font-size: .82rem;
+}
+
+/* stats: ONE card, two groups, two columns of compact tiles */
+html.rx-mobile #dash .dash-kpis {
+    display: block;
+    padding: 4px 16px;
+}
+
+html.rx-mobile #dash .dash-ov-group {
+    padding: 12px 0 6px;
+    border: 0;
+}
+
+html.rx-mobile #dash .dash-ov-group+.dash-ov-group {
+    border-top: 1px solid var(--rxm-line);
+}
+
+html.rx-mobile #dash .dash-ov-title {
+    margin: 0 0 4px;
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--rxm-muted);
+}
+
+html.rx-mobile #dash .dash-ov-stats {
+    display: grid;
+    grid-auto-flow: row;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 14px;
+}
+
+html.rx-mobile #dash .dash-kpi {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+    min-height: 0;
+    padding: 9px 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    text-align: left;
+}
+
+html.rx-mobile #dash .dash-kpi::before {
+    display: none;
+}
+
+html.rx-mobile #dash .dash-kpi:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+}
+
+html.rx-mobile #dash .dash-kpi:active {
+    background: color-mix(in srgb, var(--rxm-primary) 6%, transparent);
+}
+
+html.rx-mobile #dash .dash-kpi-label {
+    font-size: .72rem;
+    font-weight: 600;
+    color: var(--rxm-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+html.rx-mobile #dash .dash-kpi-val {
+    font-size: 1.6rem;
+    font-weight: 700;
+    line-height: 1.15;
+}
+
+html.rx-mobile #dash .dash-kpi-sub {
+    font-size: .68rem;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Needs attention: a plain list inside its card */
+html.rx-mobile #dash .dash-attn {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+html.rx-mobile #dash .dash-attn>li+li {
+    border-top: 1px solid var(--rxm-line);
+}
+
+html.rx-mobile #dash .dash-attn-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 60px;
+    padding: 10px 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    text-align: left;
+}
+
+html.rx-mobile #dash .dash-attn-item:active {
+    background: color-mix(in srgb, var(--rxm-primary) 6%, transparent);
+}
+
+html.rx-mobile #dash .dash-attn-text strong {
+    font-size: .88rem;
+}
+
+html.rx-mobile #dash .dash-attn-text small {
+    font-size: .74rem;
+}
+
+/* Latest requests: table -> one compact row per request */
+html.rx-mobile #dash .dash-area-latest .ps-table-wrap {
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+}
+
+html.rx-mobile #dash .dash-table thead {
+    display: none;
+}
+
+html.rx-mobile #dash .dash-table tbody tr:not(:has(td[colspan])) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "who st" "eq eq" "per per";
+    gap: 2px 10px;
+    margin: 0;
+    padding: 11px 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+}
+
+html.rx-mobile #dash .dash-table tbody tr+tr {
+    border-top: 1px solid var(--rxm-line);
+}
+
+html.rx-mobile #dash .dash-table tbody tr:nth-child(n+6) {
+    display: none;
+}
+
+html.rx-mobile #dash .dash-table td {
+    display: block;
+    order: 0;
+    margin: 0;
+    padding: 0 !important;
+    border: 0 !important;
+    text-align: left;
+    min-width: 0;
+}
+
+html.rx-mobile #dash .dash-table td::before {
+    display: none !important;
+}
+
+html.rx-mobile #dash .dash-table td:nth-child(1) {
+    grid-area: who;
+    font-size: inherit;
+}
+
+html.rx-mobile #dash .dash-table td:nth-child(2) {
+    grid-area: eq;
+    font-size: .82rem;
+    color: var(--rxm-text);
+}
+
+html.rx-mobile #dash .dash-table td:nth-child(3) {
+    grid-area: per;
+    font-size: .74rem;
+    color: var(--rxm-muted);
+}
+
+html.rx-mobile #dash .dash-table td:nth-child(4) {
+    grid-area: st;
+    align-self: start;
+}
+
+html.rx-mobile #dash .dash-table .dash-cell-name {
+    font-size: .9rem;
+    font-weight: 700;
+}
+
+html.rx-mobile #dash .dash-table .dash-cell-sub {
+    font-size: .72rem;
+    color: var(--rxm-muted);
+}
+
+html.rx-mobile #dash .dash-table td[colspan] {
+    padding: 14px 0 !important;
+    text-align: center;
+}
+
+/* Facilities + Stock watch: short lists */
+html.rx-mobile #dash .dash-area-rooms .dash-list>li:nth-child(n+4),
+html.rx-mobile #dash .dash-area-stock .dash-list>li:nth-child(n+5) {
+    display: none;
+}
+
+html.rx-mobile #dash .dash-row {
+    padding: 10px 0;
+}
+
+/* trend chart (inside "show more"): keep the controls, drop the extra commentary */
+html.rx-mobile #dash .dash-area-chart .dash-insights {
+    display: none;
+}
+
+html.rx-mobile #dash .dash-area-chart .dash-card-head {
+    display: block;
+}
+
+html.rx-mobile #dash .dash-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+/* ---------------------------------------------------------------
+   10. NOTIFICATIONS (full-height sheet) and QR SCANNER (full screen)
+--------------------------------------------------------------- */
+html.rx-mobile #notifOverlay .ps-modal {
+    height: 92vh;
+    height: 92dvh;
+}
+
+html.rx-mobile #notifOverlay .notif-filter-chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 6px;
+    scrollbar-width: none;
+}
+
+html.rx-mobile #notifOverlay .notif-filter-chips::-webkit-scrollbar {
+    display: none;
+}
+
+html.rx-mobile #notifOverlay .notif-filter-chips .rq-filter-chip {
+    flex: 0 0 auto;
+}
+
+html.rx-mobile #notifOverlay .notif-modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+html.rx-mobile #notifOverlay .notif-card-actions {
+    flex-wrap: wrap;
+}
+
+html.rx-mobile #qrScannerModal {
+    align-items: stretch;
+    justify-content: stretch;
+    background: var(--rxm-card);
+}
+
+html.rx-mobile #qrScannerModal>.qr-scanner-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    width: 100% !important;
+    max-width: none !important;
+    height: 100vh;
+    height: 100dvh;
+    border-radius: 0;
+    box-shadow: none;
+    padding: calc(var(--rxm-st) + 64px) 16px calc(var(--rxm-sb) + 20px) !important;
+}
+
+html.rx-mobile #qrScannerModal .qr-scanner-close {
+    position: fixed;
+    top: calc(var(--rxm-st) + 8px);
+    right: 8px;
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--rxm-tonal);
+    color: var(--rxm-text);
+    font-size: 20px;
+}
+
+html.rx-mobile #qrScannerModal .qr-scanner-card h3 {
+    font-size: 1.2rem;
+}
+
+html.rx-mobile #qrScannerModal .qr-video-wrap {
+    border-radius: 20px;
+    max-height: 62dvh;
+}
+
+html.rx-mobile #qrScannerModal #qrScanStatus {
+    margin-top: 14px;
+    font-size: .9rem;
+    line-height: 1.5;
+}
+
+/* ---------------------------------------------------------------
+   11. EQUIPMENT: sub-tabs + LOANS
+   Catalog / Loans / Archived chips scroll sideways. Each loan is one
+   card: borrower + status pill, equipment, two dates, one info line,
+   then the action buttons (full-width, thumb-sized).
+--------------------------------------------------------------- */
+html.rx-mobile #eqTabs {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    overflow-x: auto;
+    margin: 0 -16px 12px;
+    padding: 2px 16px 4px;
+    scrollbar-width: none;
+}
+
+html.rx-mobile #eqTabs::-webkit-scrollbar {
+    display: none;
+}
+
+html.rx-mobile #eqTabs .rq-filter-chip {
+    flex: 0 0 auto;
+    min-height: 40px;
+    margin-left: 0;
+    white-space: nowrap;
+}
+
+/* ---- Loans: header, search, status chips, sort ---- */
+html.rx-mobile #eq-onloan .ps-card {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    border-radius: 0;
+}
+
+html.rx-mobile #eq-onloan .eq-loan-head {
+    display: block;
+    padding: 0 0 10px;
+    background: transparent;
+    border: 0;
+}
+
+html.rx-mobile #eq-onloan .eq-loan-title {
+    display: none;
+}
+
+html.rx-mobile #eq-onloan .eq-loan-tools {
+    width: 100%;
+}
+
+html.rx-mobile #eq-onloan #eq-loan-search {
+    width: 100% !important;
+    min-height: 44px;
+    font-size: 16px;            /* stops iOS zooming into the field */
+    border-radius: 12px;
+}
+
+html.rx-mobile #eq-onloan .eq-loan-status-bar {
+    display: block;
+    padding: 0 0 10px;
+    background: transparent;
+    border: 0;
+}
+
+html.rx-mobile #eq-onloan .eq-loan-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin: 0 -16px;
+    padding: 2px 16px 6px;
+    scrollbar-width: none;
+}
+
+html.rx-mobile #eq-onloan .eq-loan-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+html.rx-mobile #eq-onloan .eq-loan-tab {
+    flex: 0 0 auto;
+    min-height: 38px;
+    padding: 0 14px;
+    font-size: 13px;
+}
+
+html.rx-mobile #eq-onloan .eq-loan-sort {
+    margin: 6px 0 0;
+    width: 100%;
+}
+
+html.rx-mobile #eq-onloan .eq-loan-sort .pr-filter-select {
+    flex: 1 1 auto;
+    min-height: 44px;
+    font-size: 16px;
+}
+
+html.rx-mobile #eq-onloan .eq-loan-sort-dir {
+    flex: 0 0 44px;
+}
+
+/* the desktop table gives each column a fixed width: drop all of it */
+html.rx-mobile #eq-loan-table {
+    display: block;
+    width: 100%;
+    min-width: 0 !important;
+    table-layout: auto;
+}
+
+html.rx-mobile #eq-loan-table th,
+html.rx-mobile #eq-loan-table td,
+html.rx-mobile #eq-loan-table td:nth-child(n) {
+    width: auto !important;
+    max-width: none !important;
+}
+
+html.rx-mobile #eq-onloan .ps-table-wrap {
+    overflow: visible;
+}
+
+/* ---- one loan = one card ---- */
+html.rx-mobile #eq-loan-table tbody tr.eq-loan-row {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 14px;
+    row-gap: 2px;
+    padding: 14px 14px 12px;
+    margin-bottom: 12px;
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+html.rx-mobile #eq-loan-table tbody tr.eq-loan-row > td {
+    display: block;
+    min-width: 0;
+    padding: 4px 0 !important;
+    text-align: left;
+    order: 0;
+}
+
+/* the tables' own labels are written for the desktop columns; write the right ones per status */
+html.rx-mobile #eq-loan-table tbody tr.eq-loan-row > td::before {
+    display: block;
+    margin-bottom: 2px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .5px;
+    text-transform: uppercase;
+    color: var(--text-light);
+    content: "";
+}
+
+html.rx-mobile #eq-loan-table tr.eq-loan-row[data-loan-state="waiting"] > td[data-col="col3"]::before   { content: "Requested"; }
+html.rx-mobile #eq-loan-table tr.eq-loan-row[data-loan-state="waiting"] > td[data-col="col4"]::before   { content: "Needed by"; }
+html.rx-mobile #eq-loan-table tr.eq-loan-row[data-loan-state="waiting"] > td[data-col="col5"]::before   { content: "Request letter"; }
+html.rx-mobile #eq-loan-table tr.eq-loan-row[data-loan-state="scheduled"] > td[data-col="col3"]::before { content: "Requested"; }
+html.rx-mobile #eq-loan-table tr.eq-loan-row[data-loan-state="scheduled"] > td[data-col="col4"]::before { content: "Starts"; }
+html.rx-mobile #eq-loan-table tr.eq-loan-row[data-loan-state="pickup"] > td[data-col="col3"]::before,
+html.rx-mobile #eq-loan-table tr.eq-loan-row[data-loan-state="ok"] > td[data-col="col3"]::before,
+html.rx-mobile #eq-loan-table tr.eq-loan-row[data-loan-state="due"] > td[data-col="col3"]::before,
+html.rx-mobile #eq-loan-table tr.eq-loan-row[data-loan-state="overdue"] > td[data-col="col3"]::before,
+html.rx-mobile #eq-loan-table tr.eq-loan-row[data-loan-state="returned"] > td[data-col="col3"]::before { content: "Issued"; }
+html.rx-mobile #eq-loan-table tr.eq-loan-row[data-loan-state="pickup"] > td[data-col="col4"]::before,
+html.rx-mobile #eq-loan-table tr.eq-loan-row[data-loan-state="ok"] > td[data-col="col4"]::before,
+html.rx-mobile #eq-loan-table tr.eq-loan-row[data-loan-state="due"] > td[data-col="col4"]::before     { content: "Due"; }
+html.rx-mobile #eq-loan-table tr.eq-loan-row[data-loan-state="overdue"] > td[data-col="col4"]::before { content: "Was due"; }
+html.rx-mobile #eq-loan-table tr.eq-loan-row[data-loan-state="returned"] > td[data-col="col4"]::before { content: "Returned"; }
+html.rx-mobile #eq-loan-table tr.eq-loan-row[data-loan-state="pickup"] > td[data-col="col5"]::before,
+html.rx-mobile #eq-loan-table tr.eq-loan-row[data-loan-state="ok"] > td[data-col="col5"]::before,
+html.rx-mobile #eq-loan-table tr.eq-loan-row[data-loan-state="due"] > td[data-col="col5"]::before,
+html.rx-mobile #eq-loan-table tr.eq-loan-row[data-loan-state="overdue"] > td[data-col="col5"]::before { content: "Condition"; }
+html.rx-mobile #eq-loan-table tr.eq-loan-row[data-loan-state="returned"] > td[data-col="col5"]::before { content: "Handled by"; }
+html.rx-mobile #eq-loan-table tr.eq-loan-row[data-loan-state="scheduled"] > td[data-col="col5"]::before { content: none; display: none; }
+
+/* layout of the cells */
+html.rx-mobile #eq-loan-table td[data-col="borrower"]  { grid-column: 1 / -1; order: 1; display: grid !important; grid-template-columns: 1fr auto; column-gap: 10px; align-items: start; border-bottom: 1px dashed var(--khaki-border) !important; padding-bottom: 10px !important; margin-bottom: 6px; }
+html.rx-mobile #eq-loan-table td[data-col="borrower"]::before { display: none; }
+html.rx-mobile #eq-loan-table td[data-col="borrower"] .eq-cell-name { grid-column: 1; font-size: 15px; }
+html.rx-mobile #eq-loan-table td[data-col="borrower"] .eq-cell-sub  { grid-column: 1; }
+html.rx-mobile #eq-loan-table td[data-col="equipment"] { grid-column: 1 / -1; order: 2; }
+html.rx-mobile #eq-loan-table td[data-col="equipment"]::before { display: none; }
+html.rx-mobile #eq-loan-table td[data-col="equipment"] .eq-cell-name { font-size: 14px; }
+html.rx-mobile #eq-loan-table td[data-col="col3"]      { order: 3; }
+html.rx-mobile #eq-loan-table td[data-col="col4"]      { order: 4; }
+html.rx-mobile #eq-loan-table td[data-col="col5"]      { grid-column: 1 / -1; order: 5; }
+html.rx-mobile #eq-loan-table td[data-col="actions"]   { grid-column: 1 / -1; order: 9; margin-top: 8px; padding-top: 12px !important; border-top: 1px solid var(--khaki-border) !important; }
+html.rx-mobile #eq-loan-table td[data-col="actions"]::before { display: none; }
+html.rx-mobile #eq-loan-table td[data-col="col5"]:empty { display: none; }
+
+/* status pill (top right of the card) */
+html.rx-mobile #eq-loan-table td[data-col="borrower"]::after {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: start;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+    background: var(--secondary-cream);
+    color: var(--text-dark);
+    content: "";
+}
+
+html.rx-mobile #eq-loan-table tr.is-waiting   td[data-col="borrower"]::after { content: "Waiting";          background: #fff4d6; color: #8a5a00; }
+html.rx-mobile #eq-loan-table tr.is-scheduled td[data-col="borrower"]::after { content: "Scheduled";        background: #e6f0fb; color: #1f5fa8; }
+html.rx-mobile #eq-loan-table tr.is-pickup    td[data-col="borrower"]::after { content: "Ready for pickup"; background: #e4f3ff; color: #14578f; }
+html.rx-mobile #eq-loan-table tr.is-ok        td[data-col="borrower"]::after { content: "On loan";          background: #e3f6ea; color: #17693a; }
+html.rx-mobile #eq-loan-table tr.is-due       td[data-col="borrower"]::after { content: "Due today";        background: #fff1d6; color: #8a5200; }
+html.rx-mobile #eq-loan-table tr.is-overdue   td[data-col="borrower"]::after { content: "Overdue";          background: #fde4e4; color: #b3261e; }
+html.rx-mobile #eq-loan-table tr.is-returned  td[data-col="borrower"]::after { content: "Returned";         background: var(--secondary-cream); color: var(--text-light); }
+
+html[data-theme="dark"].rx-mobile #eq-loan-table tr.eq-loan-row td[data-col="borrower"]::after { background: rgba(255,255,255,.1); color: var(--text-dark); }
+html[data-theme="dark"].rx-mobile #eq-loan-table tr.is-overdue td[data-col="borrower"]::after  { background: rgba(240,90,80,.2); color: #ff9c94; }
+
+/* action buttons: easy to hit, side by side */
+html.rx-mobile #eq-loan-table .eq-act-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+}
+
+html.rx-mobile #eq-loan-table .eq-act-wrap .ps-btn {
+    flex: 1 1 0;
+    min-width: 110px;
+    min-height: 44px;
+    justify-content: center;
+    font-size: 13.5px;
+    white-space: nowrap;
+}
+
+html.rx-mobile #eq-loan-table .eq-act-wrap > .eq-cell-sub {
+    flex: 1 1 100%;
+    margin: 0;
+    text-align: center;
+}
+
+/* rows that belong to the same cart: a thin maroon edge instead of the desktop connector line */
+html.rx-mobile #eq-loan-table tr.eq-loan-row.eq-bundle-link-start::before,
+html.rx-mobile #eq-loan-table tr.eq-loan-row.eq-bundle-link-middle::before,
+html.rx-mobile #eq-loan-table tr.eq-loan-row.eq-bundle-link-end::before,
+html.rx-mobile #eq-loan-table tr.eq-loan-row.eq-bundle-link-start::after,
+html.rx-mobile #eq-loan-table tr.eq-loan-row.eq-bundle-link-middle::after,
+html.rx-mobile #eq-loan-table tr.eq-loan-row.eq-bundle-link-end::after {
+    display: none;
+}
+
+html.rx-mobile #eq-loan-table tr.eq-loan-row[class*="eq-bundle-link-"][class] {
+    box-shadow: inset 4px 0 0 #9a4964, var(--shadow);
+}
+
+html.rx-mobile #eq-loan-table tr.eq-loan-row[class*="eq-bundle-link-"] td:last-child {
+    padding-right: 0 !important;
+}
+
+/* the "Scheduled bookings" divider is not needed: every card carries its own status pill */
+html.rx-mobile #eq-loan-table tr.eq-loan-section-divider {
+    display: none !important;
+}
+
+/* status edge: on the card itself (the desktop puts it inside the first cell, which would cut into the name) */
+html.rx-mobile #eq-loan-table tr.eq-loan-row > td:first-child {
+    box-shadow: none !important;
+}
+
+html.rx-mobile #eq-loan-table tr.eq-loan-row.is-overdue   { box-shadow: inset 4px 0 0 var(--danger), var(--shadow); }
+html.rx-mobile #eq-loan-table tr.eq-loan-row.is-scheduled { box-shadow: inset 4px 0 0 #3b82c4, var(--shadow); }
+html.rx-mobile #eq-loan-table tr.eq-loan-row.is-waiting   { box-shadow: inset 4px 0 0 var(--accent-gold, #d9a520), var(--shadow); }
+
+/* the Scheduled pill is already in the card's corner */
+html.rx-mobile #eq-loan-table tr.eq-loan-row.is-scheduled > td[data-col="col5"] {
+    display: none;
+}
+
+/* empty + no match */
+html.rx-mobile #eq-loan-table tr.eq-loan-empty,
+html.rx-mobile #eq-loan-table tr.eq-loan-nomatch:not([hidden]) {
+    display: block;
+}
+
+html.rx-mobile #eq-loan-table tr.eq-loan-nomatch[hidden] {
+    display: none;
+}
+
+/* pager: compact, centred */
+html.rx-mobile #eq-loan-pager {
+    flex-direction: column;
+    gap: 8px;
+    padding: 4px 0 8px;
+    text-align: center;
+}
+
+html.rx-mobile #eq-loan-pager .inv-pager-btn {
+    min-width: 44px;
+    min-height: 44px;
+}
+
+/* ---------------------------------------------------------------
+   12. EQUIPMENT DIALOGS (approve, decline, cancel, return, claim,
+   overdue notice, bundle approve, request + loan details)
+   .ps-modal is already a bottom sheet (section 7). Here: roomy
+   fields, big full-width buttons, and the side "drawers" turn into
+   tall sheets too.
+--------------------------------------------------------------- */
+html.rx-mobile .ps-modal-head {
+    position: relative;
+    padding: 18px 16px 12px;
+}
+
+html.rx-mobile .ps-modal-head::before {          /* grab handle */
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    width: 36px;
+    height: 4px;
+    margin-left: -18px;
+    border-radius: 4px;
+    background: var(--khaki-border);
+    content: "";
+}
+
+html.rx-mobile .ps-modal-close {
+    min-width: 44px;
+    min-height: 44px;
+}
+
+html.rx-mobile .ps-modal-body {
+    padding: 14px 16px;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+html.rx-mobile .ps-modal-body .ps-form-control,
+html.rx-mobile .ps-modal-body select,
+html.rx-mobile .ps-modal-body textarea,
+html.rx-mobile .ps-modal-body input {
+    font-size: 16px;                              /* no iOS zoom on focus */
+}
+
+html.rx-mobile .ps-modal-body .ps-form-control:not(textarea),
+html.rx-mobile .ps-modal-body select.ps-form-control {
+    min-height: 46px;
+}
+
+html.rx-mobile .ps-req-sum-row {
+    gap: 12px;
+    font-size: 13.5px;
+}
+
+html.rx-mobile .ps-rsl {
+    min-width: 84px;
+}
+
+html.rx-mobile .ps-modal-foot {
+    position: sticky;
+    bottom: 0;
+    flex-direction: column-reverse;               /* main action on top, Cancel below */
+    gap: 8px;
+    padding: 12px 16px calc(12px + var(--rxm-sb));
+    background: var(--primary-white);
+}
+
+html.rx-mobile .ps-modal-foot .ps-btn {
+    width: 100%;
+    min-height: 48px;
+    justify-content: center;
+    font-size: 15px;
+}
+
+html.rx-mobile .ps-modal {
+    padding-bottom: 0;                            /* the footer carries the safe-area gap */
+}
+
+/* side drawers (loan details, request details/review) -> tall bottom sheet */
+html.rx-mobile .ps-modal-backdrop.ps-drawer-backdrop {
+    align-items: flex-end;
+    justify-content: center;
+}
+
+html.rx-mobile .ps-drawer {
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    max-height: 92vh;
+    max-height: 92dvh;
+    border-radius: 24px 24px 0 0;
+    box-shadow: none;
+}
+
+html.rx-mobile .ps-drawer-backdrop.ps-modal-open .ps-drawer {
+    animation: rxmSheetUp .26s cubic-bezier(.16, 1, .3, 1) both;
+}
+
+html.rx-mobile .ps-drawer-body {
+    padding: 14px 16px;
+    overscroll-behavior: contain;
+}
+
+html.rx-mobile .ps-drawer-foot {
+    flex-direction: column-reverse;
+    gap: 8px;
+    padding: 12px 16px calc(12px + var(--rxm-sb));
+}
+
+html.rx-mobile .ps-drawer-foot .ps-btn {
+    width: 100%;
+    min-height: 48px;
+    justify-content: center;
+}
+
+html.rx-mobile .ps-kv {
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 14px;
+}
+
+html.rx-mobile .ps-kv strong {
+    font-size: 13.5px;
+}
+
+/* landscape phones: sheets must still fit */
+@media (orientation: landscape) and (max-height: 500px) {
+    html.rx-mobile .ps-modal,
+    html.rx-mobile .ps-drawer {
+        max-height: 96dvh;
+    }
+
+    html.rx-mobile .ps-modal-foot,
+    html.rx-mobile .ps-drawer-foot {
+        flex-direction: row-reverse;
+    }
+
+    html.rx-mobile #eq-loan-table tbody tr.eq-loan-row {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+/* a message that appears while a dialog is open goes to the top, so it never covers the dialog's buttons */
+html.rx-mobile:has(.ps-modal-backdrop.ps-modal-open) #app-toast {
+    top: calc(var(--rxm-st) + 12px);
+    bottom: auto;
+    z-index: 700;
+}
+
+/* ---------------------------------------------------------------
+   13. EQUIPMENT: CATALOG, EDIT, ARCHIVED
+   Add is desktop only (the form is hidden). Edit stays: it is the
+   existing dialog, which is already a bottom sheet (sections 7, 12).
+   Archived keeps Restore; "Delete permanently" is desktop only.
+--------------------------------------------------------------- */
+html.rx-mobile #item-form-wrap {
+    display: none !important;
+}
+
+html.rx-mobile #eq-catalog .faculty-layout.inv-layout {
+    display: block;
+}
+
+html.rx-mobile #inv-table-card,
+html.rx-mobile #eq-archived .eq-card {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    border-radius: 0;
+    padding: 0;
+}
+
+html.rx-mobile #inv-table-card .eq-card-header,
+html.rx-mobile #eq-archived .eq-card-header {
+    display: block;
+    padding: 0 0 10px;
+    background: transparent;
+    border: 0;
+}
+
+html.rx-mobile #inv-table-card .eq-card-header h2,
+html.rx-mobile #eq-archived .eq-card-header h2 {
+    margin: 0 0 10px;
+    font-size: 15px;
+}
+
+html.rx-mobile #inv-table-card .fac-search {
+    width: 100%;
+    max-width: none;
+}
+
+html.rx-mobile #inventorySearch {
+    width: 100%;
+    min-height: 44px;
+    font-size: 16px;
+    border-radius: 12px;
+}
+
+html.rx-mobile #inv-table-card .tbl-wrap,
+html.rx-mobile #eq-archived .tbl-wrap {
+    overflow: visible;
+    padding: 0;
+}
+
+/* ---- catalog card: [photo] name + added date ........ [edit]
+                     CATEGORY | CONDITION | STOCK ---- */
+html.rx-mobile #inv-list-table tbody tr.inv-row-item {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 12px;
+    padding: 14px 14px 12px;
+    border-radius: 16px;
+}
+
+html.rx-mobile #inv-list-table tbody tr.inv-row-item > td {
+    display: block;
+    min-width: 0;
+    width: auto !important;
+    padding: 4px 0 !important;
+    text-align: left;
+}
+
+html.rx-mobile #inv-list-table tbody tr.inv-row-item > td.rc-title {
+    grid-column: 1 / -1;
+    order: 0;
+    padding: 0 52px 10px 0 !important;
+    margin-bottom: 6px;
+    font-size: 15px;
+}
+
+html.rx-mobile #inv-list-table .fac-person {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+html.rx-mobile #inv-list-table .inv-thumb {
+    flex: 0 0 52px;
+    width: 52px;
+    height: 52px;
+    border-radius: 12px;
+}
+
+html.rx-mobile #inv-list-table .fac-person-name {
+    font-size: 15px;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+html.rx-mobile #inv-list-table tbody tr.inv-row-item > td[data-label]::before {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .5px;
+    text-transform: uppercase;
+    color: var(--text-light);
+}
+
+html.rx-mobile #inv-list-table tbody tr.inv-row-item > td[data-label="Stock"] {
+    grid-column: 1 / -1;
+}
+
+/* the edit button sits in the card's top-right corner, 44px to hit */
+html.rx-mobile #inv-list-table tbody tr.inv-row-item > td.rc-actions {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: block;
+    margin: 0;
+    padding: 0 !important;
+    border: 0 !important;
+}
+
+html.rx-mobile #inv-list-table .inv-edit-btn {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    padding: 0;
+    justify-content: center;
+    border-radius: 12px;
+}
+
+/* empty state says "using the form" -- there is no form on a phone */
+html.rx-mobile #inv-empty-row .inv-empty-cell {
+    font-size: 0;
+    text-align: center;
+}
+
+html.rx-mobile #inv-empty-row .inv-empty-cell::after {
+    display: block;
+    margin-top: 6px;
+    font-size: 14px;
+    color: var(--text-light);
+    content: "No equipment yet. New items are added from a desktop.";
+}
+
+/* ---- archived ---- */
+html.rx-mobile #eq-archived .inv-arch-note {
+    margin: 0 0 12px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+html.rx-mobile #inv-archive-body tr:not(:has(td[colspan])) {
+    display: grid;
+    grid-template-columns: 56px 1fr;
+    column-gap: 12px;
+    align-items: center;
+    padding: 12px 14px;
+    border-radius: 16px;
+}
+
+html.rx-mobile #inv-archive-body tr > td {
+    min-width: 0;
+    width: auto !important;
+    text-align: left;
+    padding: 2px 0 !important;
+}
+
+html.rx-mobile #inv-archive-body tr > td.rc-thumb {
+    grid-row: 1 / span 2;
+    padding: 0 !important;
+}
+
+html.rx-mobile #inv-archive-body tr > td.rc-thumb img {
+    width: 56px;
+    height: 56px;
+}
+
+html.rx-mobile #inv-archive-body tr > td.rc-title {
+    grid-column: 2;
+    padding: 0 !important;
+    margin: 0;
+    border: 0 !important;
+    font-size: 15px;
+}
+
+html.rx-mobile #inv-archive-body tr > td[data-label="Category"] {
+    grid-column: 2;
+    display: block;
+    color: var(--text-light);
+    font-size: 13px;
+}
+
+html.rx-mobile #inv-archive-body tr > td[data-label="Category"]::before {
+    content: none;
+}
+
+html.rx-mobile #inv-archive-body tr > td.rc-actions {
+    grid-column: 1 / -1;
+    margin-top: 10px;
+    padding-top: 12px !important;
+    border-top: 1px solid var(--khaki-border) !important;
+}
+
+html.rx-mobile #inv-archive-body .rm-actions {
+    display: flex;
+    width: 100%;
+    gap: 8px;
+}
+
+html.rx-mobile #inv-archive-body .pr-tbl-btn {
+    flex: 1 1 0;
+    min-height: 44px;
+    justify-content: center;
+    font-size: 14px;
+}
+
+/* permanent delete: desktop only */
+html.rx-mobile #inv-archive-body .pr-tbl-btn.danger {
+    display: none !important;
+}
+
+/* ---- pagers (catalog + archived + loans) ---- */
+html.rx-mobile .inv-pager:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 4px 0 8px;
+    text-align: center;
+}
+
+html.rx-mobile .inv-pager-ctl {
+    justify-content: center;
+}
+
+html.rx-mobile .inv-pager-btn {
+    min-width: 44px;
+    min-height: 44px;
+}
+
+/* ---- edit dialog ---- */
+html.rx-mobile #eq-edit-modal .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+html.rx-mobile #eq-edit-modal .form-group {
+    margin-bottom: 14px;
+}
+
+html.rx-mobile #eq-edit-modal label {
+    font-size: 13px !important;
+}
+
+html.rx-mobile #eqm-dropZone {
+    padding: 18px 12px;
+}
+
+html.rx-mobile #eqm-dropZone p {
+    font-size: 0;
+}
+
+html.rx-mobile #eqm-dropZone p::after {
+    display: block;
+    font-size: 14px;
+    color: var(--text-light);
+    content: "Tap to choose a photo";
+}
+
+html.rx-mobile #eqm-removeImageBtn:not(.hidden) {
+    min-height: 44px;
+    font-size: 14px !important;
+}
+
+html.rx-mobile #eqm-archive-link {
+    width: 100%;
+    min-height: 48px;
+    justify-content: center;
+}
+
+/* ---- Pass 4 touch-ups ---- */
+html.rx-mobile #inv-table-card .eq-card-header::before,
+html.rx-mobile #eq-archived .eq-card-header::before {
+    display: none;
+}
+
+/* category / condition / stock on one line */
+html.rx-mobile #inv-list-table tbody tr.inv-row-item {
+    display: flex;
+    flex-flow: row wrap;
+    gap: 0 18px;
+}
+
+html.rx-mobile #inv-list-table tbody tr.inv-row-item > td.rc-title {
+    flex: 1 1 100%;
+}
+
+html.rx-mobile #inv-list-table tbody tr.inv-row-item > td[data-label] {
+    flex: 0 1 auto;
+}
+
+html.rx-mobile #inv-list-table tbody tr.inv-row-item > td[data-label="Stock"] {
+    grid-column: auto;
+}
+
+/* the archived note talks about deleting for good, which is desktop only */
+html.rx-mobile #eq-archived .inv-arch-note {
+    font-size: 0;
+}
+
+html.rx-mobile #eq-archived .inv-arch-note::after {
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--text-light);
+    content: "Archived equipment is hidden from the borrowing catalog. You can restore it at any time.";
+}
+
+/* ---------------------------------------------------------------
+   14. FACILITIES: facilities list, reservations, archived,
+   Edit sheet, cancel / reschedule / issue-review dialogs, schedule.
+   Add Facility is desktop only (button hidden in section 6; the empty
+   text and "Delete All" / permanent delete are hidden below).
+--------------------------------------------------------------- */
+html.rx-mobile #panel-rooms .rm-tabbar {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    overflow-x: auto;
+    margin: 0 -16px 12px;
+    padding: 2px 16px 4px;
+    scrollbar-width: none;
+}
+
+html.rx-mobile #panel-rooms .rm-tabbar::-webkit-scrollbar {
+    display: none;
+}
+
+html.rx-mobile #panel-rooms .rm-tabbar .pr-sub-tabs {
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+}
+
+html.rx-mobile #panel-rooms .rm-tabbar .pr-sub-tab {
+    flex: 0 0 auto;
+    min-height: 40px;
+    white-space: nowrap;
+}
+
+/* flat cards (the desktop's framed card + gold edge is not needed) */
+html.rx-mobile #panel-rooms .pr-card {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    border-radius: 0;
+}
+
+html.rx-mobile #panel-rooms .pr-card::before,
+html.rx-mobile #panel-rooms .pr-card-header::before {
+    display: none;
+}
+
+html.rx-mobile #panel-rooms .pr-card-header {
+    display: block;
+    padding: 0 0 10px;
+    background: transparent;
+    border: 0;
+}
+
+html.rx-mobile #panel-rooms .pr-card-header h3 {
+    margin: 0 0 10px;
+    font-size: 15px;
+}
+
+html.rx-mobile #panel-rooms .rm-head-tools {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    width: 100%;
+}
+
+html.rx-mobile #panel-rooms .rm-head-tools .pr-filter-select,
+html.rx-mobile #panel-rooms .pr-search-wrap,
+html.rx-mobile #panel-rooms .pr-search-wrap input {
+    width: 100%;
+    max-width: none;
+    min-height: 44px;
+    font-size: 16px;
+    border-radius: 12px;
+}
+
+/* Desktop gives the search box "flex: 0 1 280px". In this stacked column that
+   280px becomes its HEIGHT: a tall empty gap with the magnifier floating in the
+   middle. Size it to its content and pin the icon inside the input. */
+html.rx-mobile #panel-rooms .rm-rooms-card .pr-card-header .pr-search-wrap,
+html.rx-mobile #panel-rooms .rm-head-tools .pr-search-wrap {
+    flex: 0 0 auto;
+    min-width: 0;
+    height: 44px;
+}
+
+html.rx-mobile #panel-rooms .pr-search-wrap input {
+    height: 44px;
+    padding: 0 14px 0 42px;
+}
+
+html.rx-mobile #panel-rooms .pr-search-wrap .material-symbols-outlined {
+    left: 14px;
+    font-size: 20px;
+}
+
+html.rx-mobile #panel-rooms .rm-toolbar {
+    padding: 0 0 8px;
+    background: transparent;
+    border: 0;
+}
+
+html.rx-mobile #panel-rooms .rm-bld-pills,
+html.rx-mobile #panel-rooms .rm-floor-chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin: 0 -16px;
+    padding: 2px 16px 6px;
+    scrollbar-width: none;
+}
+
+html.rx-mobile #panel-rooms .rm-bld-pills > *,
+html.rx-mobile #panel-rooms .rm-floor-chips > * {
+    flex: 0 0 auto;
+    min-height: 38px;
+    white-space: nowrap;
+}
+
+html.rx-mobile #panel-rooms #roomsRegistryTable .pr-icon-btn {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+}
+
+html.rx-mobile #panel-rooms .pr-tbl-wrap {
+    overflow: visible;
+    padding: 0;
+}
+
+/* the empty text says "click Add Facility" */
+html.rx-mobile #panel-rooms .rm-rooms-card .pr-empty {
+    font-size: 0;
+    text-align: center;
+}
+
+html.rx-mobile #panel-rooms .rm-rooms-card .pr-empty::after {
+    font-size: 14px;
+    color: var(--text-light);
+    content: "No facilities yet. New facilities are added from a desktop.";
+}
+
+/* ---- Reservations ---- */
+html.rx-mobile #rr-wipe-btn {
+    display: none !important;
+}
+
+html.rx-mobile #rooms-reservations-panel .pr-card-header > div {
+    display: block !important;
+    width: 100%;
+}
+
+html.rx-mobile #rrExpiryBanner {
+    align-items: flex-start !important;
+    font-size: .8rem !important;
+}
+
+html.rx-mobile #rrTabs {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    overflow-x: auto;
+    margin: 0 -16px;
+    padding: 2px 16px 6px;
+    scrollbar-width: none;
+}
+
+html.rx-mobile #rrTabs::-webkit-scrollbar {
+    display: none;
+}
+
+html.rx-mobile #rrTabs .rr-tab {
+    flex: 0 0 auto;
+    min-height: 38px;
+    white-space: nowrap;
+}
+
+html.rx-mobile #rrTabs .rr-tab-sep {
+    display: none;
+}
+
+html.rx-mobile #rooms-reservations-panel .rr-status-bar {
+    display: block;
+    padding: 0 0 8px;
+    background: transparent;
+    border: 0;
+}
+
+html.rx-mobile #rooms-reservations-panel .rr-sort {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+html.rx-mobile #rooms-reservations-panel .rr-sort .pr-filter-select {
+    flex: 1 1 auto;
+    min-height: 44px;
+    font-size: 16px;
+}
+
+html.rx-mobile #rooms-reservations-panel .rr-sort-dir {
+    flex: 0 0 44px;
+    min-height: 44px;
+}
+
+html.rx-mobile #rrHint {
+    margin: 4px 0 10px;
+    font-size: 12.5px;
+}
+
+/* one reservation = one card:  FACILITY ........ status
+                                WHEN | REQUESTED BY
+                                [ Reschedule ] [ Cancel ] [ Review ] */
+html.rx-mobile #rrTable {
+    display: block;
+    width: 100%;
+    min-width: 0 !important;
+}
+
+html.rx-mobile #rrTable th,
+html.rx-mobile #rrTable td,
+html.rx-mobile #rrTable td:nth-child(n) {
+    width: auto !important;
+    max-width: none !important;
+}
+
+html.rx-mobile #rrTable tbody tr.ps-rr-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 14px;
+    row-gap: 2px;
+    padding: 14px 14px 12px;
+    margin-bottom: 12px;
+    border-radius: 16px;
+}
+
+html.rx-mobile #rrTable tbody tr.ps-rr-row > td {
+    display: block;
+    min-width: 0;
+    padding: 4px 0 !important;
+    text-align: left;
+    border: 0;
+}
+
+html.rx-mobile #rrTable tbody tr.ps-rr-row > td::before {
+    display: block;
+    margin-bottom: 2px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .5px;
+    text-transform: uppercase;
+    color: var(--text-light);
+}
+
+html.rx-mobile #rrTable td[data-col="facility"] { grid-column: 1; grid-row: 1; order: 1; }
+html.rx-mobile #rrTable td[data-col="facility"]::before { display: none; }
+html.rx-mobile #rrTable td[data-col="status"]   { grid-column: 2; grid-row: 1; order: 2; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; text-align: right; }
+html.rx-mobile #rrTable td[data-col="status"]::before { display: none; }
+html.rx-mobile #rrTable td[data-col="datetime"] { grid-column: 1; grid-row: 2; order: 3; margin-top: 8px; padding-top: 10px !important; border-top: 1px dashed var(--khaki-border) !important; }
+html.rx-mobile #rrTable td[data-col="datetime"]::before { content: "When"; }
+html.rx-mobile #rrTable td[data-col="who"]      { grid-column: 2; grid-row: 2; order: 4; margin-top: 8px; padding-top: 10px !important; border-top: 1px dashed var(--khaki-border) !important; }
+html.rx-mobile #rrTable td[data-col="who"]::before { content: "Requested by"; }
+html.rx-mobile #rrTable td[data-col="actions"]  { grid-column: 1 / -1; grid-row: 3; order: 5; margin-top: 8px; padding-top: 12px !important; border-top: 1px solid var(--khaki-border) !important; }
+html.rx-mobile #rrTable td[data-col="actions"]::before { display: none; }
+
+html.rx-mobile #rrTable .eq-cell-name { font-size: 14px; }
+html.rx-mobile #rrTable td[data-col="who"] .rr-ellip { white-space: normal; overflow-wrap: anywhere; }
+
+html.rx-mobile #rrTable .eq-act-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+}
+
+html.rx-mobile #rrTable .eq-act-wrap .pr-tbl-btn {
+    flex: 1 1 0;
+    min-width: 96px;
+    min-height: 44px;
+    justify-content: center;
+    font-size: 13.5px;
+}
+
+/* ---- Archived facilities ---- */
+html.rx-mobile #rooms-archived-panel .pr-card > div[style] {
+    margin: 0 0 12px;
+    padding: 12px 14px !important;
+    border: 0 !important;
+    border-radius: 12px;
+    background: var(--secondary-cream);
+    font-size: 0 !important;
+}
+
+html.rx-mobile #rooms-archived-panel .pr-card > div[style]::after {
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--text-light);
+    content: "Archived facilities are hidden from faculty and students. You can restore them at any time.";
+}
+
+html.rx-mobile #roomsArchivedTable {
+    display: block;
+    width: 100%;
+}
+
+html.rx-mobile #roomsArchivedTable thead {
+    display: none;
+}
+
+html.rx-mobile #roomsArchivedTable tbody {
+    display: block;
+}
+
+html.rx-mobile #rooms-archived-body tr:not(:has(td[colspan])) {
+    display: block;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    border-radius: 16px;
+    background: var(--card-bg);
+    border: 1px solid var(--khaki-border);
+}
+
+html.rx-mobile #rooms-archived-body tr:not(:has(td[colspan])) > td {
+    display: block;
+    width: auto !important;
+    padding: 2px 0 !important;
+    border: 0;
+    text-align: left;
+}
+
+html.rx-mobile #rooms-archived-body tr:not(:has(td[colspan])) > td:nth-child(2) {
+    font-size: 13px;
+    color: var(--text-light);
+}
+
+html.rx-mobile #rooms-archived-body tr:not(:has(td[colspan])) > td:last-child {
+    margin-top: 10px;
+    padding-top: 12px !important;
+    border-top: 1px solid var(--khaki-border);
+}
+
+html.rx-mobile #rooms-archived-body .rm-actions {
+    display: flex;
+    width: 100%;
+    gap: 8px;
+}
+
+html.rx-mobile #rooms-archived-body .pr-tbl-btn {
+    flex: 1 1 0;
+    min-height: 44px;
+    justify-content: center;
+}
+
+html.rx-mobile #rooms-archived-body .pr-tbl-btn.danger {
+    display: none !important;
+}
+
+/* ---- Edit facility = bottom sheet ---- */
+html.rx-mobile #room-form-wrap {
+    align-items: flex-end !important;
+    padding: 0 !important;
+    z-index: 700 !important;
+}
+
+html.rx-mobile #room-form-wrap .eq-card.form-card {
+    max-width: 100% !important;
+    max-height: 92vh;
+    max-height: 92dvh;
+    border-radius: 24px 24px 0 0 !important;
+    animation: rxmSheetUp .26s cubic-bezier(.16, 1, .3, 1) both;
+}
+
+html.rx-mobile #room-form-wrap .form-card-header {
+    border-radius: 24px 24px 0 0;
+    padding: 18px 16px 12px;
+}
+
+html.rx-mobile #room-form-wrap .form-card-header::before {
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    width: 36px;
+    height: 4px;
+    margin-left: -18px;
+    border-radius: 4px;
+    background: var(--khaki-border);
+    content: "";
+}
+
+html.rx-mobile #room-form-wrap .rmod-close-btn {
+    width: 44px;
+    height: 44px;
+}
+
+html.rx-mobile #room-form-wrap .form-card-body {
+    padding: 14px 16px;
+    overscroll-behavior: contain;
+}
+
+html.rx-mobile #room-form-wrap .form-control-custom {
+    min-height: 46px;
+    font-size: 16px;
+}
+
+html.rx-mobile #room-form-wrap .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+html.rx-mobile #room-form-wrap .rf-chip {
+    min-height: 40px;
+}
+
+html.rx-mobile #room-form-wrap .rmod-archive-zone {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+html.rx-mobile #room-form-wrap .rmod-archive-zone .pr-btn {
+    width: 100%;
+    min-height: 46px;
+    justify-content: center;
+}
+
+html.rx-mobile #room-form-wrap .rmod-footer {
+    flex-direction: column-reverse;
+    gap: 8px;
+    padding: 12px 16px calc(12px + var(--rxm-sb));
+    border-radius: 0;
+}
+
+html.rx-mobile #room-form-wrap .rmod-footer .pr-btn {
+    width: 100%;
+    min-height: 48px;
+    justify-content: center;
+    font-size: 15px;
+}
+
+/* ---- cancel / reschedule / issue review (older dialog style, inline styles) ---- */
+html.rx-mobile #adminCancelRrModal,
+html.rx-mobile #adminRescheduleRrModal,
+html.rx-mobile #issueReviewModal {
+    align-items: flex-end !important;
+    z-index: 700 !important;
+}
+
+html.rx-mobile #adminCancelRrModal > .form-card,
+html.rx-mobile #adminRescheduleRrModal > .form-card,
+html.rx-mobile #issueReviewModal > .form-card {
+    max-width: 100% !important;
+    margin: 0 !important;
+    max-height: 92vh;
+    max-height: 92dvh;
+    overflow-y: auto;
+    border-radius: 24px 24px 0 0 !important;
+    animation: rxmSheetUp .26s cubic-bezier(.16, 1, .3, 1) both;
+}
+
+html.rx-mobile #adminCancelRrModal .form-card-header,
+html.rx-mobile #adminRescheduleRrModal .form-card-header,
+html.rx-mobile #issueReviewModal .form-card-header {
+    padding: 18px 16px 12px;
+}
+
+html.rx-mobile #adminCancelRrModal .btn-close-custom,
+html.rx-mobile #adminRescheduleRrModal .btn-close-custom,
+html.rx-mobile #issueReviewModal .btn-close-custom {
+    width: 44px;
+    height: 44px;
+}
+
+html.rx-mobile #adminCancelRrModal .form-card-body,
+html.rx-mobile #adminRescheduleRrModal .form-card-body,
+html.rx-mobile #issueReviewModal .form-card-body {
+    padding: 14px 16px calc(14px + var(--rxm-sb));
+}
+
+html.rx-mobile #adminCancelRrModal .form-control-custom,
+html.rx-mobile #adminRescheduleRrModal .form-control-custom,
+html.rx-mobile #issueReviewModal .form-control-custom {
+    min-height: 46px;
+    font-size: 16px !important;
+}
+
+/* their button rows are inline flex-end rows: stack them, main action first */
+html.rx-mobile #adminCancelRrModal .form-card-body > div[style*="justify-content:flex-end"],
+html.rx-mobile #adminRescheduleRrModal .form-card-body > div[style*="justify-content:flex-end"],
+html.rx-mobile #issueReviewModal .form-card-body > div[style*="justify-content:flex-end"] {
+    flex-direction: column-reverse;
+    gap: 8px !important;
+}
+
+html.rx-mobile #adminCancelRrModal .form-card-body > div[style*="justify-content:flex-end"] button,
+html.rx-mobile #adminRescheduleRrModal .form-card-body > div[style*="justify-content:flex-end"] button,
+html.rx-mobile #issueReviewModal .form-card-body > div[style*="justify-content:flex-end"] button {
+    width: 100% !important;
+    min-height: 48px;
+    padding: 10px 16px !important;
+    font-size: 15px;
+}
+
+/* ---- Facility schedule: full-screen sheet; the day-tab strip (<=768px rules) does the rest ---- */
+html.rx-mobile #roomScheduleModal {
+    align-items: stretch;
+    padding: 0;
+    z-index: 700;
+}
+
+html.rx-mobile #roomScheduleModal .rsm-card {
+    max-width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    max-height: none;
+    border-radius: 0;
+}
+
+html.rx-mobile #roomScheduleModal .rsm-head {
+    padding: calc(12px + var(--rxm-st)) 16px 10px;
+}
+
+html.rx-mobile #roomScheduleModal .rsm-close-btn,
+html.rx-mobile #roomScheduleModal .rsm-week-nav-btn {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+}
+
+html.rx-mobile #roomScheduleModal .rsm-foot {
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 16px calc(10px + var(--rxm-sb));
+}
+
+html.rx-mobile #roomScheduleModal .rsm-foot .btn-cancel-acc {
+    width: 100%;
+    min-height: 48px;
+}
+
+/* ---- Pass 5 touch-ups ---- */
+html.rx-mobile #rrTable tr.ps-rr-row > td:first-child {
+    box-shadow: none !important;
+    border-bottom: 0 !important;
+}
+
+html.rx-mobile #rrTable tr.ps-rr-row[data-status="Waiting"]   { box-shadow: inset 4px 0 0 var(--accent-gold, #d9a520), var(--shadow); }
+html.rx-mobile #rrTable tr.ps-rr-row[data-status="Declined"]  { box-shadow: inset 4px 0 0 var(--danger), var(--shadow); }
+html.rx-mobile #rrTable tr.ps-rr-row[data-status="Cancelled"] { box-shadow: inset 4px 0 0 var(--text-light), var(--shadow); }
+
+html.rx-mobile #rooms-archived-body tr > td::before {
+    content: none !important;
+}
+
+html.rx-mobile #rooms-archived-panel .pr-card-header {
+    padding: 0;
+}
+
+html.rx-mobile #rooms-archived-panel .pr-card-header h3 {
+    margin: 0 0 8px;
+}
+
+
+/* ---------------------------------------------------------------
+   15. ACTIVITY, SETTINGS, HELP & FAQ  (Pass 6)
+--------------------------------------------------------------- */
+
+/* text that only makes sense on a phone (Help & FAQ phone variants) */
+html:not(.rx-mobile) .rxm-phone-only {
+    display: none !important;
+}
+
+/* ---- Activity ---- */
+html.rx-mobile #panel-activity .act-card {
+    padding: 12px 14px 14px;
+    border-radius: 16px;
+}
+
+html.rx-mobile #panel-activity .act-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    flex-wrap: nowrap;
+    gap: 10px;
+    padding-bottom: 12px;
+}
+
+/* the filter chips scroll sideways on one row instead of wrapping */
+html.rx-mobile #act-chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    margin: 0 -14px;
+    padding: 2px 14px;
+}
+
+html.rx-mobile #act-chips::-webkit-scrollbar {
+    display: none;
+}
+
+html.rx-mobile #act-chips .act-chip {
+    flex: 0 0 auto;
+    min-height: 40px;
+    padding: 0 16px;
+    font-size: 13px;
+}
+
+html.rx-mobile #panel-activity .act-selects {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    width: 100%;
+}
+
+html.rx-mobile #panel-activity .act-selects .form-control-custom {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    font-size: 16px;
+}
+
+html.rx-mobile #act-feed .act-day {
+    margin: 14px 0 2px;
+}
+
+html.rx-mobile #act-feed .act-event,
+html.rx-mobile #act-feed .act-event--who {
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+    grid-template-areas:
+        "icon body body"
+        "icon who time";
+    align-items: start;
+    column-gap: 12px;
+    row-gap: 4px;
+    padding: 12px 0;
+}
+
+html.rx-mobile #act-feed .act-event-icon {
+    width: 36px;
+    height: 36px;
+    align-self: start;
+}
+
+html.rx-mobile #act-feed .act-event-text {
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+html.rx-mobile #act-feed .act-event-meta {
+    font-size: 12px;
+}
+
+html.rx-mobile #act-feed .act-event-who {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--rxm-muted);
+    align-self: center;
+}
+
+html.rx-mobile #act-feed .act-event-who .act-no {
+    display: inline;
+    margin-left: 6px;
+    font-weight: 500;
+}
+
+html.rx-mobile #act-feed .act-event--who .act-event-time {
+    font-size: 12px;
+    text-align: right;
+    align-self: center;
+}
+
+/* "View request #41" is a real tap target */
+html.rx-mobile #act-feed .act-event-jump {
+    min-height: 36px;
+    margin-top: 6px;
+    padding: 0 12px;
+    font-size: 12.5px;
+    border-radius: 999px;
+}
+
+html.rx-mobile #act-pager {
+    margin-top: 10px;
+}
+
+html.rx-mobile #act-pager .act-pager-info {
+    display: block;
+    text-align: center;
+    font-size: 12.5px;
+}
+
+html.rx-mobile #act-pager .act-pager-ctl {
+    justify-content: center;
+}
+
+html.rx-mobile #act-pager .act-pager-btn {
+    min-width: 44px;
+    min-height: 44px;
+}
+
+/* ---- Settings: shared ---- */
+html.rx-mobile #settMainTabs {
+    margin-bottom: 12px;
+}
+
+html.rx-mobile #settMainTabs .rq-sub-tab {
+    min-height: 44px;
+    padding: 0 16px;
+    font-size: 13px;
+}
+
+html.rx-mobile #panel-settings .ps-two-col {
+    gap: 12px;
+}
+
+html.rx-mobile #panel-settings .ps-two-col > div {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+html.rx-mobile #panel-settings .info-card {
+    margin: 0;
+}
+
+/* ---- Settings: My Account ---- */
+html.rx-mobile #acctHero {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 10px;
+    padding: 20px 16px;
+    margin-bottom: 12px;
+    border-radius: 18px;
+}
+
+html.rx-mobile #acctHero .ov-hero-body {
+    width: 100%;
+    min-width: 0;
+}
+
+html.rx-mobile #acctHero .ov-hero-name {
+    font-size: 1.2rem;
+    overflow-wrap: anywhere;
+}
+
+html.rx-mobile #acctHero .ov-hero-role {
+    font-size: 12.5px;
+}
+
+/* desktop pins these buttons inside a fixed 244x44 box; on a phone they stack and fill the width */
+html.rx-mobile #acctHero .ov-hero-actions {
+    position: static;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    flex: 0 0 auto;
+    gap: 8px;
+    margin: 4px 0 0;
+}
+
+html.rx-mobile #acctHero .ov-hero-actions > button {
+    position: static;
+    width: 100%;
+    height: auto;
+    min-height: 48px;
+    justify-content: center;
+    font-size: 14px;
+}
+
+html.rx-mobile #acctHero .ov-hero-actions > #cancelProfileBtn:not([style*="display: none"]):not([style*="display:none"]) {
+    display: inline-flex;
+}
+
+/* the profile fields: label above value, full-width inputs while editing */
+html.rx-mobile #panel-settings .info-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    padding: 12px 16px;
+}
+
+html.rx-mobile #panel-settings .info-lbl {
+    min-width: 0;
+}
+
+html.rx-mobile #panel-settings .info-value-wrap {
+    width: 100%;
+}
+
+html.rx-mobile #panel-settings .info-input-f {
+    width: 100%;
+    min-height: 44px;
+    font-size: 16px;
+}
+
+/* editing: the input takes the value's place in the flow (desktop overlays it at a fixed 36px) */
+html.rx-mobile #profileInfoCard[data-editing="true"] .info-value-wrap .info-val[data-field] {
+    display: none;
+}
+
+html.rx-mobile #profileInfoCard[data-editing="true"] .info-value-wrap .info-input-f {
+    position: static;
+    top: auto;
+    transform: none;
+    height: 48px;
+    margin-top: 2px;
+}
+
+html.rx-mobile #panel-settings .info-row--link {
+    padding: 0 16px;
+}
+
+html.rx-mobile #panel-settings .info-row--link .act-open {
+    min-height: 48px;
+    font-size: 13.5px;
+}
+
+/* Change / Log Out All: no empty gap while hidden, full-width when shown */
+html.rx-mobile #panel-settings .info-row [data-profile-edit-gated]:disabled {
+    display: none;
+}
+
+html.rx-mobile #panel-settings .btn-inline-sm,
+html.rx-mobile #panel-settings .btn-inline-danger {
+    width: 100%;
+    min-height: 44px;
+    margin-top: 6px;
+    font-size: 13.5px;
+}
+
+/* Change Password dialog: bottom sheet (it is an older dialog with inline styles) */
+html.rx-mobile #changePassModal {
+    align-items: flex-end !important;
+    justify-content: stretch !important;
+}
+
+html.rx-mobile #changePassModal > .eq-card.form-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    max-height: 92vh;
+    overflow-y: auto;
+    border-radius: var(--rxm-r) var(--rxm-r) 0 0 !important;
+    padding-bottom: var(--rxm-sb);
+}
+
+html.rx-mobile #changePassModal .form-control-custom {
+    min-height: 48px;
+    font-size: 16px;
+}
+
+html.rx-mobile #changePassModal .fac-pw-toggle {
+    min-width: 44px;
+    min-height: 44px;
+}
+
+html.rx-mobile #changePassModal div[style*="justify-content: flex-end"],
+html.rx-mobile #changePassModal div[style*="justify-content:flex-end"] {
+    flex-direction: column-reverse !important;
+    gap: 8px !important;
+}
+
+html.rx-mobile #changePassModal div[style*="justify-content: flex-end"] > button,
+html.rx-mobile #changePassModal div[style*="justify-content:flex-end"] > button {
+    width: 100% !important;
+    min-height: 48px;
+    padding: 0 16px !important;
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+/* ---- Settings: Preferences (Light and Dark only) ---- */
+html.rx-mobile #tp-hc,
+html.rx-mobile .sett-theme-opt[data-theme="high-contrast"] {
+    display: none !important;
+}
+
+html.rx-mobile #sett-prefs .sett-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+html.rx-mobile #sett-prefs .sett-card-head {
+    padding: 14px 16px;
+}
+
+html.rx-mobile #sett-prefs .sett-card-body {
+    padding: 14px 16px;
+}
+
+html.rx-mobile #sett-prefs .sett-theme-opt {
+    min-height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+}
+
+html.rx-mobile #sett-prefs .sett-card-body--notifs {
+    gap: 0;
+}
+
+html.rx-mobile #sett-prefs .sett-notif-row {
+    align-items: center;
+    gap: 14px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--khaki-border);
+}
+
+html.rx-mobile #sett-prefs .sett-notif-row:last-child {
+    border-bottom: 0;
+}
+
+html.rx-mobile #sett-prefs .sett-notif-row .toggle-sw {
+    margin: 0;
+    padding: 10px 0;
+}
+
+html.rx-mobile #sett-prefs .sett-notif-title {
+    font-size: 14px;
+}
+
+html.rx-mobile #sett-prefs .sett-notif-sub {
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+html.rx-mobile #sett-prefs .sett-reset-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 14px 0 0;
+    margin-top: 4px;
+}
+
+html.rx-mobile #sett-prefs .sett-reset-btn {
+    width: 100%;
+    min-height: 48px;
+    justify-content: center;
+    font-size: 14px;
+}
+
+/* ---- Settings: Help & FAQ ---- */
+html.rx-mobile #sett-help .info-card-body {
+    padding: 4px 12px 12px !important;
+}
+
+html.rx-mobile #sett-help .hc-faq-q {
+    min-height: 52px;
+    padding: 12px 4px;
+}
+
+html.rx-mobile #sett-help .hc-faq-q-text {
+    font-size: 14px;
+    line-height: 1.35;
+}
+
+html.rx-mobile #sett-help .hc-faq-a {
+    font-size: 13.5px;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+}
+
+html.rx-mobile #sett-help .hc-st-row {
+    flex-wrap: wrap;
+    gap: 6px 10px;
+}
+
+/* ---- Pass 7 hardening ---- */
+/* If the icon font is slow or blocked, the icon's word (e.g. "notifications") must not spill over its neighbours */
+.rxm-iconbtn > .material-symbols-outlined,
+.rxm-tab .material-symbols-outlined {
+    max-width: 24px;
+    overflow: hidden;
+}
+
+/* readable small text: the desktop amber / orange / green on a pale tint is under 3:1 */
+html.rx-mobile:not([data-theme="dark"]) .dash-kpi.dash-tone-warn .dash-kpi-val,
+html.rx-mobile:not([data-theme="dark"]) .dash-kpi.dash-tone-warn .dash-kpi-sub,
+html.rx-mobile:not([data-theme="dark"]) .dash-qty--low {
+    color: #9a5b00;
+}
+
+html.rx-mobile .hc-st-pill.pending {
+    color: #a65a0c;
+}
+
+html.rx-mobile .hc-st-pill.approved {
+    color: #1b7a45;
+}
+
+/* dark theme: white numbers on the light accent / grey count bubbles are under 3:1 */
+html.rx-mobile[data-theme="dark"] #panel-rooms .pr-sub-tab:not(.active) .pr-tab-badge,
+html.rx-mobile[data-theme="dark"] #eqTabs .rq-filter-chip:not(.active) .rq-chip-count--muted {
+    color: #14141f;
+}
+
+/* small tap targets */
+html.rx-mobile #eq-loan-table .ps-appr-id {
+    padding: 9px 12px;
+    margin: -9px -12px;
+}
+
+html.rx-mobile #panel-rooms .rm-chip--sm {
+    min-height: 40px;
+    min-width: 40px;
+    padding: 0 14px;
+}
+
+html.rx-mobile #rrExpiryDismiss {
+    min-width: 40px;
+    min-height: 40px;
+}
+
+.rxm-note-link {
+    padding: 12px 0;
+}
+
+html.rx-mobile[data-theme="dark"] #panel-rooms .pr-sub-tab.active .pr-tab-badge,
+html.rx-mobile[data-theme="dark"] #eqTabs .rq-filter-chip.active .rq-chip-count--muted {
+    background: rgba(0, 0, 0, 0.3);
+    color: #fff;
+}
+
+
+/* ---------------------------------------------------------------
+   16. NEWER DESKTOP FEATURES, MADE PHONE-FRIENDLY
+   (decline-reason chips, request-buffer countdown, pick-up line)
+--------------------------------------------------------------- */
+
+/* Decline reason picker (equipment decline + facility reservation decline): one-tap chips */
+html.rx-mobile .ps-reason-picker {
+    gap: 10px;
+}
+
+html.rx-mobile .ps-reason-chips {
+    gap: 8px;
+}
+
+html.rx-mobile .ps-reason-chip {
+    min-height: 44px;
+    padding: 0 16px;
+    font-size: 13.5px;
+}
+
+html.rx-mobile .ps-reason-detail textarea {
+    min-height: 88px;
+    font-size: 16px;
+}
+
+/* the same-day approval-buffer countdown inside a Loans card */
+html.rx-mobile #eq-loan-table .eqb-chip {
+    margin-top: 2px;
+    font-size: 12.5px;
+}
+
+html.rx-mobile #eq-loan-table .eq-cell-sub:has(> .eqb-chip) {
+    margin-top: 6px;
+}
+
+/* the thin "refreshing" bar (tap the tab you are on) sits below the phone's status area */
+html.rx-mobile #ps-refresh-bar {
+    top: var(--rxm-st, 0px);
+}

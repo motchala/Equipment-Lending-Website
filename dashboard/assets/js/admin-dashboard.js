@@ -220,8 +220,26 @@
         if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
     }
 
+    /* ── Phone view: desktop-only screens ────────────────────────
+       On a phone (<html class="rx-mobile">, see the head script in admin-shell-top.php) these screens are not offered.
+       Every road to them (sidebar, Dashboard shortcuts, ?view=, #tab-, refresh restore) ends in _switchTabDOM or
+       switchSettMainTab, so the guard lives here. It is a convenience, not security: the server still checks the role
+       on every request. admin-dashboard-mobile.js owns the wording (window.psDesktopOnlyNotice). */
+    const PS_DESKTOP_ONLY_TABS = ['faculty', 'admins', 'imports', 'reports'];
+    const PS_DESKTOP_ONLY_SETT = ['sett-arbitration', 'sett-data', 'sett-ratings'];
+    function _psIsPhone() { return document.documentElement.classList.contains('rx-mobile'); }
+    function _psDesktopOnlyNotice(what) {
+        if (typeof window.psDesktopOnlyNotice === 'function') window.psDesktopOnlyNotice(what);
+    }
+
     /* ── Tab switcher ────────────────────────────────────────── */
     function _switchTabDOM(tabName, clickedEl) {
+        if (_psIsPhone() && PS_DESKTOP_ONLY_TABS.indexOf(tabName) !== -1) {
+            // a real tap gets a short explanation; a silent restore (clickedEl === false) just lands on the Dashboard
+            if (clickedEl !== false) _psDesktopOnlyNotice(tabName);
+            tabName = 'dashboard';
+            if (clickedEl !== false) clickedEl = null;
+        }
         const panel = document.getElementById('panel-' + tabName);
         if (!panel) return;
         // A real tab switch ends the "restored screen" state (see admin-shell-bottom.php), so the new screen slides in as usual
@@ -327,6 +345,10 @@
     function switchSettMainTab(panelId) {
         const settPanel = document.getElementById('panel-settings');
         if (!settPanel) return;
+        if (_psIsPhone() && PS_DESKTOP_ONLY_SETT.indexOf(panelId) !== -1) {
+            _psDesktopOnlyNotice(panelId);
+            panelId = 'sett-account';
+        }
         settPanel.querySelectorAll(':scope > .rq-sub-panel').forEach(p => p.classList.remove('active'));
         const tabsWrap = document.getElementById('settMainTabs');
         if (tabsWrap) tabsWrap.querySelectorAll('.rq-sub-tab').forEach(t => t.classList.remove('active'));
@@ -5549,7 +5571,9 @@
             // Load jsQR once
             function beginScan() {
                 if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                    status.textContent = '❌ Camera not available on HTTP. Open the admin dashboard via the ngrok HTTPS URL instead.';
+                    status.textContent = window.isSecureContext === false
+                        ? '❌ The camera needs a secure connection. Open PUPSync with its https:// address.'
+                        : '❌ The camera is not available on this device or browser.';
                     status.style.color = '#e53e3e';
                     return;
                 }

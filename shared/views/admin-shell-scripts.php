@@ -10,6 +10,8 @@
     <script src="dashboard/assets/js/admin-live-render.js?v=<?php echo @filemtime(PS_ROOT . '/dashboard/assets/js/admin-live-render.js'); ?>"></script>
     <script src="equipment-booking/assets/js/equipment-buffer-countdown.js?v=<?php echo @filemtime(PS_ROOT . '/equipment-booking/assets/js/equipment-buffer-countdown.js'); ?>"></script>
     <script src="dashboard/assets/js/admin-dashboard-responsive.js?v=<?php echo @filemtime('dashboard/assets/js/admin-dashboard-responsive.js'); ?>" defer></script>
+    <!-- Phone app shell (top bar, bottom tabs, account sheet). Does nothing unless <html class="rx-mobile">. -->
+    <script src="dashboard/assets/js/admin-dashboard-mobile.js?v=<?php echo @filemtime(PS_ROOT . '/dashboard/assets/js/admin-dashboard-mobile.js'); ?>" defer></script>
 
     <!-- Admin poll toast -->
     <div id="admin-poll-toast">

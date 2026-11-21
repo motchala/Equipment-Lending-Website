@@ -535,7 +535,8 @@ function fact_eq_render_item(array $it, string $kind, string $rootUrl, DateTimeI
     }
 
     $isBundle = fact_i($it, 'bundle_count') > 1;
-    $html  = '<article class="fact-item fact-loan' . ($isOverdue ? ' is-overdue' : '') . ($isBundle ? ' is-bundle' : '') . '" data-req-id="' . fact_i($it, 'id') . '">';
+    $html  = '<article class="fact-item fact-loan' . ($isOverdue ? ' is-overdue' : '') . ($isBundle ? ' is-bundle' : '') . '" data-req-id="' . fact_i($it, 'id')
+        . '" data-status="' . fact_h(str_replace(' ', '_', strtolower($status))) . '">';
     $html .= fact_eq_tile($it, $rootUrl);
     $html .= '<div class="fact-item-main"><div class="fact-item-top"><h4 class="fact-item-title">' . fact_eq_title($it) . '</h4>'
         . fact_status_chip($status) . '</div>';

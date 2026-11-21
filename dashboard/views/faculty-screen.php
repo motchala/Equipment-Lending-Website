@@ -260,12 +260,13 @@
                         </div>
                     </div>
 
-                    <!-- Key figures -->
+                    <!-- Key figures: each opens My Activity and flashes the rows it counts (data-fact-focus, see the My Activity block in faculty-dashboard.js) -->
                     <section class="fdb-kpis" id="dashStats" aria-label="Key figures">
                         <?php foreach ($fdb_kpis as $fdb_v_k): ?>
                             <button type="button" class="fdb-kpi fdb-tone-<?php echo $fdb_h($fdb_v_k['tone']); ?>"
                                 <?php if ($fdb_v_k['stat'] !== '') echo 'data-stat="' . $fdb_h($fdb_v_k['stat']) . '"'; ?>
-                                data-action="go-tab" data-tab="activity">
+                                data-action="go-tab" data-tab="activity"
+                                data-fact-focus="<?php echo $fdb_h($fdb_v_k['stat'] !== '' ? $fdb_v_k['stat'] : 'rooms'); ?>">
                                 <span class="fdb-kpi-icon" aria-hidden="true"><span class="material-symbols-outlined"><?php echo $fdb_h($fdb_v_k['icon']); ?></span></span>
                                 <span class="fdb-kpi-body">
                                     <span class="fdb-kpi-val" <?php if ($fdb_v_k['id'] !== '') echo ' id="' . $fdb_h($fdb_v_k['id']) . '"'; ?>><?php echo (int)$fdb_v_k['val']; ?></span>
@@ -278,7 +279,7 @@
                     <div class="fdb-grid">
 
                         <!-- My activity: borrows + reservations, Months / Week (CSS-only toggle), hover for details -->
-                        <section class="fdb-card fdb-area-chart" aria-labelledby="fdbChartTitle">
+                        <section class="fdb-card fdb-area-chart" id="fdbChartCard" aria-labelledby="fdbChartTitle">
                             <?php if ($fdb_has_chart): ?>
                                 <input type="radio" name="fdbRange" id="fdbRangeMonths" class="fdb-range-input" checked>
                                 <input type="radio" name="fdbRange" id="fdbRangeWeek" class="fdb-range-input">
@@ -327,7 +328,7 @@
                         </section>
 
                         <!-- Needs your attention -->
-                        <section class="fdb-card fdb-area-attn" aria-labelledby="fdbAttnTitle">
+                        <section class="fdb-card fdb-area-attn" id="fdbAttnCard" aria-labelledby="fdbAttnTitle">
                             <header class="fdb-card-head">
                                 <h2 id="fdbAttnTitle">Needs your attention</h2>
                             </header>
@@ -350,7 +351,7 @@
                         </section>
 
                         <!-- My schedule today -->
-                        <section class="fdb-card fdb-area-third" aria-labelledby="fdbSchedTitle">
+                        <section class="fdb-card fdb-area-third" id="fdbSchedCard" aria-labelledby="fdbSchedTitle">
                             <header class="fdb-card-head">
                                 <h2 id="fdbSchedTitle">My schedule today</h2>
                             </header>
@@ -373,7 +374,7 @@
                         </section>
 
                         <!-- Recent activity -->
-                        <section class="fdb-card fdb-area-third" aria-labelledby="fdbRecentTitle">
+                        <section class="fdb-card fdb-area-third" id="fdbRecentCard" aria-labelledby="fdbRecentTitle">
                             <header class="fdb-card-head">
                                 <h2 id="fdbRecentTitle">Recent activity</h2>
                                 <button type="button" class="fdb-link" data-action="go-tab" data-tab="activity">View all</button>
