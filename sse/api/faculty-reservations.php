@@ -12,7 +12,7 @@
  */
 
 ini_set('display_errors', '0');
-set_time_limit(60);
+set_time_limit(0);
 ignore_user_abort(true);
 
 require_once __DIR__ . '/../../config/session.php';

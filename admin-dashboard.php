@@ -1,4 +1,5 @@
 ﻿<?php require_once __DIR__ . '/shared/core/site-paths.php'; ?>
+<?php require_once __DIR__ . '/shared/core/equipment-image.php'; ?>
 <?php require_once __DIR__ . '/equipment-booking/core/admin-functions.php'; ?>
 <?php require_once __DIR__ . '/room-reservation/core/admin-rooms-functions.php'; ?>
 <?php require_once __DIR__ . '/notifications/core/admin-data.php'; ?>
