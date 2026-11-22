@@ -102,7 +102,7 @@ switch ($section) {
 
         while ($item = $result->fetch_assoc()) {
             echo "<tr>
-                <td><img src='{$item['image_path']}' class='item-img shadow-sm'></td>
+                <td><img src='" . htmlspecialchars(equipment_image_path($item['image_path'] ?? '')) . "' class='item-img shadow-sm'></td>
                 <td class='fw-bold text-maroon'>" . htmlspecialchars($item['item_name']) . "</td>
                 <td>" . htmlspecialchars($item['category']) . "</td>
                 <td><span class='badge bg-info text-dark'>{$item['quantity']} units</span></td>
