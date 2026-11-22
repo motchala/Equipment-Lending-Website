@@ -1730,7 +1730,7 @@
             if (status === 'Waiting') {
                 note = it.claim_token ? '' : (it.reason || '');
             } else if (status !== 'Approved' && it.reason) {
-                note = it.reason;
+                note = (status === 'Declined' || status === 'Cancelled') ? 'Reason: ' + it.reason : it.reason;
             }
             return reqCard('', itemRowHtml(it), note, qrs, '');
         }).join('');

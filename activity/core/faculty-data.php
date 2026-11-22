@@ -151,8 +151,14 @@ function fact_eq_load(mysqli $conn, string $faculty_id): array
             : '0 AS extension_count, NULL AS original_return_date, NULL AS original_return_time';
         $images = fact_eq_image_map($conn);
 
+        // The admin's reason for a decline sits in the decision log (the request's own text is only the "waiting" note)
+        $reasonCol = (function_exists('fnotif_table_exists') && fnotif_table_exists($conn, 'tbl_arbitration_log'))
+            ? "(SELECT COALESCE(NULLIF(l.override_reason, ''), NULLIF(l.reason, '')) FROM tbl_arbitration_log l
+                  WHERE l.request_id = r.id ORDER BY l.id DESC LIMIT 1) AS decision_reason,"
+            : "'' AS decision_reason,";
+
         $cols = "r.id, r.equipment_name, r.borrow_qty, r.room, r.room_id, r.batch_id, r.bundle_claim_token, r.booking_mode, r.borrow_date, r.borrow_time, $extCol,
-                 r.return_date, r.return_time, r.returned_at, r.status, r.reason, r.arbitration_rule, r.buffer_until,
+                 r.return_date, r.return_time, r.returned_at, r.status, r.reason, $reasonCol r.arbitration_rule, r.buffer_until,
                  r.request_date, r.return_token, r.claim_token, r.submitted_as, r.submitted_by_name, r.submitted_by_id,
                  rm.room_name, b.building_key, b.name AS building_name,
                  COALESCE(rm.floor_label, CONCAT(rm.floor_number, 'F')) AS floor_label
@@ -197,7 +203,9 @@ function fact_eq_load(mysqli $conn, string $faculty_id): array
                     'bundle_claim_token' => fact_s($row, 'bundle_claim_token'),
                     'where'       => fact_eq_where($row),
                     'status'      => $status,
-                    'reason'      => trim(fact_s($row, 'reason')),
+                    'reason'      => $status === 'Declined' && function_exists('fnotif_decision_reason')
+                        ? fnotif_decision_reason('', fact_s($row, 'decision_reason'), fact_s($row, 'reason'))
+                        : trim(fact_s($row, 'reason')),
                     'rule'        => fact_s($row, 'arbitration_rule'),
                     // same-day request still in its 10-minute approval buffer: when the system decides it (ISO time)
                     'buffer_until' => ($status === 'Waiting' && fact_s($row, 'buffer_until') !== '')

@@ -74,10 +74,24 @@ foreach ($asked as $it) {
         }
     }
     if (!$row) {
-        $out[] = ['request_id' => $id, 'status' => 'Missing', 'reason' => '', 'claim_token' => null, 'return_token' => null];
+        $out[] = ['request_id' => $id, 'batch_id' => '', 'status' => 'Missing', 'reason' => '', 'claim_token' => null, 'return_token' => null];
         continue;
     }
     $status   = (string)$row['status'];
+    $reason   = (string)$row['reason'];
+    if (in_array($status, ['Approved', 'On Loan', 'Overdue', 'Returned'], true)) {
+        $reason = '';   // the "waiting for an admin" note no longer applies
+    } elseif ($status === 'Declined' || $status === 'Cancelled') {
+        // An admin's decline reason lives in the decision log; the request's own note is still the waiting text
+        $lg = $conn->prepare('SELECT reason FROM tbl_arbitration_log WHERE request_id = ? ORDER BY id DESC LIMIT 1');
+        if ($lg) {
+            $lg->bind_param('i', $id);
+            $lg->execute();
+            $logged = trim((string)($lg->get_result()->fetch_assoc()['reason'] ?? ''));
+            $lg->close();
+            $reason = $logged !== '' ? $logged : (strncmp($reason, 'Waiting for an admin', 20) === 0 ? '' : $reason);
+        }
+    }
     // A request submitted before Claim QRs were issued at submission: give it one now.
     if ($status === 'Waiting' && !$row['claim']) {
         $made = equipment_issue_pending_tokens($conn, $id);
@@ -88,7 +102,7 @@ foreach ($asked as $it) {
         'request_id'   => $id,
         'batch_id'     => (string)$row['batch_id'],
         'status'       => $status,
-        'reason'       => (string)$row['reason'],
+        'reason'       => $reason,
         // same-day request still in its 10-minute approval buffer: when the system decides it (ISO time), else null
         'buffer_until' => ($status === 'Waiting' && !empty($row['buffer_until']))
             ? (new DateTimeImmutable((string)$row['buffer_until'], new DateTimeZone('Asia/Manila')))->format('c') : null,
