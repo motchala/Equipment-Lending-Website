@@ -417,7 +417,7 @@
                                 </summary>
                                 <div class="hc-faq-a">
                                     <span class="rxm-desktop-only">In <strong>Facilities</strong>, a Super Admin can click <strong>Add Facility</strong> (building, name, floor, status and features). Admins and Super Admins can edit a facility. The status is Available, Maintenance or Not bookable, and the last two cannot be reserved.<br><br></span><span class="rxm-phone-only">In <strong>Facilities</strong>, Admins and Super Admins can edit a facility. The status is Available, Maintenance or Not bookable, and the last two cannot be reserved. Adding a new facility is done on a desktop or a larger screen.<br><br></span>
-                                    <strong>Lock Facility</strong> (in the Edit window) keeps a facility visible but stops its schedule from opening. Admins and Super Admins can lock and unlock.<br><br>
+                                    <strong>Lock Facility</strong> (in the Edit window) keeps a facility visible but stops its schedule from opening. Only a Super Admin can lock and unlock a facility. While a facility is locked, Admins cannot edit it; their Edit window shows a red <strong>Locked Facility</strong> label instead.<br><br>
                                     Only a Super Admin can <strong>Archive</strong> a facility. Archived facilities are hidden from new reservations but their history is kept, and they can be restored from <strong>Facilities → Archived</strong>.<span class="rxm-desktop-only"> Only a Super Admin can delete an archived facility permanently, which removes its reservation history for good.</span>
                                 </div>
                             </details>

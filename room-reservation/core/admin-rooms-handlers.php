@@ -46,11 +46,14 @@ if (isset($_POST['add_room'])) {
         exit();
     }
 
+    // A new facility is always created UNLOCKED, so every Admin can edit it. Only a Super Admin
+    // can lock it afterwards. Written out explicitly (not left to the column default).
+    $lock_col = ps_rooms_lock_column_ready($conn);
     $stmt = $conn->prepare(
         "INSERT INTO tbl_rooms
             (building_id, room_name, floor_number, floor_label,
-             amenities, status, sort_order)
-         VALUES (?, ?, ?, ?, ?, ?, ?)"
+             amenities, status, sort_order" . ($lock_col ? ", is_locked" : "") . ")
+         VALUES (?, ?, ?, ?, ?, ?, ?" . ($lock_col ? ", 0" : "") . ")"
     );
     $stmt->bind_param(
         'isisssi',
@@ -124,11 +127,15 @@ if (isset($_POST['update_room'])) {
         exit();
     }
 
+    // A locked facility can only be edited by a Super Admin (checked against the database, not the
+    // session). The lock test is part of the UPDATE itself, so a facility that was locked a moment
+    // ago can never be changed by a regular Admin who still had the Edit window open.
+    $lock_guard = (!admin_is_super_admin($conn) && ps_rooms_lock_column_ready($conn)) ? ' AND is_locked = 0' : '';
     $stmt = $conn->prepare(
         "UPDATE tbl_rooms
          SET building_id = ?, room_name = ?, floor_number = ?, floor_label = ?,
              amenities = ?, status = ?, sort_order = ?
-         WHERE room_id = ? AND is_archived = 0"
+         WHERE room_id = ? AND is_archived = 0" . $lock_guard
     );
     $stmt->bind_param(
         'isisssii',
@@ -143,6 +150,11 @@ if (isset($_POST['update_room'])) {
     );
 
     if ($stmt->execute()) {
+        // No row changed: either nothing was different (fine) or the guard above blocked a locked room.
+        if ($lock_guard !== '' && $stmt->affected_rows === 0 && ps_room_is_locked($conn, $room_id)) {
+            $stmt->close();
+            ps_rooms_forbidden($is_ajax, 'This facility is locked. Only a Super Admin can edit it.');
+        }
         $stmt->close();
         admin_log_activity($conn, 'room', 'Updated facility: ' . $room_name);
         if ($is_ajax) ps_send_rooms_ajax_response($conn, 'Facility updated.');
@@ -161,12 +173,18 @@ if (isset($_POST['update_room'])) {
 
 // ════════════════════════════════════════════════════════════════
 // LOCK / UNLOCK ROOM  (POST toggle_room_lock, room_id, lock=1|0)
-// Admin + Super Admin (the page already requires an admin session).
-// A locked room's tile no longer opens its schedule; Edit still works.
+// Super Admin only — checked against the database, not just the session.
+// A locked room's tile no longer opens its schedule, and a regular Admin
+// can no longer edit it (see UPDATE ROOM above). A Super Admin still can.
 // ════════════════════════════════════════════════════════════════
 if (isset($_POST['toggle_room_lock'])) {
     csrf_verify();
     $is_ajax = ($_POST['ajax'] ?? '') === '1';
+
+    if (!admin_is_super_admin($conn)) {
+        ps_rooms_forbidden($is_ajax, 'Only a Super Admin can lock or unlock facilities.');
+    }
+
     $room_id = intval($_POST['room_id'] ?? 0);
     $lock    = (($_POST['lock'] ?? '') === '1') ? 1 : 0;
 

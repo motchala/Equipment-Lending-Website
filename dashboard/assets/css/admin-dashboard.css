@@ -6875,6 +6875,42 @@ body:has(#roomScheduleModal:not(.hidden)) {
     cursor: wait;
 }
 
+/* Lock status label (regular Admins). Same size and position as the Super Admin's Lock button
+   (it reuses .pr-btn .pr-btn-ghost .pr-btn-sm) but it is only a label: no hover, no click.
+   Unlocked = grayed out ("Lock Facility"), locked = red ("Locked Facility"). */
+#panel-rooms .rmod-archive-zone .pr-lock-status {
+    cursor: default;
+    pointer-events: none;
+    user-select: none;
+    color: var(--text-light);
+    opacity: .6;
+}
+
+#panel-rooms .rmod-archive-zone .pr-lock-status .material-symbols-outlined {
+    font-size: 15px;
+}
+
+#panel-rooms .rmod-archive-zone .pr-lock-status.is-locked {
+    color: var(--danger);
+    opacity: 1;
+}
+
+/* A locked facility is read-only for a regular Admin: the Edit window shows the details, nothing can be changed. */
+#room-form-wrap .form-control-custom:disabled {
+    opacity: .7;
+    cursor: not-allowed;
+}
+
+#room-form-wrap .rf-chip input:disabled+span {
+    opacity: .6;
+    cursor: not-allowed;
+}
+
+#room-form-wrap.is-readonly .rmod-footer .pr-btn-primary {
+    opacity: .5;
+    cursor: not-allowed;
+}
+
 /* Hide the old inline submit — replaced by rmod-footer below */
 #room-form-wrap .btn-submit-form {
     display: none !important;

@@ -41,6 +41,23 @@ function ps_rooms_lock_select(mysqli $conn): string
     return ps_rooms_lock_column_ready($conn) ? 'r.is_locked' : '0 AS is_locked';
 }
 
+/**
+ * Is this facility locked right now? Read straight from the database, never from the request.
+ * False when the facility does not exist or the lock column is not there yet.
+ * A locked facility can only be edited by a Super Admin.
+ */
+function ps_room_is_locked(mysqli $conn, int $room_id): bool
+{
+    if (!ps_rooms_lock_column_ready($conn)) return false;
+    $st = $conn->prepare('SELECT is_locked FROM tbl_rooms WHERE room_id = ? LIMIT 1');
+    if (!$st) return false;
+    $st->bind_param('i', $room_id);
+    $st->execute();
+    $row = $st->get_result()->fetch_assoc();
+    $st->close();
+    return $row !== null && !empty($row['is_locked']);
+}
+
 /** Does a table exist? (used to skip optional child tables during permanent delete) */
 function ps_rooms_table_exists(mysqli $conn, string $table): bool
 {

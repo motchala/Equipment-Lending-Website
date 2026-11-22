@@ -19,7 +19,8 @@ require_once __DIR__ . '/../../shared/core/activity-logger.php'; // activity log
  *   - Redirect after POST with ?room_added=1 / ?room_updated=1 etc.
  *   - Soft-delete (is_archived = 1) first; permanent delete is a separate,
  *     Super-Admin-only action that only works on rooms already archived
- *   - Room lock (is_locked): Admin + Super Admin; archive / permanent delete: Super Admin only
+ *   - Room lock (is_locked): only a Super Admin can lock / unlock, and only a Super Admin can edit a
+ *     locked room; archive / permanent delete: Super Admin only
  */
 
 ini_set('display_errors', '0');
