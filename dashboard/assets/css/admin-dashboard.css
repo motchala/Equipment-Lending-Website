@@ -8723,6 +8723,11 @@ body:has(#roomDeleteConfirm:not(.hidden)) {
     font-size: 12px;
 }
 
+/* Equipment catalog: the search also filters by condition / stock, so its placeholder is longer */
+.inv-list-card .fac-search input {
+    width: 310px;
+}
+
 .fac-nomatch {
     padding: 3rem 1rem;
     text-align: center;

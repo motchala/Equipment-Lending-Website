@@ -4046,3 +4046,22 @@ button.fcty-open-chip {
     background: color-mix(in srgb, var(--fcty-brand) 8%, var(--fcty-card));
     color: var(--color-primary, #800000);
 }
+
+/* ── Missing-field flash ─────────────────────────────────────
+   Confirming with something not filled in flashes that part red for about a second instead of showing an
+   error: the same hold-then-fade as a Next steps entry in My Activity, in the error red. There is no closing
+   keyframe on purpose, so the fade ends on the element's own colours and nothing stays highlighted. */
+.fcty-flash {
+    animation: fcty-flash-red 1.2s ease-out;
+}
+
+.fcty-chips.fcty-flash {
+    border-radius: 12px;
+}
+
+@keyframes fcty-flash-red {
+    0%, 55% {
+        background-color: color-mix(in srgb, var(--color-error, #c0392b) 16%, transparent);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-error, #c0392b) 65%, transparent);
+    }
+}

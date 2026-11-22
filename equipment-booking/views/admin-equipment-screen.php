@@ -378,7 +378,9 @@
                         <div class="fac-search">
                             <span class="material-symbols-outlined">search</span>
                             <input type="text" id="inventorySearch" class="form-control-custom"
-                                placeholder="Search name or category" autocomplete="off">
+                                placeholder="Search name, category, condition or stock" autocomplete="off"
+                                aria-label="Search equipment by name, category, condition or stock"
+                                title="Search or filter. Try: low stock · no stock · in stock · for repair · good · fair · 0 · &lt;3 · &gt;=10">
                         </div>
                     </div>
                     <div class="tbl-wrap">
