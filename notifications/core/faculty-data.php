@@ -280,6 +280,26 @@ if (!function_exists('fnotif_date_ts')) {
     }
 }
 
+if (!function_exists('fnotif_decision_reason')) {
+    /**
+     * The reason an admin (or the decision rule) gave for a request's outcome.
+     * The decision log holds it: the admin's own note first, then the rule's reason. tbl_requests.reason is only a
+     * fallback, and its "Waiting for an admin …" wording is the holding text shown while the request was
+     * waiting, so it is never presented as a reason.
+     */
+    function fnotif_decision_reason(?string $adminNote, ?string $logReason, ?string $requestReason): string
+    {
+        foreach ([$adminNote, $logReason] as $candidate) {
+            $candidate = trim((string)$candidate);
+            if ($candidate !== '') {
+                return $candidate;
+            }
+        }
+        $fallback = trim((string)$requestReason);
+        return strncmp($fallback, 'Waiting for an admin', 20) === 0 ? '' : $fallback;
+    }
+}
+
 if (!function_exists('fnotif_rule_label')) {
     /** Human wording for an arbitration rule code (request or room). */
     function fnotif_rule_label(?string $rule): ?string
@@ -476,7 +496,9 @@ if (!function_exists('fnotif_build_list')) {
                             'body'  => 'You are approved to borrow <strong>' . $e($equipLbl) . '</strong>. Borrow on <strong>'
                                 . $e(date('M j', fnotif_date_ts($conn, $r['borrow_date']))) . '</strong>, return by <strong>'
                                 . $e(date('M j', fnotif_date_ts($conn, $r['return_date']))) . '</strong>. Receipt <strong>'
-                                . $e($recNo) . '</strong>.',
+                                . $e($recNo) . '</strong>.'
+                                . (trim((string)($r['log_override_reason'] ?? '')) !== ''
+                                    ? ' Admin note: ' . $e(fnotif_clip(trim((string)$r['log_override_reason']), 120)) : ''),
                             'ts'    => $decidedTs,
                             'detail' => [
                                 $d('Receipt No.', $recNo),
@@ -563,7 +585,8 @@ if (!function_exists('fnotif_build_list')) {
                             break;
                         }
 
-                        $reason = trim((string)($r['reason'] ?? '')) !== '' ? trim($r['reason']) : trim((string)($r['log_reason'] ?? ''));
+                        // The ADMIN'S reason (decision log) comes first; the request's own text is only a fallback
+                        $reason = fnotif_decision_reason($r['log_override_reason'] ?? '', $r['log_reason'] ?? '', $r['reason'] ?? '');
                         $add([
                             'key' => 'reqdeclined-' . $id,
                             'cat' => 'borrow',
@@ -577,7 +600,8 @@ if (!function_exists('fnotif_build_list')) {
                                 $d('Reason', $reason, true),
                                 $d('Decision Rule', fnotif_rule_label($r['log_rule'] ?? $r['arbitration_rule'] ?? null)),
                                 $d('Decision', $override ? 'Overridden by an administrator' : ''),
-                                $d('Admin Note', $r['log_override_reason'] ?? ''),
+                                // the admin's note IS the reason above in most cases; only list it again when it adds something
+                                $d('Admin Note', trim((string)($r['log_override_reason'] ?? '')) !== $reason ? ($r['log_override_reason'] ?? '') : ''),
                                 $d('Requested On', date('M j, Y g:i A', $reqTs)),
                             ]),
                             'link' => $lendingLink,
