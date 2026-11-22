@@ -66,13 +66,30 @@
                                     }
                                 }
 
-                                /* Lock button in the Edit modal: label + icon + next action. */
+                                /* Lock control in the Edit modal.
+                                   Super Admin: a real button; label + icon show the NEXT action.
+                                   Regular Admin: the same-looking control is only a status label
+                                   (it carries data-lock-status): grayed "Lock Facility" while the
+                                   facility is unlocked, red "Locked Facility" while it is locked.
+                                   A locked facility is read-only for a regular Admin - every field and
+                                   the Save buttons are disabled. (The server enforces the same rule;
+                                   this just stops the window from inviting edits that would be refused.) */
                                 window.psSetLockButton = function(isLocked) {
                                     const btn = document.getElementById('room-lock-btn');
                                     if (!btn) return;
-                                    btn.dataset.lock = isLocked ? '0' : '1';
                                     const ico = document.getElementById('room-lock-icon');
                                     const lbl = document.getElementById('room-lock-label');
+
+                                    if (btn.dataset.lockStatus !== undefined) {
+                                        btn.dataset.lockStatus = isLocked ? '1' : '0';
+                                        btn.classList.toggle('is-locked', isLocked);
+                                        if (ico) ico.textContent = 'lock';
+                                        if (lbl) lbl.textContent = isLocked ? 'Locked Facility' : 'Lock Facility';
+                                        setRoomFormReadOnly(isLocked);
+                                        return;
+                                    }
+
+                                    btn.dataset.lock = isLocked ? '0' : '1';
                                     if (ico) ico.textContent = isLocked ? 'lock_open' : 'lock';
                                     if (lbl) lbl.textContent = isLocked ? 'Unlock Facility' : 'Lock Facility';
                                 };
@@ -82,6 +99,18 @@
                                         return document.getElementById(id);
                                     })
                                     .filter(Boolean);
+
+                                /* Read-only Edit window (locked facility, regular Admin). */
+                                function setRoomFormReadOnly(readOnly) {
+                                    const wrap = document.getElementById('room-form-wrap');
+                                    if (wrap) wrap.classList.toggle('is-readonly', readOnly);
+                                    roomForm.querySelectorAll('input:not([type="hidden"]), select').forEach(function(el) {
+                                        el.disabled = readOnly;
+                                    });
+                                    submitBtns.forEach(function(b) {
+                                        b.disabled = readOnly;
+                                    });
+                                }
 
                                 roomForm.addEventListener('submit', function(e) {
                                     e.preventDefault();
@@ -362,4 +391,13 @@
                                         if (go) go.disabled = !e.target.checked;
                                     }
                                 });
+
+                                /* If the Edit window is already open on page load (?edit_room=ID), apply
+                                   the saved lock state to it (regular Admins only - they have the label). */
+                                (function() {
+                                    const statusEl = document.getElementById('room-lock-btn');
+                                    if (statusEl && statusEl.dataset.lockStatus !== undefined) {
+                                        window.psSetLockButton(statusEl.dataset.lockStatus === '1');
+                                    }
+                                })();
                             })();

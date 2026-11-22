@@ -124,17 +124,29 @@
                             </form>
 
                             <!-- Room actions zone (edit mode only): always in DOM, shown/hidden by JS.
-                                 Lock / Unlock: Admin + Super Admin.  Archive: Super Admin only
+                                 Lock / Unlock: Super Admin only. A regular Admin sees the same-looking control
+                                 as a plain status label (grayed "Lock Facility" = unlocked, red "Locked Facility"
+                                 = locked) that cannot be clicked.  Archive: Super Admin only
                                  (the link is not even rendered for a regular Admin; the server checks too). -->
                             <?php $edit_locked = $edit_room && !empty($edit_room['is_locked']); ?>
                             <div class="rmod-archive-zone<?php echo $edit_room ? '' : ' hidden'; ?>" id="room-archive-zone">
-                                <button type="button" id="room-lock-btn"
-                                    class="pr-btn pr-btn-ghost pr-btn-sm"
-                                    data-action="toggle-room-lock"
-                                    data-lock="<?php echo $edit_locked ? '0' : '1'; ?>">
-                                    <span class="material-symbols-outlined" id="room-lock-icon" style="font-size:15px;"><?php echo $edit_locked ? 'lock_open' : 'lock'; ?></span>
-                                    <span id="room-lock-label"><?php echo $edit_locked ? 'Unlock Facility' : 'Lock Facility'; ?></span>
-                                </button>
+                                <?php if ($is_super_admin): ?>
+                                    <button type="button" id="room-lock-btn"
+                                        class="pr-btn pr-btn-ghost pr-btn-sm"
+                                        data-action="toggle-room-lock"
+                                        data-lock="<?php echo $edit_locked ? '0' : '1'; ?>">
+                                        <span class="material-symbols-outlined" id="room-lock-icon" style="font-size:15px;"><?php echo $edit_locked ? 'lock_open' : 'lock'; ?></span>
+                                        <span id="room-lock-label"><?php echo $edit_locked ? 'Unlock Facility' : 'Lock Facility'; ?></span>
+                                    </button>
+                                <?php else: ?>
+                                    <span id="room-lock-btn"
+                                        class="pr-btn pr-btn-ghost pr-btn-sm pr-lock-status<?php echo $edit_locked ? ' is-locked' : ''; ?>"
+                                        role="status"
+                                        data-lock-status="<?php echo $edit_locked ? '1' : '0'; ?>">
+                                        <span class="material-symbols-outlined" id="room-lock-icon">lock</span>
+                                        <span id="room-lock-label"><?php echo $edit_locked ? 'Locked Facility' : 'Lock Facility'; ?></span>
+                                    </span>
+                                <?php endif; ?>
                                 <?php if ($is_super_admin): ?>
                                     <a href="admin-dashboard.php?archive_room=<?php echo $edit_room ? (int)$edit_room['room_id'] : ''; ?>"
                                         id="room-archive-link"
