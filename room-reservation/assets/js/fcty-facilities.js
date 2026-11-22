@@ -1794,6 +1794,13 @@
 
         /* Leaving the Facilities tab resets everything */
         var panel = $('panel-rooms');
+
+        /* The page can open ALREADY on the Facilities tab (a refresh keeps the screen you were on, and the server
+           prints it as the active one). faculty-dashboard.js asks this script to start when it opens the tab, but
+           that happens before this init() has created window.PUPSyncFacilities, so the request is lost and the
+           building panels (and their photos) would stay on their grey loading placeholders. Start here instead. */
+        if (panel && panel.classList.contains('active')) start();
+
         if (panel && typeof MutationObserver !== 'undefined') {
             new MutationObserver(function () {
                 if (panel.classList.contains('active')) return;
