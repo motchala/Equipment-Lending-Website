@@ -25,7 +25,7 @@ $conn->set_charset('utf8mb4');
 // ── Read config ──────────────────────────────────────────────────────────────
 $cfg_stmt = $conn->prepare(
     "SELECT config_key, value FROM tbl_sync_config
-      WHERE config_key IN ('gsheet_url','gsheet_last_modified')"
+      WHERE config_key IN ('gsheet_url','gsheet_last_modified','gsheet_sync_enabled')"
 );
 $cfg_stmt->execute();
 $cfg_rows = $cfg_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -33,8 +33,10 @@ $cfg_stmt->close();
 $cfg = [];
 foreach ($cfg_rows as $r) $cfg[$r['config_key']] = $r['value'];
 
-$gsheet_url = trim((string)($cfg['gsheet_url'] ?? ''));
-if ($gsheet_url === '') {
+$gsheet_url     = trim((string)($cfg['gsheet_url'] ?? ''));
+$sync_enabled   = (string)($cfg['gsheet_sync_enabled'] ?? '0');
+
+if ($gsheet_url === '' || $sync_enabled !== '1') {
     echo json_encode(['changed' => false]);
     exit;
 }

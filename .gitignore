@@ -9,6 +9,17 @@ config/db.php
 *.log
 /uploads/request_letters/
 
+# Equipment images are stored in Cloudinary — do not commit them to git
+/uploads/*.jpg
+/uploads/*.jpeg
+/uploads/*.png
+/uploads/*.webp
+/uploads/*.gif
+/uploads/*.JPG
+/uploads/*.JPEG
+/uploads/*.PNG
+/uploads/*.WEBP
+
 # OS noise
 .DS_Store
 Thumbs.db

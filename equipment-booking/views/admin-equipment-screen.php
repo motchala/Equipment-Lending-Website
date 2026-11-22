@@ -327,7 +327,7 @@
                                     <input type="file" name="item_image" id="itemImageInput"
                                         accept="image/jpeg,image/png" hidden>
                                     <?php if ($edit_item && $edit_item['image_path'] !== 'uploads/default.png'): ?>
-                                        <img src="<?php echo $root_url . htmlspecialchars($edit_item['image_path']); ?>"
+                                        <img src="<?php echo htmlspecialchars(equipment_image_path($edit_item['image_path'], $root_url)); ?>"
                                             class="drop-zone-preview" id="imagePreview" style="display:block;" alt="">
                                     <?php else: ?>
                                         <img id="imagePreview" class="drop-zone-preview" alt="">
@@ -427,12 +427,12 @@
                                             data-item-category="<?php echo htmlspecialchars($item['category'], ENT_QUOTES); ?>"
                                             data-item-quantity="<?php echo $inv_qty; ?>"
                                             data-item-condition="<?php echo htmlspecialchars($inv_cond, ENT_QUOTES); ?>"
-                                            data-item-image="<?php echo htmlspecialchars($item['image_path'], ENT_QUOTES); ?>"
-                                            data-item-image-full="<?php echo htmlspecialchars($root_url . $item['image_path'], ENT_QUOTES); ?>">
+                                            data-item-image="<?php echo htmlspecialchars(equipment_image_path($item['image_path'], $root_url), ENT_QUOTES); ?>"
+                                            data-item-image-full="<?php echo htmlspecialchars(equipment_image_path($item['image_path'], $root_url), ENT_QUOTES); ?>">
                                             <td>
                                                 <div class="fac-person">
                                                     <span class="inv-thumb">
-                                                        <img src="<?php echo $root_url . htmlspecialchars($item['image_path']); ?>"
+                                                        <img src="<?php echo htmlspecialchars(equipment_image_path($item['image_path'], $root_url)); ?>"
                                                             alt="<?php echo htmlspecialchars($item['item_name']); ?>"
                                                             loading="lazy">
                                                         <span class="material-symbols-outlined inv-thumb-ph">inventory_2</span>
@@ -519,9 +519,9 @@
                                 <?php else: while ($item = mysqli_fetch_assoc($archive_result)): ?>
                                     <tr>
                                         <td>
-                                            <img src="<?php echo $root_url . htmlspecialchars($item['image_path']); ?>"
+                                            <img src="<?php echo htmlspecialchars(equipment_image_path($item['image_path'], $root_url)); ?>"
                                                 class="item-img"
-                                                onerror="this.src='../uploads/default.png'">
+                                                onerror="this.src='<?php echo $root_url; ?>uploads/default.png'">
                                         </td>
                                         <td class="fw-bold"><?php echo htmlspecialchars($item['item_name']); ?></td>
                                         <td><?php echo htmlspecialchars($item['category']); ?></td>

@@ -1,1 +1,3 @@
-# sse/api/ — these files are intentionally public endpoints; no deny rule needed.
+# SSE API endpoints are intentionally public — explicitly grant access
+# so the parent directory's Require all denied does not apply here.
+Require all granted

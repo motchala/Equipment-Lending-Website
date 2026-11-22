@@ -1,1 +1,3 @@
-Deny from all
+# Block direct browser access to the sse/ module root.
+# Sub-directories (api/, assets/) override this with their own rules.
+Require all denied

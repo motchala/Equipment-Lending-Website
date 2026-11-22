@@ -16,7 +16,7 @@ ini_set('display_startup_errors', '0');
 error_reporting(E_ALL);
 ini_set('log_errors', '1');
 date_default_timezone_set('Asia/Manila');
-set_time_limit(60);
+set_time_limit(0);
 ignore_user_abort(true);
 
 require_once __DIR__ . '/../../config/session.php';

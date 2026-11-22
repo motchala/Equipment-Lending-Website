@@ -8,6 +8,7 @@ $today = date('Y-m-d');   // kept: other code that includes this file may read i
 require_once __DIR__ . '/auto-approve-tick.php';
 equipment_auto_approve_tick($conn);
 BookingSchedule::tick($conn);
+require_once __DIR__ . '/../../shared/core/cloudinary.php';
 
 
 // ================= EQUIPMENT IMAGE FILE HELPERS =================
@@ -31,6 +32,27 @@ if (!function_exists('equipment_delete_image_file')) {
         if ($image_path === '' || $image_path === 'uploads/default.png') {
             return false;
         }
+
+        // Cloudinary image — delete via API
+        if (str_starts_with($image_path, 'https://res.cloudinary.com/')) {
+            try {
+                // Check if another item still uses this URL
+                $stmt = $conn->prepare('SELECT COUNT(*) FROM tbl_inventory WHERE image_path = ? AND item_id <> ?');
+                $stmt->bind_param('si', $image_path, $except_item_id);
+                $stmt->execute();
+                $stmt->bind_result($others);
+                $stmt->fetch();
+                $stmt->close();
+                if ((int)$others > 0) {
+                    return false;
+                }
+            } catch (Throwable $e) {
+                error_log('[PUPSync] Cloudinary in-use check failed: ' . $e->getMessage());
+                return false;
+            }
+            return cloudinary_delete($image_path);
+        }
+
         // Must be exactly "uploads/<file name>" - no sub-folders, no "..", no hidden files.
         if (!preg_match('#^uploads/([^/\\\\]+)$#', $image_path, $m)) {
             return false;
@@ -114,11 +136,19 @@ if (isset($_POST['add_item'])) {
             exit();
         }
 
-        $image_name = time() . "_" . preg_replace("/[^a-zA-Z0-9.]/", "_", $_FILES['item_image']['name']);
-        $target = __DIR__ . '/../../uploads/' . $image_name;
-
-        if (move_uploaded_file($_FILES['item_image']['tmp_name'], $target)) {
-            $image_path = "uploads/" . $image_name;
+        $cloud_url = cloudinary_upload(
+            $_FILES['item_image']['tmp_name'],
+            $_FILES['item_image']['name']
+        );
+        if ($cloud_url !== '') {
+            $image_path = $cloud_url;
+        } else {
+            // Cloudinary failed — fall back to local storage
+            $image_name = time() . "_" . preg_replace("/[^a-zA-Z0-9.]/", "_", $_FILES['item_image']['name']);
+            $target = __DIR__ . '/../../uploads/' . $image_name;
+            if (move_uploaded_file($_FILES['item_image']['tmp_name'], $target)) {
+                $image_path = "uploads/" . $image_name;
+            }
         }
     }
 
@@ -213,21 +243,30 @@ if (isset($_POST['update_item'])) {
             exit();
         }
 
-        $image_name = time() . "_" . preg_replace("/[^a-zA-Z0-9.]/", "_", $_FILES['item_image']['name']);
-        $target = __DIR__ . '/../../uploads/' . $image_name;
-
-        if (!move_uploaded_file($_FILES['item_image']['tmp_name'], $target)) {
-            if ($is_ajax) {
-                header('Content-Type: application/json');
-                echo json_encode(['status' => 'error', 'message' => 'Could not save the image. Please try again.']);
+        $cloud_url = cloudinary_upload(
+            $_FILES['item_image']['tmp_name'],
+            $_FILES['item_image']['name']
+        );
+        if ($cloud_url !== '') {
+            $image_path = $cloud_url;
+            $old_image_to_delete = $current_image;
+        } else {
+            // Cloudinary failed — fall back to local storage
+            $image_name = time() . "_" . preg_replace("/[^a-zA-Z0-9.]/", "_", $_FILES['item_image']['name']);
+            $target = __DIR__ . '/../../uploads/' . $image_name;
+            if (!move_uploaded_file($_FILES['item_image']['tmp_name'], $target)) {
+                if ($is_ajax) {
+                    header('Content-Type: application/json');
+                    echo json_encode(['status' => 'error', 'message' => 'Could not save the image. Please try again.']);
+                    exit();
+                }
+                header("Location: {$base}/admin-dashboard.php?view=inventory&error=dberror");
                 exit();
             }
-            header("Location: {$base}/admin-dashboard.php?view=inventory&error=dberror");
-            exit();
+            $new_image_abs = $target;
+            $image_path = "uploads/" . $image_name;
+            $old_image_to_delete = $current_image;
         }
-        $new_image_abs = $target;
-        $image_path = "uploads/" . $image_name;
-        $old_image_to_delete = $current_image;   // the photo being replaced goes away once the save succeeds
     } elseif (($_POST['remove_image'] ?? '0') === '1') {
         // Explicit "Remove image" click — revert to the default placeholder and
         // (after the save succeeds) delete the old upload from disk.

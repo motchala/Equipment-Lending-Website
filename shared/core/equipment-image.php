@@ -21,19 +21,36 @@ if (!defined('EQUIPMENT_DEFAULT_IMAGE')) {
 
 if (!function_exists('equipment_image_path')) {
     /**
-     * @param string|null $path image_path as stored in tbl_inventory (may be null / empty)
-     * @return string a path relative to the project root, never empty
+     * Returns the correct src value for an equipment image.
+     *
+     * Handles three formats stored in tbl_inventory.image_path:
+     *   1. Cloudinary URL  (https://res.cloudinary.com/…) — returned as-is; $root_url ignored
+     *   2. Local path      (uploads/filename.jpg)         — prefixed with $root_url
+     *   3. Empty / default                                — $root_url + 'uploads/default.png'
+     *
+     * The is_file() check is intentionally removed: Cloudinary URLs are always
+     * valid remote URLs; for legacy local paths, the onerror fallback on each
+     * <img> tag handles missing files gracefully.
+     *
+     * @param string|null $path     image_path as stored in tbl_inventory (may be null / empty)
+     * @param string      $root_url site root URL with trailing slash, e.g. 'https://site.com/'
+     *                              Pass '' when you need a bare path (rare).
+     * @return string a URL or path, never empty
      */
-    function equipment_image_path(?string $path): string
+    function equipment_image_path(?string $path, string $root_url = ''): string
     {
         $path = trim((string)$path);
-        if ($path === '' || str_contains($path, '..')) {
-            return EQUIPMENT_DEFAULT_IMAGE;
+
+        // Cloudinary URL — absolute, return as-is
+        if (str_starts_with($path, 'https://')) {
+            return $path;
         }
-        // A path that points at a file that is no longer there would be a broken image.
-        if (!is_file(dirname(__DIR__, 2) . '/' . ltrim($path, '/'))) {
-            return EQUIPMENT_DEFAULT_IMAGE;
+
+        // Empty, suspicious, or default placeholder
+        if ($path === '' || str_contains($path, '..') || $path === EQUIPMENT_DEFAULT_IMAGE) {
+            return $root_url . EQUIPMENT_DEFAULT_IMAGE;
         }
-        return $path;
+
+        return $root_url . $path;
     }
 }

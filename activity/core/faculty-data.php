@@ -99,7 +99,7 @@ function fact_eq_image_map(mysqli $conn): array
     $map = [];
     $res = $conn->query('SELECT item_name, image_path FROM tbl_inventory');
     while ($res && ($row = $res->fetch_assoc())) {
-        $map[strtolower(trim((string)$row['item_name']))] = equipment_image_path((string)($row['image_path'] ?? ''));
+        $map[strtolower(trim((string)$row['item_name']))] = equipment_image_path((string)($row['image_path'] ?? ''), $root_url ?? '');
     }
     return $map;
 }
