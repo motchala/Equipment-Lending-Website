@@ -286,11 +286,36 @@
         var modal = $('bfModal'); if (modal) modal.style.display = 'none';
     }
 
+    /* At most n short sentences on one line, so a message can be read at a glance. */
+    function brief(msg, n) {
+        msg = String(msg == null ? '' : msg).replace(/\s+/g, ' ').trim();
+        if (!msg) return '';
+        return msg.replace(/([.!?])\s+(?=[A-Z\u201C"])/g, '$1\u0001').split('\u0001').slice(0, n || 2).join(' ');
+    }
+
+    /* The one error line of the modal: one to two sentences, never a list. */
     function setError(msg) {
         var el = $('bfError'); if (!el) return;
+        msg = brief(msg, 2);
         el.hidden = !msg;
-        el.textContent = msg || '';
+        el.textContent = msg;
         if (msg && el.scrollIntoView) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+
+    /* Something not filled in yet is shown, not explained: the field flashes red for about a second
+       (same fade as a Next steps entry in My Activity, in red). The CSS animation fades it out by itself;
+       the class is taken off afterwards only to tidy up, and put back from scratch on the next try. */
+    var FLASH_MS = 1200;
+    function flashFields(list) {
+        list = (list || []).filter(Boolean);
+        if (!list.length) return;
+        list.forEach(function (el) { el.classList.remove('bf-flash'); });
+        void list[0].offsetWidth;
+        list.forEach(function (el) { el.classList.add('bf-flash'); });
+        setTimeout(function () { list.forEach(function (el) { el.classList.remove('bf-flash'); }); }, FLASH_MS + 100);
+        var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (list[0].scrollIntoView) list[0].scrollIntoView({ behavior: calm ? 'auto' : 'smooth', block: 'center' });
+        if (list[0].tagName === 'INPUT' && list[0].type === 'text') list[0].focus({ preventScroll: true });
     }
 
     /* ---- the items inside the modal ------------------------------------ */
@@ -772,17 +797,33 @@
     }
 
     /* ---- submit --------------------------------------------------------- */
-    function validate(w) {
-        if (!count()) return 'Please add at least one item.';
+    /* What has not been filled in yet. Never reported with a message: every one of these fields flashes red
+       at once (see flashFields). */
+    function missingFields() {
+        var out = [], r = rules();
+        var date = $('bfDate'), time = $('bfTime'), dur = $('bfDuration');
+        var dv = date ? date.value : '';
+        var type = (document.querySelector('input[name="bf_collector_type"]:checked') || {}).value || 'faculty';
+        if (!count()) out.push($('bfItems'));
+        if (!dv) out.push(date);
+        if (time && !time.value && (!dv || time.options.length > 1)) out.push(time);
+        if (dur && !durParse(dur.value).n) out.push(dur);
+        if (!$('bfRoomId').value) out.push($('bfRoomBtn'));
+        if (type === 'student' && !$('bfStudentName').value.trim()) out.push($('bfStudentName'));
+        var file = $('request_document') && $('request_document').files && $('request_document').files[0];
+        if (r.letterRequired && dv && dv > todayStr() && !file) out.push(document.querySelector('#bfLetter .pslc-pair'));
+        return out.filter(Boolean);
+    }
+
+    /* Everything else that can be wrong: the FIRST problem only, in one or two sentences. */
+    function ruleError(w) {
         var r = rules(), date = $('bfDate').value;
-        if (!date) return 'Please select a borrow date.';
         var d = borrowDates().filter(function (e) { return e.value === date; })[0];
         if (!d) return 'Choose today or a non-Sunday date within the next ' + (r.ahead === 14 ? 'two weeks' : r.ahead + ' days') + '.';
         if (!d.available) return isSunday(date) ? 'Same-day borrowing is unavailable on Sundays. Choose a later date.' : 'Same-day borrowing is unavailable after ' + clock(r.lastStart) + '. Choose a later date.';
         if (isSunday(date)) return 'Equipment borrowing is unavailable on Sundays.';
-        if (!w) return 'Please choose a start time and a duration.';
+        if (!w) return 'No start times are left on that date. Please choose a later date.';
         if (startTimes(date, w.unit === 'days' ? 1 : w.dur).indexOf(w.time) === -1) return 'Choose a start time that allows the selected borrowing duration.';
-        if (!$('bfRoomId').value) return 'Please choose a building and room.';
         for (var i = 0; i < order.length; i++) {
             var name = order[i], s = stock(name), q = sel[name].qty;
             if (w.mode === 'today') {
@@ -793,18 +834,29 @@
             }
         }
         var type = (document.querySelector('input[name="bf_collector_type"]:checked') || {}).value || 'faculty';
-        if (type === 'student' && !$('bfStudentName').value.trim()) return 'Please enter the student\u2019s name before submitting.';
         if (type === 'student' && Array.from($('bfStudentName').value.trim().replace(/\s+/g, ' ')).length > STUDENT_NAME_MAX) return 'The student name is too long. Please check it and try again.';
         if (w.mode === 'future') {
             var f = $('request_document') && $('request_document').files && $('request_document').files[0];
-            if (!f && r.letterRequired) return 'A request letter is required for later-date requests. Please attach one.';
             if (f) {
                 if (!/\.(pdf|jpe?g|png|webp)$/i.test(f.name)) return 'The request letter must be a PDF, JPG, PNG or WEBP file.';
                 if (f.size > 5 * 1024 * 1024) return 'The request letter is too large. Maximum size is 5 MB.';
             }
         }
-        if (mstate.ok === false) return ($('bfAvail').textContent || 'That schedule is not available.');
         return '';
+    }
+
+    /* null = good to go; { flash: [fields] } = something is not filled in; { msg } = one short message */
+    function validate(w) {
+        var miss = missingFields();
+        if (miss.length) return { flash: miss };
+        var msg = ruleError(w);
+        if (msg) return { msg: msg };
+        if (mstate.ok === false) {
+            /* the live availability line under the schedule already says what is wrong: point at it, do not repeat it */
+            var av = $('bfAvail');
+            return av && av.textContent ? { flash: [av] } : { msg: 'That schedule is not available.' };
+        }
+        return null;
     }
 
     function setBusy(on) {
@@ -823,8 +875,8 @@
         if (mstate.busy) return;
         setError('');
         var w = windowOf();
-        var err = validate(w);
-        if (err) { setError(err); toast(err, 'error'); return; }
+        var bad = validate(w);
+        if (bad) { if (bad.flash) flashFields(bad.flash); else setError(bad.msg); return; }
 
         var type = (document.querySelector('input[name="bf_collector_type"]:checked') || {}).value || 'faculty';
         var payload = {
@@ -876,13 +928,14 @@
                     resetForm();
                     closeModal();
                 } else {
-                    var lines = failed.map(function (f) { return f.name + ': ' + f.error; }).join('\n');
+                    /* ONE short message: the first problem. If some items did go through, say so in the same breath. */
+                    var first = brief(failed[0].name + ': ' + failed[0].error, 1);
                     if (done.length) {
-                        toast(done.length + ' submitted. ' + failed.length + ' could not be filed.', 'error');
                         renderRows(); onWindowChange();
-                        setError(lines + '\nThe items that went through were removed — fix the rest and submit again.');
+                        setError(plural(done.length, 'item') + ' submitted, ' + failed.length + ' not filed. ' + first);
                     } else {
-                        setError(lines);
+                        var more = failed.length - 1;
+                        setError(more ? first + ' ' + plural(more, 'other item') + ' could not be filed either.' : brief(failed[0].name + ': ' + failed[0].error, 2));
                     }
                 }
                 if (done.length) document.dispatchEvent(new CustomEvent('pupsync:requests-changed'));

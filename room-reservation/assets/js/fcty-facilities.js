@@ -871,6 +871,29 @@
         el.hidden = false;
     }
 
+    /* At most n short sentences on one line, so a message can be read at a glance. */
+    function brief(msg, n) {
+        msg = String(msg == null ? '' : msg).replace(/\s+/g, ' ').trim();
+        if (!msg) return '';
+        return msg.replace(/([.!?])\s+(?=[A-Z\u201C"])/g, '$1\u0001').split('\u0001').slice(0, n || 2).join(' ');
+    }
+
+    /* Something not filled in yet is shown, not explained: it flashes red for about a second (same fade as a
+       Next steps entry in My Activity, in red). The CSS animation fades it out by itself; the class is taken
+       off afterwards only to tidy up, and put back from scratch on the next try. */
+    var FLASH_MS = 1200;
+    function flashMissing(list) {
+        list = (list || []).filter(Boolean);
+        if (!list.length) return;
+        list.forEach(function (el) { el.classList.remove('fcty-flash'); });
+        void list[0].offsetWidth;
+        list.forEach(function (el) { el.classList.add('fcty-flash'); });
+        setTimeout(function () { list.forEach(function (el) { el.classList.remove('fcty-flash'); }); }, FLASH_MS + 100);
+        var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (list[0].scrollIntoView) list[0].scrollIntoView({ behavior: calm ? 'auto' : 'smooth', block: 'center' });
+        if (list[0].tagName === 'INPUT' && list[0].type === 'text') list[0].focus({ preventScroll: true });
+    }
+
     function chipRow(id, labels) {
         return '<div class="fcty-chips" id="' + id + '">' + labels.map(function (l) {
             return '<button type="button" class="fcty-chip" aria-pressed="false" data-val="' + esc(l) + '">' + esc(l) + '</button>';
@@ -1414,15 +1437,20 @@
         $('fcty-res-report').addEventListener('click', function () { openReportIssueForm(room); });
 
         btnSubmit.addEventListener('click', function () {
-            function fail(t) { setAlert(elMsg, 'error', 'error', esc(t)); elMsg.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+            /* ONE short message, never a list */
+            function fail(t) { setAlert(elMsg, 'error', 'error', esc(brief(t, 2))); elMsg.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+            elMsg.hidden = true;
+            /* Not filled in yet: flash those parts red instead of showing an error */
             var purpose = String(st.purpose || '').trim();
-            if (!purpose) return fail(st.other ? 'Tell us what the room is for.' : 'Pick what the room is for.');
+            var missing = [];
+            if (!purpose) missing.push(st.other ? elPurpose : $('fcty-purpose-chips'));
+            if (quota && quota.rules && quota.rules.letterRequired && isLaterDate() && !docFile) missing.push($('fcty-drop'), $('fcty-doc-cam'));
+            if (missing.length) return flashMissing(missing);
             if (st.end <= st.start) return fail('End time must be after the start time.');
             if (isClosedDay(parseYmd(st.date))) return fail('Reservations are not available on ' + closedDaysText() + '. Please choose another day.');
             if (st.end - st.start > MAX_RES_MIN) return fail('A reservation can be at most ' + (MAX_RES_MIN / 60) + (MAX_RES_MIN === 60 ? ' hour' : ' hours') + ' long.');
             if (weekData && clashes().length) return fail('That time is already taken. Pick one of the open times.');
             if (elDate.max && st.date > elDate.max) return fail('Rooms can only be reserved up to ' + advanceLabel() + ' ahead. Please pick an earlier date.');
-            if (quota && quota.rules && quota.rules.letterRequired && isLaterDate() && !docFile) return fail('A request letter is required for later-date reservations. Please attach one.');
 
             btnSubmit.disabled = true;
             btnSubmit.textContent = 'Submitting\u2026';

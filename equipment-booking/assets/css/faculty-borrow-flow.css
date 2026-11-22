@@ -1109,3 +1109,24 @@
         transition: none;
     }
 }
+
+/* ── Missing-field flash ─────────────────────────────────────
+   Submitting with something not filled in flashes that field red for about a second instead of showing an
+   error: the same hold-then-fade as a Next steps entry in My Activity, in the error red. There is no closing
+   keyframe on purpose, so the fade ends on the field's own colours and nothing stays highlighted. */
+.bf-flash {
+    animation: bf-flash-red 1.2s ease-out;
+}
+
+#bfItems.bf-flash,
+#bfAvail.bf-flash,
+#bfLetter .pslc-pair.bf-flash {
+    border-radius: 12px;
+}
+
+@keyframes bf-flash-red {
+    0%, 55% {
+        background-color: color-mix(in srgb, var(--color-error, #c0392b) 16%, transparent);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-error, #c0392b) 65%, transparent);
+    }
+}
