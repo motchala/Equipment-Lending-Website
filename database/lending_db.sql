@@ -2627,7 +2627,19 @@ INSERT INTO `tbl_sync_config` (`config_key`, `value`, `updated_at`) VALUES
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `tbl_sync_config`
+--
+
+CREATE TABLE IF NOT EXISTS `tbl_sync_config` (
+  `config_key` varchar(100) NOT NULL,
+  `value`      text         NOT NULL,
+  `updated_at` datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`config_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+--
 -- Table structure for table `tbl_sync_pending_deletions`
+
 --
 
 CREATE TABLE `tbl_sync_pending_deletions` (

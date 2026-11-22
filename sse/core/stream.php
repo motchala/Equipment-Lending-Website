@@ -35,9 +35,10 @@ function sse_send_headers(): void
 function sse_emit(string $event, string $data): void
 {
     echo "event: {$event}\ndata: {$data}\n\n";
-    ob_flush();
+    if (ob_get_level() > 0) ob_flush();
     flush();
 }
+
 
 /**
  * Write a heartbeat comment if the interval has elapsed, then flush.
@@ -54,7 +55,7 @@ function sse_maybe_heartbeat(int &$lastHb, int $interval = 20): void
 {
     if (time() - $lastHb >= $interval) {
         echo ": heartbeat\n\n";
-        ob_flush();
+        if (ob_get_level() > 0) ob_flush();
         flush();
         $lastHb = time();
     }
