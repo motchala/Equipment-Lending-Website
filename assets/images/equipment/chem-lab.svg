@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" role="img" aria-label="Laboratory equipment">
+<rect width="600" height="600" fill="#eceff2"/>
+<rect x="258" y="170" width="84" height="16" rx="8" fill="#a9b2bc"/>
+<path d="M272 186h56v82l74 124c15 25-2 58-31 58H229c-29 0-46-33-31-58l74-124z" fill="#a9b2bc"/>
+<path d="M232 352q17-14 34 0t34 0 34 0 34 0" fill="none" stroke="#eceff2" stroke-width="11" stroke-linecap="round"/>
+</svg>

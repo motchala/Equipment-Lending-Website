@@ -1257,8 +1257,7 @@ select.st-input option:disabled {
         padding-left: 24px;
         padding-right: 24px;
         border: 1px solid var(--st-line);
-        border-bottom: none;
-        border-radius: 16px 16px 0 0;
+        border-radius: 16px;
     }
 }
 
@@ -3379,4 +3378,23 @@ select.st-input option:disabled {
 /* QR codes: two side by side when there is room (also on phones), one per row only on very narrow screens */
 .st-req>.st-qrs {
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+/* ── Missing-field flash ─────────────────────────────────────
+   Submitting with something not filled in flashes that field red for about a second instead of showing an
+   error: the same hold-then-fade as a Next steps entry in the faculty My Activity, in the error red. There is
+   no closing keyframe on purpose, so the fade ends on the field's own colours and nothing stays highlighted. */
+.st-flash {
+    animation: st-flash-red 1.2s ease-out;
+}
+
+.st-chiprow.st-flash {
+    border-radius: 12px;
+}
+
+@keyframes st-flash-red {
+    0%, 55% {
+        background-color: color-mix(in srgb, var(--st-err, #b3261e) 16%, transparent);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--st-err, #b3261e) 65%, transparent);
+    }
 }

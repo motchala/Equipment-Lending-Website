@@ -88,7 +88,7 @@
     function rules() {
         var r = meta().rules || {};
         return {
-            open: toMin(r.dayStart || '07:00'), lastStart: toMin(r.lastStart || '20:00'), close: toMin(r.dayEnd || '21:00'),
+            open: toMin(r.dayStart || '07:00'), lastStart: toMin(r.lastStart || '19:00'), close: toMin(r.dayEnd || '20:00'),
             step: +r.slot || 60, ahead: +r.maxAhead || 14,
             hours: (r.durationHours && r.durationHours.length) ? r.durationHours : [1, 2, 3, 6],
             maxDays: Math.max(1, +r.maxBorrowDays || 1), letterRequired: !!r.letterRequired
@@ -420,7 +420,7 @@
             for (var i = 1; i < dur.options.length; i++) if (!dur.options[i].disabled) { dur.value = dur.options[i].value; break; }
         }
     }
-    /* Rebuilds the date list when "today" opens or closes (Sunday / after 8 PM) while the page stays open */
+    /* Rebuilds the date list when "today" opens or closes (Sunday / after the last start time) while the page stays open */
     function syncSchedule() {
         var date = $('bfDate'); if (!date) return;
         var r = rules(), today = borrowDates()[0];
@@ -477,6 +477,20 @@
     /* ---- live check: item availability + which rooms are taken ---------- */
     var avail = { rooms: null, tok: 0, rtok: 0 };   /* rooms: { reserved:Set, mine:Set, info:{} } for the current window */
 
+    /* "Points used": the faculty member's shared allowance (different items + students authorized) for the
+       chosen day, including what this request adds. The server sends it with every availability check. */
+    function setPoints(p) {
+        var el = $('bfPoints'); if (!el) return;
+        if (!p || !(p.points_max > 0)) { el.hidden = true; el.innerHTML = ''; el.className = 'bm-points'; return; }
+        var items = p.own_held + p.own_new;
+        var detail = 'Items ' + items + ' of ' + p.own_max + (p.own_new ? ' (' + p.own_new + ' in this request)' : '') +
+            ' \u00b7 Students ' + p.students + ' of ' + p.students_max;
+        el.hidden = false;
+        el.className = 'bm-points' + (p.points_used >= p.points_max ? ' full' : '');
+        el.innerHTML = icon('stars') + '<span><strong>' + esc(p.points_used + ' of ' + p.points_max) + ' points used</strong> on ' +
+            esc(p.day) + '<small>' + esc(detail) + '</small></span>';
+    }
+
     function setAvail(msg, cls) {
         var el = $('bfAvail'); if (!el) return;
         el.textContent = msg || ''; el.className = 'bm-avail' + (cls ? ' ' + cls : '');
@@ -489,7 +503,7 @@
         mstate.mode = w ? w.mode : modeNow();
         if (!w) {
             if (sum) { sum.innerHTML = ''; sum.classList.remove('has'); }
-            setAvail('', ''); mstate.ok = null; avail.rooms = null; mstate.lastQuery = '';
+            setAvail('', ''); setPoints(null); mstate.ok = null; avail.rooms = null; mstate.lastQuery = '';
             clampRoomIfTaken();
             return;
         }
@@ -513,14 +527,15 @@
             .then(function (r) { return r.json(); })
             .then(function (j) {
                 if (token !== avail.tok) return;
-                if (!j || j.ok !== true) { mstate.ok = false; setAvail((j && j.error) || 'That schedule is not allowed.', 'bad'); return; }
+                if (!j || j.ok !== true) { setPoints(null); mstate.ok = false; setAvail((j && j.error) || 'That schedule is not allowed.', 'bad'); return; }
                 var bad = (j.results || []).filter(function (x) { return !x.ok; });
                 mstate.ok = bad.length === 0;
                 if (!bad.length) setAvail(order.length > 1 ? 'All items are available for that time.' : ((j.results[0] || {}).message || ''), 'ok');
                 else setAvail(bad.slice(0, 2).map(function (x) { return (order.length > 1 ? x.name + ': ' : '') + x.message; }).join(' '), 'bad');
+                setPoints(j.points);
                 if (j.rooms) applyRooms(j.rooms);
             })
-            .catch(function () { if (token === avail.tok) { mstate.ok = null; setAvail('', ''); } });
+            .catch(function () { if (token === avail.tok) { mstate.ok = null; setAvail('', ''); setPoints(null); } });
     }
     function applyRooms(rooms) {
         var toSet = function (a) { return new Set((a || []).map(Number)); };
@@ -951,7 +966,7 @@
         var fac = document.querySelector('input[name="bf_collector_type"][value="faculty"]'); if (fac) fac.checked = true;
         var n = $('bfStudentName'); if (n) n.value = '';
         var sf = $('bfStudentFields'); if (sf) sf.hidden = true;
-        setError(''); setAvail('', ''); mstate.ok = null; avail.rooms = null;
+        setError(''); setAvail('', ''); setPoints(null); mstate.ok = null; avail.rooms = null;
     }
 
     /* ══════════════════════════════════════════════════════════
@@ -1064,7 +1079,7 @@
         if (t && t.tagName === 'IMG' && t.hasAttribute('data-fallback')) t.remove();
     }, true);
 
-    /* "today" can close (Sunday / after 8 PM) while the modal is open */
+    /* "today" can close (Sunday / after the last start time) while the modal is open */
     setInterval(function () { if (isOpen('bfModal')) { syncSchedule(); onWindowChange(); } }, 60000);
 
     function init() { paintAll(); }

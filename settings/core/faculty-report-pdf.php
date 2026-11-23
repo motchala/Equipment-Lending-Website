@@ -542,7 +542,7 @@ class FacultyReportPdf extends FPDF
         $startH = (int)floor($minS / 60);
         $endH   = (int)ceil($maxE / 60);
         while ($endH - $startH < 8) {
-            if ($endH < 21) { $endH++; } elseif ($startH > 6) { $startH--; } else { break; }
+            if ($endH < 20) { $endH++; } elseif ($startH > 6) { $startH--; } else { break; }
         }
         $hours = $endH - $startH;
 

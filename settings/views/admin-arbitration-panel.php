@@ -6,7 +6,7 @@
  * Included from settings/views/admin-screen.php as a direct child of #panel-settings,
  * so the existing Settings sub-tab switcher can show and hide it.
  *
- * LIVE cards (marked data-arb-live): "Current semester", "Borrowing rules", "Booking window", "Reservation rules" and "Room schedule". They load their
+ * LIVE cards (marked data-arb-live): "Current semester", "Borrowing rules", "Borrowing points", "Booking window", "Reservation rules" and "Room schedule". They load their
  * values through ArbitrationConfig and save through settings/api/save-arbitration.php.
  * The other cards (role weights, priority faculty) are still UI only
  * and carry a "Not connected yet" badge.
@@ -223,7 +223,6 @@ $arb_date = static function (string $key, string $title, string $sub, string $va
                 <?php
                 $arb_toggle('rule_overdue_block_enabled', 'Decline if the borrower has an overdue item', 'A faculty member with equipment past its return time cannot borrow more or generate student codes.', (bool)$arb_live['rule_overdue_block_enabled']);
                 $arb_toggle('rule_missing_doc_block_enabled', 'Require a request letter', 'Faculty must attach a request letter when booking for a later date. Same-day requests never need one.', (bool)$arb_live['rule_missing_doc_block_enabled']);
-                $arb_stepper('max_items_per_borrower', 'Items per borrower', 'Most items a borrower can hold or have requested at the same time.', (int)$arb_live['max_items_per_borrower'], 1, 20, 1, 'items');
                 $arb_stepper('max_borrow_days', 'Longest loan', 'The most days a faculty member can pick in the Borrow form.', (int)$arb_live['max_borrow_days'], 1, 3, 1, 'days');
                 $arb_stepper('max_extensions', 'Extensions per loan', 'A borrower can extend a loan once. 0 turns extensions off.', (int)$arb_live['max_extensions'], 0, 1, 1, 'times');
                 $arb_stepper('low_stock_threshold', 'Low-stock warning', 'Shows in Stock watch when an item has this many units or fewer.', (int)$arb_live['low_stock_threshold'], 0, 20, 1, 'units');
@@ -244,6 +243,39 @@ $arb_date = static function (string $key, string $title, string $sub, string $va
                 $arb_stepper('equip_cancel_cutoff_min', 'Cancellation cutoff', 'Borrowers can cancel an approved booking until this long before it starts. 0 allows it until the start.', (int)$arb_live['equip_cancel_cutoff_min'], 0, 240, 15, 'min');
                 $arb_chips('equip_dur', 'Booking lengths offered', 'Hours a borrower can pick, for today and for later dates. At least one is needed.', [1 => '1 hr', 2 => '2 hrs', 3 => '3 hrs', 4 => '4 hrs', 5 => '5 hrs', 6 => '6 hrs'], array_map('intval', (array)$arb_live['equip_durations']));
                 ?>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ BORROWING POINTS ════════════════════════════════════════ -->
+    <div class="arb-section">
+        <h3 class="arb-section__title"><span class="material-symbols-outlined">stars</span> Borrowing points</h3>
+        <p class="arb-section__sub">A faculty member and the students they authorize share one allowance. Each different item the faculty borrows uses 1 point, whatever the quantity, and each student they authorize for a day uses 1 point.</p>
+    </div>
+
+    <div class="arb-grid">
+        <div class="sett-card arb-card" data-arb-live>
+            <div class="sett-card-head">
+                <span class="material-symbols-outlined">stars</span>
+                <h3>Points</h3>
+            </div>
+            <div class="sett-card-body">
+                <?php
+                $arb_stepper('max_items_per_borrower', 'Different items per faculty', 'Most different items a faculty member can hold or have requested at the same time. Quantity is not limited.', (int)$arb_live['max_items_per_borrower'], 1, 20, 1, 'items');
+                $arb_stepper('max_student_slots', 'Students per day', 'Most students a faculty member can authorize on the same day. It starts over every day.', (int)$arb_live['max_student_slots'], 1, 10, 1, 'students');
+                $arb_stepper('max_shared_points', 'Shared ceiling', 'Different items held plus students authorized on the same day can never be more than this.', (int)$arb_live['max_shared_points'], 1, 30, 1, 'points');
+                $arb_stepper('max_items_per_student', 'Items per student', 'Most different items in one student request, so a single student cannot take everything.', (int)$arb_live['max_items_per_student'], 1, 10, 1, 'items');
+                ?>
+            </div>
+        </div>
+
+        <div class="sett-card arb-card">
+            <div class="sett-card-head">
+                <span class="material-symbols-outlined">calculate</span>
+                <h3>What this allows</h3>
+            </div>
+            <div class="sett-card-body">
+                <div class="arb-points" id="arbPointsPreview" aria-live="polite"></div>
             </div>
         </div>
     </div>

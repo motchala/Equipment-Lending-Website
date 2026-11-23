@@ -7,14 +7,14 @@ declare(strict_types=1);
  *
  * Scheduling rules for equipment borrowing (the Borrow modal on the faculty Equipment tab).
  *
- *  - Today bookings:  hourly start time (7:00 AM through 8:00 PM) + duration in hours
+ *  - Today bookings:  hourly start time (7:00 AM through 7:00 PM) + duration in hours
  *                     (1 / 2 / 3 / 6). No request letter.
  *  - Later bookings:  borrow date + start time + duration in hours (1 / 2 / 3 / 6)
  *                     + quantity + an optional (recommended) request letter.
  *  - Later bookings are checked against the SCHEDULE (overlapping approved
  *    bookings versus the item's total stock), not against what happens to be on
  *    the shelf right now. Today bookings need the item to be available right now.
- *  - Bookings end by 9:00 PM and can start at most MAX_ADVANCE_DAYS days from today;
+ *  - Bookings end by 8:00 PM and can start at most MAX_ADVANCE_DAYS days from today;
  *    Sundays are not bookable.
  *
  * "Total stock" is the stock the admin set. tbl_inventory.quantity only holds what is
@@ -39,8 +39,8 @@ final class BookingSchedule
     // (tbl_arbitration_config, via ArbitrationConfig) and are read through the getters
     // below: dayStart(), dayEnd(), lastStart(), maxAhead(), graceMin(), durations() ...
     public const DAY_START            = '07:00';   // earliest start time
-    public const LAST_START            = '20:00';   // latest start time
-    public const DAY_END              = '21:00';   // bookings must end by this time
+    public const LAST_START            = '19:00';   // latest start time
+    public const DAY_END              = '20:00';   // bookings must end by this time
     public const SLOT_MINUTES         = 60;        // start-time step
     public const MAX_ADVANCE_DAYS     = 14;        // how far ahead a booking may start (2 weeks)
     public const IMMEDIATE_GRACE_MIN  = 15;        // a "today" booking starting within this many minutes takes stock right away
@@ -1087,6 +1087,8 @@ final class BookingSchedule
      * @param bool   $isStudent a student's request (filed with the faculty's code) rather than the faculty's own
      * @param ?int   $beforeId  count only requests filed BEFORE this one (the request being decided passes its own id)
      * @param string $batchId   the student's cart id ('' for a single item or a faculty request)
+     * @param list<string> $alsoHeld  items already in the SAME cart that will be filed before this one (the live
+     *                          pre-check passes them, so a cart is judged as a whole before it is submitted)
      */
     public static function shareLimitError(
         mysqli $conn,
@@ -1096,7 +1098,8 @@ final class BookingSchedule
         string $startTs,
         string $endTs,
         ?int $beforeId = null,
-        string $batchId = ''
+        string $batchId = '',
+        array $alsoHeld = []
     ): ?string {
         self::loadRules($conn);
         $maxOwn   = self::maxItems();
@@ -1104,6 +1107,19 @@ final class BookingSchedule
         $maxPts   = self::maxSharedPoints();
         $maxStu   = self::maxStudentItems();
         $own      = self::ownItemsHeld($conn, $facultyId, $startTs, $endTs, $beforeId);
+        foreach ($alsoHeld as $extra) {
+            $extra = trim((string)$extra);
+            $known = $extra === '';
+            foreach ($own as $held) {
+                if (strcasecmp($held, $extra) === 0) {
+                    $known = true;
+                    break;
+                }
+            }
+            if (!$known) {
+                $own[] = $extra;
+            }
+        }
 
         if (!$isStudent) {
             // The faculty member's own item. One they already hold at that time adds no variety.
@@ -1159,6 +1175,70 @@ final class BookingSchedule
                 . ' (the items they hold plus the students they authorize). Please choose another date, or ask your faculty.';
         }
         return null;
+    }
+
+    /**
+     * What the faculty member's allowance looks like for a window, for the "points used" line in the Borrow
+     * form. $cartNames are the items of the request being filled in (only the ones that are available), so the
+     * line shows "held + this request" before anything is submitted.
+     *
+     * @param list<string> $cartNames
+     * @return array{day:string,own_held:int,own_new:int,own_max:int,students:int,students_max:int,points_used:int,points_max:int}
+     */
+    public static function pointsSummary(mysqli $conn, string $facultyId, string $startTs, string $endTs, array $cartNames = []): array
+    {
+        self::loadRules($conn);
+        $held = self::ownItemsHeld($conn, $facultyId, $startTs, $endTs, null);
+        $new  = [];
+        foreach ($cartNames as $n) {
+            $n = trim((string)$n);
+            if ($n === '') {
+                continue;
+            }
+            $known = false;
+            foreach (array_merge($held, $new) as $h) {
+                if (strcasecmp($h, $n) === 0) {
+                    $known = true;
+                    break;
+                }
+            }
+            if (!$known) {
+                $new[] = $n;
+            }
+        }
+        // The busiest day the window touches decides the student side (a multi-day loan covers several days).
+        $worstDay = '';
+        $students = 0;
+        foreach (self::windowDates($startTs, $endTs) as $day) {
+            $s = count(self::studentSlotsOn($conn, $facultyId, $day, null));
+            if ($worstDay === '' || $s > $students) {
+                $worstDay = $day;
+                $students = $s;
+            }
+        }
+        return [
+            'day'          => date('D, M j', strtotime($worstDay)),
+            'own_held'     => count($held),
+            'own_new'      => count($new),
+            'own_max'      => self::maxItems(),
+            'students'     => $students,
+            'students_max' => self::maxStudentSlots(),
+            'points_used'  => count($held) + count($new) + $students,
+            'points_max'   => self::maxSharedPoints(),
+        ];
+    }
+
+    /**
+     * Would one more student fit under this faculty member on that day and time? Used by the student form to warn
+     * BEFORE the student fills in everything. message is '' when there is room, otherwise the same student-facing
+     * text the submit would give.
+     *
+     * @return array{message:string}
+     */
+    public static function studentSlotStatus(mysqli $conn, string $facultyId, string $startTs, string $endTs): array
+    {
+        $msg = self::shareLimitError($conn, $facultyId, '', true, $startTs, $endTs, null, 'slot-preview');
+        return ['message' => (string)($msg ?? '')];
     }
 
     /** First start date (on/after $fromDate, within the booking window) where $qty units are free. */

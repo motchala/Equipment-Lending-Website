@@ -382,7 +382,7 @@ INSERT INTO `tbl_arbitration_config` (`id`, `config_key`, `config_value`, `updat
 (26, 'semester_end', '2027-12-17', '2026-11-14 19:46:04'),
 (27, 'max_extensions', '2', '2026-11-14 19:45:57'),
 (28, 'equip_day_start', '07:00', '2026-11-14 19:45:57'),
-(29, 'equip_day_end', '21:00', '2026-11-14 19:45:57'),
+(29, 'equip_day_end', '20:00', '2026-11-14 19:45:57'),
 (30, 'equip_max_advance_days', '14', '2026-11-14 19:45:57'),
 (31, 'equip_immediate_grace_min', '15', '2026-11-14 19:45:57'),
 (32, 'equip_cancel_cutoff_min', '60', '2026-11-14 19:45:57'),

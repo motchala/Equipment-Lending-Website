@@ -1,7 +1,7 @@
             <!-- ============================================================
          TAB: EQUIPMENT (LENDING)
     ============================================================ -->
-            <?php require_once dirname(__DIR__, 2) . '/shared/core/equipment-image.php'; // no photo -> uploads/default.png ?>
+            <?php require_once dirname(__DIR__, 2) . '/shared/core/equipment-image.php'; // no photo -> its category picture ?>
             <div class="tab-panel<?php echo ($fac_boot_tab ?? 'home') === 'lending' ? ' active' : ''; ?>" id="panel-lending">
 
 
@@ -114,7 +114,7 @@
                                             </div>
                                         </div>
                                         <div class="feat-hero-img">
-                                            <img src="<?php echo htmlspecialchars(equipment_image_path($featured_hero['image_path'] ?? '', $root_url)); ?>"
+                                            <img src="<?php echo htmlspecialchars(equipment_image_path($featured_hero['image_path'] ?? '', $root_url, $featured_hero['category'] ?? '')); ?>"
                                                 alt="<?php echo htmlspecialchars($featured_hero['item_name']); ?>">
                                         </div>
                                     </div>
@@ -124,7 +124,7 @@
                                 <?php if ($featured_sec): ?>
                                     <div class="feat-secondary" data-campus="<?php echo (int)($featured_sec['campus_id'] ?? 1); ?>">
                                         <div class="feat-secondary-img" style="position:relative;">
-                                            <img src="<?php echo htmlspecialchars(equipment_image_path($featured_sec['image_path'] ?? '', $root_url)); ?>"
+                                            <img src="<?php echo htmlspecialchars(equipment_image_path($featured_sec['image_path'] ?? '', $root_url, $featured_sec['category'] ?? '')); ?>"
                                                 alt="<?php echo htmlspecialchars($featured_sec['item_name']); ?>">
                                             <span class="stock-badge stock-avail"
                                                 style="position:absolute;top:10px;left:10px;margin-bottom:0;z-index:2;background:rgba(209,250,229,.95);backdrop-filter:blur(4px);">
@@ -229,7 +229,7 @@
                                         data-item-id="<?php echo (int)$item['item_id']; ?>">
                                         <div class="eq-item-img-wrap">
                                             <img class="eq-item-img"
-                                                src="<?php echo htmlspecialchars(equipment_image_path($item['image_path'] ?? '', $root_url)); ?>"
+                                                src="<?php echo htmlspecialchars(equipment_image_path($item['image_path'] ?? '', $root_url, $item['category'] ?? '')); ?>"
                                                 alt="<?php echo htmlspecialchars($item['item_name']); ?>"
                                                 loading="lazy" decoding="async">
                                             <!-- Shown when the item is part of the current request -->

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" role="img" aria-label="Equipment">
+<rect width="600" height="600" fill="#eceff2"/>
+<path d="M242 244v-30a18 18 0 0 1 18-18h80a18 18 0 0 1 18 18v30" fill="none" stroke="#a9b2bc" stroke-width="22" stroke-linecap="round"/>
+<rect x="160" y="240" width="280" height="172" rx="24" fill="#a9b2bc"/>
+<rect x="160" y="300" width="280" height="10" fill="#eceff2"/>
+<rect x="268" y="282" width="64" height="46" rx="10" fill="#eceff2"/>
+<rect x="284" y="296" width="32" height="18" rx="5" fill="#a9b2bc"/>
+</svg>

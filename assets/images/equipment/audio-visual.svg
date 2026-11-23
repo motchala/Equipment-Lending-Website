@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" role="img" aria-label="Audio-visual equipment">
+<rect width="600" height="600" fill="#eceff2"/>
+<g transform="translate(0 -20)">
+<rect x="150" y="250" width="300" height="130" rx="28" fill="#a9b2bc"/>
+<circle cx="372" cy="315" r="46" fill="#eceff2"/>
+<circle cx="372" cy="315" r="26" fill="#a9b2bc"/>
+<g fill="#eceff2"><rect x="190" y="284" width="76" height="11" rx="5.5"/><rect x="190" y="306" width="76" height="11" rx="5.5"/><rect x="190" y="328" width="76" height="11" rx="5.5"/></g>
+<rect x="190" y="380" width="46" height="16" rx="8" fill="#a9b2bc"/>
+<rect x="364" y="380" width="46" height="16" rx="8" fill="#a9b2bc"/>
+</g>
+</svg>

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" role="img" aria-label="Electrical equipment">
+<rect width="600" height="600" fill="#eceff2"/>
+<circle cx="300" cy="300" r="125" fill="#a9b2bc"/>
+<circle cx="300" cy="300" r="103" fill="#eceff2"/>
+<g stroke="#a9b2bc" stroke-width="12" stroke-linecap="round">
+<path d="M300 222v22"/><path d="M229 252l15 15"/><path d="M371 252l-15 15"/>
+<path d="M300 300l36-66" stroke-width="14"/>
+</g>
+<circle cx="300" cy="300" r="17" fill="#a9b2bc"/>
+</svg>

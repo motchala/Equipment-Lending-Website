@@ -56,6 +56,7 @@
                     </div>
                     <div class="bm-summary" id="bfSummary" aria-live="polite"></div>
                     <p class="bm-avail" id="bfAvail" aria-live="polite"></p>
+                    <div class="bm-points" id="bfPoints" aria-live="polite" hidden></div>
 
                     <!-- Request letter: only for a later date, recommended, never required -->
                     <div class="form-group bm-letter" id="bfLetter" hidden>

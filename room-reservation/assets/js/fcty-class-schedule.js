@@ -25,10 +25,10 @@
     if (!root) return;
 
     var HOUR_H = 40;                 /* px per hour in the grid (compact)                    */
-    var PAD = 14;                    /* breathing room above 7 AM / below 9 PM (first and last
+    var PAD = 14;                    /* breathing room above 7 AM / below 8 PM (first and last
                                         hour labels sit centred on their lines)                */
-    var CORE_START = 7 * 60;         /* the grid always covers 7 AM – 9 PM, and grows to fit */
-    var CORE_END = 21 * 60;          /* anything booked earlier or later                     */
+    var CORE_START = 7 * 60;         /* the grid always covers 7 AM – 8 PM, and grows to fit */
+    var CORE_END = 20 * 60;          /* anything booked earlier or later                     */
     var REFETCH_MS = 5 * 60 * 1000;
     var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     var DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -163,7 +163,7 @@
 
     /* ── Layout ────────────────────────────────────────────── */
 
-    /* Grid hours: 7 AM – 9 PM, stretched out to the hour for anything outside that */
+    /* Grid hours: 7 AM – 8 PM, stretched out to the hour for anything outside that */
     function hourWindow(days) {
         var lo = CORE_START, hi = CORE_END;
         days.forEach(function (d) {
