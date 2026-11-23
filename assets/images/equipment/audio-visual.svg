@@ -1,27 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" role="img" aria-label="audio visual equipment">
-<defs>
-<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6eaf2"/><stop offset="1" stop-color="#ebd0e1"/></linearGradient>
-<filter id="soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="7"/></filter>
-</defs>
-<rect width="600" height="600" fill="url(#bg)"/>
-<g transform="translate(45 45) scale(.85)">
-<ellipse cx="300" cy="498" rx="170" ry="14" fill="#4a1636" opacity=".18" filter="url(#soft)"/>
-<defs>
-<linearGradient id="beam" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ffe9a8" stop-opacity=".95"/><stop offset="1" stop-color="#ffe9a8" stop-opacity=".25"/></linearGradient>
-</defs>
-<g transform="translate(0,-4)">
-  <path d="M266 360L186 210h228L334 360z" fill="url(#beam)"/>
-  <rect x="150" y="112" width="300" height="108" rx="10" fill="#ffffff" stroke="#7b4a68" stroke-width="7"/>
-  <rect x="162" y="124" width="276" height="84" rx="4" fill="#fff8e3"/>
-  <circle cx="226" cy="166" r="19" fill="#e9b949"/><path d="M262 196l36-46 28 30 22-22 46 38z" fill="#b57edc" opacity=".85"/>
-  <rect x="350" y="138" width="64" height="8" rx="4" fill="#7b4a68" opacity=".7"/><rect x="350" y="156" width="46" height="8" rx="4" fill="#7b4a68" opacity=".45"/>
-  <rect x="164" y="360" width="272" height="102" rx="24" fill="#5b2a49"/>
-  <rect x="164" y="360" width="272" height="42" rx="24" fill="#74395e"/>
-  <rect x="164" y="384" width="272" height="18" fill="#74395e"/>
-  <circle cx="300" cy="360" r="34" fill="#2e1425"/><circle cx="300" cy="360" r="25" fill="#7ec3e8" opacity=".95"/><circle cx="300" cy="360" r="14" fill="#d8f0fb"/><circle cx="292" cy="352" r="5" fill="#fff" opacity=".9"/>
-  <g stroke="#f0dcea" stroke-width="5" stroke-linecap="round" opacity=".6"><path d="M190 418h54M190 434h54M190 450h54"/></g>
-  <circle cx="376" cy="430" r="9" fill="#e9b949"/><circle cx="406" cy="430" r="9" fill="#f0dcea" opacity=".7"/>
-  <rect x="190" y="462" width="34" height="12" rx="6" fill="#3d1b30"/><rect x="376" y="462" width="34" height="12" rx="6" fill="#3d1b30"/>
-</g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" role="img" aria-label="Audio-visual equipment">
+<rect width="600" height="600" fill="#eceff2"/>
+<g transform="translate(0 -20)">
+<rect x="150" y="250" width="300" height="130" rx="28" fill="#a9b2bc"/>
+<circle cx="372" cy="315" r="46" fill="#eceff2"/>
+<circle cx="372" cy="315" r="26" fill="#a9b2bc"/>
+<g fill="#eceff2"><rect x="190" y="284" width="76" height="11" rx="5.5"/><rect x="190" y="306" width="76" height="11" rx="5.5"/><rect x="190" y="328" width="76" height="11" rx="5.5"/></g>
+<rect x="190" y="380" width="46" height="16" rx="8" fill="#a9b2bc"/>
+<rect x="364" y="380" width="46" height="16" rx="8" fill="#a9b2bc"/>
 </g>
 </svg>

@@ -7,7 +7,8 @@ declare(strict_types=1);
  *
  * Google redirects here after the Super Admin clicks Allow.
  * Exchanges the authorization code for access + refresh tokens,
- * stores them in tbl_sync_config, redirects back to the Imports tab.
+ * stores them in the private token file (config/google-oauth-token.php —
+ * never in the database), redirects back to the Imports tab.
  */
 
 require_once __DIR__ . '/../../config/security-headers.php';
@@ -142,12 +143,15 @@ if (empty($data['access_token']) || empty($data['refresh_token'])) {
 }
 
 $conn = getDB();
-gs_token_store(
+$saved = gs_token_store(
     $conn,
     (string)$data['access_token'],
     (string)$data['refresh_token'],
     time() + (int)($data['expires_in'] ?? 3600)
 );
+if (!$saved) {
+    gs_cb_fail('Could not save the Google connection on the server. Make sure the config/ folder is writable by PHP.');
+}
 
 // SameSite=Strict means a cross-origin redirect from Google will not carry the session cookie.
 // A meta-refresh is a same-origin navigation — the session cookie is sent normally.

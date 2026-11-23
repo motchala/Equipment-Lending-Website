@@ -2,6 +2,10 @@
 
 config/db.php
 
+# Google Sheets OAuth tokens live in this file, NOT in the database (see google-sheets/core/oauth.php).
+# Never commit it. The trailing * also covers its temporary write files.
+config/google-oauth-token.php*
+
 # Environment secrets — never push real credentials
 .env
 
@@ -42,3 +46,5 @@ importing.md
 /x-CLAUDE.md
 
 .agents/
+
+.vscode/settings.json
