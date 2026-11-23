@@ -11044,6 +11044,41 @@ body .side-nav .side-nav-user .side-nav-user-name {
     font-weight: 500;
 }
 
+/* Borrow form: the shared points line (different items + students authorized) */
+.bm-points {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin: 6px 0 0;
+    font-size: 0.8125rem;
+    color: var(--color-on-surface-variant);
+}
+
+.bm-points[hidden] {
+    display: none;
+}
+
+.bm-points .material-symbols-outlined {
+    flex: none;
+    font-size: 18px;
+    color: var(--color-primary);
+}
+
+.bm-points strong {
+    font-weight: 600;
+    color: var(--color-on-surface);
+}
+
+.bm-points small {
+    display: block;
+    font-size: 0.75rem;
+    opacity: 0.85;
+}
+
+.bm-points.full strong {
+    color: var(--color-primary);
+}
+
 [data-theme="dark"] .bm-form input[type="date"],
 [data-theme="dark"] .bm-form select {
     color-scheme: dark;

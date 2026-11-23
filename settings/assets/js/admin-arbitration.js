@@ -19,10 +19,11 @@
        only overrides what it changes. */
     var DEFAULTS = {
         rule_overdue_block_enabled: false, rule_missing_doc_block_enabled: false,
-        max_items_per_borrower: 3, max_borrow_days: 3, max_extensions: 1,
+        max_items_per_borrower: 5, max_student_slots: 3, max_shared_points: 7, max_items_per_student: 2,
+        max_borrow_days: 3, max_extensions: 1,
         low_stock_threshold: 2,
 
-        equip_day_start: '07:00', equip_day_end: '21:00', equip_max_advance_days: 14,
+        equip_day_start: '07:00', equip_day_end: '20:00', equip_max_advance_days: 14,
         equip_immediate_grace_min: 15, equip_cancel_cutoff_min: 60,
         equip_dur_1: true, equip_dur_2: true, equip_dur_3: true, equip_dur_4: false, equip_dur_5: false, equip_dur_6: true,
 
@@ -40,14 +41,16 @@
         standard: { rule_overdue_block_enabled: true },
         busy: {
             rule_overdue_block_enabled: true, rule_missing_doc_block_enabled: true,
-            max_items_per_borrower: 2, max_borrow_days: 1, max_extensions: 1,
+            max_items_per_borrower: 3, max_student_slots: 2, max_shared_points: 4, max_items_per_student: 1,
+            max_borrow_days: 1, max_extensions: 1,
             low_stock_threshold: 3,
             equip_max_advance_days: 7, equip_cancel_cutoff_min: 120,
             room_max_active: 1, room_max_advance_weeks: 2, room_cancel_cutoff_min: 120, room_letter_required: true
         },
         relaxed: {
             rule_overdue_block_enabled: false, rule_missing_doc_block_enabled: false,
-            max_items_per_borrower: 5, max_borrow_days: 3, max_extensions: 1,
+            max_items_per_borrower: 8, max_student_slots: 5, max_shared_points: 11, max_items_per_student: 3,
+            max_borrow_days: 3, max_extensions: 1,
             low_stock_threshold: 1,
             equip_max_advance_days: 21, equip_cancel_cutoff_min: 30,
             room_max_active: 3, room_max_advance_weeks: 4, room_cancel_cutoff_min: 30
@@ -111,6 +114,62 @@
             if (Object.prototype.hasOwnProperty.call(map, k)) writeField(el, map[k]);
         });
         applying = false;
+        renderPoints();
+    }
+
+    /* The "What this allows" card: what the borrowing-point numbers mean together, in plain words */
+    function plural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
+
+    function renderPoints() {
+        var out = document.getElementById('arbPointsPreview');
+        if (!out) return;
+        function val(key) {
+            var el = document.getElementById('arb-' + key);
+            var n = el ? parseInt(el.value, 10) : NaN;
+            return isNaN(n) || n < 1 ? 1 : n;
+        }
+        var N = val('max_items_per_borrower'), M = val('max_student_slots'), P = val('max_shared_points'), S = val('max_items_per_student');
+        var items = Math.min(N, P), students = Math.min(M, P);
+        var rows = [
+            ['inventory_2', 'Items', 'Up to ' + plural(items, 'different item') + ' at a time, in any quantity (stock decides).'],
+            ['groups', 'Students', 'Up to ' + plural(students, 'student') + ' per day, ' + plural(S, 'item') + ' each at most.']
+        ];
+        if (P >= N + M) {
+            rows.push(['balance', 'Together', 'Items and students never compete: a faculty member can use all ' + N + ' items and all ' + M + ' students.']);
+        } else {
+            var withAllItems = Math.max(0, Math.min(M, P - items));
+            var withAllStudents = Math.max(0, Math.min(N, P - students));
+            rows.push(['balance', 'Together', 'They share ' + plural(P, 'point') + ' a day. With ' + plural(items, 'item') + ', ' +
+                (withAllItems ? 'only ' + plural(withAllItems, 'student') + ' fit' : 'no students fit') + '; with ' + plural(students, 'student') + ', ' +
+                (withAllStudents ? 'only ' + plural(withAllStudents, 'item') + ' fit' : 'no items fit') + '.']);
+        }
+        var warn = '';
+        if (P < N) warn = 'The shared ceiling is lower than the item limit, so a faculty member can never hold more than ' + plural(P, 'item') + '.';
+        else if (P < M) warn = 'The shared ceiling is lower than the student limit, so a faculty member can never authorize more than ' + plural(P, 'student') + ' a day.';
+
+        out.textContent = '';
+        function addRow(cls, icon, title, text) {
+            var row = document.createElement('div');
+            row.className = cls;
+            var ic = document.createElement('span');
+            ic.className = 'material-symbols-outlined';
+            ic.setAttribute('aria-hidden', 'true');
+            ic.textContent = icon;
+            var box = document.createElement('div');
+            if (title) {
+                var b = document.createElement('strong');
+                b.textContent = title;
+                box.appendChild(b);
+            }
+            var sp = document.createElement('span');
+            sp.textContent = text;
+            box.appendChild(sp);
+            row.appendChild(ic);
+            row.appendChild(box);
+            out.appendChild(row);
+        }
+        rows.forEach(function (r) { addRow('arb-points__row', r[0], r[1], r[2]); });
+        if (warn) addRow('arb-points__row arb-points__row--warn', 'warning', '', warn);
     }
 
     function setPresetActive(name) {
@@ -285,6 +344,8 @@
         showBar();
     }
     root.addEventListener('input', onEdit);
+    root.addEventListener('input', renderPoints);
+    renderPoints();
     root.addEventListener('change', function (e) {
         if (e.target.classList && e.target.classList.contains('arb-stepper__input')) clampInput(e.target);
         onEdit(e);

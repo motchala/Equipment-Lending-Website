@@ -42,7 +42,7 @@ final class ArbitrationConfig
 
         // ── Equipment: booking window ───────────────────────────────────────
         'equip_day_start'                => ['type' => 'time', 'default' => '07:00'],
-        'equip_day_end'                  => ['type' => 'time', 'default' => '21:00'],
+        'equip_day_end'                  => ['type' => 'time', 'default' => '20:00'],
         'equip_max_advance_days'         => ['type' => 'int', 'default' => 14, 'min' => 1, 'max' => 60],
         'equip_immediate_grace_min'      => ['type' => 'int', 'default' => 15, 'min' => 0, 'max' => 60, 'step' => 5],
         'equip_cancel_cutoff_min'        => ['type' => 'int', 'default' => 60, 'min' => 0, 'max' => 240, 'step' => 15],

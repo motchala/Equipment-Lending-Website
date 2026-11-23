@@ -568,7 +568,7 @@
                                     <span class="material-symbols-outlined help-item-chevron">expand_more</span>
                                 </summary>
                                 <div class="help-item-a">
-                                    An item is <strong>Overdue</strong> when its return time has passed and it has not been returned. While you have an overdue item you cannot borrow more equipment or generate student codes (room reservations are not affected). Return it to the Admin Office, or use <strong>Extend</strong> in My Activity.<br><br>Extending adds 1, 2, 3 or 5 hours to an hourly loan, or 1, 2 or 3 days to a day loan. You can extend a loan at most 2 times. It is not possible if someone else has booked the item, another faculty member has reserved the room, or it is too late in the day (the office closes at 9:00 PM). The original lateness stays on record.
+                                    An item is <strong>Overdue</strong> when its return time has passed and it has not been returned. While you have an overdue item you cannot borrow more equipment or generate student codes (room reservations are not affected). Return it to the Admin Office, or use <strong>Extend</strong> in My Activity.<br><br>Extending adds 1, 2, 3 or 5 hours to an hourly loan, or 1, 2 or 3 days to a day loan. You can extend a loan at most 2 times. It is not possible if someone else has booked the item, another faculty member has reserved the room, or it is too late in the day (the office closes at <?= htmlspecialchars($hh['equip']['end']) ?>). The original lateness stays on record.
                                 </div>
                             </details>
 

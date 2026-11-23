@@ -20,14 +20,14 @@
     /* Must match STUDENT_COURSES in shared/core/student-courses.php */
     var COURSES = ['BSIT', 'BSCpE', 'BSIE', 'BSBA', 'BSEEd', 'BSEd', 'BSPSY', 'DIT', 'DCET'];
     var OPEN_MIN = 7 * 60;       /* room reservations open at 7:00 AM (loadBorrowRules() applies Settings → Arbitration → Room schedule) */
-    var CLOSE_MIN = 21 * 60;     /* … 9:00 PM (server enforces the same) */
+    var CLOSE_MIN = 20 * 60;     /* … 8:00 PM (server enforces the same) */
     var BORROW_OPEN_MIN = 7 * 60;
-    var BORROW_LAST_START_MIN = 20 * 60;
+    var BORROW_LAST_START_MIN = 19 * 60;
     var STEP_MIN = 60;
     var BORROW_HOURS = [1, 2, 3, 6];
     var BORROW_ADVANCE_DAYS = 14;
     var ROOM_ADVANCE_DAYS = 21;       /* how far ahead a room can be reserved (Settings → Arbitration; loadBorrowRules() updates it) */
-    var BORROW_CLOSE_MIN = 21 * 60;   /* borrowing closes (equipment only; rooms use CLOSE_MIN) */
+    var BORROW_CLOSE_MIN = 20 * 60;   /* borrowing closes (equipment only; rooms use CLOSE_MIN) */
     /* The six values above are only defaults: loadBorrowRules() replaces them with the booking
        window from Settings → Arbitration, so the pickers match what the server accepts. */
     var EQ_PAGE_SIZE = 20;
@@ -54,7 +54,8 @@
         borrow: 'equipment-booking/api/submit-student-borrow.php',
         requestStatus: 'equipment-booking/api/student-request-status.php',
         reserve: 'room-reservation/api/submit-student-reserve.php',
-        roomSchedule: 'room-reservation/api/student-room-schedule.php'
+        roomSchedule: 'room-reservation/api/student-room-schedule.php',
+        slotStatus: 'equipment-booking/api/student-slot-status.php'
     };
 
     /* ── Small helpers ───────────────────────────────────────── */
@@ -317,11 +318,35 @@
         return { file: f, error: '' };
     }
 
+    /* At most n short sentences on one line, so a message can be read at a glance. */
+    function brief(msg, n) {
+        msg = String(msg == null ? '' : msg).replace(/\s+/g, ' ').trim();
+        if (!msg) return '';
+        return msg.replace(/([.!?])\s+(?=[A-Z\u201C"])/g, '$1\u0001').split('\u0001').slice(0, n || 2).join(' ');
+    }
+
+    /* Something not filled in yet is shown, not explained: the field flashes red for about a second (same
+       fade as a Next steps entry in the faculty My Activity, in red). The CSS animation fades it out by itself;
+       the class is taken off afterwards only to tidy up, and put back from scratch on the next try. */
+    var FLASH_MS = 1200;
+    function flashFields(list) {
+        list = (list || []).filter(Boolean);
+        if (!list.length) return;
+        list.forEach(function (el) { el.classList.remove('st-flash'); });
+        void list[0].offsetWidth;
+        list.forEach(function (el) { el.classList.add('st-flash'); });
+        setTimeout(function () { list.forEach(function (el) { el.classList.remove('st-flash'); }); }, FLASH_MS + 100);
+        var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (list[0].scrollIntoView) list[0].scrollIntoView({ behavior: calm ? 'auto' : 'smooth', block: 'center' });
+        if (list[0].tagName === 'INPUT' && list[0].type === 'text') list[0].focus({ preventScroll: true });
+    }
+
+    /* The one error line of a form: one to two sentences, never a list. */
     function showAlert(id, msg) {
         var el = $(id);
         if (!el) return;
         el.innerHTML = icon('error') + '<span></span>';
-        el.lastChild.textContent = msg;
+        el.lastChild.textContent = brief(msg, 2);
         el.hidden = false;
         if (el.scrollIntoView) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
@@ -444,10 +469,13 @@
         var id = '';
         var course = $('studentCourse').value.trim();
 
-        if (!code) return showAlert('detailsError', 'Please enter the code.');
-        if (!name) return showAlert('detailsError', 'Please enter your name.');
+        /* Not filled in yet: those fields flash red (no message), all at once */
+        var missing = [];
+        if (!code) missing.push($('facultyCode'));
+        if (!name) missing.push($('studentName'));
+        if (!course) missing.push($('studentCourse'));
+        if (missing.length) return flashFields(missing);
         if (Array.from(name.replace(/\s+/g, ' ')).length > STUDENT_NAME_MAX) return showAlert('detailsError', 'Your name is too long. Please check it and try again.');
-        if (!course) return showAlert('detailsError', 'Please select your course.');
 
         /* Facilities and equipment both take the faculty code (the facility one goes to its own check). */
         var kind = st.service === 'facility' ? 'room' : 'faculty';
@@ -543,6 +571,7 @@
             '<button type="button" class="st-room-choice" id="borrowRoomPicker" data-action="open-student-room-picker" data-target="borrow">' +
             icon('location_on') + '<span id="borrowRoomLabel">Choose a building and room</span>' + icon('expand_more') + '</button></div>' +
             scheduleFields('borrow') +
+            '<div class="st-alert is-error" id="slotNote" role="status" aria-live="polite" hidden></div>' +
             LETTER_HTML('borrowLetter', 'Recommended when borrowing on a later date. You can still submit without one.') +
             '<div class="st-alert is-note">' + icon('info') + '<span>Each item creates its own request. Your faculty will be notified.</span></div>' +
             '<div class="st-actions">' +
@@ -718,6 +747,40 @@
         if (openBtn) openBtn.disabled = !items.length;
     }
 
+    /* Slot warning: before the student fills in the rest, ask whether their faculty still has a student slot
+       (and shared points) for the day and time they picked. Only a warning: the real check is at Submit. */
+    var slotCheck = { key: '', tok: 0, timer: 0 };
+
+    function slotNote(msg) {
+        var el = $('slotNote');
+        if (!el) return;
+        if (!msg) { el.hidden = true; el.textContent = ''; return; }
+        el.innerHTML = icon('event_busy') + '<span></span>';
+        el.lastChild.textContent = msg;
+        el.hidden = false;
+    }
+
+    function queueSlotCheck(force) {
+        var m = $('borrowModal');
+        var v = st.verified;
+        if (!m || m.hidden || !v || !v.code_db_id) return;
+        var date = $('borrowDate') ? $('borrowDate').value : '';
+        var start = $('borrowStartTime') ? $('borrowStartTime').value : '';
+        var dur = $('borrowDuration') ? toInt($('borrowDuration').value) : 0;
+        if (!date || !start || !dur) { slotNote(''); slotCheck.key = ''; return; }
+        var key = [v.code_db_id, date, start, dur].join('|');
+        if (!force && key === slotCheck.key) return;
+        slotCheck.key = key;
+        window.clearTimeout(slotCheck.timer);
+        var token = ++slotCheck.tok;
+        slotCheck.timer = window.setTimeout(function () {
+            post(URLS.slotStatus, { code_db_id: v.code_db_id, date: date, start: start, duration: dur }).then(function (d) {
+                if (token !== slotCheck.tok) return;   /* the student picked something else meanwhile */
+                slotNote(d && d.success && d.ok === false ? d.message : '');
+            });
+        }, 350);
+    }
+
     /* "Where and when" pop-up: Continue opens it, Cancel / X / Esc close it */
     function openBorrowModal() {
         var m = $('borrowModal');
@@ -726,6 +789,7 @@
         m.hidden = false;
         document.body.classList.add('st-modal-open');
         nav.modal = true;
+        queueSlotCheck(true);
         var first = $('borrowRoomPicker');
         if (first) first.focus({ preventScroll: true });
         schedulePersist();
@@ -755,13 +819,6 @@
 
         var items = pendingItems();
         if (!items.length) return showAlert('flowError', 'Please add at least one item.');
-        for (var k = 0; k < items.length; k++) {
-            var it = st.invMap[items[k].name];
-            var max = it ? toInt(it.quantity) : 0;
-            if (!items[k].qty || items[k].qty < 1 || items[k].qty > max) {
-                return showAlert('flowError', items[k].name + ': please enter a quantity between 1 and ' + max + '.');
-            }
-        }
 
         var room = st.where ? st.where.room : $('borrowRoom').value.trim();
         var roomId = st.where ? st.where.roomId : toInt($('borrowRoomId').value);
@@ -769,9 +826,22 @@
         var startTime = st.where ? st.where.startTime : $('borrowStartTime').value;
         var duration = st.where ? st.where.duration : toInt($('borrowDuration').value);
         var ret = st.where ? st.where.ret : scheduleReturn(borrow, startTime, duration);
-        if (!roomId || !room) return showAlert('flowError', 'Please choose a building and room.');
-        if (!borrow) return showAlert('flowError', 'Please select a borrow date.');
-        if (!startTime || !duration) return showAlert('flowError', 'Please choose a start time and a duration.');
+
+        /* Not filled in yet: those fields flash red (no message), all at once */
+        var missing = [];
+        if (!roomId || !room) missing.push($('borrowRoomPicker'));
+        if (!borrow) missing.push($('borrowDate'));
+        if (!startTime) missing.push($('borrowStartTime'));
+        if (!duration) missing.push($('borrowDuration'));
+        if (missing.length) return flashFields(missing);
+
+        for (var k = 0; k < items.length; k++) {
+            var it = st.invMap[items[k].name];
+            var max = it ? toInt(it.quantity) : 0;
+            if (!items[k].qty || items[k].qty < 1 || items[k].qty > max) {
+                return showAlert('flowError', items[k].name + ': please enter a quantity between 1 and ' + max + '.');
+            }
+        }
         if (borrow < todayStr() || !borrowDates().some(function (date) { return date.value === borrow; })) {
             return showAlert('flowError', borrowAheadMsg());
         }
@@ -831,8 +901,9 @@
                         lockWhere(false);
                     }
                     pendingNamesRefresh();
-                    showAlert('flowError', cur.name + ': ' + d.error +
-                        (st.done.length ? ' Items already submitted are kept — fix this and submit again.' : ''));
+                    showAlert('flowError', st.done.length
+                        ? brief(cur.name + ': ' + d.error, 1) + ' Items already submitted are kept.'
+                        : cur.name + ': ' + d.error);
                     return;
                 }
                 st.done.push({
@@ -1462,13 +1533,18 @@
         var end = minToHHMM(s.end);
         var purpose = (s.other ? $('reservePurpose').value : s.purpose).trim();
 
-        if (!date) return showAlert('flowError', 'Please select a date.');
+        /* Not filled in yet: those parts flash red (no message), all at once */
+        var missing = [];
+        if (!date) missing.push($('reserveDate'));
+        if (date && !start && date !== todayStr()) missing.push($('reserveStart'));
+        if (!purpose) missing.push(s.other ? $('reservePurpose') : $('reservePurposeChips'));
+        if (missing.length) return flashFields(missing);
+
         if (date < todayStr()) return showAlert('flowError', 'Reservation date and time cannot be in the past.');
         if (isClosedDay(parseYmd(date))) return showAlert('flowError', 'Reservations are not available on ' + roomClosedList() + '. Please choose another day.');
-        if (!start) return showAlert('flowError', date === todayStr() ? 'No start times are left today. Please choose another date.' : 'Please select a start time.');
+        if (!start) return showAlert('flowError', 'No start times are left today. Please choose another date.');
         if (end <= start) return showAlert('flowError', 'End time must be after start time.');
         if (s.end - s.start > ROOM_MAX_MIN) return showAlert('flowError', roomMaxLengthMsg());
-        if (!purpose) return showAlert('flowError', 'Please choose or enter the purpose.');
         var letter = pickLetter('reserveLetter', date);
         if (letter.error) return showAlert('flowError', letter.error);
 
@@ -2196,8 +2272,10 @@
         } else if (t.id === 'borrowDate') {
             syncLetter('borrowLetter', t.value);
             syncStudentSchedule('borrow');
+            queueSlotCheck();
         } else if (t.id === 'borrowStartTime' || t.id === 'borrowDuration') {
             syncStudentSchedule('borrow');
+            queueSlotCheck();
         } else if (t.id === 'reserveDate' || t.id === 'reserveStart' || t.id === 'reserveDuration' || t.id === 'reserveEnd') {
             resOnChange(t);
         } else if (t.type === 'file') {

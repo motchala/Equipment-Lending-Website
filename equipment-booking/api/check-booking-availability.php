@@ -15,6 +15,10 @@
  *   items     JSON [{"n":"Projector","q":2}, ...]
  *   rooms     1 = also report which rooms are reserved by someone else (blocked) and which
  *             are reserved by this faculty member (suggested) during that window
+ *
+ * The items are judged as one cart: an item that would be the faculty member's 6th different item (or push
+ * items + students past the shared ceiling) is flagged here, exactly as it would be refused on submit. The
+ * reply also carries "points": what is already used on that day and what this request adds.
  */
 ini_set('display_errors', '0');
 error_reporting(E_ALL);
@@ -55,7 +59,8 @@ if (!$w['ok']) {
 }
 $win = $w['data'];
 
-$results = [];
+$results   = [];
+$cartNames = [];   // items of this cart that are available, so the next one is judged after them
 foreach ($items as $it) {
     $name = trim((string)($it['n'] ?? ''));
     $qty  = max(1, (int)($it['q'] ?? 1));
@@ -90,7 +95,7 @@ foreach ($items as $it) {
         } elseif ($qty > $total) {
             $row['message'] = 'Only ' . $total . ' in stock.';
         } elseif (!empty($_SESSION['faculty_id'])
-            && ($ruleErr = BookingSchedule::shareLimitError($conn, (string)$_SESSION['faculty_id'], $name, false, $win['start_ts'], $win['end_ts'])) !== null) {
+            && ($ruleErr = BookingSchedule::shareLimitError($conn, (string)$_SESSION['faculty_id'], $name, false, $win['start_ts'], $win['end_ts'], null, '', $cartNames)) !== null) {
             // The shared points (items + students) from Settings → Arbitration, shown before the faculty member submits
             $row['message'] = $ruleErr;
         } elseif ($free >= $qty) {
@@ -119,8 +124,13 @@ foreach ($items as $it) {
             }
         }
     }
+    if ($row['ok']) {
+        $cartNames[] = $name;
+    }
     $results[] = $row;
 }
+
+$points = BookingSchedule::pointsSummary($conn, (string)$_SESSION['faculty_id'], $win['start_ts'], $win['end_ts'], $cartNames);
 
 $rooms = null;
 if (($_GET['rooms'] ?? '') === '1') {
@@ -134,5 +144,6 @@ echo json_encode([
         'end'   => $win['end_ts'],
     ],
     'results' => $results,
+    'points'  => $points,
     'rooms'   => $rooms,
 ]);

@@ -21,7 +21,7 @@ declare(strict_types=1);
  * USAGE:
  *   require_once PS_ROOT . '/shared/core/operating-hours.php';
  *   $oh = ps_operating_hours($conn);       // $conn is optional; the helper opens its own if omitted
- *   $oh['equip']['hoursTo']  -> "7:00 AM to 9:00 PM"      $oh['room']['hoursTo']  -> "7:00 AM to 8:00 PM"
+ *   $oh['equip']['hoursTo']  -> "7:00 AM to 8:00 PM"      $oh['room']['hoursTo']  -> "7:00 AM to 8:00 PM"
  *   $oh['equip']['days']     -> "Mon – Sat"               $oh['room']['daysLong'] -> "Monday to Saturday"
  */
 
@@ -136,8 +136,8 @@ if (!function_exists('ps_operating_hours')) {
             'aheadLabel' => ps_ahead_label((int)$c['room_max_advance_weeks'] * 7),
             'maxActive'  => (int)$c['room_max_active'],
         ];
-        $equip['hours']   = $equip['start'] . ' – ' . $equip['end'];    // "7:00 AM – 9:00 PM"
-        $equip['hoursTo'] = $equip['start'] . ' to ' . $equip['end'];   // "7:00 AM to 9:00 PM"
+        $equip['hours']   = $equip['start'] . ' – ' . $equip['end'];    // "7:00 AM – 8:00 PM"
+        $equip['hoursTo'] = $equip['start'] . ' to ' . $equip['end'];   // "7:00 AM to 8:00 PM"
         $room['hours']    = $room['start'] . ' – ' . $room['end'];
         $room['hoursTo']  = $room['start'] . ' to ' . $room['end'];
 
