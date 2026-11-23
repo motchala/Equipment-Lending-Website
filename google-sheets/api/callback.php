@@ -158,14 +158,18 @@ if (!$saved) {
 // We do NOT use a <script> redirect because security-headers.php sets a CSP that blocks inline scripts.
 $base        = rtrim(dirname(dirname(dirname($_SERVER['SCRIPT_NAME']))), '/');
 $destination = htmlspecialchars($base . '/admin-dashboard.php?gs_connected=1#tab-imports', ENT_QUOTES, 'UTF-8');
-?><!DOCTYPE html>
+?>
+<!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8">
-<meta http-equiv="refresh" content="0; url=<?php echo $destination; ?>">
-<title>Connecting…</title>
+    <meta charset="UTF-8">
+    <meta http-equiv="refresh" content="0; url=<?php echo $destination; ?>">
+    <title>Connecting…</title>
 </head>
+
 <body>Connecting to Google Sheets, please wait…</body>
+
 </html>
 <?php
 exit;

@@ -45,7 +45,11 @@ $s = $conn->prepare(
 // Also store the admin email so callback.php can restore the session
 $adminEmail   = (string)($_SESSION['admin_email'] ?? '');
 $statePayload = $state . '|' . $expires . '|' . $adminEmail;
-if ($s) { $s->bind_param('ss', $statePayload, $statePayload); $s->execute(); $s->close(); }
+if ($s) {
+    $s->bind_param('ss', $statePayload, $statePayload);
+    $s->execute();
+    $s->close();
+}
 
 // Detect environment for redirect URI
 $host        = $_SERVER['HTTP_HOST'] ?? 'localhost';
