@@ -432,7 +432,7 @@
                                             <td>
                                                 <div class="fac-person">
                                                     <span class="inv-thumb">
-                                                        <img src="<?php echo htmlspecialchars(equipment_image_path($item['image_path'], $root_url)); ?>"
+                                                        <img src="<?php echo htmlspecialchars(equipment_image_path($item['image_path'], $root_url, $item['category'] ?? '')); ?>"
                                                             alt="<?php echo htmlspecialchars($item['item_name']); ?>"
                                                             loading="lazy">
                                                         <span class="material-symbols-outlined inv-thumb-ph">inventory_2</span>
@@ -519,7 +519,7 @@
                                 <?php else: while ($item = mysqli_fetch_assoc($archive_result)): ?>
                                     <tr>
                                         <td>
-                                            <img src="<?php echo htmlspecialchars(equipment_image_path($item['image_path'], $root_url)); ?>"
+                                            <img src="<?php echo htmlspecialchars(equipment_image_path($item['image_path'], $root_url, $item['category'] ?? '')); ?>"
                                                 class="item-img"
                                                 onerror="this.src='<?php echo $root_url; ?>uploads/default.png'">
                                         </td>

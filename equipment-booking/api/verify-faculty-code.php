@@ -19,6 +19,7 @@ if (($name_err = student_name_error($student_name)) !== null) {
 }
 
 require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../../shared/core/equipment-image.php';
 $conn = getDB();
 
 // Look up the code
@@ -134,7 +135,11 @@ $inv = $conn->query(
       ORDER BY item_name ASC"
 );
 $inventory = [];
-while ($item = $inv->fetch_assoc()) $inventory[] = $item;
+while ($item = $inv->fetch_assoc()) {
+    // No photo of its own -> the picture drawn for its category (a bare path; the student page resolves it).
+    $item['image_path'] = equipment_image_path((string)($item['image_path'] ?? ''), '', (string)($item['category'] ?? ''));
+    $inventory[] = $item;
+}
 
 $conn->close();
 

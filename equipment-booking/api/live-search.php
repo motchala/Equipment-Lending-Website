@@ -7,6 +7,7 @@ if (!isset($_SESSION['faculty_id']) && !isset($_SESSION['admin'])) {
     exit();
 }
 require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../../shared/core/equipment-image.php';
 $conn = getDB();
 
 $search = $_GET['q'] ?? '';
@@ -102,7 +103,7 @@ switch ($section) {
 
         while ($item = $result->fetch_assoc()) {
             echo "<tr>
-                <td><img src='" . htmlspecialchars(equipment_image_path($item['image_path'] ?? '')) . "' class='item-img shadow-sm'></td>
+                <td><img src='" . htmlspecialchars(equipment_image_path($item['image_path'] ?? '', '', $item['category'] ?? '')) . "' class='item-img shadow-sm'></td>
                 <td class='fw-bold text-maroon'>" . htmlspecialchars($item['item_name']) . "</td>
                 <td>" . htmlspecialchars($item['category']) . "</td>
                 <td><span class='badge bg-info text-dark'>{$item['quantity']} units</span></td>
@@ -170,7 +171,7 @@ switch ($section) {
                 'category'  => $row['category'],
                 'quantity'  => (int)$row['quantity'],
                 'available' => (int)$row['quantity'] > 0,
-                'image'     => $row['image_path'] ?? ''
+                'image'     => equipment_image_path((string)($row['image_path'] ?? ''), '', (string)($row['category'] ?? ''))
             ];
         }
         echo json_encode($items);

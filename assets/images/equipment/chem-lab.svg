@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" role="img" aria-label="chem lab equipment">
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e6f6f1"/><stop offset="1" stop-color="#c8ebe0"/></linearGradient>
+<filter id="soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="7"/></filter>
+</defs>
+<rect width="600" height="600" fill="url(#bg)"/>
+<g transform="translate(45 45) scale(.85)">
+<ellipse cx="300" cy="498" rx="190" ry="15" fill="#0e4a3a" opacity=".18" filter="url(#soft)"/>
+<defs>
+<linearGradient id="liq" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#47c9a2"/><stop offset="1" stop-color="#1f9c7b"/></linearGradient>
+<linearGradient id="liq2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4b740"/><stop offset="1" stop-color="#e08a00"/></linearGradient>
+<linearGradient id="liq3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b57edc"/><stop offset="1" stop-color="#8a4fc0"/></linearGradient>
+<clipPath id="fl"><path d="M262 140h60v96l100 190c10 22-4 44-30 44H192c-26 0-40-22-30-44l100-190z"/></clipPath>
+</defs>
+<g transform="translate(-30,-6)">
+  <path d="M262 140h60v96l100 190c10 22-4 44-30 44H192c-26 0-40-22-30-44l100-190z" fill="#ffffff" fill-opacity=".55" stroke="#5f8f84" stroke-width="7" stroke-linejoin="round"/>
+  <g clip-path="url(#fl)">
+    <path d="M140 352c40-16 74 14 114 0s72-14 112 0 80 14 100-4v140H140z" fill="url(#liq)"/>
+    <circle cx="232" cy="404" r="9" fill="#fff" opacity=".5"/><circle cx="276" cy="380" r="6" fill="#fff" opacity=".55"/><circle cx="318" cy="414" r="11" fill="#fff" opacity=".4"/><circle cx="262" cy="440" r="7" fill="#fff" opacity=".45"/>
+  </g>
+  <rect x="254" y="126" width="76" height="20" rx="8" fill="#5f8f84"/>
+  <path d="M276 160v70" stroke="#fff" stroke-width="7" stroke-linecap="round" opacity=".7"/>
+  <path d="M214 372l-40 72" stroke="#fff" stroke-width="7" stroke-linecap="round" opacity=".55"/>
+  <path d="M250 300h16M246 322h24" stroke="#5f8f84" stroke-width="4" stroke-linecap="round" opacity=".55"/>
+</g>
+<g transform="translate(0,-6)">
+  <g transform="rotate(8 442 330)">
+    <rect x="420" y="200" width="46" height="250" rx="23" fill="#ffffff" fill-opacity=".6" stroke="#5f8f84" stroke-width="6"/>
+    <path d="M426 330h34v95a17 17 0 0 1-34 0z" fill="url(#liq2)"/>
+    <rect x="414" y="194" width="58" height="14" rx="7" fill="#5f8f84"/>
+  </g>
+  <g transform="rotate(-6 508 340)">
+    <rect x="486" y="226" width="40" height="224" rx="20" fill="#ffffff" fill-opacity=".6" stroke="#5f8f84" stroke-width="6"/>
+    <path d="M491 350h30v78a15 15 0 0 1-30 0z" fill="url(#liq3)"/>
+    <rect x="481" y="220" width="50" height="13" rx="6.5" fill="#5f8f84"/>
+  </g>
+</g>
+</g>
+</svg>

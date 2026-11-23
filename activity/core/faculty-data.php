@@ -87,8 +87,8 @@ function fact_eq_housekeeping(mysqli $conn): void
 }
 
 /**
- * Picture per item name (tbl_requests only stores the name as text). An item with no photo, or whose
- * photo file is gone, gets the shared default picture (uploads/default.png) instead of an icon tile.
+ * Picture per item name (tbl_requests only stores the name as text). An item with no photo gets the
+ * picture drawn for its category instead of an icon tile.
  */
 function fact_eq_image_map(mysqli $conn): array
 {
@@ -97,9 +97,9 @@ function fact_eq_image_map(mysqli $conn): array
         return $map;
     }
     $map = [];
-    $res = $conn->query('SELECT item_name, image_path FROM tbl_inventory');
+    $res = $conn->query('SELECT item_name, category, image_path FROM tbl_inventory');
     while ($res && ($row = $res->fetch_assoc())) {
-        $map[strtolower(trim((string)$row['item_name']))] = equipment_image_path((string)($row['image_path'] ?? ''), $root_url ?? '');
+        $map[strtolower(trim((string)$row['item_name']))] = equipment_image_path((string)($row['image_path'] ?? ''), $root_url ?? '', (string)($row['category'] ?? ''));
     }
     return $map;
 }
