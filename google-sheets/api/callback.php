@@ -7,7 +7,8 @@ declare(strict_types=1);
  *
  * Google redirects here after the Super Admin clicks Allow.
  * Exchanges the authorization code for access + refresh tokens,
- * stores them in tbl_sync_config, redirects back to the Imports tab.
+ * stores them in the private token file (config/google-oauth-token.php —
+ * never in the database), redirects back to the Imports tab.
  */
 
 require_once __DIR__ . '/../../config/security-headers.php';
@@ -142,26 +143,33 @@ if (empty($data['access_token']) || empty($data['refresh_token'])) {
 }
 
 $conn = getDB();
-gs_token_store(
+$saved = gs_token_store(
     $conn,
     (string)$data['access_token'],
     (string)$data['refresh_token'],
     time() + (int)($data['expires_in'] ?? 3600)
 );
+if (!$saved) {
+    gs_cb_fail('Could not save the Google connection on the server. Make sure the config/ folder is writable by PHP.');
+}
 
 // SameSite=Strict means a cross-origin redirect from Google will not carry the session cookie.
 // A meta-refresh is a same-origin navigation — the session cookie is sent normally.
 // We do NOT use a <script> redirect because security-headers.php sets a CSP that blocks inline scripts.
 $base        = rtrim(dirname(dirname(dirname($_SERVER['SCRIPT_NAME']))), '/');
 $destination = htmlspecialchars($base . '/admin-dashboard.php?gs_connected=1#tab-imports', ENT_QUOTES, 'UTF-8');
-?><!DOCTYPE html>
+?>
+<!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8">
-<meta http-equiv="refresh" content="0; url=<?php echo $destination; ?>">
-<title>Connecting…</title>
+    <meta charset="UTF-8">
+    <meta http-equiv="refresh" content="0; url=<?php echo $destination; ?>">
+    <title>Connecting…</title>
 </head>
+
 <body>Connecting to Google Sheets, please wait…</body>
+
 </html>
 <?php
 exit;

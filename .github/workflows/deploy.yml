@@ -28,6 +28,7 @@ jobs:
             .env
             .env.example
             **/config/db.php
+            **/config/google-oauth-token.php*
             database/**
             docs/**
             z-README.md

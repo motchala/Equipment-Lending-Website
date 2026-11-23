@@ -6,7 +6,8 @@ declare(strict_types=1);
  * google-sheets/api/disconnect.php
  *
  * POST: Super Admin disconnects the Google Sheet integration.
- * Revokes the OAuth token at Google and deletes it from tbl_sync_config.
+ * Revokes the OAuth token at Google and deletes the stored tokens
+ * (private token file config/google-oauth-token.php, plus any legacy DB rows).
  */
 
 require_once __DIR__ . '/../../config/security-headers.php';
