@@ -13826,7 +13826,7 @@ html.rx-mobile body #settingsOverlay .sov-pagehead::after {
     align-items: center;
     justify-content: space-between;
     padding: 12px 20px;
-    border-radius: 12px 12px 0 0;
+    border-radius: 12px;
     box-shadow: 0 -4px 20px rgba(128, 0, 0, .25);
     z-index: 50;
     gap: 12px;
