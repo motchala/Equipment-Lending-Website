@@ -26,7 +26,8 @@ if ($key === '' || !preg_match('/^[a-z]+-\d+$/', $key)) {
 }
 
 // Deleting implies it's no longer unread, too.
-notif_set_state($conn, $key, true, true);
+// a merged notification stands for everything inside it
+notif_set_state_many($conn, [$key], true, true);
 
 $notifications = notif_build_list($conn);
 echo json_encode(['status' => 'success', 'unread_count' => notif_count_unread($notifications)]);

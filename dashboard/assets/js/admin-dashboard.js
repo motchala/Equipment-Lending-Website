@@ -1008,6 +1008,7 @@
         wrap.className = 'notif-item notif-card notif-fresh' + (n.urgent ? ' notif-urgent' : '') + (n.is_read ? '' : ' unread');
         wrap.dataset.cat = n.cat;
         wrap.dataset.notifKey = n.key;
+        wrap.dataset.notifSig = n.sig || '';
         wrap.dataset.linkTab = (n.link && n.link.tab) || '';
         wrap.dataset.linkChip = (n.link && n.link.chip) || '';
         wrap.dataset.linkSub = (n.link && n.link.sub) || '';
@@ -1068,9 +1069,19 @@
                     }
                 });
 
+                // A merged card whose content changed (e.g. "2 items" -> "3 items") is rebuilt in place,
+                // unless the admin has it expanded.
+                let addedAny = false;
+                data.notifications.forEach(n => {
+                    const card = list.querySelector('.notif-item[data-notif-key="' + n.key + '"]');
+                    if (card && n.sig && card.dataset.notifSig !== n.sig && !card.classList.contains('expanded') && !card.classList.contains('notif-removing')) {
+                        card.replaceWith(_buildNotifCardEl(n));
+                        addedAny = true;
+                    }
+                });
+
                 // Add cards for genuinely new notifications, newest group-appropriate spot.
                 const existingKeys = new Set(Array.from(list.querySelectorAll('.notif-item[data-notif-key]')).map(c => c.dataset.notifKey));
-                let addedAny = false;
                 data.notifications.forEach(n => {
                     if (existingKeys.has(n.key)) return;
                     addedAny = true;

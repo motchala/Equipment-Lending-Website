@@ -71,6 +71,7 @@
                         <div class="notif-item notif-card<?php echo $n['is_read'] ? '' : ' unread'; ?><?php echo $n['urgent'] ? ' notif-urgent' : ''; ?>"
                             data-cat="<?php echo htmlspecialchars($n['cat']); ?>"
                             data-notif-key="<?php echo htmlspecialchars($n['key']); ?>"
+                            data-notif-sig="<?php echo htmlspecialchars($n['sig'] ?? ''); ?>"
                             data-link-tab="<?php echo htmlspecialchars($n['link']['tab'] ?? ''); ?>"
                             data-link-chip="<?php echo htmlspecialchars($n['link']['chip'] ?? ''); ?>"
                             data-link-sub="<?php echo htmlspecialchars($n['link']['sub'] ?? ''); ?>"
