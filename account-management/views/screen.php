@@ -6,7 +6,7 @@
 
         <div class="admin-screen-header fac-management-head">
             <h2 style="font-size:1.3rem;font-weight:700;color:var(--text-dark)">Faculty Management</h2>
-            <p style="color:var(--text-light);font-size:12.5px;margin-top:2px">Create, edit, and remove faculty accounts.</p>
+            <p style="color:var(--text-light);font-size:12.5px;margin-top:2px">Create, edit, and deactivate faculty accounts.</p>
         </div>
 
         <div class="faculty-layout">
@@ -171,8 +171,9 @@
                         </thead>
                         <tbody id="faculty-list-tbody">
                             <?php
+                            require_once __DIR__ . '/../core/faculty-status.php';
                             $fac_res = $conn->query(
-                                "SELECT u.fullname, u.email, u.faculty_id"
+                                "SELECT u.fullname, u.email, u.faculty_id, " . faculty_status_select($conn, 'u')
                                     . " FROM tbl_users u"
                                     . " ORDER BY u.fullname ASC"
                             );
@@ -180,8 +181,10 @@
                                 while ($frow = $fac_res->fetch_assoc()):
                                     $idUnset   = faculty_id_is_unset($frow['faculty_id']);
                                     $initFac   = strtoupper(substr(trim($frow['fullname'] ?? '') ?: 'F', 0, 1));
+                                    $facActive = ((int)($frow['is_active'] ?? 1)) !== 0;   // deactivated accounts stay in the list
                             ?>
-                                    <tr
+                                    <tr<?= $facActive ? '' : ' class="fac-row-inactive"' ?>
+                                        data-active="<?= $facActive ? '1' : '0' ?>"
                                         data-fullname="<?= htmlspecialchars($frow['fullname']) ?>"
                                         data-email="<?= htmlspecialchars($frow['email']) ?>"
                                         data-faculty-id="<?= htmlspecialchars($frow['faculty_id']) ?>"
@@ -190,7 +193,7 @@
                                             <div class="fac-person">
                                                 <span class="fac-avatar"><?= htmlspecialchars($initFac) ?></span>
                                                 <div class="fac-person-text">
-                                                    <div class="fac-person-name"><?= htmlspecialchars($frow['fullname']) ?></div>
+                                                    <div class="fac-person-name"><?= htmlspecialchars($frow['fullname']) ?><?php if (!$facActive): ?> <span class="fac-status-off">Deactivated</span><?php endif; ?></div>
                                                     <div class="fac-person-sub"><?= htmlspecialchars($frow['email']) ?></div>
                                                 </div>
                                             </div>

@@ -43,8 +43,12 @@
                 <div id="fac-edit-alert" class="alert-banner hidden" role="alert" style="margin-bottom:0"></div>
             </div>
             <div class="ps-modal-foot fac-foot-split">
-                <button class="ps-btn fac-btn-delete" id="fac-edit-delete-btn" type="button">
-                    <span class="material-symbols-outlined">person_remove</span> Delete
+                <!-- One of these two shows, depending on whether the account is active (JS toggles .hidden) -->
+                <button class="ps-btn fac-btn-deactivate" id="fac-edit-deactivate-btn" type="button">
+                    <span class="material-symbols-outlined">person_off</span> Deactivate
+                </button>
+                <button class="ps-btn fac-btn-reactivate hidden" id="fac-edit-reactivate-btn" type="button">
+                    <span class="material-symbols-outlined">how_to_reg</span> <span id="fac-edit-reactivate-label">Reactivate</span>
                 </button>
                 <div class="fac-foot-actions">
                     <button class="ps-btn ps-btn--ghost" id="fac-edit-cancel">Cancel</button>
@@ -58,56 +62,56 @@
 
 
     <!-- ================================================================
-     MODAL: DELETE FACULTY CONFIRM
+     MODAL: DEACTIVATE FACULTY CONFIRM
      One message at a time: "checking" -> "confirm" OR "blocked" (override).
     ================================================================ -->
-    <div class="ps-modal-backdrop" id="fac-delete-modal">
+    <div class="ps-modal-backdrop" id="fac-deactivate-modal">
         <div class="ps-modal ps-modal--sm">
             <div class="ps-modal-head">
                 <div class="ps-modal-head-icon ps-mhi--danger">
-                    <span class="material-symbols-outlined">person_remove</span>
+                    <span class="material-symbols-outlined">person_off</span>
                 </div>
-                <h3>Delete Faculty Account</h3>
-                <button class="ps-modal-close" id="fac-delete-close" aria-label="Close">
+                <h3>Deactivate Faculty Account</h3>
+                <button class="ps-modal-close" id="fac-deactivate-close" aria-label="Close">
                     <span class="material-symbols-outlined">close</span>
                 </button>
             </div>
             <div class="ps-modal-body">
-                <p class="fac-del-lead">Permanently delete <strong id="fac-delete-name">this faculty member</strong>?</p>
+                <p class="fac-del-lead">Deactivate <strong id="fac-deactivate-name">this faculty member</strong>?</p>
 
                 <!-- View: checking -->
-                <p class="fac-del-checking" id="fac-delete-view-checking">
+                <p class="fac-del-checking" id="fac-deactivate-view-checking">
                     <span class="material-symbols-outlined">progress_activity</span> Checking account&hellip;
                 </p>
 
                 <!-- View: confirm (nothing blocking) -->
-                <p class="fac-del-note hidden" id="fac-delete-view-confirm">This can&rsquo;t be undone. Borrowing history is kept.</p>
+                <p class="fac-del-note hidden" id="fac-deactivate-view-confirm">They won&rsquo;t be able to sign in. Their account, data and borrowing history are all kept, and you can reactivate the account at any time.</p>
 
                 <!-- View: blocked (open bookings) -> Super Admin may override with their password -->
-                <div class="hidden" id="fac-delete-view-blocked">
+                <div class="hidden" id="fac-deactivate-view-blocked">
                     <div class="fac-del-warn">
                         <div class="fac-del-warn-title">
                             <span class="material-symbols-outlined">warning</span> Open bookings found
                         </div>
-                        <ul class="fac-del-list" id="fac-delete-list"></ul>
+                        <ul class="fac-del-list" id="fac-deactivate-list"></ul>
                     </div>
-                    <label class="fac-del-pw-label" for="fac-delete-password">Enter your password to delete anyway</label>
+                    <label class="fac-del-pw-label" for="fac-deactivate-password">Enter your password to deactivate anyway</label>
                     <div class="fac-pw-wrap">
-                        <input type="password" id="fac-delete-password" class="form-control-custom"
+                        <input type="password" id="fac-deactivate-password" class="form-control-custom"
                             maxlength="128" autocomplete="current-password" placeholder="Your password">
                         <button type="button" class="fac-pw-toggle"
-                            data-target="fac-delete-password" aria-label="Toggle password">
+                            data-target="fac-deactivate-password" aria-label="Toggle password">
                             <span class="material-symbols-outlined" style="font-size:17px">visibility</span>
                         </button>
                     </div>
                 </div>
 
-                <p class="fac-del-error hidden" id="fac-delete-error" role="alert"></p>
+                <p class="fac-del-error hidden" id="fac-deactivate-error" role="alert"></p>
             </div>
             <div class="ps-modal-foot">
-                <button class="ps-btn ps-btn--ghost" id="fac-delete-cancel">Cancel</button>
-                <button class="ps-btn ps-btn--danger" id="fac-delete-confirm" disabled>
-                    <span class="material-symbols-outlined">delete</span> <span id="fac-delete-confirm-label">Delete Account</span>
+                <button class="ps-btn ps-btn--ghost" id="fac-deactivate-cancel">Cancel</button>
+                <button class="ps-btn ps-btn--danger" id="fac-deactivate-confirm" disabled>
+                    <span class="material-symbols-outlined">person_off</span> <span id="fac-deactivate-confirm-label">Deactivate Account</span>
                 </button>
             </div>
         </div>

@@ -1536,8 +1536,9 @@
 
     /* ── Faculty list: client-side search + pagination (20 per page) ──
        Mirrors setupInventoryList(): every <tr[data-faculty-id]> is rendered by
-       PHP (or swapped in by adminRefreshFacultyList, or removed by the delete
-       flow) and this only shows/hides them: filter by the search box, then show
+       PHP (or swapped in by adminRefreshFacultyList, or re-rendered by psFacRender
+       when an account is edited / deactivated / reactivated) and this only shows/hides
+       them: filter by the search box, then show
        20 rows per page. A MutationObserver re-renders whenever rows are added or
        removed, so none of that other code needs to know the list is paged. */
     function setupFacultyList() {
@@ -1893,21 +1894,30 @@
     /* The faculty-list row is rendered in ONE place so the create form and the edit
        modal produce rows identical to the ones the server prints (admin-dashboard.php).
        An id starting with NOTSET- is the internal placeholder for "no Faculty ID yet"
-       (see shared/core/faculty-id.php) and is shown as "Not set yet". */
+       (see shared/core/faculty-id.php) and is shown as "Not set yet".
+       d.is_active (1/0) says whether the account is active; when it is left out the row keeps
+       the state it already had (so saving an edit never changes it). A deactivated account is
+       shown with a "Deactivated" badge and a muted look, and is never removed from the list. */
     window.psFacRender = function (tr, d) {
         const idUnset = !d.faculty_id || String(d.faculty_id).indexOf('NOTSET-') === 0;
         const init = ((d.fullname || 'F').trim().charAt(0) || 'F').toUpperCase();
+        const active = (d.is_active === undefined)
+            ? tr.dataset.active !== '0'
+            : !(d.is_active === 0 || d.is_active === '0' || d.is_active === false);
 
         tr.dataset.fullname = d.fullname || '';
         tr.dataset.email = d.email || '';
         tr.dataset.facultyId = d.faculty_id || '';
         tr.dataset.init = init;
+        tr.dataset.active = active ? '1' : '0';
+        tr.classList.toggle('fac-row-inactive', !active);
 
         tr.innerHTML =
             '<td><div class="fac-person">' +
             '<span class="fac-avatar">' + _esc(init) + '</span>' +
             '<div class="fac-person-text">' +
-            '<div class="fac-person-name">' + _esc(d.fullname) + '</div>' +
+            '<div class="fac-person-name">' + _esc(d.fullname) +
+            (active ? '' : ' <span class="fac-status-off">Deactivated</span>') + '</div>' +
             '<div class="fac-person-sub">' + _esc(d.email) + '</div>' +
             '</div></div></td>' +
             '<td>' + (idUnset

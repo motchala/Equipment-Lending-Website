@@ -292,7 +292,7 @@
         ];
         if (isSuper()) {
             items = [
-                ['group', 'Faculty accounts', 'Create, edit and remove faculty'],
+                ['group', 'Faculty accounts', 'Create, edit and deactivate faculty'],
                 ['admin_panel_settings', 'Admin accounts', 'Create and manage admins'],
                 ['upload_file', 'Imports', 'Faculty registry and room schedules']
             ].concat(items, [

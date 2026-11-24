@@ -45,9 +45,9 @@
             function closeFacModal(id) {
                 var el = document.getElementById(id);
                 if (el) el.classList.remove('ps-modal-open');
-                if (id === 'fac-delete-modal') {
-                    _facDelCheckSeq++; /* ignore any check still in flight */
-                    var pw = document.getElementById('fac-delete-password');
+                if (id === 'fac-deactivate-modal') {
+                    _facDeactCheckSeq++; /* ignore any check still in flight */
+                    var pw = document.getElementById('fac-deactivate-password');
                     if (pw) {
                         pw.value = '';
                         pw.type = 'password';
@@ -92,7 +92,8 @@
                 var facId = row.dataset.facultyId || '';
                 var init = row.dataset.init || (fullname.charAt(0).toUpperCase()) || 'F';
                 var idUnset = !facId || facId.indexOf('NOTSET-') === 0;
-                var subLine = (idUnset ? 'Faculty ID not set yet' : facId) + ' \u00B7 Active Faculty';
+                var isActive = row.dataset.active !== '0';
+                var subLine = (idUnset ? 'Faculty ID not set yet' : facId) + (isActive ? ' \u00B7 Active Faculty' : ' \u00B7 Deactivated');
 
                 var parts = fullname.trim().split(' ');
                 var lastName = parts.length > 1 ? parts[parts.length - 1] : '';
@@ -104,10 +105,30 @@
                 document.getElementById('fac-edit-first').value = firstName;
                 document.getElementById('fac-edit-last').value = lastName;
                 document.getElementById('fac-edit-email').value = email;
-                document.getElementById('fac-delete-name').textContent = fullname;
+                document.getElementById('fac-deactivate-name').textContent = fullname;
+                _facSyncEditFooter(isActive);
 
                 openFacModal('fac-edit-modal');
             });
+
+            /* Edit modal footer: an active account offers Deactivate, a deactivated one offers Reactivate. */
+            function _facSyncEditFooter(isActive) {
+                var off = document.getElementById('fac-edit-deactivate-btn');
+                var on = document.getElementById('fac-edit-reactivate-btn');
+                if (off) off.classList.toggle('hidden', !isActive);
+                if (on) on.classList.toggle('hidden', isActive);
+            }
+
+            /* Show a row as active or deactivated (badge + muted look). The row is never removed. */
+            function _facSetRowActive(row, active) {
+                if (!row || typeof window.psFacRender !== 'function') return;
+                window.psFacRender(row, {
+                    fullname: row.dataset.fullname || '',
+                    email: row.dataset.email || '',
+                    faculty_id: row.dataset.facultyId || '',
+                    is_active: active ? 1 : 0
+                });
+            }
 
             /* Edit modal: close */
             ['fac-edit-close', 'fac-edit-cancel'].forEach(function(id) {
@@ -117,56 +138,58 @@
                 });
             });
 
-            /* ── Delete Account ──────────────────────────────────────────
+            /* ── Deactivate Account ──────────────────────────────────────
+               Nothing is deleted: the account and all its data stay, the person just can't sign in
+               until a Super Admin reactivates it.
                The confirm modal shows ONE state at a time:
                  checking -> confirm  (nothing blocking)
                           -> blocked  (open bookings: Super Admin can override
                                        by re-entering their own password) */
-            var _facDelView = 'checking';
-            var _facDelCheckSeq = 0;
+            var _facDeactView = 'checking';
+            var _facDeactCheckSeq = 0;
 
-            function _facDelEl(id) {
+            function _facDeactEl(id) {
                 return document.getElementById(id);
             }
 
-            function _facDelClearError() {
-                var box = _facDelEl('fac-delete-error');
+            function _facDeactClearError() {
+                var box = _facDeactEl('fac-deactivate-error');
                 if (box) {
                     box.classList.add('hidden');
                     box.textContent = '';
                 }
                 /* the plain note comes back once an error is gone */
-                var note = _facDelEl('fac-delete-view-confirm');
-                if (note && _facDelView === 'confirm') note.classList.remove('hidden');
+                var note = _facDeactEl('fac-deactivate-view-confirm');
+                if (note && _facDeactView === 'confirm') note.classList.remove('hidden');
             }
 
-            function _facDelShowError(msg) {
-                var box = _facDelEl('fac-delete-error');
+            function _facDeactShowError(msg) {
+                var box = _facDeactEl('fac-deactivate-error');
                 if (!box) return;
                 /* only one message at a time: an error replaces the plain note */
-                var note = _facDelEl('fac-delete-view-confirm');
+                var note = _facDeactEl('fac-deactivate-view-confirm');
                 if (note) note.classList.add('hidden');
                 box.textContent = msg;
                 box.classList.remove('hidden');
             }
 
-            function _facDelSetView(view) {
-                _facDelView = view;
+            function _facDeactSetView(view) {
+                _facDeactView = view;
                 ['checking', 'confirm', 'blocked'].forEach(function(v) {
-                    var el = _facDelEl('fac-delete-view-' + v);
+                    var el = _facDeactEl('fac-deactivate-view-' + v);
                     if (el) el.classList.toggle('hidden', v !== view);
                 });
-                var btn = _facDelEl('fac-delete-confirm');
-                var lbl = _facDelEl('fac-delete-confirm-label');
+                var btn = _facDeactEl('fac-deactivate-confirm');
+                var lbl = _facDeactEl('fac-deactivate-confirm-label');
                 if (btn) btn.disabled = (view === 'checking');
-                if (lbl) lbl.textContent = (view === 'blocked') ? 'Delete Anyway' : 'Delete Account';
-                var box = _facDelEl('fac-delete-error');
+                if (lbl) lbl.textContent = (view === 'blocked') ? 'Deactivate Anyway' : 'Deactivate Account';
+                var box = _facDeactEl('fac-deactivate-error');
                 if (box) {
                     box.classList.add('hidden');
                     box.textContent = '';
                 }
                 if (view === 'blocked') {
-                    var pw = _facDelEl('fac-delete-password');
+                    var pw = _facDeactEl('fac-deactivate-password');
                     if (pw) {
                         pw.value = '';
                         setTimeout(function() {
@@ -176,8 +199,8 @@
                 }
             }
 
-            function _facDelRenderBlocked(d) {
-                var list = _facDelEl('fac-delete-list');
+            function _facDeactRenderBlocked(d) {
+                var list = _facDeactEl('fac-deactivate-list');
                 if (!list) return;
                 list.innerHTML = '';
                 var rows = [
@@ -203,7 +226,7 @@
                     li.appendChild(o);
                     list.appendChild(li);
                 });
-                _facDelSetView('blocked');
+                _facDeactSetView('blocked');
             }
 
             function _facCsrf() {
@@ -211,22 +234,22 @@
                 return el ? el.value : '';
             }
 
-            var facEditDelBtn = document.getElementById('fac-edit-delete-btn');
-            if (facEditDelBtn) {
-                facEditDelBtn.addEventListener('click', function() {
+            var facEditDeactBtn = document.getElementById('fac-edit-deactivate-btn');
+            if (facEditDeactBtn) {
+                facEditDeactBtn.addEventListener('click', function() {
                     if (!_facEditRow) return;
                     var facultyId = _facEditRow.dataset.facultyId || '';
-                    var nameEl = _facDelEl('fac-delete-name');
+                    var nameEl = _facDeactEl('fac-deactivate-name');
                     if (nameEl) nameEl.textContent = _facEditRow.dataset.fullname || 'this faculty member';
 
-                    _facDelSetView('checking');
+                    _facDeactSetView('checking');
                     closeFacModal('fac-edit-modal');
-                    openFacModal('fac-delete-modal');
+                    openFacModal('fac-deactivate-modal');
 
-                    /* Dry run: find out up front whether anything blocks the delete,
+                    /* Dry run: find out up front whether anything blocks the deactivation,
                        so the right message is the first (and only) one shown. */
-                    var seq = ++_facDelCheckSeq;
-                    fetch('account-management/api/delete-faculty-account.php', {
+                    var seq = ++_facDeactCheckSeq;
+                    fetch('account-management/api/deactivate-faculty-account.php', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/x-www-form-urlencoded'
@@ -241,24 +264,24 @@
                             return res.json();
                         })
                         .then(function(data) {
-                            if (seq !== _facDelCheckSeq) return;
+                            if (seq !== _facDeactCheckSeq) return;
                             if (data && data.status === 'success' && data.blocked && data.details) {
-                                _facDelRenderBlocked(data.details);
+                                _facDeactRenderBlocked(data.details);
                             } else {
-                                /* clear, or the check itself failed: the real delete
+                                /* clear, or the check itself failed: the real request
                                    re-checks on the server and reports any problem */
-                                _facDelSetView('confirm');
+                                _facDeactSetView('confirm');
                             }
                         })
                         .catch(function() {
-                            if (seq !== _facDelCheckSeq) return;
-                            _facDelSetView('confirm');
+                            if (seq !== _facDeactCheckSeq) return;
+                            _facDeactSetView('confirm');
                         });
                 });
             }
 
-            /* Keep the "Faculty List (N)" badge in step with the table, whether a
-               row is added (create form) or removed (delete). */
+            /* Keep the "Faculty List (N)" badge in step with the table when a row is added
+               (create form). Deactivated accounts stay in the list, so they stay in the count. */
             var _facTbody = document.getElementById('faculty-list-tbody');
 
             function _facRefreshCount() {
@@ -380,45 +403,45 @@
                 });
             }
 
-            /* Delete modal: close */
-            ['fac-delete-close', 'fac-delete-cancel'].forEach(function(id) {
+            /* Deactivate modal: close */
+            ['fac-deactivate-close', 'fac-deactivate-cancel'].forEach(function(id) {
                 var el = document.getElementById(id);
                 if (el) el.addEventListener('click', function() {
-                    closeFacModal('fac-delete-modal');
+                    closeFacModal('fac-deactivate-modal');
                 });
             });
 
-            /* Delete modal: confirm */
-            var facDelConf = document.getElementById('fac-delete-confirm');
-            var facDelPw = document.getElementById('fac-delete-password');
+            /* Deactivate modal: confirm */
+            var facDeactConf = document.getElementById('fac-deactivate-confirm');
+            var facDeactPw = document.getElementById('fac-deactivate-password');
 
-            function _facDelSubmit() {
-                if (!_facEditRow || _facDelView === 'checking') return;
+            function _facDeactSubmit() {
+                if (!_facEditRow || _facDeactView === 'checking') return;
 
-                var override = (_facDelView === 'blocked');
-                var password = facDelPw ? facDelPw.value : '';
+                var override = (_facDeactView === 'blocked');
+                var password = facDeactPw ? facDeactPw.value : '';
                 if (override && !password) {
-                    _facDelShowError('Enter your password to continue.');
-                    if (facDelPw) facDelPw.focus();
+                    _facDeactShowError('Enter your password to continue.');
+                    if (facDeactPw) facDeactPw.focus();
                     return;
                 }
-                _facDelClearError();
+                _facDeactClearError();
 
-                var rowToRemove = _facEditRow;
+                var rowToDeactivate = _facEditRow;
                 var params = {
                     csrf_token: _facCsrf(),
-                    faculty_id: rowToRemove.dataset.facultyId || ''
+                    faculty_id: rowToDeactivate.dataset.facultyId || ''
                 };
                 if (override) {
                     params.override = '1';
                     params.current_password = password;
                 }
 
-                var savedLabel = facDelConf.innerHTML;
-                facDelConf.disabled = true;
-                facDelConf.innerHTML = '<span class="material-symbols-outlined" style="animation:spin 0.8s linear infinite">progress_activity</span> Deleting...';
+                var savedLabel = facDeactConf.innerHTML;
+                facDeactConf.disabled = true;
+                facDeactConf.innerHTML = '<span class="material-symbols-outlined" style="animation:spin 0.8s linear infinite">progress_activity</span> Deactivating...';
 
-                fetch('account-management/api/delete-faculty-account.php', {
+                fetch('account-management/api/deactivate-faculty-account.php', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/x-www-form-urlencoded'
@@ -435,56 +458,101 @@
                     })
                     .then(function(data) {
                         if (data.status === 'success') {
-                            rowToRemove.remove();
-                            _facEditRow = null;
-
-                            /* Table is now empty -> show the empty state again */
-                            if (_facTbody && !_facTbody.querySelector('tr[data-faculty-id]')) {
-                                var tr = document.createElement('tr');
-                                tr.id = 'fac-empty-row';
-                                tr.innerHTML = '<td colspan="3" style="text-align:center;padding:3rem;color:var(--text-light)">' +
-                                    '<span class="material-symbols-outlined" style="font-size:40px;display:block;margin:0 auto 10px;opacity:0.3">group</span>' +
-                                    'No faculty accounts yet.</td>';
-                                _facTbody.appendChild(tr);
-                            }
-
-                            closeFacModal('fac-delete-modal');
-                            if (typeof showToast === 'function') showToast('Faculty account deleted.', 't-danger');
+                            /* The row stays: it is re-rendered with the "Deactivated" badge. */
+                            _facSetRowActive(rowToDeactivate, false);
+                            closeFacModal('fac-deactivate-modal');
+                            if (typeof showToast === 'function') showToast('Faculty account deactivated.');
+                        } else if (data.code === 'already_inactive') {
+                            /* another Super Admin got there first: just show the current state */
+                            _facSetRowActive(rowToDeactivate, false);
+                            closeFacModal('fac-deactivate-modal');
+                            if (typeof showToast === 'function') showToast(data.message || 'That account is already deactivated.');
                         } else if (data.code === 'blocked' && data.details) {
                             /* bookings appeared since the check: switch to the override view */
-                            _facDelRenderBlocked(data.details);
+                            _facDeactRenderBlocked(data.details);
                         } else if (data.code === 'bad_password') {
-                            _facDelShowError(data.message || 'Incorrect password.');
-                            if (facDelPw) {
-                                facDelPw.focus();
-                                facDelPw.select();
+                            _facDeactShowError(data.message || 'Incorrect password.');
+                            if (facDeactPw) {
+                                facDeactPw.focus();
+                                facDeactPw.select();
                             }
                         } else {
-                            _facDelShowError(data.message || data.error || 'Could not delete this account.');
+                            _facDeactShowError(data.message || data.error || 'Could not deactivate this account.');
                         }
                     })
                     .catch(function() {
-                        _facDelShowError('Network error. Please try again.');
+                        _facDeactShowError('Network error. Please try again.');
                     })
                     .finally(function() {
-                        facDelConf.innerHTML = savedLabel;
-                        facDelConf.disabled = (_facDelView === 'checking');
+                        facDeactConf.innerHTML = savedLabel;
+                        facDeactConf.disabled = (_facDeactView === 'checking');
                     });
             }
 
-            if (facDelConf) facDelConf.addEventListener('click', _facDelSubmit);
-            if (facDelPw) {
-                facDelPw.addEventListener('keydown', function(e) {
+            if (facDeactConf) facDeactConf.addEventListener('click', _facDeactSubmit);
+            if (facDeactPw) {
+                facDeactPw.addEventListener('keydown', function(e) {
                     if (e.key === 'Enter') {
                         e.preventDefault();
-                        _facDelSubmit();
+                        _facDeactSubmit();
                     }
                 });
-                facDelPw.addEventListener('input', _facDelClearError);
+                facDeactPw.addEventListener('input', _facDeactClearError);
+            }
+
+            /* ── Reactivate Account ──────────────────────────────────────
+               Undoes a deactivation straight away (nothing destructive to confirm). */
+            var facEditReactBtn = document.getElementById('fac-edit-reactivate-btn');
+            if (facEditReactBtn) {
+                facEditReactBtn.addEventListener('click', function() {
+                    if (!_facEditRow) return;
+                    _clearFacEditAlert();
+                    var row = _facEditRow;
+                    var savedLabel = facEditReactBtn.innerHTML;
+                    facEditReactBtn.disabled = true;
+                    facEditReactBtn.innerHTML = '<span class="material-symbols-outlined" style="animation:spin 0.8s linear infinite">progress_activity</span> Reactivating...';
+
+                    fetch('account-management/api/reactivate-faculty-account.php', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded'
+                            },
+                            body: new URLSearchParams({
+                                csrf_token: _facCsrf(),
+                                faculty_id: row.dataset.facultyId || ''
+                            }).toString()
+                        })
+                        .then(function(res) {
+                            return res.json().catch(function() {
+                                return {
+                                    status: 'error',
+                                    message: 'Unexpected response from the server.'
+                                };
+                            });
+                        })
+                        .then(function(data) {
+                            if (data.status === 'success' || data.code === 'already_active') {
+                                _facSetRowActive(row, true);
+                                closeFacModal('fac-edit-modal');
+                                if (typeof showToast === 'function') {
+                                    showToast(data.status === 'success' ? 'Faculty account reactivated.' : (data.message || 'That account is already active.'));
+                                }
+                            } else {
+                                _showFacEditAlert(data.message || 'Could not reactivate this account.', true);
+                            }
+                        })
+                        .catch(function() {
+                            _showFacEditAlert('Network error. Please try again.', true);
+                        })
+                        .finally(function() {
+                            facEditReactBtn.disabled = false;
+                            facEditReactBtn.innerHTML = savedLabel;
+                        });
+                });
             }
 
             /* Backdrop click to close */
-            ['fac-edit-modal', 'fac-delete-modal'].forEach(function(id) {
+            ['fac-edit-modal', 'fac-deactivate-modal'].forEach(function(id) {
                 var bd = document.getElementById(id);
                 if (bd) bd.addEventListener('click', function(e) {
                     if (e.target === bd) closeFacModal(id);
