@@ -175,6 +175,7 @@ final class BookingSchedule
             'graceMin'       => $r['graceMin'],
             'maxBorrowDays'  => $r['maxBorrowDays'],
             'letterRequired' => $r['letterRequired'],
+            'maxStudentItems' => $r['maxStudentItems'],   // different items in ONE student request
         ];
     }
 

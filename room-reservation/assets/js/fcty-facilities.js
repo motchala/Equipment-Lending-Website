@@ -875,7 +875,10 @@
     function brief(msg, n) {
         msg = String(msg == null ? '' : msg).replace(/\s+/g, ' ').trim();
         if (!msg) return '';
-        return msg.replace(/([.!?])\s+(?=[A-Z\u201C"])/g, '$1\u0001').split('\u0001').slice(0, n || 2).join(' ');
+        /* a full stop after a title (Prof., Dr., Engr.) or an initial (Maria C. Santos) does not end a sentence */
+        msg = msg.replace(/\b(Prof|Dr|Mr|Mrs|Ms|Mx|Engr|Atty|Arch|Sr|Jr|St|No|Dir|Hon|Rev|Asst|Assoc|vs)\.\s+(?=[A-Z])/g, '$1.\u0002')
+                 .replace(/\b([A-Z])\.\s+(?=[A-Z])/g, '$1.\u0002');
+        return msg.replace(/([.!?])\s+(?=[A-Z\u201C"])/g, '$1\u0001').split('\u0001').slice(0, n || 2).join(' ').replace(/\u0002/g, ' ');
     }
 
     /* Something not filled in yet is shown, not explained: it flashes red for about a second (same fade as a
@@ -1009,11 +1012,11 @@
             '<span class="fcty-sublabel fcty-doc-label">Request letter <small>(optional)</small><span class="fcty-doc-state" id="fcty-doc-state"></span></span>' +
             '<div class="pslc-pair">' +
             '<label class="fcty-drop" id="fcty-drop" for="fcty-res-doc">' + icon('upload_file') +
-            '<span><strong>Upload a file</strong><small>JPG, PNG or PDF \u00b7 max 5 MB</small></span></label>' +
+            '<span><strong>Upload a file</strong><small>JPG, PNG, WEBP or PDF \u00b7 max 5 MB</small></span></label>' +
             '<button type="button" class="pslc-trigger" id="fcty-doc-cam" data-letter-camera="fcty-res-doc">' + icon('photo_camera') +
             '<span class="pslc-trigger-text"><strong>Take a photo</strong><small>Use your camera</small></span></button>' +
             '</div>' +
-            '<input type="file" id="fcty-res-doc" class="fcty-sr-only" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf">' +
+            '<input type="file" id="fcty-res-doc" class="fcty-sr-only" accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf">' +
             '<div class="fcty-file" id="fcty-file" hidden></div>' +
             '<p class="fcty-hint" id="fcty-doc-hint"></p>' +
             '</div>' +
@@ -1096,7 +1099,7 @@
 
         /* ── Request letter: always shown. Optional, unless Settings require one for a LATER date ── */
         var docFile = null;
-        var DOC_TYPES = ['image/jpeg', 'image/png', 'application/pdf'];
+        var DOC_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
         var DOC_MAX = 5 * 1024 * 1024;
         var DOC_HINT = 'Optional. You can still submit without one.';
         function isLaterDate() { return st.date > ymd(now); }
@@ -1107,6 +1110,7 @@
             if (f.type) return f.type;
             if (/\.pdf$/.test(n)) return 'application/pdf';
             if (/\.png$/.test(n)) return 'image/png';
+            if (/\.webp$/.test(n)) return 'image/webp';
             if (/\.jpe?g$/.test(n)) return 'image/jpeg';
             return '';
         }
@@ -1125,7 +1129,7 @@
                 return;
             }
             var kind = fileKind(f);
-            if (DOC_TYPES.indexOf(kind) === -1) { elDoc.value = ''; docMessage('Please choose a JPG, PNG or PDF file.'); return; }
+            if (DOC_TYPES.indexOf(kind) === -1) { elDoc.value = ''; docMessage('Please choose a JPG, PNG, WEBP or PDF file.'); return; }
             if (f.size > DOC_MAX) { elDoc.value = ''; docMessage('That file is ' + fmtSize(f.size) + '. The limit is 5 MB.'); return; }
             docFile = f; docMessage('');
             elFile.innerHTML = icon(kind === 'application/pdf' ? 'picture_as_pdf' : 'image') +

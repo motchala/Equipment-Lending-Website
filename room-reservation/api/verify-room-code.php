@@ -89,7 +89,7 @@ $overdue->close();
 
 if ($has_overdue) {
     echo json_encode([
-        'error' => 'Your faculty advisor currently has an overdue equipment item. Room reservations are not allowed until it is returned. Please coordinate with ' . htmlspecialchars($row['faculty_name']) . '.',
+        'error' => 'Room reservations are not allowed until your faculty advisor, ' . htmlspecialchars($row['faculty_name']) . ', returns an overdue equipment item. Please coordinate with them.',
     ]);
     exit();
 }

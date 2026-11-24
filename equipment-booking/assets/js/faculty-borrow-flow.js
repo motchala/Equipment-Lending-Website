@@ -290,7 +290,10 @@
     function brief(msg, n) {
         msg = String(msg == null ? '' : msg).replace(/\s+/g, ' ').trim();
         if (!msg) return '';
-        return msg.replace(/([.!?])\s+(?=[A-Z\u201C"])/g, '$1\u0001').split('\u0001').slice(0, n || 2).join(' ');
+        /* a full stop after a title (Prof., Dr., Engr.) or an initial (Maria C. Santos) does not end a sentence */
+        msg = msg.replace(/\b(Prof|Dr|Mr|Mrs|Ms|Mx|Engr|Atty|Arch|Sr|Jr|St|No|Dir|Hon|Rev|Asst|Assoc|vs)\.\s+(?=[A-Z])/g, '$1.\u0002')
+                 .replace(/\b([A-Z])\.\s+(?=[A-Z])/g, '$1.\u0002');
+        return msg.replace(/([.!?])\s+(?=[A-Z\u201C"])/g, '$1\u0001').split('\u0001').slice(0, n || 2).join(' ').replace(/\u0002/g, ' ');
     }
 
     /* The one error line of the modal: one to two sentences, never a list. */

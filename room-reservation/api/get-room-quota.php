@@ -53,8 +53,8 @@ echo json_encode([
     'reservations' => $active,
     'rules'        => RoomRules::meta(),   // Settings → Arbitration: advance, cutoff, letter, same-day
     'doc'          => [
-        'types'     => ['image/jpeg', 'image/png', 'application/pdf'],
-        'extensions'=> ['jpg', 'jpeg', 'png', 'pdf'],
+        'types'     => ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'],
+        'extensions'=> ['jpg', 'jpeg', 'png', 'webp', 'pdf'],
         'max_bytes' => FCTY_ROOM_DOC_MAX_BYTES,
     ],
 ]);
