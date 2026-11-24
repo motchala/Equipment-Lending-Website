@@ -141,6 +141,26 @@ if ($rl_count >= $RATE_LIMIT) {
     );
 }
 
+// ── System-level daily cap ────────────────────────────────────────────────────
+// Groq free tier: 200,000 tokens/day shared across all faculty.
+// Each message costs ~3,050 tokens (2,500 system + 300 history + 50 user + 200 reply).
+// Safe ceiling: 60 messages/day total (leaves buffer before hard Groq 429).
+$SYSTEM_DAILY_CAP = 60;
+$sys_stmt = $conn->prepare(
+    "SELECT COUNT(*) AS cnt FROM tbl_ai_chat_log WHERE sent_at >= CURDATE()"
+);
+$sys_stmt->execute();
+$sys_total = (int)($sys_stmt->get_result()->fetch_assoc()['cnt'] ?? 0);
+$sys_stmt->close();
+
+if ($sys_total >= $SYSTEM_DAILY_CAP) {
+    chat_respond(429, 'rate_limited',
+        'The AI assistant has reached its daily usage limit for today across all users. ' .
+        'It resets at midnight. You can still browse rooms in the Facilities tab.',
+        ['reset_time' => '', 'remaining' => 0]
+    );
+}
+
 // Log before API call — aborted calls still count
 $log_insert_id = 0;
 $log_stmt = $conn->prepare(
@@ -703,12 +723,32 @@ PROMPT;
 
 // ── 15. Call Groq ─────────────────────────────────────────────────────────────
 $groq_url          = 'https://api.groq.com/openai/v1/chat/completions';
+// Build conversation history from the client (last 6 turns).
+// Each entry must have role (user|assistant) and content (string).
+// We validate strictly so malicious input cannot inject system-role messages.
+$raw_history = $body['history'] ?? [];
+$safe_history = [];
+if (is_array($raw_history)) {
+    foreach (array_slice($raw_history, -6) as $turn) {
+        $role    = (string)($turn['role']    ?? '');
+        $content = trim((string)($turn['content'] ?? ''));
+        // Only allow user/assistant roles — never system — and non-empty content
+        if (in_array($role, ['user', 'assistant'], true) && $content !== '') {
+            $safe_history[] = ['role' => $role, 'content' => mb_substr($content, 0, 500)];
+        }
+    }
+}
+
+// Build the full messages array: system prompt → history → current user message
+$api_messages = array_merge(
+    [['role' => 'system', 'content' => $system_prompt]],
+    $safe_history,
+    [['role' => 'user', 'content' => $raw_message]]
+);
+
 $groq_request_body = json_encode([
     'model'       => 'openai/gpt-oss-120b',
-    'messages'    => [
-        ['role' => 'system', 'content' => $system_prompt],
-        ['role' => 'user',   'content' => $raw_message],
-    ],
+    'messages'    => $api_messages,
     'max_tokens'  => 500,
     'temperature' => 0.7,
 ]);

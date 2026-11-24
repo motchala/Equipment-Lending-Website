@@ -186,7 +186,8 @@
             <!-- ── AI Support Hub ──────────────────────────────────────────── -->
             <div class="act-ai-chat" id="actAiChat"
     data-max-advance-days="<?= (int)RoomRules::maxAdvanceDays() ?>"
-    data-max-hours="<?= (int)RoomRules::maxHours() ?>">
+    data-max-hours="<?= (int)RoomRules::maxHours() ?>"
+    data-faculty-slug="<?= htmlspecialchars($user_slug ?? $_SESSION['faculty_id'] ?? '', ENT_QUOTES) ?>">
 
                 <!-- Header -->
                 <div class="act-ai-chat-head">

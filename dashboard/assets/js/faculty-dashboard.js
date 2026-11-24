@@ -377,6 +377,11 @@
         if (tabName === 'rooms') {
             if (aiFab) aiFab.style.display = '';
             _aiTooltipMaybeShow();
+                        // Restore persisted chat history on first visit (idempotent — only runs once per session)
+            if (!window._aiChatRestored && typeof window._restoreChatHistory === 'function') {
+                window._aiChatRestored = true;
+                window._restoreChatHistory();
+            }
             // Refresh the rate-limit counter from the server every time the
             // Rooms tab becomes active — covers hard resets, tab switches, and
             // FAB opens, so the displayed count is always accurate.
@@ -4111,6 +4116,7 @@
             '</div>';
         body.appendChild(row);
         body.scrollTop = body.scrollHeight;
+        if (typeof window._saveChatHistory === 'function') window._saveChatHistory();
     }
     function appendTyping(body) {
         var row = document.createElement('div');
@@ -4126,6 +4132,66 @@
         body.scrollTop = body.scrollHeight;
         return row;
     }
+    // localStorage key for this faculty's chat history (injected by PHP via data-faculty-slug)
+    var _chatStorageKey = (function () {
+        try {
+            var chatEl = document.getElementById('actAiChat');
+            var slug = chatEl ? (chatEl.dataset.facultySlug || '') : '';
+            return slug ? 'ai_chat_history_' + slug : 'ai_chat_history';
+        } catch (_) { return 'ai_chat_history'; }
+    }());
+
+    window._saveChatHistory = function _saveChatHistory() {
+        try {
+            var chatBody = document.getElementById('actAiChatBody');
+            if (!chatBody) return;
+            var rows = chatBody.querySelectorAll('.act-chat-row');
+            var saved = [];
+            rows.forEach(function (row) {
+                if (row.classList.contains('act-chat-row-typing')) return;
+                var isUser = row.classList.contains('act-chat-row-user');
+                var bubble = row.querySelector('.act-chat-bubble, .act-chat-bubble-user');
+                if (!bubble) return;
+                saved.push({ role: isUser ? 'user' : 'assistant', text: (bubble.innerHTML || '') });
+            });
+            // Keep last 20 messages to avoid localStorage bloat
+            if (saved.length > 20) saved = saved.slice(saved.length - 20);
+            localStorage.setItem(_chatStorageKey, JSON.stringify(saved));
+        } catch (_) {}
+    }
+
+    window._restoreChatHistory = function _restoreChatHistory() {
+        try {
+            var chatBody = document.getElementById('actAiChatBody');
+            if (!chatBody) return;
+            var raw = localStorage.getItem(_chatStorageKey);
+            if (!raw) return;
+            var saved = JSON.parse(raw);
+            if (!Array.isArray(saved) || saved.length === 0) return;
+            saved.forEach(function (entry) {
+                var row = document.createElement('div');
+                if (entry.role === 'user') {
+                    row.className = 'act-chat-row act-chat-row-user';
+                    row.innerHTML =
+                        '<div class="act-chat-col act-chat-col-user">' +
+                        '<div class="act-chat-bubble act-chat-bubble-user">' + entry.text + '</div>' +
+                        '</div>';
+                } else {
+                    row.className = 'act-chat-row act-chat-row-ai';
+                    row.innerHTML =
+                        '<div class="act-chat-ai-avatar">' +
+                        '<span class="material-symbols-outlined">smart_toy</span>' +
+                        '</div>' +
+                        '<div class="act-chat-col">' +
+                        '<div class="act-chat-bubble">' + entry.text + '</div>' +
+                        '</div>';
+                }
+                chatBody.appendChild(row);
+            });
+            chatBody.scrollTop = chatBody.scrollHeight;
+        } catch (_) {}
+    }
+
     function appendAiBubble(body, text) {
         var row = document.createElement('div');
         row.className = 'act-chat-row act-chat-row-ai';
@@ -4139,6 +4205,7 @@
             '</div>';
         body.appendChild(row);
         body.scrollTop = body.scrollHeight;
+         if (typeof window._saveChatHistory === 'function') window._saveChatHistory();
         return row;
     }
 
@@ -4514,10 +4581,37 @@
         var csrfMeta = document.querySelector('meta[name="csrf-token"]');
         var csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
 
+        // Collect the last 6 chat bubbles (3 exchanges) for conversation memory.
+        // Only plain text bubbles are included — form rows, chips, and typing
+        // indicators are skipped because they carry no conversational content.
+        var historyMessages = [];
+        try {
+            var chatBodyForHistory = document.getElementById('actAiChatBody');
+            if (chatBodyForHistory) {
+                var allRows = chatBodyForHistory.querySelectorAll('.act-chat-row');
+                var validRows = Array.prototype.filter.call(allRows, function (row) {
+                    return !row.classList.contains('act-chat-row-typing') &&
+                           row.querySelector('.act-chat-bubble, .act-chat-bubble-user');
+                });
+                // Take the last 6 rows (not counting the message being sent right now)
+                var recentRows = validRows.slice(Math.max(0, validRows.length - 6));
+                recentRows.forEach(function (row) {
+                    var isUser = row.classList.contains('act-chat-row-user');
+                    var bubble = row.querySelector('.act-chat-bubble, .act-chat-bubble-user');
+                    if (bubble) {
+                        historyMessages.push({
+                            role: isUser ? 'user' : 'assistant',
+                            content: (bubble.textContent || '').trim()
+                        });
+                    }
+                });
+            }
+        } catch (_) { historyMessages = []; }
+
         fetch('room-reservation/api/room-assistant.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: msg, csrf_token: csrfToken }),
+            body: JSON.stringify({ message: msg, csrf_token: csrfToken, history: historyMessages }),
             credentials: 'same-origin',
         })
             .then(function (r) {
