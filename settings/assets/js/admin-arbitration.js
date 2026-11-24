@@ -34,7 +34,7 @@
         room_day_mon: true, room_day_tue: true, room_day_wed: true, room_day_thu: true, room_day_fri: true, room_day_sat: true, room_day_sun: false,
         room_max_hours: 13,
 
-        role_priority_student: 1, role_priority_faculty: 2, role_priority_director: 4
+        role_priority_student: 1, role_priority_faculty: 2, role_priority_priority: 4
     };
 
     var PRESETS = {
@@ -83,9 +83,14 @@
         return el ? el.value : '';
     }
     function clearErrors() {
-        root.querySelectorAll('.arb-row.has-error').forEach(function (r) { r.classList.remove('has-error'); });
+        root.querySelectorAll('.arb-row.has-error, .arb-card.has-error').forEach(function (r) { r.classList.remove('has-error'); });
     }
     function markError(key) {
+        if (key === 'priority_faculty') {   // not a single field: outline the whole picker card
+            var card = document.getElementById('arbPriorityCard');
+            if (card) card.classList.add('has-error');
+            return card;
+        }
         var alias = { equip_durations: 'equip_dur_1', room_open_days: 'room_day_mon' };
         var el = document.getElementById('arb-' + (alias[key] || key));
         var row = el ? el.closest('.arb-row') : null;
@@ -212,6 +217,12 @@
         optBtns.forEach(function (b) {
             prio.info[b.dataset.id] = { name: b.dataset.name, dept: b.dataset.dept };
         });
+
+        // The saved list (accounts that no longer exist are left out; the next save drops them)
+        prio.chosen = String(prioCard.dataset.arbChosen || '').split(',').filter(function (id) {
+            return id && Object.prototype.hasOwnProperty.call(prio.info, id);
+        }).slice(0, prio.max);
+        prio.initial = prio.chosen.slice();
 
         var initials = function (name) {
             var parts = String(name).trim().split(/\s+/).filter(Boolean);
@@ -424,6 +435,7 @@
         });
         settings.equip_durations = durations;
         settings.room_open_days = openDays;
+        settings.priority_faculty = prio.chosen.slice();   // the picker is not a form field: its list is sent as one setting
         return settings;
     }
 
@@ -441,19 +453,16 @@
         });
         fill(map);
         liveFields().forEach(function (el) { initial[el.dataset.arbKey] = readField(el); });
-    }
-
-    function nonLiveChanged() {
-        return Array.prototype.some.call(fields(), function (el) {
-            return !isLive(el) && readField(el) !== initial[el.dataset.arbKey];
-        });
+        if (values.priority_faculty) {
+            setPriority(values.priority_faculty.filter(function (id) { return Object.prototype.hasOwnProperty.call(prio.info, id); }));
+            prio.initial = prio.chosen.slice();
+        }
     }
 
     if (saveBtn) {
         saveBtn.addEventListener('click', function () {
             if (saveBtn.disabled) return;
             clearErrors();
-            var otherEdits = nonLiveChanged() || prio.chosen.length !== prio.initial.length;
             saveBtn.disabled = true;
             saveBtn.innerHTML = 'Saving\u2026';
 
@@ -472,8 +481,7 @@
                     applySaved(j.values || {});
                     var msg = '<span class="material-symbols-outlined">check_circle</span> ' +
                         (j.changed && j.changed.length ? 'Saved. New requests use these rules now.' : 'Nothing changed.');
-                    if (otherEdits) msg += ' Role weights and priority edits are not connected yet, so they were not saved.';
-                    say(msg, otherEdits ? 7000 : 3500);
+                    say(msg, 3500);
                     return;
                 }
                 var errs = j.errors || {};

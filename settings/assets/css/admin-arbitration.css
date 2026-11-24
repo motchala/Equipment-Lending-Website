@@ -591,6 +591,17 @@
     white-space: nowrap;
 }
 
+#sett-arbitration .arb-card.has-error {
+    box-shadow: 0 0 0 2px #dc2626;
+}
+
+#sett-arbitration .arb-note-inline {
+    margin: 0.5rem 0 0.75rem;
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: var(--text-light);
+}
+
 #sett-arbitration .arb-row.has-error {
     box-shadow: inset 3px 0 0 #dc2626;
     padding-left: 0.6rem;
