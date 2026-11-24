@@ -12,6 +12,8 @@
     'use strict';
 
     var form = document.getElementById('fsForm');
+    // A Super Admin password reset: one step (the password) and no details step.
+    var resetMode = form.getAttribute('data-mode') === 'reset';
     if (!form) return;
 
     var DASHBOARD_URL = '../faculty-dashboard.php';
@@ -180,6 +182,7 @@
         el.back.hidden = n === 1;
         el.next.hidden = n !== 1;
         el.submit.hidden = n !== 2;
+        if (resetMode) { el.back.hidden = true; el.next.hidden = true; el.submit.hidden = false; }
         hideAlert();
 
         if (moveFocus) {
@@ -248,7 +251,7 @@
     function save() {
         if (submitting) return;
         if (!validateStep1()) { goTo(1, true, false); validateStep1(); return; }
-        if (!validateStep2()) return;
+        if (!resetMode && !validateStep2()) return;
 
         hideAlert();
         setBusy(true);
@@ -301,7 +304,7 @@
 
     form.addEventListener('submit', function (e) {
         e.preventDefault();                      // Enter on step 1 goes to step 2, on step 2 it saves
-        if (step === 1) { if (validateStep1()) goTo(2, false, true); }
+        if (step === 1 && !resetMode) { if (validateStep1()) goTo(2, false, true); }
         else save();
     });
 

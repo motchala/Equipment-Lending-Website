@@ -35,6 +35,7 @@ if (!isset($_SESSION['faculty_id'])) {
 require_once PS_ROOT . '/config/db.php';
 require_once PS_ROOT . '/settings/core/faculty-helpers.php';           // department list
 require_once PS_ROOT . '/account-management/core/faculty-first-login.php';
+require_once PS_ROOT . '/auth/core/password-reset.php';
 $conn = getDB();
 faculty_fl_ensure_schema($conn);
 
@@ -70,6 +71,9 @@ if (count($name_parts) > 1) {
 $id_label    = faculty_id_display($faculty_id, '—');
 $dept_locked = trim((string)$acct['department']) !== '';
 $dept_value  = trim((string)$acct['department']);
+// A Super Admin reset a locked-out account (auth/core/password-reset.php): the person already has an account
+// and a department, so this screen shows ONLY the new-password step.
+$reset_mode  = pwr_is_reset_pending($conn, $email);
 
 $h = static fn($v): string => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
 // $rel is a path from the project root. This page lives one folder down (account-management/), so the URL
@@ -87,7 +91,7 @@ $asset = static function (string $rel): string {
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#800000">
     <meta name="robots" content="noindex">
-    <title>PUPSync | Set up your account</title>
+    <title>PUPSync | <?php echo $reset_mode ? 'Choose a new password' : 'Set up your account'; ?></title>
     <link rel="icon" href="../shared/assets/images/favicon.ico" sizes="32x32">
     <link rel="icon" type="image/svg+xml" href="../shared/assets/images/favicon.svg">
     <link rel="icon" type="image/png" sizes="192x192" href="../shared/assets/images/favicon-192.png">
@@ -121,9 +125,15 @@ $asset = static function (string $rel): string {
             </div>
 
             <div class="fs-brand-body">
-                <p class="fs-eyebrow">Welcome aboard</p>
-                <h1 class="fs-hello">Hi, <?php echo $h($first_name); ?>. <br>Let&rsquo;s get your account ready.</h1>
-                <p class="fs-lead">Your account was created by an administrator with a temporary password. Two quick steps and you&rsquo;re in.</p>
+                <?php if ($reset_mode): ?>
+                    <p class="fs-eyebrow">Password reset</p>
+                    <h1 class="fs-hello">Hi, <?php echo $h($first_name); ?>. <br>Let&rsquo;s set a new password.</h1>
+                    <p class="fs-lead">A Super Admin reset your password so you could get back in. Choose a new one that only you know and your portal opens right away.</p>
+                <?php else: ?>
+                    <p class="fs-eyebrow">Welcome aboard</p>
+                    <h1 class="fs-hello">Hi, <?php echo $h($first_name); ?>. <br>Let&rsquo;s get your account ready.</h1>
+                    <p class="fs-lead">Your account was created by an administrator with a temporary password. Two quick steps and you&rsquo;re in.</p>
+                <?php endif; ?>
 
                 <ol class="fs-steps" id="fsSteps">
                     <li class="fs-steps-item is-current" data-step-indicator="1">
@@ -136,6 +146,7 @@ $asset = static function (string $rel): string {
                             <span class="fs-steps-desc">Replace the temporary password</span>
                         </span>
                     </li>
+                    <?php if (!$reset_mode): ?>
                     <li class="fs-steps-item" data-step-indicator="2">
                         <span class="fs-steps-dot" aria-hidden="true">
                             <span class="fs-steps-num">2</span>
@@ -146,6 +157,7 @@ $asset = static function (string $rel): string {
                             <span class="fs-steps-desc">Department and contact details</span>
                         </span>
                     </li>
+                    <?php endif; ?>
                 </ol>
             </div>
 
@@ -159,7 +171,7 @@ $asset = static function (string $rel): string {
         <main class="fs-panel">
             <div class="fs-card" id="fsCard">
 
-                <div class="fs-progress" id="fsProgress">
+                <div class="fs-progress" id="fsProgress"<?php echo $reset_mode ? ' hidden' : ''; ?>>
                     <div class="fs-progress-top">
                         <span class="fs-progress-label" id="fsProgressLabel">Step 1 of 2</span>
                         <span class="fs-progress-name" id="fsProgressName">Secure your account</span>
@@ -170,7 +182,7 @@ $asset = static function (string $rel): string {
                 </div>
 
                 <form id="fsForm" class="fs-form" method="post" novalidate autocomplete="off"
-                    data-endpoint="api/first-login-setup.php">
+                    data-endpoint="api/first-login-setup.php" data-mode="<?php echo $reset_mode ? 'reset' : 'setup'; ?>">
                     <?php echo csrf_field(); ?>
 
                     <!-- ── Step 1: password ── -->
@@ -179,7 +191,7 @@ $asset = static function (string $rel): string {
                             <span class="fs-step-icon" aria-hidden="true"><span class="material-symbols-outlined">lock_reset</span></span>
                             <div>
                                 <h2 class="fs-step-title" id="fsStep1Title" tabindex="-1">Choose your own password</h2>
-                                <p class="fs-step-sub">The temporary password only works for this first sign-in. Pick one only you know.</p>
+                                <p class="fs-step-sub"><?php echo $reset_mode ? 'The password the Super Admin gave you only works for this one sign-in. Pick one only you know.' : 'The temporary password only works for this first sign-in. Pick one only you know.'; ?></p>
                             </div>
                         </header>
 
@@ -218,6 +230,7 @@ $asset = static function (string $rel): string {
                         </div>
                     </section>
 
+                    <?php if (!$reset_mode): ?>
                     <!-- ── Step 2: details ── -->
                     <section class="fs-step" data-step="2" aria-labelledby="fsStep2Title" hidden>
                         <header class="fs-step-head">
@@ -254,6 +267,7 @@ $asset = static function (string $rel): string {
                             <p class="fs-err" id="fsDepartmentErr" role="alert" hidden></p>
                         </div>
                     </section>
+                    <?php endif; ?>
 
                     <div class="fs-alert" id="fsAlert" role="alert" hidden></div>
 
@@ -261,10 +275,10 @@ $asset = static function (string $rel): string {
                         <button type="button" class="fs-btn fs-btn--ghost" id="fsBack" hidden>
                             <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>Back
                         </button>
-                        <button type="button" class="fs-btn fs-btn--primary" id="fsNext">
+                        <button type="button" class="fs-btn fs-btn--primary" id="fsNext"<?php echo $reset_mode ? ' hidden' : ''; ?>>
                             Continue<span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
                         </button>
-                        <button type="submit" class="fs-btn fs-btn--primary" id="fsSubmit" hidden>
+                        <button type="submit" class="fs-btn fs-btn--primary" id="fsSubmit"<?php echo $reset_mode ? '' : ' hidden'; ?>>
                             <span class="material-symbols-outlined fs-btn-icon" aria-hidden="true">check_circle</span>
                             <span class="fs-btn-label">Save &amp; open my portal</span>
                         </button>

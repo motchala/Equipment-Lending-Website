@@ -288,6 +288,14 @@ function faculty_session_guard(): void
     // until its owner has chosen their own password: pages go to the setup screen, API calls get a
     // 403. Only the setup screen, its save endpoint and log out stay reachable.
     if ($must_change === 1) {
+        // A sign-in that started BEFORE a Super Admin issued a reset password is not trusted: it would reach
+        // the "choose a new password" screen without ever knowing the temporary password. Fails open.
+        require_once __DIR__ . '/password-reset.php';
+        if (pwr_session_predates_reset($conn, (string)($_SESSION['faculty_email'] ?? ''), (int)($_SESSION['login_time'] ?? 0))) {
+            faculty_session_end('Your password was reset by a Super Admin. Please sign in with the temporary password you were given.');
+            return;
+        }
+
         $script = faculty_fl_current_script();
         if (in_array($script, FACULTY_FIRST_LOGIN_ALLOWED, true)) {
             return;

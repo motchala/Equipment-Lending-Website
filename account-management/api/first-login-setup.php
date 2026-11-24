@@ -41,6 +41,7 @@ date_default_timezone_set('Asia/Manila');
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../settings/core/faculty-helpers.php';     // department helpers
 require_once __DIR__ . '/../core/faculty-first-login.php';
+require_once __DIR__ . '/../../auth/core/password-reset.php';
 $conn = getDB();
 
 $fail = static function (string $msg, string $field = '', int $code = 422): void {
@@ -79,6 +80,10 @@ if ((int)$cur['must_change_password'] !== 1) {
     exit;
 }
 
+// A Super Admin reset (auth/core/password-reset.php) is not a brand-new account: only the password is
+// asked for and the department on file is left exactly as it is.
+$reset_mode = pwr_is_reset_pending($conn, (string)$cur['email']);
+
 // ── Password ────────────────────────────────────────────────────────────────
 $new_pw  = (string)($_POST['new_password'] ?? '');
 $confirm = (string)($_POST['confirm_password'] ?? '');
@@ -105,7 +110,9 @@ if (password_verify($new_pw, (string)$cur['password'])) {
 // ── Details ─────────────────────────────────────────────────────────────────
 $department = trim((string)($_POST['department'] ?? ''));
 $cur_dept   = trim((string)($cur['department'] ?? ''));
-if ($cur_dept !== '') {
+if ($reset_mode) {
+    $department = $cur_dept;                       // a password reset never touches the department
+} elseif ($cur_dept !== '') {
     $department = $cur_dept;                       // already on file: it is permanent, keep it
 } else {
     // 1 to 3 different departments from the list; the first one is required, the other two are optional
@@ -123,16 +130,28 @@ if ($cur_dept !== '') {
 $hash = password_hash($new_pw, PASSWORD_BCRYPT);
 $now  = date('Y-m-d H:i:s');
 try {
-    $upd = $conn->prepare(
-        'UPDATE tbl_users
-            SET password = ?, last_password_change = ?, must_change_password = 0,
-                department = ?
-          WHERE faculty_id = ? AND must_change_password = 1'
-    );
-    if (!$upd) {
-        throw new RuntimeException('prepare failed: ' . $conn->error);
+    if ($reset_mode) {
+        $upd = $conn->prepare(
+            'UPDATE tbl_users
+                SET password = ?, last_password_change = ?, must_change_password = 0
+              WHERE faculty_id = ? AND must_change_password = 1'
+        );
+        if (!$upd) {
+            throw new RuntimeException('prepare failed: ' . $conn->error);
+        }
+        $upd->bind_param('sss', $hash, $now, $faculty_id);
+    } else {
+        $upd = $conn->prepare(
+            'UPDATE tbl_users
+                SET password = ?, last_password_change = ?, must_change_password = 0,
+                    department = ?
+              WHERE faculty_id = ? AND must_change_password = 1'
+        );
+        if (!$upd) {
+            throw new RuntimeException('prepare failed: ' . $conn->error);
+        }
+        $upd->bind_param('ssss', $hash, $now, $department, $faculty_id);
     }
-    $upd->bind_param('ssss', $hash, $now, $department, $faculty_id);
     $upd->execute();
     $changed = $upd->affected_rows;
     $upd->close();
@@ -144,6 +163,11 @@ if ($changed !== 1) {
     // Lost a race with another tab that finished first: the account is unlocked already.
     echo json_encode(['success' => true, 'already' => true, 'msg' => 'Your account is already set up.', 'redirect' => 'faculty-dashboard.php']);
     exit;
+}
+
+// The reset is finished: the account is a normal one again.
+if ($reset_mode) {
+    pwr_complete_reset($conn, (string)$cur['email']);
 }
 
 // A new password invalidates every "remember me" token of this account (they are tied to the old

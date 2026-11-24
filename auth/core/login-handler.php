@@ -38,6 +38,7 @@ require_once PS_ROOT . '/config/db.php';
 require_once PS_ROOT . '/shared/core/mailer.php';
 require_once PS_ROOT . '/auth/core/rate-limiter.php';
 require_once PS_ROOT . '/account-management/core/faculty-status.php';
+require_once PS_ROOT . '/auth/core/password-reset.php';   // faculty "forgot password" counter (5 wrong passwords)
 $conn = getDB();
 $rl_ip = rl_get_client_ip();
 
@@ -288,6 +289,8 @@ if (isset($_POST['login'])) {
             unset($_SESSION['flash_remember_me']);
 
             recordSuccessfulLogin($email, $rl_ip, $conn);
+            pwr_clear_on_success($conn, $email);               // a correct password clears the wrong-password count
+            unset($_SESSION['pw_reset_offer_email']);
             if ($remember_me_requested) {
                 remember_me_issue($conn, 'faculty', $email, (string)$user['password'], (int)$_SESSION['login_time']);
             } else {
@@ -300,6 +303,15 @@ if (isset($_POST['login'])) {
             // ── Email matches a faculty account, wrong password ────────
             $rl_result = recordFailedAttempt($email, $rl_ip, true, $user['fullname'] ?? '', $conn);
             $_SESSION['flash_login_error'] = $rl_result['message'];
+            // Faculty "forgot password" counter (auth/core/password-reset.php): PWR_MAX_ATTEMPTS wrong passwords
+            // in a row make the sign-in form offer "Notify Super Admin". Counted per account, so it keeps
+            // counting across the 3-try lockout rounds above.
+            if (pwr_record_failed_login($conn, $email) >= PWR_MAX_ATTEMPTS) {
+                $_SESSION['pw_reset_offer_email'] = strtolower($email);
+                if (!$rl_result['locked']) {
+                    $_SESSION['flash_login_error'] = 'Wrong password. You have used all ' . PWR_MAX_ATTEMPTS . ' attempts.';
+                }
+            }
             if ($rl_result['locked']) {
                 $_SESSION['login_lockout_email'] = $email;
                 $_SESSION['flash_lockout_seconds'] = $rl_result['seconds_left'];
@@ -332,3 +344,21 @@ if (isset($_POST['login'])) {
 }
 // ── End POST handler — all paths above exit() ─────────────────────────────
 // Everything below this line executes only on GET requests.
+
+// ── "Notify Super Admin" offer ───────────────────────────────────────────────
+// Shown under the sign-in error once a faculty account has used all its attempts. The email comes from
+// the session (set by the POST handler above), never from the browser, and the account is re-checked
+// here so the offer disappears as soon as the count is cleared (correct sign-in or a finished reset).
+$pw_reset_offer = null;
+$pw_offer_email = (string)($_SESSION['pw_reset_offer_email'] ?? '');
+if ($pw_offer_email !== '') {
+    $pw_offer_status = pwr_status($conn, $pw_offer_email);
+    if ($pw_offer_status['eligible']) {
+        $pw_reset_offer = [
+            'email'    => $pw_offer_email,
+            'notified' => $pw_offer_status['notified_at'] !== null,
+        ];
+    } else {
+        unset($_SESSION['pw_reset_offer_email']);
+    }
+}

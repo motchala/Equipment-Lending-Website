@@ -1,6 +1,7 @@
     <!-- ================================================================
      MODAL: EDIT FACULTY ACCOUNT
     ================================================================ -->
+    <link rel="stylesheet" href="account-management/assets/css/faculty-password-reset.css?v=<?= (int)@filemtime(PS_ROOT . '/account-management/assets/css/faculty-password-reset.css') ?>">
     <div class="ps-modal-backdrop" id="fac-edit-modal">
         <div class="ps-modal">
             <div class="ps-modal-head">
@@ -38,6 +39,64 @@
                 <div class="form-group" style="margin-bottom:0">
                     <label for="fac-edit-email">PUPSync email</label>
                     <input type="email" id="fac-edit-email" class="form-control-custom" placeholder="email@example.com">
+                </div>
+
+                <!-- Password reset (Super Admin only). Works only after the faculty used all 5 sign-in attempts.
+                     Flow: Reset password -> check -> enter YOUR password -> Generate. See faculty-password-reset.js -->
+                <div class="fac-edit-section">Password</div>
+                <div class="fac-reset" id="fac-reset" data-view="idle">
+                    <button type="button" class="ps-btn ps-btn--ghost fac-reset-open" id="fac-reset-open">
+                        <span class="material-symbols-outlined">lock_reset</span> Reset password
+                    </button>
+
+                    <div class="fac-reset-panel hidden" id="fac-reset-panel">
+                        <p class="fac-reset-checking hidden" id="fac-reset-view-checking">
+                            <span class="material-symbols-outlined">progress_activity</span> Checking sign-in attempts&hellip;
+                        </p>
+
+                        <!-- Not allowed yet -->
+                        <div class="fac-reset-blocked hidden" id="fac-reset-view-blocked">
+                            <div class="fac-reset-blocked-title">
+                                <span class="material-symbols-outlined">lock</span> Not available yet
+                            </div>
+                            <p class="fac-reset-text" id="fac-reset-blocked-text"></p>
+                            <div class="fac-reset-dots" id="fac-reset-dots" aria-hidden="true"></div>
+                        </div>
+
+                        <!-- Allowed: confirm with the Super Admin's own password -->
+                        <div class="hidden" id="fac-reset-view-ready">
+                            <p class="fac-reset-text" id="fac-reset-ready-text"></p>
+                            <label class="fac-del-pw-label" for="fac-reset-password">Enter your password to continue</label>
+                            <div class="fac-pw-wrap">
+                                <input type="password" id="fac-reset-password" class="form-control-custom"
+                                    maxlength="128" autocomplete="current-password" placeholder="Your password">
+                                <button type="button" class="fac-pw-toggle"
+                                    data-target="fac-reset-password" aria-label="Toggle password">
+                                    <span class="material-symbols-outlined" style="font-size:17px">visibility</span>
+                                </button>
+                            </div>
+                            <button type="button" class="ps-btn ps-btn--primary fac-reset-generate" id="fac-reset-generate" disabled>
+                                <span class="material-symbols-outlined">key</span> Generate reset password
+                            </button>
+                        </div>
+
+                        <!-- Done: shown once -->
+                        <div class="fac-reset-done hidden" id="fac-reset-view-done">
+                            <div class="fac-reset-done-title">
+                                <span class="material-symbols-outlined">check_circle</span> New password generated
+                            </div>
+                            <div class="fac-reset-result-row">
+                                <input type="text" id="fac-reset-result" class="form-control-custom fac-reset-result" readonly
+                                    autocomplete="off" spellcheck="false" aria-label="Generated password">
+                                <button type="button" class="ps-btn ps-btn--ghost" id="fac-reset-copy">
+                                    <span class="material-symbols-outlined">content_copy</span> <span id="fac-reset-copy-label">Copy</span>
+                                </button>
+                            </div>
+                            <p class="fac-reset-text">Shown only once. Give it to the faculty: it replaces their old password, and they will be asked to choose their own the next time they sign in.</p>
+                        </div>
+
+                        <p class="fac-del-error hidden" id="fac-reset-error" role="alert"></p>
+                    </div>
                 </div>
 
                 <div id="fac-edit-alert" class="alert-banner hidden" role="alert" style="margin-bottom:0"></div>

@@ -77,6 +77,7 @@
                             data-link-sub="<?php echo htmlspecialchars($n['link']['sub'] ?? ''); ?>"
                             data-link-request-id="<?php echo htmlspecialchars((string)($n['link']['request_id'] ?? '')); ?>"
                             data-link-issue-id="<?php echo htmlspecialchars((string)($n['link']['issue_id'] ?? '')); ?>"
+                            data-link-email="<?php echo htmlspecialchars((string)($n['link']['email'] ?? '')); ?>"
                             data-link-item-id="<?php echo htmlspecialchars((string)($n['link']['item_id'] ?? '')); ?>">
                             <div class="notif-card-main" role="button" tabindex="0">
                                 <span class="anotif-check" aria-hidden="true"><span class="material-symbols-outlined">check</span></span>

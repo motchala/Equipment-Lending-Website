@@ -504,6 +504,56 @@ if (!function_exists('notif_build_list')) {
             }
         }
 
+        // ── Faculty password-reset requests (Super Admin only) ──────────
+        // A faculty member used all 5 sign-in attempts and pressed "Notify Super Admin" on the sign-in form.
+        // The card goes away by itself once they sign in correctly or the reset has been generated.
+        if (function_exists('admin_is_super_admin') && admin_is_super_admin($conn)) {
+            require_once __DIR__ . '/../../auth/core/password-reset.php';
+            foreach (pwr_open_requests($conn, 10) as $pr) {
+                $prEmail = (string)$pr['email'];
+                $prName  = $prEmail;
+                $prFid   = '';
+                if ($st = $conn->prepare('SELECT fullname, faculty_id FROM tbl_users WHERE email = ? LIMIT 1')) {
+                    $st->bind_param('s', $prEmail);
+                    $st->execute();
+                    $u = $st->get_result()->fetch_assoc();
+                    $st->close();
+                    if (!$u) continue;                      // the account was deleted since
+                    $prName = (string)$u['fullname'];
+                    $prFid  = (string)$u['faculty_id'];
+                }
+                // Key rule shared by mark-read / delete: letters, a dash, then DIGITS only (so a numeric hash, not hex).
+                // It changes when the same person asks again, so a fresh request is a fresh (unread) card.
+                $key     = 'pwreset-' . sprintf('%u', crc32($prEmail . '|' . $pr['notified_at']));
+                $askedAt = notif_datetime($conn, (string)$pr['notified_at']);
+                $items[] = [
+                    'key'          => $key,
+                    'cat'          => 'account',
+                    'group_label'  => 'Account Requests',
+                    'group_icon'   => 'lock_reset',
+                    'group_danger' => false,
+                    'icon'         => 'lock_reset',
+                    'icon_class'   => 'notif-icon--warning',
+                    'urgent'       => false,
+                    'title'        => 'Password reset requested',
+                    'body'         => '<strong>' . htmlspecialchars($prName) . '</strong> used all ' . PWR_MAX_ATTEMPTS
+                        . ' sign-in attempts and is asking for a new password.',
+                    'time_label'   => notif_time_ago($askedAt),
+                    'sort_ts'      => $askedAt->getTimestamp(),
+                    'detail' => [
+                        ['label' => 'Faculty', 'value' => $prName . ($prFid !== '' && !faculty_id_is_unset($prFid) ? ' (' . $prFid . ')' : '')],
+                        ['label' => 'Email', 'value' => $prEmail],
+                        ['label' => 'Wrong Passwords', 'value' => (int)$pr['fail_count'] . ' of ' . PWR_MAX_ATTEMPTS, 'danger' => true],
+                        ['label' => 'Requested At', 'value' => $askedAt->format('M d, Y g:i A')],
+                    ],
+                    'view_label' => 'Open Faculty Account',
+                    'link'       => ['tab' => 'faculty', 'email' => $prEmail],
+                    'is_read'    => $state[$key]['is_read']    ?? false,
+                    'is_deleted' => $state[$key]['is_deleted'] ?? false,
+                ];
+            }
+        }
+
         // Notification Preferences (Settings > Preferences): categories this admin
         // turned off, or everything when the master switch is off, are never part of
         // the feed -- so they are not listed, counted, polled or marked read either.
@@ -527,7 +577,7 @@ if (!function_exists('notif_build_list')) {
         unset($i);
 
         // Sort: urgent groups first (overdue > request > room > system), then most recent within group.
-        $groupOrder = ['overdue' => 0, 'request' => 1, 'room' => 2, 'system' => 3];
+        $groupOrder = ['overdue' => 0, 'account' => 1, 'request' => 2, 'room' => 3, 'system' => 4];
         usort($items, function ($a, $b) use ($groupOrder) {
             $ga = $groupOrder[$a['cat']] ?? 9;
             $gb = $groupOrder[$b['cat']] ?? 9;
