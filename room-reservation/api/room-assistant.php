@@ -111,7 +111,7 @@ $RATE_LIMIT = 20;
 
 $rl_stmt = $conn->prepare(
     "SELECT COUNT(*) AS cnt FROM tbl_ai_chat_log
-      WHERE faculty_id = ? AND sent_at >= (NOW() - INTERVAL 1 HOUR)"
+      WHERE faculty_id = ? AND sent_at >= (NOW() - INTERVAL 1 DAY)"
 );
 $rl_stmt->bind_param('s', $faculty_id);
 $rl_stmt->execute();
@@ -121,7 +121,7 @@ $rl_stmt->close();
 if ($rl_count >= $RATE_LIMIT) {
     $oldest_stmt = $conn->prepare(
         "SELECT MIN(sent_at) AS oldest FROM tbl_ai_chat_log
-          WHERE faculty_id = ? AND sent_at >= (NOW() - INTERVAL 1 HOUR)"
+          WHERE faculty_id = ? AND sent_at >= (NOW() - INTERVAL 1 DAY)"
     );
     $oldest_stmt->bind_param('s', $faculty_id);
     $oldest_stmt->execute();
@@ -135,9 +135,29 @@ if ($rl_count >= $RATE_LIMIT) {
         $reset_time = $reset_dt->format('g:i A');
     }
     chat_respond(429, 'rate_limited',
-        'You have reached the 20 message limit for this hour.' .
+        'You have reached the 20 message limit for today.' .
         ($reset_time ? " Your limit resets at {$reset_time}." : ''),
         ['reset_time' => $reset_time, 'remaining' => 0]
+    );
+}
+
+// ── System-level daily cap ────────────────────────────────────────────────────
+// Groq free tier: 200,000 tokens/day shared across all faculty.
+// Each message costs ~3,050 tokens (2,500 system + 300 history + 50 user + 200 reply).
+// Safe ceiling: 60 messages/day total (leaves buffer before hard Groq 429).
+$SYSTEM_DAILY_CAP = 60;
+$sys_stmt = $conn->prepare(
+    "SELECT COUNT(*) AS cnt FROM tbl_ai_chat_log WHERE sent_at >= CURDATE()"
+);
+$sys_stmt->execute();
+$sys_total = (int)($sys_stmt->get_result()->fetch_assoc()['cnt'] ?? 0);
+$sys_stmt->close();
+
+if ($sys_total >= $SYSTEM_DAILY_CAP) {
+    chat_respond(429, 'rate_limited',
+        'The AI assistant has reached its daily usage limit for today across all users. ' .
+        'It resets at midnight. You can still browse rooms in the Facilities tab.',
+        ['reset_time' => '', 'remaining' => 0]
     );
 }
 
@@ -373,6 +393,65 @@ function ai_is_availability_query(string $msg): bool
     return false;
 }
 
+/**
+ * PHP-side reservation intent classifier.
+ *
+ * Returns true ONLY when the faculty is asking you (the AI) to perform
+ * the booking action right now — not when they are asking for information.
+ *
+ * Rules:
+ *   DENY (information requests) — checked first
+ *     - starts with question words: how, what, why, when, where, can i, is it, do i
+ *     - contains "how do", "how to", "what is", "what are", "explain", "tell me how",
+ *       "steps", "process", "guide", "help me understand"
+ *   ALLOW (action requests) — checked second
+ *     - explicit booking verbs targeted at the AI:
+ *       "reserve me", "book me", "book a room for me", "make a reservation",
+ *       "get me a room", "i want to reserve", "i need to reserve", "i want to book",
+ *       "i need to book", "can you reserve", "can you book", "please reserve",
+ *       "please book", "help me reserve", "set up a reservation"
+ */
+function ai_is_reserve_intent(string $msg): bool
+{
+    $lower = mb_strtolower(trim($msg));
+
+    // ── Deny list: information / how-to requests ─────────────────────────────
+    $deny_starts = [
+        'how do', 'how to', 'how can', 'how should', 'how would',
+        'what is', 'what are', 'what\'s', 'why ', 'when can', 'when do',
+        'where can', 'where do', 'can i ', 'can i?', 'is it possible',
+        'is there a way', 'do i need', 'do i have to',
+    ];
+    foreach ($deny_starts as $pattern) {
+        if (str_starts_with($lower, $pattern)) return false;
+    }
+    $deny_contains = [
+        'explain', 'tell me how', 'show me how', 'what are the steps',
+        'what is the process', 'what is the procedure', 'step by step',
+        'instructions for', 'guide me', 'help me understand', 'how does',
+    ];
+    foreach ($deny_contains as $pattern) {
+        if (str_contains($lower, $pattern)) return false;
+    }
+
+    // ── Allow list: explicit action requests targeting the AI ─────────────────
+    $allow = [
+        'reserve me', 'book me', 'book a room for me', 'make a reservation',
+        'get me a room', 'i want to reserve', 'i need to reserve',
+        'i want to book', 'i need to book', 'i would like to reserve',
+        'i\'d like to reserve', 'i would like to book', 'i\'d like to book',
+        'can you reserve', 'can you book', 'could you reserve', 'could you book',
+        'please reserve', 'please book', 'help me reserve', 'help me book',
+        'set up a reservation', 'open the reservation form', 'open the form',
+        'do it for me',
+    ];
+    foreach ($allow as $pattern) {
+        if (str_contains($lower, $pattern)) return true;
+    }
+
+    return false;
+}
+
 function ai_detect_campus(string $msg): ?string
 {
     $lower = mb_strtolower($msg);
@@ -511,7 +590,7 @@ function ai_availability_summary(mysqli $conn, string $campus, string $date): st
             }
         }
     }
-    $lines[] = "\nFor specific time slots, tell the faculty to click the room card in the Facilities tab.";
+    $lines[] = "\nIf the faculty wants to reserve a specific slot, ask them for the time and emit INTENT:reserve with the available details.";
     return implode("\n", $lines);
 }
 
@@ -537,9 +616,19 @@ $avail_section = $ctx_availability !== ''
     ? $ctx_availability
     : 'Not queried — the faculty did not ask about availability.';
 
+// $intent_gate is appended after the PROMPT heredoc below.
+// Keeping it separate makes the heredoc readable and the gate auditable.
+
 $campus_instruction = $ask_campus
     ? "\n## IMPORTANT — CAMPUS UNKNOWN\nThe faculty asked about availability but did not specify a campus. You MUST ask: \"Which campus are you at?\" and present exactly two options:\n→ PUP Main (Buildings A & B)\n→ PUP CITE (Building C)\nDo not answer until you know the campus."
     : '';
+
+// PHP-side intent decision — overrides whatever the LLM would decide on its own.
+// This is injected into the system prompt so the LLM receives a clear directive.
+$php_reserve_intent = ai_is_reserve_intent($raw_message);
+$intent_gate = $php_reserve_intent
+    ? "\n## PHP INTENT DECISION: RESERVE\nThis message is a reservation request. You MUST include INTENT:reserve (with any detected prefill fields) at the end of your reply."
+    : "\n## PHP INTENT DECISION: NO FORM\nThis message is NOT a reservation request — it is a question or information request. You MUST NOT include INTENT:reserve in your reply under any circumstances. Answer with text only.";
 
 $system_prompt = <<<PROMPT
 You are PUPSync Room Assistant, an AI assistant for the Polytechnic University of the Philippines (PUP) Biñan Campus room reservation system. You help faculty members with room reservations only.
@@ -564,10 +653,40 @@ You are PUPSync Room Assistant, an AI assistant for the Polytechnic University o
 ## HOW TO RESERVE A ROOM (manual flow)
 Go to the Facilities tab → choose a building → browse by floor → click a room card → Reserve.
 
+## INTENT DETECTION — CRITICAL RULES
+
+### Availability queries (NEVER trigger INTENT:reserve for these)
+When a faculty asks about room availability, free rooms, or which rooms are open — they are just ASKING.
+They have NOT asked to reserve anything yet.
+DO NOT emit INTENT:reserve for messages like:
+- "what rooms are available", "which rooms are free", "are there any open rooms"
+- "what's available tomorrow", "check availability", "room availability"
+- "is there a room available", "any free rooms", "rooms today"
+For these: answer with availability data from the LIVE AVAILABILITY DATA section above, then ask if they would like to reserve one. Wait for them to say yes before emitting INTENT:reserve.
+
+### Reservation requests (DO trigger INTENT:reserve)
+Only emit INTENT:reserve when the faculty explicitly asks YOU to do the booking action for them right now.
+The faculty must express CURRENT ACTION INTENT, not just mention the word "reserve".
+
+TRIGGERS INTENT:reserve — faculty is asking you to act:
+- "reserve me a room", "book a room for me", "can you reserve a room", "make a reservation for me"
+- "get me a room", "I want to reserve a room now", "help me reserve"
+- "What rooms are available? I want to reserve one" — availability question PLUS action request
+
+DOES NOT trigger INTENT:reserve — faculty is asking for information only:
+- "How do I reserve a room?" → answer with step-by-step instructions only, NO form
+- "What is the process to reserve?" → explain the process, NO form
+- "How does reservation work?" → explain, NO form
+- "What are the steps?" → explain, NO form
+- "Can I reserve a room?" → answer yes/no with how-to, NO form
+- Any question starting with "How", "What", "Why", "When", "Where", "Can I", "Is it possible" → these are information requests, NOT action requests
+
+Rule: if the faculty is asking HOW to do something, they want instructions. If they are asking you TO DO it, they want the form.
+
 ## HOW TO RESERVE VIA AI ASSISTANT
-If a faculty asks YOU to reserve a room for them, respond with a short, friendly message that:
+When a faculty clearly asks to reserve (not just check availability), respond with a short, friendly message that:
 1. Acknowledges their request
-2. Briefly notes that you will not be doing the booking yourself — you will open a pre-filled form so they can confirm and submit it
+2. Briefly notes that you will open a pre-filled form so they can confirm and submit it
 3. Mentions any fields you detected from their message (room, date, time) so they know what will be pre-filled
 Then append the reservation signal at the very end of your message using this format:
   INTENT:reserve|campus:{campus}|date:{date}|start:{start}|end:{end}
@@ -578,10 +697,13 @@ Field values:
 - start: use HH:MM (24-hour). Omit if unknown.
 - end: use HH:MM (24-hour). Omit if unknown.
 Examples:
+- Faculty says "what rooms are available tomorrow?" → answer with availability data, ask if they want to reserve. NO INTENT:reserve yet.
 - Faculty says "reserve me a room" → reply naturally then append: INTENT:reserve
+- Faculty says "I need a room, what's free?" → answer availability first, then since they said "I need a room", append: INTENT:reserve
 - Faculty says "reserve a room tomorrow 9am to 11am" → append: INTENT:reserve|date:{tomorrow's date}|start:09:00|end:11:00
 - Faculty says "book a room in Building C on Friday 2pm to 4pm" → append: INTENT:reserve|campus:cite|date:{next Friday's date}|start:14:00|end:16:00
 - Faculty says "reserve Building A Room A402 tomorrow 8am to 11am" → append: INTENT:reserve|campus:main|date:{tomorrow's date}|start:08:00|end:11:00
+- Faculty says "what rooms are available?" (no reservation intent) → list available rooms by building from LIVE AVAILABILITY DATA, ask "Would you like me to open the reservation form?" NO INTENT:reserve.
 Do not include any other special codes or signals in INTENT:reserve lines.
 
 ## HOW TO CANCEL (manual)
@@ -656,24 +778,50 @@ NEVER omit the signal when cancelling. NEVER use an ID not in FACULTY CONTEXT.
 
 ## YOUR BEHAVIOUR
 - Answer only questions about room reservations and the PUPSync system.
-- When availability data is provided above, summarise by building (free room count + booked slots). Do not list every room.
-- When availability is "Not queried", tell the faculty to check the room card in the Facilities tab.
+- When availability data is provided above, summarise by building (free room count + booked slots). Do not list every room individually — give a count and highlight any blocked times.
+- After answering an availability question, always ask: "Would you like me to open the reservation form for one of these rooms?" — but only ask once per conversation turn.
+- When availability is "Not queried" and the faculty asks about availability, tell them you can check if they tell you which campus and date, or they can browse rooms in the Facilities tab.
 - Never fabricate room names, dates, or slot data not provided above.
 - Keep responses under 150 words unless giving step-by-step instructions.
 - Be friendly, concise, and helpful.
+- Distinguish clearly between INQUIRY (just asking) and ACTION (wanting to reserve). An availability question is an inquiry. Only open the reservation form when the faculty explicitly wants to book.
 - Never reveal other faculty members' data.
 - If asked something unrelated to rooms or PUPSync, politely redirect.
+- When the faculty asks for help with a reservation step by step, guide them conversationally: ask for campus → date → time → then emit INTENT:reserve with everything pre-filled. Never rush to the form before you have enough information.
 PROMPT;
+
+// Append the PHP intent gate — this overrides the LLM's own judgment.
+$system_prompt .= $intent_gate;
 
 // ── 15. Call Groq ─────────────────────────────────────────────────────────────
 $groq_url          = 'https://api.groq.com/openai/v1/chat/completions';
+// Build conversation history from the client (last 6 turns).
+// Each entry must have role (user|assistant) and content (string).
+// We validate strictly so malicious input cannot inject system-role messages.
+$raw_history = $body['history'] ?? [];
+$safe_history = [];
+if (is_array($raw_history)) {
+    foreach (array_slice($raw_history, -6) as $turn) {
+        $role    = (string)($turn['role']    ?? '');
+        $content = trim((string)($turn['content'] ?? ''));
+        // Only allow user/assistant roles — never system — and non-empty content
+        if (in_array($role, ['user', 'assistant'], true) && $content !== '') {
+            $safe_history[] = ['role' => $role, 'content' => mb_substr($content, 0, 500)];
+        }
+    }
+}
+
+// Build the full messages array: system prompt → history → current user message
+$api_messages = array_merge(
+    [['role' => 'system', 'content' => $system_prompt]],
+    $safe_history,
+    [['role' => 'user', 'content' => $raw_message]]
+);
+
 $groq_request_body = json_encode([
     'model'       => 'openai/gpt-oss-120b',
-    'messages'    => [
-        ['role' => 'system', 'content' => $system_prompt],
-        ['role' => 'user',   'content' => $raw_message],
-    ],
-    'max_tokens'  => 300,
+    'messages'    => $api_messages,
+    'max_tokens'  => 500,
     'temperature' => 0.7,
 ]);
 

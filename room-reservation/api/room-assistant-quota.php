@@ -44,7 +44,7 @@ $conn->query("
 
 $stmt = $conn->prepare(
     "SELECT COUNT(*) AS cnt FROM tbl_ai_chat_log
-      WHERE faculty_id = ? AND sent_at >= (NOW() - INTERVAL 1 HOUR)"
+      WHERE faculty_id = ? AND sent_at >= (NOW() - INTERVAL 1 DAY)"
 );
 $stmt->bind_param('s', $faculty_id);
 $stmt->execute();

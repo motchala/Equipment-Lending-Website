@@ -186,7 +186,8 @@
             <!-- ── AI Support Hub ──────────────────────────────────────────── -->
             <div class="act-ai-chat" id="actAiChat"
     data-max-advance-days="<?= (int)RoomRules::maxAdvanceDays() ?>"
-    data-max-hours="<?= (int)RoomRules::maxHours() ?>">
+    data-max-hours="<?= (int)RoomRules::maxHours() ?>"
+    data-faculty-slug="<?= htmlspecialchars($user_slug ?? $_SESSION['faculty_id'] ?? '', ENT_QUOTES) ?>">
 
                 <!-- Header -->
                 <div class="act-ai-chat-head">
@@ -238,7 +239,7 @@
                 <!-- Input bar -->
                 <div class="act-ai-chat-input-wrap">
                     <div class="act-ai-chat-counter" id="actAiCounterBar">
-                        <span id="actAiCounter">—</span> messages remaining this hour
+                        <span id="actAiCounter">—</span> messages remaining today
                     </div>
                     <div class="act-ai-chat-input">
                         <input type="text" id="actAiInput" placeholder="Ask about rooms or reservations..."
