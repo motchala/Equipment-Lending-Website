@@ -187,13 +187,14 @@ function faculty_session_end(string $message): void
 
 /**
  * Re-check the logged-in faculty member against the database.
- * If a Super Admin deleted the account while this person was still logged
- * in, end the session so the portal and its API endpoints stop working
- * for them (every faculty page/endpoint already treats a missing
- * $_SESSION['faculty_id'] as "logged out").
+ * If a Super Admin deactivated the account (or it no longer exists) while
+ * this person was still logged in, end the session so the portal and its
+ * API endpoints stop working for them (every faculty page/endpoint already
+ * treats a missing $_SESSION['faculty_id'] as "logged out").
  *
  * Fails open when the lookup itself errors, so a database hiccup can't
- * log every faculty member out - only a definite "no such account" does.
+ * log every faculty member out - only a definite "no such account" or a
+ * definite "deactivated" does.
  */
 function faculty_session_guard(): void
 {
@@ -204,16 +205,19 @@ function faculty_session_guard(): void
 
     require_once __DIR__ . '/../../config/db.php';
     require_once __DIR__ . '/../../account-management/core/faculty-first-login.php';
+    require_once __DIR__ . '/../../account-management/core/faculty-status.php';
     $conn = getDB();
 
-    // One lookup answers two questions: does the account still exist, and is it still waiting for its
-    // first-sign-in setup (must_change_password)? An older database without that column is upgraded on
-    // the spot (faculty_fl_ensure_schema) and the lookup is repeated once.
+    // One lookup answers three questions: does the account still exist, is it deactivated (is_active), and
+    // is it still waiting for its first-sign-in setup (must_change_password)? An older database without
+    // one of those columns is upgraded on the spot (faculty_fl_ensure_schema / faculty_status_ensure_schema)
+    // and the lookup is repeated once.
     $must_change = null;   // null = account not found
+    $is_active   = 1;
     $lookup_ok   = false;
     for ($try = 0; $try < 2 && !$lookup_ok; $try++) {
         try {
-            $stmt = $conn->prepare('SELECT must_change_password FROM tbl_users WHERE faculty_id = ? LIMIT 1');
+            $stmt = $conn->prepare('SELECT must_change_password, is_active FROM tbl_users WHERE faculty_id = ? LIMIT 1');
             if (!$stmt) {
                 throw new RuntimeException('prepare failed');
             }
@@ -226,9 +230,13 @@ function faculty_session_guard(): void
             $row = ($res && $res->num_rows > 0) ? $res->fetch_assoc() : null;
             $stmt->close();
             $must_change = $row ? (int)$row['must_change_password'] : null;
+            $is_active   = $row ? (int)$row['is_active'] : 1;
             $lookup_ok   = true;
         } catch (Throwable $e) {
-            if ($try === 0 && faculty_fl_ensure_schema($conn)) {
+            // Run BOTH upgrades (no short-circuit): either column may be the missing one.
+            $fl_ok = faculty_fl_ensure_schema($conn);
+            $st_ok = faculty_status_ensure_schema($conn);
+            if ($try === 0 && $fl_ok && $st_ok) {
                 continue;      // column was missing: it exists now, ask again
             }
             return;            // fail open on a database hiccup, as before
@@ -244,7 +252,7 @@ function faculty_session_guard(): void
         // session still holds the old id: find the account by email and follow it.
         $email = (string)($_SESSION['faculty_email'] ?? '');
         if ($email !== '') {
-            $st = $conn->prepare('SELECT faculty_id, must_change_password FROM tbl_users WHERE email = ? LIMIT 1');
+            $st = $conn->prepare('SELECT faculty_id, must_change_password, is_active FROM tbl_users WHERE email = ? LIMIT 1');
             if ($st) {
                 $st->bind_param('s', $email);
                 if ($st->execute()) {
@@ -254,6 +262,7 @@ function faculty_session_guard(): void
                         $st->close();
                         $_SESSION['faculty_id'] = (string)$row['faculty_id'];
                         $must_change = (int)$row['must_change_password'];
+                        $is_active   = (int)$row['is_active'];
                     }
                 }
                 if ($must_change === null) {
@@ -265,6 +274,13 @@ function faculty_session_guard(): void
             faculty_session_end('This faculty account is no longer available. Please contact your administrator.');
             return;
         }
+    }
+
+    // ── Deactivated by a Super Admin ───────────────────────────────────────
+    // The account and its data are kept, but nobody can use it until it is reactivated.
+    if ($is_active === 0) {
+        faculty_session_end(FACULTY_DEACTIVATED_MESSAGE);
+        return;
     }
 
     // ── First sign-in lock ─────────────────────────────────────────────────

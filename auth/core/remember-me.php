@@ -280,8 +280,10 @@ function remember_me_restore(mysqli $conn): void
             . 'FROM tbl_accounts WHERE email = ? LIMIT 1'
         );
     } elseif ($accountType === 'faculty') {
+        require_once __DIR__ . '/../../account-management/core/faculty-status.php';
         $accountStmt = $conn->prepare(
-            'SELECT faculty_id, fullname, email, password FROM tbl_users WHERE email = ? LIMIT 1'
+            'SELECT faculty_id, fullname, email, password, ' . faculty_status_select($conn)
+            . ' FROM tbl_users WHERE email = ? LIMIT 1'
         );
     } else {
         $accountStmt = false;
@@ -306,6 +308,10 @@ function remember_me_restore(mysqli $conn): void
     if ($validAccount && $accountType === 'admin') {
         $validAccount = !admin_is_dormant($account['dormant_until'])
             && (int)$account['session_epoch'] <= $authTime;
+    }
+    // A deactivated faculty account is not restored; the token and cookie are dropped below.
+    if ($validAccount && $accountType === 'faculty') {
+        $validAccount = (int)$account['is_active'] !== 0;
     }
 
     if (!$validAccount) {

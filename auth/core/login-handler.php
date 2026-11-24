@@ -37,6 +37,7 @@ if (($_GET['go'] ?? '') === 'student') {
 require_once PS_ROOT . '/config/db.php';
 require_once PS_ROOT . '/shared/core/mailer.php';
 require_once PS_ROOT . '/auth/core/rate-limiter.php';
+require_once PS_ROOT . '/account-management/core/faculty-status.php';
 $conn = getDB();
 $rl_ip = rl_get_client_ip();
 
@@ -256,7 +257,7 @@ if (isset($_POST['login'])) {
     }
 
     // ===== Not an admin account — try FACULTY (tbl_users) =====
-    $stmt = $conn->prepare("SELECT faculty_id, fullname, password FROM tbl_users WHERE email = ?");
+    $stmt = $conn->prepare("SELECT faculty_id, fullname, password, " . faculty_status_select($conn) . " FROM tbl_users WHERE email = ?");
     $stmt->bind_param("s", $email);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -264,6 +265,15 @@ if (isset($_POST['login'])) {
     if ($result->num_rows === 1) {
         $user = $result->fetch_assoc();
         if (password_verify($password, $user['password'])) {
+            // ── Deactivated account ────────────────────────────────────
+            // Only said AFTER the password was right, so the status is never revealed to someone who
+            // doesn't know it. No session is created, and it is not counted as a successful sign-in.
+            if ((int)$user['is_active'] === 0) {
+                $_SESSION['flash_login_error'] = FACULTY_DEACTIVATED_MESSAGE;
+                header("Location: landing-page.php");
+                exit();
+            }
+
             // ── Successful faculty login ───────────────────────────────
             if (!session_regenerate_id(true)) {
                 throw new RuntimeException('Could not renew the session after login.');

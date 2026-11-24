@@ -2810,7 +2810,8 @@ CREATE TABLE `tbl_users` (
   `profile_picture` varchar(255) DEFAULT NULL,
   `department` varchar(255) DEFAULT NULL,
   `role` varchar(50) DEFAULT 'Regular Faculty',
-  `must_change_password` tinyint(1) NOT NULL DEFAULT 0
+  `must_change_password` tinyint(1) NOT NULL DEFAULT 0,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --

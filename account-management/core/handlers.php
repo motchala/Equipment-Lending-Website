@@ -6,9 +6,10 @@ if (($_GET['fragment'] ?? '') === 'faculty-tbody') {
     header('Content-Type: application/json');
     header('Cache-Control: no-store');
 
+    require_once __DIR__ . '/faculty-status.php';
     $fac_rows = [];
     $fac_result = $conn->query(
-        "SELECT u.fullname, u.email, u.faculty_id"
+        "SELECT u.fullname, u.email, u.faculty_id, " . faculty_status_select($conn, 'u')
             . " FROM tbl_users u"
             . " ORDER BY u.fullname ASC"
     );
@@ -28,8 +29,10 @@ if (($_GET['fragment'] ?? '') === 'faculty-tbody') {
         foreach ($fac_rows as $frow):
             $idUnset   = faculty_id_is_unset($frow['faculty_id']);
             $initFac   = strtoupper(substr(trim($frow['fullname'] ?? '') ?: 'F', 0, 1));
+            $facActive = ((int)($frow['is_active'] ?? 1)) !== 0;   // deactivated accounts stay in the list
         ?>
-            <tr
+            <tr<?= $facActive ? '' : ' class="fac-row-inactive"' ?>
+                data-active="<?= $facActive ? '1' : '0' ?>"
                 data-fullname="<?= htmlspecialchars($frow['fullname']) ?>"
                 data-email="<?= htmlspecialchars($frow['email']) ?>"
                 data-faculty-id="<?= htmlspecialchars($frow['faculty_id']) ?>"
@@ -38,7 +41,7 @@ if (($_GET['fragment'] ?? '') === 'faculty-tbody') {
                     <div class="fac-person">
                         <span class="fac-avatar"><?= htmlspecialchars($initFac) ?></span>
                         <div class="fac-person-text">
-                            <div class="fac-person-name"><?= htmlspecialchars($frow['fullname']) ?></div>
+                            <div class="fac-person-name"><?= htmlspecialchars($frow['fullname']) ?><?php if (!$facActive): ?> <span class="fac-status-off">Deactivated</span><?php endif; ?></div>
                             <div class="fac-person-sub"><?= htmlspecialchars($frow['email']) ?></div>
                         </div>
                     </div>

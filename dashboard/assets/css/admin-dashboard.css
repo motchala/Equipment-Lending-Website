@@ -8473,7 +8473,7 @@ body:has(#roomDeleteConfirm:not(.hidden)) {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   FACULTY TAB — Edit + Delete modals
+   FACULTY TAB — Edit + Deactivate modals
    ══════════════════════════════════════════════════════════════ */
 
 /* ── Delete modal: one message at a time ───────────────────── */
@@ -8641,7 +8641,7 @@ body:has(#roomDeleteConfirm:not(.hidden)) {
     color: var(--text-light);
 }
 
-/* Footer: Delete on the left, Cancel + Save on the right */
+/* Footer: Deactivate / Reactivate on the left, Cancel + Save on the right */
 .ps-modal-foot.fac-foot-split {
     justify-content: space-between;
     align-items: center;
@@ -8652,14 +8652,24 @@ body:has(#roomDeleteConfirm:not(.hidden)) {
     gap: 8px;
 }
 
-.ps-btn.fac-btn-delete {
+.ps-btn.fac-btn-deactivate {
     background: transparent;
     border-color: transparent;
     color: var(--danger);
 }
 
-.ps-btn.fac-btn-delete:hover {
+.ps-btn.fac-btn-deactivate:hover {
     background: #fdecea;
+}
+
+.ps-btn.fac-btn-reactivate {
+    background: transparent;
+    border-color: transparent;
+    color: var(--success);
+}
+
+.ps-btn.fac-btn-reactivate:hover {
+    background: rgba(39, 174, 96, 0.12);
 }
 
 @media (max-width: 420px) {
@@ -8865,6 +8875,29 @@ body:has(#roomDeleteConfirm:not(.hidden)) {
     color: var(--text-light);
     background: var(--secondary-cream);
     border: 1px solid var(--khaki-border);
+}
+
+/* Deactivated account: stays in the list (nothing is deleted) with a badge and a muted look. */
+.fac-status-off {
+    display: inline-block;
+    margin-left: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 999px;
+    padding: 1px 8px;
+    white-space: nowrap;
+    vertical-align: middle;
+    color: var(--danger);
+    border: 1px solid currentColor;
+}
+
+#fac-list-table tr.fac-row-inactive .fac-avatar,
+#fac-list-table tr.fac-row-inactive .fac-id {
+    opacity: .55;
+}
+
+#fac-list-table tr.fac-row-inactive .fac-person-name {
+    color: var(--text-light);
 }
 
 @media (max-width: 520px) {

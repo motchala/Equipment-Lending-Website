@@ -68,6 +68,6 @@ if (!empty($_COOKIE[REMEMBER_ME_COOKIE]) && empty($_SESSION['admin']) && empty($
 admin_session_guard();
 
 // ── Faculty session re-validation ───────────────────────────────────────
-// Ends faculty sessions whose account was deleted by a Super Admin.
+// Ends faculty sessions whose account was deactivated by a Super Admin (or no longer exists).
 // No-op for visitors/students/admins.
 faculty_session_guard();
