@@ -470,7 +470,7 @@
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken() },
-                body: JSON.stringify({ settings: collectLive() })
+                body: JSON.stringify({ csrf_token: csrfToken(), settings: collectLive() })
             }).then(function (r) {
                 return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, body: j }; });
             }).then(function (res) {

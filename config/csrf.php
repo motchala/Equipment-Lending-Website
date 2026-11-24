@@ -13,11 +13,24 @@ function csrf_field(): string {
 function csrf_verify(): void {
     $token = $_POST['csrf_token'] ?? null;
 
-    // Fallback: JSON-body requests carry it in a header instead of $_POST
+    // Fallback: JSON-body requests carry it in a header instead of $_POST.
+    // $_SERVER is read first because getallheaders() does not exist on some hosts
+    // (PHP running as CGI/FastCGI, e.g. InfinityFree), which made every JSON save fail there.
+    if ($token === null && !empty($_SERVER['HTTP_X_CSRF_TOKEN'])) {
+        $token = $_SERVER['HTTP_X_CSRF_TOKEN'];
+    }
     if ($token === null) {
         $headers = function_exists('getallheaders') ? getallheaders() : [];
         $headers = array_change_key_case($headers, CASE_UPPER);
         $token = $headers['X-CSRF-TOKEN'] ?? null;
+    }
+    // Last resort: hosts that strip custom headers. JSON callers may also send "csrf_token" in the body.
+    if ($token === null && $_SERVER['REQUEST_METHOD'] === 'POST'
+        && stripos((string)($_SERVER['CONTENT_TYPE'] ?? ''), 'application/json') === 0) {
+        $json = json_decode((string)file_get_contents('php://input'), true);
+        if (is_array($json) && isset($json['csrf_token']) && is_string($json['csrf_token'])) {
+            $token = $json['csrf_token'];
+        }
     }
 
     if (
