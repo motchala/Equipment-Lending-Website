@@ -337,6 +337,7 @@
                                     class="inv-remove-img<?php echo ($edit_item && $edit_item['image_path'] !== 'uploads/default.png') ? '' : ' hidden'; ?>">
                                     &#x2715; Remove image
                                 </button>
+                                <span class="text-danger" id="itemImageError" style="display:none;font-size:0.85rem;margin-top:4px;display:block"></span>
                             </div>
 
                             <div class="inv-form-actions">

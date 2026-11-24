@@ -92,6 +92,7 @@ function fact_eq_housekeeping(mysqli $conn): void
  */
 function fact_eq_image_map(mysqli $conn): array
 {
+    global $root_url;
     static $map = null;
     if ($map !== null) {
         return $map;

@@ -72,6 +72,7 @@
                             style="margin-top:6px;font-size:0.75rem;color:var(--danger);background:none;border:none;cursor:pointer;">
                             &#x2715; Remove image
                         </button>
+                        <span class="text-danger" id="eqmImageError" style="display:none;font-size:0.85rem;margin-top:4px;display:block"></span>
                     </div>
 
                     <div style="border-top:1px solid var(--khaki-border);margin-top:1rem;padding-top:1rem">
