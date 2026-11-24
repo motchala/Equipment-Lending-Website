@@ -247,11 +247,20 @@ if (!function_exists('fnotif_supersede')) {
     function fnotif_supersede(array $items): array
     {
         static $stages = [
-            'reqpending' => ['req', 1], 'reqapproved' => ['req', 2], 'duesoon' => ['req', 3], 'overdue' => ['req', 4],
-            'returned' => ['req', 5], 'reqdeclined' => ['req', 5], 'reqcancelled' => ['req', 5], 'reqselfcancelled' => ['req', 5],
-            'roompending' => ['room', 1], 'roomapproved' => ['room', 2], 'roomsoon' => ['room', 3],
-            'roomdeclined' => ['room', 5], 'roomcancelled' => ['room', 5],
-            'issueopen' => ['issue', 1], 'issueresolved' => ['issue', 5], 'issuedismissed' => ['issue', 5],
+            'reqapproved' => ['req', 2],
+            'duesoon' => ['req', 3],
+            'overdue' => ['req', 4],
+            'returned' => ['req', 5],
+            'reqdeclined' => ['req', 5],
+            'reqcancelled' => ['req', 5],
+            'reqselfcancelled' => ['req', 5],
+            'roomapproved' => ['room', 2],
+            'roomsoon' => ['room', 3],
+            'roomdeclined' => ['room', 5],
+            'roomcancelled' => ['room', 5],
+            'issueopen' => ['issue', 1],
+            'issueresolved' => ['issue', 5],
+            'issuedismissed' => ['issue', 5],
         ];
         $top = [];
         $of  = [];
@@ -278,7 +287,7 @@ if (!function_exists('fnotif_merge_id')) {
     /** Which notifications belong to one stream: the items of one borrow request (bundle), or reminders due the same day. */
     function fnotif_merge_id(array $n): string
     {
-        static $types = ['reqpending', 'reqapproved', 'duesoon', 'overdue', 'returned', 'reqdeclined', 'reqcancelled', 'reqselfcancelled'];
+        static $types = ['reqapproved', 'duesoon', 'overdue', 'returned', 'reqdeclined', 'reqcancelled', 'reqselfcancelled'];
         [$p] = fnotif_key_parts((string)$n['key']);
         if (!in_array($p, $types, true)) {
             return '';
@@ -341,7 +350,10 @@ if (!function_exists('fnotif_compose_group')) {
             if (in_array($label, $skip, true)) continue;
             $same = true;
             foreach ($members as $m) {
-                if ($val($m, $label) !== (string)$row['value']) { $same = false; break; }
+                if ($val($m, $label) !== (string)$row['value']) {
+                    $same = false;
+                    break;
+                }
             }
             if ($same) $detail[] = $row;
         }
@@ -455,6 +467,13 @@ if (!function_exists('fnotif_rule_label')) {
             'rule_4_return_history' => 'Return history',
             'rule_5_id_order'       => 'Tie-break by ID order',
             'qr_return'             => 'QR code return',
+            'rule_buffer_approved'  => 'Approved when the 10-minute review ended',
+            'rule_buffer_declined'  => 'Declined when the 10-minute review ended',
+            'rule_expired_unreviewed' => 'Not reviewed in time',
+            'rule_schedule_conflict'  => 'Schedule conflict',
+            'rule_item_limit'       => 'Borrowing limit reached',
+            'rule_letter_required'  => 'Request letter required',
+            'rule_no_show'          => 'Not collected in time',
         ];
         if (isset($map[$rule])) return $map[$rule];
         return ucfirst(trim(str_replace('_', ' ', preg_replace('/^rule_(\d+_)?/', '', $rule))));
@@ -603,20 +622,8 @@ if (!function_exists('fnotif_build_list')) {
                     $d('Requested By (Student)', $studentBy),
                 ];
                 switch ($status) {
-                    case 'Waiting':
-                        $add([
-                            'key' => 'reqpending-' . $id,
-                            'cat' => 'borrow',
-                            'icon' => 'hourglass_top',
-                            'icon_class' => 'ni-alert',
-                            'title' => 'Request sent: ' . $equip,
-                            'body'  => 'Waiting for admin approval.',
-                            'short' => 'Waiting for admin approval.',
-                            'ts'    => $reqTs,
-                            'detail' => array_merge([$d('Status', 'Waiting for approval')], $common),
-                            'link' => $lendingLink,
-                        ]);
-                        break;
+                    // 'Waiting' deliberately has no notification: a request that was just sent is already shown in
+                    // My Activity. The feed only carries the RECEIPT once an admin or the system approves / declines it.
 
                     case 'Approved':
                     case 'On Loan':
@@ -719,16 +726,27 @@ if (!function_exists('fnotif_build_list')) {
 
                         // The ADMIN'S reason (decision log) comes first; the request's own text is only a fallback
                         $reason = fnotif_decision_reason($r['log_override_reason'] ?? '', $r['log_reason'] ?? '', $r['reason'] ?? '');
+                        // The decline receipt: same receipt number as the approval one (#R-0123), and who decided
+                        $decRecNo  = ps_receipt_no('equipment', $id);
+                        $decRule   = fnotif_rule_label($r['log_rule'] ?? $r['arbitration_rule'] ?? null);
+                        $declinedBy = $override
+                            ? 'Admin — ' . trim((string)$r['log_override_by'])
+                            : 'Automatic' . ($decRule ? ' — ' . $decRule : '');
+                        $declShort = $reason !== '' ? 'Reason: ' . $e(fnotif_clip($reason, 90)) : 'Your request was declined.';
                         $add([
                             'key' => 'reqdeclined-' . $id,
                             'cat' => 'borrow',
                             'icon' => 'cancel',
                             'icon_class' => 'ni-overdue',
                             'title' => 'Declined: ' . $equip,
-                            'body'  => $reason !== '' ? 'Reason: ' . $e(fnotif_clip($reason, 90)) : 'Your request was declined.',
-                            'short' => $reason !== '' ? 'Reason: ' . $e(fnotif_clip($reason, 90)) : 'Your request was declined.',
+                            'body'  => $declShort . ' · ' . $e($decRecNo),
+                            'short' => $declShort,
                             'ts'    => $decidedTs,
-                            'detail' => array_merge([$d('Reason', $reason, true)], $common),
+                            'detail' => array_merge(
+                                [$d('Receipt No.', $decRecNo), $d('Reason', $reason, true)],
+                                $common,
+                                [$d('Declined By', $declinedBy)]
+                            ),
                             'link' => $lendingLink,
                         ]);
                         break;
@@ -871,6 +889,12 @@ if (!function_exists('fnotif_build_list')) {
                         $d('Purpose', $r['purpose']),
                         $d('Requested By (Student)', $roomStudentBy),
                     ];
+                    // Who made the decision: the room decision log marks an admin's own decision 'override' / 'manual';
+                    // anything else is the system (a rule, or the review window ending)
+                    $roomRule = trim((string)($r['log_rule'] ?? ''));
+                    $roomBy   = in_array($roomRule, ['override', 'manual'], true)
+                        ? 'Admin'
+                        : ($roomRule !== '' ? 'Automatic — ' . fnotif_rule_label($roomRule) : '');
 
                     if ($status === 'Approved') {
                         $upcoming = $endTs >= $now;
@@ -885,7 +909,7 @@ if (!function_exists('fnotif_build_list')) {
                                 'title' => 'Approved: ' . $room,
                                 'body'  => '<strong>' . $e($slot) . '</strong> · ' . $e(ps_receipt_no('room', $id)),
                                 'ts'    => $roomDecidedTs,
-                                'detail' => array_merge([$d('Receipt No.', ps_receipt_no('room', $id))], $common),
+                                'detail' => array_merge([$d('Receipt No.', ps_receipt_no('room', $id))], $common, [$d('Approved By', $roomBy)]),
                                 'link' => $resvLink,
                             ]);
                         }
@@ -906,22 +930,13 @@ if (!function_exists('fnotif_build_list')) {
                                 'link'   => $resvLink,
                             ]);
                         }
-                    } elseif ($status === 'Waiting') {
-                        // Still waiting for an admin (a later-date reservation, or any student reservation made with
-                        // this faculty member's code). Leaves the feed on its own once it is approved or declined.
-                        $add([
-                            'key' => 'roompending-' . $id,
-                            'cat' => 'room',
-                            'icon' => 'hourglass_top',
-                            'icon_class' => 'ni-alert',
-                            'title' => 'Reservation sent: ' . $room,
-                            'body'  => '<strong>' . $e($slot) . '</strong> · waiting for admin approval.',
-                            'ts'    => $reqTs,
-                            'detail' => array_merge([$d('Status', 'Waiting for approval')], $common),
-                            'link' => $resvLink,
-                        ]);
+                        // 'Waiting' deliberately has no notification (the sent request is already in My Activity);
+                        // the receipt below appears once an admin or the system approves / declines it.
                     } elseif ($status === 'Declined') {
-                        if ($reqTs < $windowTs) continue;
+                        // When it was DECIDED, not when it was sent: a later-date reservation can wait days for the decision
+                        // (or be declined automatically at 12:01 AM on its day), same as the approval receipt above
+                        $roomDeclinedTs = !empty($r['log_at']) ? fnotif_db_timestamp($conn, $r['log_at'], $reqTs) : $reqTs;
+                        if ($roomDeclinedTs < $windowTs) continue;
                         $reason = trim((string)($r['reason'] ?? ''));
                         $add([
                             'key' => 'roomdeclined-' . $id,
@@ -929,9 +944,13 @@ if (!function_exists('fnotif_build_list')) {
                             'icon' => 'event_busy',
                             'icon_class' => 'ni-overdue',
                             'title' => 'Declined: ' . $room,
-                            'body'  => '<strong>' . $e($slot) . '</strong>' . ($reason !== '' ? ' · Reason: ' . $e(fnotif_clip($reason, 90)) : ''),
-                            'ts'    => $reqTs,
-                            'detail' => array_merge([$d('Reason', $reason, true)], $common),
+                            'body'  => '<strong>' . $e($slot) . '</strong>' . ($reason !== '' ? ' · Reason: ' . $e(fnotif_clip($reason, 90)) : '') . ' · ' . $e(ps_receipt_no('room', $id)),
+                            'ts'    => $roomDeclinedTs,
+                            'detail' => array_merge(
+                                [$d('Receipt No.', ps_receipt_no('room', $id)), $d('Reason', $reason, true)],
+                                $common,
+                                [$d('Declined By', $roomBy)]
+                            ),
                             'link' => $resvLink,
                         ]);
                     } elseif ($status === 'Cancelled') {

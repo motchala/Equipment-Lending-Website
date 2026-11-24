@@ -1,4 +1,5 @@
 <?php
+
 /**
  * notifications/core/preferences.php
  *
@@ -63,13 +64,11 @@ if (!function_exists('notif_pref_family_map')) {
         }
         if ($audience === 'faculty') {
             return [
-                'reqpending'      => 'equipment',
                 'reqapproved'     => 'equipment',
                 'reqdeclined'     => 'equipment',
                 'reqcancelled'    => 'equipment',
                 'reqselfcancelled' => 'equipment',
                 'returned'        => 'equipment',
-                'roompending'     => 'facilities',
                 'roomapproved'    => 'facilities',
                 'roomdeclined'    => 'facilities',
                 'roomcancelled'   => 'facilities',
@@ -207,7 +206,10 @@ if (!function_exists('notif_prefs_save')) {
             $st->close();
             return true;
         } catch (Throwable $e) {
-            try { $conn->rollback(); } catch (Throwable $e2) {}
+            try {
+                $conn->rollback();
+            } catch (Throwable $e2) {
+            }
             error_log('[PUPSync] notif_prefs_save: ' . $e->getMessage());
             return false;
         }

@@ -211,7 +211,7 @@
             <button type="button" class="rq-filter-chip eq-tab-archived" data-eq-panel="eq-archived"
                 title="Equipment hidden from the borrowing catalog">
                 <span class="material-symbols-outlined eq-tab-ico" aria-hidden="true">inventory_2</span> Archived
-                <span class="rq-chip-count rq-chip-count--muted" id="eqArchivedChipCount"<?php echo $eq_archive_count > 0 ? '' : ' hidden'; ?>><?php echo $eq_archive_count; ?></span>
+                <span class="rq-chip-count rq-chip-count--muted" id="eqArchivedChipCount" <?php echo $eq_archive_count > 0 ? '' : ' hidden'; ?>><?php echo $eq_archive_count; ?></span>
             </button>
         </div>
 
@@ -730,16 +730,16 @@
                                         data-return-date-display="<?php echo date('M d, Y', strtotime($r['return_date'])); ?>"
                                         data-arb-rule="<?php echo htmlspecialchars($r['arbitration_rule'] ?? ''); ?>"
                                         data-auto-ok="<?php
-                                            // 1 = this waiting request meets every automatic-approval rule, so the Approve screen
-                                            // asks for no reason / internal note (a cart is judged as a whole)
-                                            $lauto = '0';
-                                            if ($lst === 'waiting') {
-                                                $lauto_batch = trim((string)($r['batch_id'] ?? ''));
-                                                $lauto = ($lauto_batch !== ''
-                                                    ? equipment_cart_meets_auto_rules($conn, $lauto_batch)
-                                                    : equipment_waiting_meets_auto_rules($conn, (int)$r['id'])) ? '1' : '0';
-                                            }
-                                            echo $lauto; ?>"
+                                                        // 1 = this waiting request meets every automatic-approval rule, so the Approve screen
+                                                        // asks for no reason / internal note (a cart is judged as a whole)
+                                                        $lauto = '0';
+                                                        if ($lst === 'waiting') {
+                                                            $lauto_batch = trim((string)($r['batch_id'] ?? ''));
+                                                            $lauto = ($lauto_batch !== ''
+                                                                ? equipment_cart_meets_auto_rules($conn, $lauto_batch)
+                                                                : equipment_waiting_meets_auto_rules($conn, (int)$r['id'])) ? '1' : '0';
+                                                        }
+                                                        echo $lauto; ?>"
                                         data-note="<?php echo htmlspecialchars($r['reason'] ?? ''); ?>"
                                         data-doc-url="<?php echo $ldoc ? htmlspecialchars($ldoc['url']) : ''; ?>"
                                         data-doc-open-url="<?php echo $ldoc ? htmlspecialchars($ldoc['open_url']) : ''; ?>"
@@ -760,7 +760,7 @@
                                             <?php endif; ?>
                                             </div>
                                             <?php if ($lpickup !== ''): ?>
-                                            <div class="eq-cell-sub">Pick-up: <?php echo htmlspecialchars($lpickup); ?></div>
+                                                <div class="eq-cell-sub">Pick-up: <?php echo htmlspecialchars($lpickup); ?></div>
                                             <?php endif; ?>
                                         </td>
                                         <td data-col="equipment">
@@ -770,39 +770,45 @@
                                                 // same-day request in its 10-minute approval buffer: live countdown (equipment-buffer-countdown.js)
                                                 $lbuf_ts   = (int)strtotime((string)$r['buffer_until']);
                                                 $lbuf_left = max(0, $lbuf_ts - time()); ?>
-                                            <div class="eq-cell-sub"><span class="eqb-chip" data-eqbuf-until="<?php echo htmlspecialchars(date('c', $lbuf_ts)); ?>" data-eqbuf-id="<?php echo (int)$r['id']; ?>" title="Approve or decline now. If nobody does, the system approves it when the equipment is free for that time, otherwise declines it."><span class="material-symbols-outlined" aria-hidden="true">timer</span>Auto-decides in <b class="eqb-time"><?php echo sprintf('%d:%02d', intdiv($lbuf_left, 60), $lbuf_left % 60); ?></b></span></div>
+                                                <div class="eq-cell-sub"><span class="eqb-chip" data-eqbuf-until="<?php echo htmlspecialchars(date('c', $lbuf_ts)); ?>" data-eqbuf-id="<?php echo (int)$r['id']; ?>" title="Approve or decline now. If nobody does, the system approves it when the equipment is free for that time, otherwise declines it."><span class="material-symbols-outlined" aria-hidden="true">timer</span>Auto-decides in <b class="eqb-time"><?php echo sprintf('%d:%02d', intdiv($lbuf_left, 60), $lbuf_left % 60); ?></b></span></div>
                                             <?php endif; ?>
                                         </td>
                                         <td data-col="col3">
                                             <?php if ($lst === 'waiting' || $lst === 'scheduled'): ?>
-                                                <div class="eq-when"><?php echo date('M d', strtotime($r['request_date'])); ?></div><div class="eq-cell-sub"><?php echo date('g:i A', strtotime($r['request_date'])); ?></div>
+                                                <div class="eq-when"><?php echo date('M d', strtotime($r['request_date'])); ?></div>
+                                                <div class="eq-cell-sub"><?php echo date('g:i A', strtotime($r['request_date'])); ?></div>
                                             <?php else: ?>
-                                                <div class="eq-when"><?php echo date('M d', strtotime($r['borrow_date'])); ?></div><div class="eq-cell-sub"><?php echo $lbt !== '' ? $lbt : '&mdash;'; ?></div>
-                                        <?php endif; ?>
+                                                <div class="eq-when"><?php echo date('M d', strtotime($r['borrow_date'])); ?></div>
+                                                <div class="eq-cell-sub"><?php echo $lbt !== '' ? $lbt : '&mdash;'; ?></div>
+                                            <?php endif; ?>
                                         </td>
                                         <td data-col="col4" <?php echo ($lst === 'overdue') ? ' style="color:var(--danger);font-weight:600"' : ''; ?>>
                                             <?php if ($lst === 'waiting'): ?>
-                                                <div class="eq-when"><?php echo date('M d', strtotime($r['borrow_date'])); ?></div><div class="eq-cell-sub"><?php echo $lbt !== '' ? $lbt : '&mdash;'; ?></div>
-                                        <?php elseif ($lst === 'scheduled'): ?>
-                                            <div class="eq-when"><?php echo date('M d', strtotime($r['borrow_date'])); ?></div><div class="eq-cell-sub"><?php echo ($lbt !== '' ? $lbt . ' &middot; ' : '') . ($ldays > 0 ? 'in ' . $ldays . 'd' : 'today'); ?></div>
-                                        <?php elseif ($lst === 'returned'): ?>
-                                            <div class="eq-when"><?php echo date('M d', strtotime($lret)); ?></div><div class="eq-cell-sub"><?php echo date('g:i A', strtotime($lret)); ?></div>
-                                        <?php elseif ($lst === 'overdue'): ?>
-                                            <div class="eq-when"><?php echo date('M d', strtotime($r['return_date'])); ?></div>
-                                            <div class="eq-cell-sub" style="font-weight:400"><?php echo max(1, $ldays); ?>d overdue</div>
-                                            <?php if (!empty($eq_notices[(int)$r['id']])):
+                                                <div class="eq-when"><?php echo date('M d', strtotime($r['borrow_date'])); ?></div>
+                                                <div class="eq-cell-sub"><?php echo $lbt !== '' ? $lbt : '&mdash;'; ?></div>
+                                            <?php elseif ($lst === 'scheduled'): ?>
+                                                <div class="eq-when"><?php echo date('M d', strtotime($r['borrow_date'])); ?></div>
+                                                <div class="eq-cell-sub"><?php echo ($lbt !== '' ? $lbt . ' &middot; ' : '') . ($ldays > 0 ? 'in ' . $ldays . 'd' : 'today'); ?></div>
+                                            <?php elseif ($lst === 'returned'): ?>
+                                                <div class="eq-when"><?php echo date('M d', strtotime($lret)); ?></div>
+                                                <div class="eq-cell-sub"><?php echo date('g:i A', strtotime($lret)); ?></div>
+                                            <?php elseif ($lst === 'overdue'): ?>
+                                                <div class="eq-when"><?php echo date('M d', strtotime($r['return_date'])); ?></div>
+                                                <div class="eq-cell-sub" style="font-weight:400"><?php echo max(1, $ldays); ?>d overdue</div>
+                                                <?php if (!empty($eq_notices[(int)$r['id']])):
                                                     $ninfo = $eq_notices[(int)$r['id']];
                                                     $nSecs = max(0, time() - strtotime($ninfo['last_at']));
                                                     $nAgo = $nSecs < 60 ? 'just now' : ($nSecs < 3600 ? floor($nSecs / 60) . 'm ago' : ($nSecs < 86400 ? floor($nSecs / 3600) . 'h ago' : ($nSecs < 172800 ? 'yesterday' : floor($nSecs / 86400) . 'd ago')));
-                                            ?>
-                                                <div class="eq-cell-sub" style="color:#059669;font-weight:500;display:flex;align-items:center;gap:3px;margin-top:2px;" title="Notice sent: <?php echo date('M j, Y g:i A', strtotime($ninfo['last_at'])); ?>">
-                                                    <span class="material-symbols-outlined" style="font-size:12px;">mark_email_read</span>
-                                                    Notice sent (<?php echo $nAgo; ?>)
-                                                </div>
+                                                ?>
+                                                    <div class="eq-cell-sub" style="color:#059669;font-weight:500;display:flex;align-items:center;gap:3px;margin-top:2px;" title="Notice sent: <?php echo date('M j, Y g:i A', strtotime($ninfo['last_at'])); ?>">
+                                                        <span class="material-symbols-outlined" style="font-size:12px;">mark_email_read</span>
+                                                        Notice sent (<?php echo $nAgo; ?>)
+                                                    </div>
+                                                <?php endif; ?>
+                                            <?php else: ?>
+                                                <div class="eq-when"><?php echo date('M d', strtotime($r['return_date'])); ?></div>
+                                                <div class="eq-cell-sub"><?php echo $lrt !== '' ? $lrt : '&mdash;'; ?></div><?php if ((int)($r['extension_count'] ?? 0) > 0): $lext = (int)$r['extension_count']; ?><div class="eq-cell-sub" title="Extended <?php echo $lext; ?> time<?php echo $lext === 1 ? '' : 's'; ?><?php echo !empty($r['original_return_date']) ? ', was ' . date('M d', strtotime($r['original_return_date'])) : ''; ?>">+<?php echo $lext; ?> ext</div><?php endif; ?>
                                             <?php endif; ?>
-                                        <?php else: ?>
-                                            <div class="eq-when"><?php echo date('M d', strtotime($r['return_date'])); ?></div><div class="eq-cell-sub"><?php echo $lrt !== '' ? $lrt : '&mdash;'; ?></div><?php if ((int)($r['extension_count'] ?? 0) > 0): $lext = (int)$r['extension_count']; ?><div class="eq-cell-sub" title="Extended <?php echo $lext; ?> time<?php echo $lext === 1 ? '' : 's'; ?><?php echo !empty($r['original_return_date']) ? ', was ' . date('M d', strtotime($r['original_return_date'])) : ''; ?>">+<?php echo $lext; ?> ext</div><?php endif; ?>
-                                    <?php endif; ?>
                                         </td>
                                         <td data-col="col5">
                                             <?php if ($lst === 'waiting'): ?>
@@ -823,8 +829,9 @@
                                         <td data-col="actions">
                                             <div class="eq-act-wrap">
                                                 <?php if ($lst === 'waiting'): ?>
-                                                    <button type="button" class="ps-btn ps-btn--success ps-btn--sm" data-action="ps-open-modal" data-modal="ps-approve-modal" data-req-id="<?php echo (int)$r['id']; ?>"><span class="material-symbols-outlined">check</span> Approve</button>
-                                                    <button type="button" class="ps-btn ps-btn--danger ps-btn--sm" data-action="ps-open-modal" data-modal="ps-decline-modal" data-req-id="<?php echo (int)$r['id']; ?>"><span class="material-symbols-outlined">close</span> Decline</button>
+                                                    <?php /* One Review button, same as the Reservations table. It opens the review drawer (#ps-appr-drawer), which shows
+                                                       the request letter and details and holds the Approve / Decline buttons, so there is only one place to decide. */ ?>
+                                                    <button type="button" class="ps-btn ps-btn--outline ps-btn--sm" data-eq-review><span class="material-symbols-outlined">fact_check</span> Review</button>
                                                 <?php elseif ($lst === 'scheduled'): ?>
                                                     <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-action="eq-open-loan-detail">View</button>
                                                     <button type="button" class="ps-btn ps-btn--danger ps-btn--sm" data-action="ps-open-modal" data-modal="ps-cancel-booking-modal"><span class="material-symbols-outlined">event_busy</span> Cancel</button>
