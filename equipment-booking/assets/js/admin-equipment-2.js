@@ -87,6 +87,12 @@
                         refreshInventoryTbody();
                     } else {
                         if (typeof showToast === 'function') showToast(json.message || 'Error saving equipment.');
+                        // Show persistent error near the file input when the image upload failed
+                        var imgErr = document.getElementById('itemImageError');
+                        if (imgErr) {
+                            imgErr.textContent = json.message || 'Error saving equipment.';
+                            imgErr.style.display = 'block';
+                        }
                     }
                 })
                 .catch(function () {
@@ -124,6 +130,12 @@
                         refreshInventoryTbody();
                     } else {
                         if (typeof showToast === 'function') showToast(json.message || 'Could not update equipment.');
+                        // Show persistent error near the file input when the image upload failed
+                        var imgErr = document.getElementById('eqmImageError');
+                        if (imgErr) {
+                            imgErr.textContent = json.message || 'Could not update equipment.';
+                            imgErr.style.display = 'block';
+                        }
                     }
                 })
                 .catch(function () {

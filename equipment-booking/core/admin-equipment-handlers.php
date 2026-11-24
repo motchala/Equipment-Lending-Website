@@ -135,28 +135,14 @@ if (!function_exists('equipment_store_uploaded_image')) {
         }
         $ext = $ext_by_type[$info[2]];
 
-        // 1) Cloudinary
+        // Cloudinary — the only supported upload path on this deployment
         $orig = (string)($file['name'] ?? 'image.' . $ext);
         $cloud_url = cloudinary_upload($tmp, $orig);
         if ($cloud_url !== '') {
             return ['ok' => true, 'path' => $cloud_url, 'abs' => null, 'message' => ''];
         }
-        $cloud_reason = cloudinary_last_error();
 
-        // 2) Local fallback — the extension comes from the verified type, never from the file name
-        $uploads = dirname(__DIR__, 2) . '/uploads';
-        if (!is_dir($uploads)) {
-            @mkdir($uploads, 0755, true);
-        }
-        $base = trim((string)preg_replace('/[^a-zA-Z0-9_-]/', '_', pathinfo($orig, PATHINFO_FILENAME)), '_');
-        $name = time() . '_' . substr($base !== '' ? $base : 'image', 0, 60) . '.' . $ext;
-        $target = $uploads . '/' . $name;
-        if (!@move_uploaded_file($tmp, $target)) {
-            error_log('[PUPSync] equipment image: Cloudinary failed (' . $cloud_reason . ') and local save to ' . $target . ' failed');
-            return $fail('The image could not be saved. ' . ($cloud_reason !== '' ? $cloud_reason . ' ' : '') . 'The local uploads folder is not writable either.');
-        }
-        @chmod($target, 0644);
-        return ['ok' => true, 'path' => 'uploads/' . $name, 'abs' => $target, 'message' => ''];
+        return $fail('Image upload failed. Cloudinary is not configured or the upload was rejected. Please check the server .env file has valid CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET values.');
     }
 }
 
