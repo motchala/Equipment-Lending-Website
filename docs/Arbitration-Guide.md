@@ -1,190 +1,132 @@
-# Arbitration Guide
+# Borrowing Points: Simple Guide
 
-*Equipment borrowing and room reservations: the shared points rule, and how arbitration works*
+*How the points work, what they mean for faculty and students, and how requests are decided*
 
-PUPSYNC  |  Based on the latest system folder  |  November 2026
+PUPSYNC  |  November 2026
 
 ---
 
-# Part 1. The shared points rule
+# 1. How the points work
 
-A faculty member and the students they authorize share one borrowing allowance of 7 points. Each different item costs 1 point, and each student costs 1 point.
+Every faculty member gets **7 points each day**. The faculty member and the students they authorize use the **same** 7 points.
 
-## The four numbers
+- **1 point** for each different item the faculty borrows. The quantity does not matter: 25 chairs is still 1 point.
+- **1 point** for each student the faculty authorizes that day. A student's whole request is 1 point.
+- The faculty is responsible for their students, so the students' points come out of the faculty's 7.
 
-The Super Admin sets these in Settings, Arbitration, Borrowing points.
+## A day in points
 
-| Setting | What it limits | Standard |
+Example: a faculty member borrows 3 different items and authorizes 2 students.
+
+`[ Item ] [ Item ] [ Item ] [ Student ] [ Student ] [ free ] [ free ]`
+
+**5 of 7 points used. 2 points left.**
+
+The 2 free points could be 2 more items, or 1 more item and 1 more student.
+
+## The four limits
+
+| Limit | Number | In plain words |
 | --- | --- | --- |
-| Different items per faculty | Different items a faculty member holds at the same time. Quantity is not limited. | 5 |
-| Students per day | Students a faculty member can authorize on the same day. It starts over every day. | 3 |
-| Shared ceiling | Items held plus students authorized on the same day, together. | 7 |
-| Items per student | Different items in one student request. | 2 |
+| Different items | 5 | The most different items a faculty member can have borrowed at the same time. |
+| Students | 3 | The most students a faculty member can authorize in one day. |
+| Total points | 7 | Items and students added together can never be more than this. |
+| Items per student | 2 | The most different items in one student's request. |
 
-## How points are counted
+Quantity has no limit of its own. The stock decides how many units can be borrowed.
 
-- **Items:** 1 point for each different item. 25 projectors is still 1 point. Asking for the same item again adds nothing.
-- **Students:** 1 point for each student for the day. A student's whole cart counts as one student, however many items are in it.
-- **What counts:** an item counts while it is Waiting, Approved or On Loan and overlaps the new request's time. An overdue item always counts. A student counts on their borrow date.
-- **What frees a point:** a declined, cancelled or no-show request frees its point. A returned item frees the faculty's item point. A student who returns early still uses their slot for that day.
-- **Order:** requests are counted in the order they were filed. In a cart, the later items are the ones refused.
+---
 
-## Examples (with the standard 5 / 3 / 7)
+# 2. What it means for faculty
+
+- You can borrow up to **5 different items** at a time, in any quantity.
+- You can authorize up to **3 students** a day.
+- Items and students together can **not go over 7 points**.
+- Each student you authorize uses **1 of your points** for the day they borrow.
+- The Borrow form shows "**N of 7 points used**" before you submit, and marks the items that will not fit.
+- If you go over, the request is **refused right away** with the reason, and nothing is saved. Remove an item, or ask a student to pick another day.
+
+## When do points come back?
+
+| What happens | Points back? |
+| --- | --- |
+| A request is declined or cancelled, or nobody collects it | Yes |
+| You return the item | Yes, the item's point |
+| A student returns the item early | No. The student's point stays used for that day. |
+| A new day starts | Yes. Students' points start fresh each day. |
+| An item is overdue | No. It still uses a point. |
+
+---
+
+# 3. What it means for students
+
+- A student has **no points of their own.** They use 1 of their faculty's points for the day they pick.
+- A student can ask for up to **2 different items** in one request, in any quantity. The whole request is 1 point.
+- A student borrows for a few hours on a single day.
+- When the student picks a date and time, the form **warns them** if their faculty has no points left for that day. They can pick another day or ask their faculty.
+- If the day is full and they submit anyway, the request is **refused right away** with the same reason.
+
+---
+
+# 4. Examples
+
+With the standard limits (5 items, 3 students, 7 points):
 
 | Situation | Result |
 | --- | --- |
-| Faculty has 5 items and 1 student that day | Fine (6 points) |
-| Faculty has 5 items and 2 students | Fine (7 points). A 3rd student is refused (8 points). |
-| Faculty has 4 items and 3 students | Fine (7 points). A 5th item is refused. |
-| Faculty asks for a 6th different item | Refused. The limit is 5 different items. |
-| Faculty asks for 25 units of one item | Fine. It is 1 point. Stock decides the quantity. |
-| A 4th student for the same day | Refused. The limit is 3 students per day. |
-| One student asks for 3 different items | The 3rd item is refused. The limit is 2 per student. |
-| A student asks for the next day | Fine. Each day has its own allowance. |
+| Faculty has 5 items and 1 student | Fine. 6 points. |
+| Faculty has 5 items and 2 students | Fine. 7 points. A 3rd student is refused. |
+| Faculty has 4 items and 3 students | Fine. 7 points. A 5th item is refused. |
+| Faculty asks for a 6th different item | Refused. The limit is 5. |
+| Faculty asks for 25 units of one item | Fine. It is 1 point. |
+| A 4th student on the same day | Refused. The limit is 3 per day. |
+| A student asks for 3 different items | The 3rd item is refused. The limit is 2. |
+| A student picks another day | Fine. Each day starts fresh. |
 
-## Where it is checked
-
-- **When a request is submitted,** every way of submitting (faculty single item or cart, student with a faculty code, item code). A refused request gets the reason right away and is not saved.
-- **Faculty Borrow form:** shows "N of 7 points used" for the chosen day, and flags the items of a cart that will not fit before it is submitted.
-- **Student form:** warns the student when their faculty has no student slot left for the date and time they picked. The check at Submit still decides.
-- **Admin approval is not limited** by points. The rule only applies when a request is submitted.
-
-## What people see
+## Messages people see
 
 | Who | Message |
 | --- | --- |
-| Faculty (too many items) | You can borrow at most 5 different items at a time, and you already have 5 booked or requested for that time. |
-| Faculty (over the ceiling) | Your 7-point allowance for Tue, Nov 24 would be over: 5 items + 3 students you authorized (each item and each student uses 1 point). |
-| Student (day is full) | Your faculty has already authorized the most students allowed for Tue, Nov 24 (3). Please choose another date, or ask your faculty. |
-| Student (too many items) | One student request can include at most 2 different items. |
-
-## Presets on the settings screen
-
-| Preset | Items | Students | Ceiling | Items per student |
-| --- | --- | --- | --- | --- |
-| Standard | 5 | 3 | 7 | 2 |
-| Busy period | 3 | 2 | 4 | 1 |
-| Relaxed | 8 | 5 | 11 | 3 |
-
-Clicking a preset only fills in the fields. Nothing changes until you press Save.
-
-> **Note:** The ceiling is the dial for how much students count against the faculty. At 8 (5 + 3) students never compete with items. The lower the ceiling, the more they compete. If a database already saved "Items per borrower" as 3, it stays 3 until you save a new value.
+| Faculty | You can borrow at most 5 different items at a time, and you already have 5 booked or requested for that time. |
+| Faculty | Your 7-point allowance for Tue, Nov 24 would be over: 5 items + 3 students you authorized (each item and each student uses 1 point). |
+| Student | Your faculty has already authorized the most students allowed for Tue, Nov 24 (3). Please choose another date, or ask your faculty. |
 
 ---
 
-# Part 2. How arbitration works
+# 5. How requests are decided (arbitration)
 
-Arbitration is the set of automatic rules that decide every equipment request and room reservation: approve it, make it wait for an admin, or decline it. The Super Admin controls the numbers in Settings, Arbitration. Admins can still decide any request by hand.
+Arbitration is the set of automatic rules that decide every equipment request and room reservation: **approve** it, make it **wait for an admin**, or **decline** it. The Super Admin sets the numbers. Admins can still decide any request by hand, even over the points limit.
 
-## The path of an equipment request
+## What happens to an equipment request
 
-1. **Submit.** A faculty member sends one item or a cart. A student sends a request with a faculty code. An item code works the same way.
-2. **Checks.** The checks in the table below run first, the same for everyone. If one fails, the request is declined on the spot with the reason, and it is not saved.
-3. **Today or later?** A same-day request goes through the 10-minute buffer. A later-date request waits for an admin.
-4. **Approved.** The faculty gets Claim and Return QR codes (Ready for Pick Up).
-5. **Collected and returned.** Pick up makes it On Loan, and returning it makes it Returned. If nobody collects it, it is Cancelled once its end time passes. If it is not returned on time, it becomes Overdue.
+1. **Submit.** A faculty member, or a student with a faculty code, sends the request.
+2. **Checks.** The system checks the points and archived items, and also overdue items and the request letter if those switches are on. If a check fails, the request is refused right away and is not saved. (A request declined later, by an admin or by the deadline, stays in the faculty's history.)
+3. **Same-day request.** It waits 10 minutes. An admin can decide at any time. If nobody does, the system approves it when stock is free and nobody else has the item booked, and declines it otherwise.
+4. **Later-date request.** It waits for an admin. If nobody decides, it is declined at 12:01 AM on the borrow date. It is never approved automatically.
+5. **After approval.** The faculty gets QR codes. Picking up makes it On Loan, and returning it makes it Returned. Not collected: Cancelled. Not returned on time: Overdue.
 
-## Checks that run on every request
+## If two requests want the same item
 
-| Check | What it does | Default |
-| --- | --- | --- |
-| Overdue block | Declines a borrower who has an overdue item. | Off (switch) |
-| Archived item | Declines an item that is no longer available. | Always on |
-| Shared points | The rule in Part 1. | Always on |
-| Request letter | A faculty member's own later-date request must carry a letter. | Off (switch) |
-| Stock and schedule | A same-day request that cannot be done (item out right now, not enough free units) is declined. | Always on |
+The first request filed wins. If they are tied, these break the tie, in order:
 
-## Same-day requests
-
-- After the checks above, the request is saved as Waiting and a **10-minute buffer** starts.
-- An admin can approve or decline it at any time during the buffer.
-- If nobody decides, the system approves it when every item has stock and nobody else has the item booked for that time. Otherwise it declines it.
-
-## Later-date requests
-
-- They **wait for an admin.** A later-date request is never approved automatically.
-- If nobody decides, it is **declined automatically at 12:01 AM on the borrow date,** so the faculty finds out in the morning with the whole day left.
-- A request submitted after 12:01 AM of its own borrow day is declined at its start time instead.
-
-## When requests compete
-
-When several requests want the same item at the same time, the first one filed wins. If they are tied, these tie-breaks apply, in order:
-
-1. Request letter level (signatory)
-2. Role weight
-3. Good return history
-4. Request ID (the lower one wins)
-
-| Role | Weight | Who |
-| --- | --- | --- |
-| Student representative | 1 | A request a student filed with a faculty code |
-| Regular faculty | 2 | A faculty member's own request |
-| Priority | 4 | Faculty the Super Admin marked as priority (up to 10) |
-
-Weights can be 1 to 10 in settings.
+1. The request letter level
+2. The role: priority faculty (4), faculty (2), student (1)
+3. A good return history
+4. The request number (lower wins)
 
 ## Room reservations
 
-- Checks first: the date is not in the past, the room is not under maintenance, and the overdue block if that switch is on. Then time clashes are settled first come, first served, with the same tie-breaks.
-- Same-day reservations can be approved automatically (a setting, on by default).
-- Later reservations wait for an admin. If nobody decides, the setting "If nobody decides" says when they are declined: at the start of the day (default), at the start time, or never.
-- Other room limits are in the settings table below: active reservations, how far ahead, opening hours and days, and the longest reservation.
+- The system checks the date is not in the past and the room is not under maintenance. Clashes are settled first come, first served.
+- Same-day reservations can be approved automatically. Later ones wait for an admin and are declined if nobody decides in time. The limits per faculty and the open hours are in the settings below.
 
-## Admin override
+## Main settings (Settings, Arbitration, Super Admin only)
 
-An admin can approve or decline any request by hand, whatever the automatic rules would say. The points limit applies when a request is submitted, so it does not stop an admin from approving.
-
-## All settings (Super Admin only)
-
-### Equipment: borrowing rules
-
-| Setting | Default | Range |
-| --- | --- | --- |
-| Overdue block | Off | On / off |
-| Request letter required (later-date, faculty) | Off | On / off |
-| Different items per faculty | 5 | 1 to 20 |
-| Students per day | 3 | 1 to 10 |
-| Shared ceiling (points) | 7 | 1 to 30 |
-| Items per student | 2 | 1 to 10 |
-| Longest loan (days) | 3 | 1 to 3 |
-| Extensions allowed | 1 | 0 to 1 |
-| Low-stock alert (units) | 2 | 0 to 20 |
-
-### Equipment: booking window
-
-| Setting | Default | Range |
-| --- | --- | --- |
-| Opens / closes | 7:00 AM / 8:00 PM | On the hour |
-| Book ahead up to (days) | 14 | 1 to 60 |
-| Start-now grace (minutes). A request starting this soon counts as starting right now. | 15 | 0 to 60 |
-| Cancel cutoff (minutes before start) | 60 | 0 to 240 |
-| Loan lengths (hours) | 1, 2, 3, 6 | Any of 1 to 6 |
-
-### Rooms
-
-| Setting | Default | Range |
-| --- | --- | --- |
-| Active reservations per faculty | 2 | 1 to 10 |
-| Book ahead up to (weeks) | 3 | 1 to 8 |
-| Cancel cutoff (minutes before start) | 60 | 0 to 240 |
-| Same-day reservations approved automatically | On | On / off |
-| Request letter required | Off | On / off |
-| If nobody decides | At start of the day | Start of day / start time / never |
-| Opens / closes | 7:00 AM / 8:00 PM | On the hour |
-| Open days | Mon to Sat | Any days |
-| Longest reservation (hours) | 13 | 1 to 16 |
-
-### Competing requests and semester
-
-| Setting | Default | Range |
-| --- | --- | --- |
-| Role weights: student / faculty / priority | 1 / 2 / 4 | 1 to 10 each |
-| Priority faculty | None | Up to 10 faculty |
-| Semester name and dates | No active semester | 1st, 2nd, Summer, none |
-
-## Good to know
-
-- A request refused when it is submitted is not saved, and its log entries are removed. A request declined later, by an admin or by the deadline, stays in the faculty's history.
-- There is no scheduled job. Deadlines are checked whenever an admin or faculty page refreshes.
-- The engine also has a duplicate-request block, but it has no switch on the settings screen, so it is off.
-- If a setting is missing or invalid, the system uses its default.
+| Setting | Standard |
+| --- | --- |
+| Different items / students per day / total points / items per student | 5 / 3 / 7 / 2 |
+| Longest loan, extensions allowed | 3 days, 1 extension |
+| Equipment hours, book ahead | 7 AM to 8 PM, up to 14 days |
+| Room reservations per faculty, book ahead | 2 at a time, up to 3 weeks |
+| Room hours, longest reservation | 7 AM to 8 PM, Mon to Sat, 13 hours |
+| Overdue block, request letter required | Both off |
+| Presets (fill in the limits; press Save to apply) | Standard 5/3/7/2, Busy 3/2/4/1, Relaxed 8/5/11/3 |
