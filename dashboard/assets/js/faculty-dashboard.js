@@ -4155,8 +4155,12 @@
     // It only collects context and hands off to the existing Facilities UI.
 
     function showMiniForm(lastRow, prefill) {
-        var col = lastRow && lastRow.querySelector('.act-chat-col');
-        if (!col) return;
+        // The form is rendered as a new standalone row in the chat body,
+        // not inside the AI text bubble's column — this keeps the AI response
+        // text separate and above the form, never interleaved.
+        var chatBody = document.getElementById('actAiChatBody');
+        if (!chatBody) return;
+        var col = null; // form renders directly into chatBody, not into lastRow's col
 
         // Read limits injected by PHP; fall back to safe defaults
         var chatEl = document.getElementById('actAiChat');
@@ -4181,15 +4185,6 @@
         var campusMainSel = pfCampus === 'main' ? ' selected' : '';
         var campusCiteSel = pfCampus === 'cite' ? ' selected' : '';
         var campusDefault = pfCampus === '' ? ' selected' : '';
-
-        // Disclaimer bubble — shown before the form
-        var body = document.getElementById('actAiChatBody');
-        if (body) {
-            appendAiBubble(body,
-                "I\u2019ll help you get there! Just so you know \u2014 I won\u2019t complete " +
-                "the booking myself. Confirm the details below and I\u2019ll open the " +
-                "reservation form with everything ready.");
-        }
 
         var form = document.createElement('div');
         form.className = 'act-mini-form';
@@ -4239,7 +4234,13 @@
             'id="actMfSubmitBtn" disabled>Find & Reserve</button>' +
             '</div>';
 
-        col.appendChild(form);
+        // Append the form directly to the chat body — not inside the AI bubble's column.
+        // This ensures: AI text → (new line) form, never text-form-text interleaved.
+        var chatBodyEl = document.getElementById('actAiChatBody');
+        if (chatBodyEl) {
+            chatBodyEl.appendChild(form);
+            chatBodyEl.scrollTop = chatBodyEl.scrollHeight;
+        }
         _wireMiniForm(maxHoursVal, pfCampus !== '' && pfDate !== '' && pfStart !== '' && pfEnd !== '');
     }
 

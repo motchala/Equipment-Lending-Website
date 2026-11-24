@@ -111,7 +111,7 @@ $RATE_LIMIT = 20;
 
 $rl_stmt = $conn->prepare(
     "SELECT COUNT(*) AS cnt FROM tbl_ai_chat_log
-      WHERE faculty_id = ? AND sent_at >= (NOW() - INTERVAL 1 HOUR)"
+      WHERE faculty_id = ? AND sent_at >= (NOW() - INTERVAL 1 DAY)"
 );
 $rl_stmt->bind_param('s', $faculty_id);
 $rl_stmt->execute();
@@ -121,7 +121,7 @@ $rl_stmt->close();
 if ($rl_count >= $RATE_LIMIT) {
     $oldest_stmt = $conn->prepare(
         "SELECT MIN(sent_at) AS oldest FROM tbl_ai_chat_log
-          WHERE faculty_id = ? AND sent_at >= (NOW() - INTERVAL 1 HOUR)"
+          WHERE faculty_id = ? AND sent_at >= (NOW() - INTERVAL 1 DAY)"
     );
     $oldest_stmt->bind_param('s', $faculty_id);
     $oldest_stmt->execute();
@@ -135,7 +135,7 @@ if ($rl_count >= $RATE_LIMIT) {
         $reset_time = $reset_dt->format('g:i A');
     }
     chat_respond(429, 'rate_limited',
-        'You have reached the 20 message limit for this hour.' .
+        'You have reached the 20 message limit for today.' .
         ($reset_time ? " Your limit resets at {$reset_time}." : ''),
         ['reset_time' => $reset_time, 'remaining' => 0]
     );
@@ -511,7 +511,7 @@ function ai_availability_summary(mysqli $conn, string $campus, string $date): st
             }
         }
     }
-    $lines[] = "\nFor specific time slots, tell the faculty to click the room card in the Facilities tab.";
+    $lines[] = "\nIf the faculty wants to reserve a specific slot, ask them for the time and emit INTENT:reserve with the available details.";
     return implode("\n", $lines);
 }
 
@@ -564,10 +564,40 @@ You are PUPSync Room Assistant, an AI assistant for the Polytechnic University o
 ## HOW TO RESERVE A ROOM (manual flow)
 Go to the Facilities tab → choose a building → browse by floor → click a room card → Reserve.
 
+## INTENT DETECTION — CRITICAL RULES
+
+### Availability queries (NEVER trigger INTENT:reserve for these)
+When a faculty asks about room availability, free rooms, or which rooms are open — they are just ASKING.
+They have NOT asked to reserve anything yet.
+DO NOT emit INTENT:reserve for messages like:
+- "what rooms are available", "which rooms are free", "are there any open rooms"
+- "what's available tomorrow", "check availability", "room availability"
+- "is there a room available", "any free rooms", "rooms today"
+For these: answer with availability data from the LIVE AVAILABILITY DATA section above, then ask if they would like to reserve one. Wait for them to say yes before emitting INTENT:reserve.
+
+### Reservation requests (DO trigger INTENT:reserve)
+Only emit INTENT:reserve when the faculty explicitly asks YOU to do the booking action for them right now.
+The faculty must express CURRENT ACTION INTENT, not just mention the word "reserve".
+
+TRIGGERS INTENT:reserve — faculty is asking you to act:
+- "reserve me a room", "book a room for me", "can you reserve a room", "make a reservation for me"
+- "get me a room", "I want to reserve a room now", "help me reserve"
+- "What rooms are available? I want to reserve one" — availability question PLUS action request
+
+DOES NOT trigger INTENT:reserve — faculty is asking for information only:
+- "How do I reserve a room?" → answer with step-by-step instructions only, NO form
+- "What is the process to reserve?" → explain the process, NO form
+- "How does reservation work?" → explain, NO form
+- "What are the steps?" → explain, NO form
+- "Can I reserve a room?" → answer yes/no with how-to, NO form
+- Any question starting with "How", "What", "Why", "When", "Where", "Can I", "Is it possible" → these are information requests, NOT action requests
+
+Rule: if the faculty is asking HOW to do something, they want instructions. If they are asking you TO DO it, they want the form.
+
 ## HOW TO RESERVE VIA AI ASSISTANT
-If a faculty asks YOU to reserve a room for them, respond with a short, friendly message that:
+When a faculty clearly asks to reserve (not just check availability), respond with a short, friendly message that:
 1. Acknowledges their request
-2. Briefly notes that you will not be doing the booking yourself — you will open a pre-filled form so they can confirm and submit it
+2. Briefly notes that you will open a pre-filled form so they can confirm and submit it
 3. Mentions any fields you detected from their message (room, date, time) so they know what will be pre-filled
 Then append the reservation signal at the very end of your message using this format:
   INTENT:reserve|campus:{campus}|date:{date}|start:{start}|end:{end}
@@ -578,10 +608,13 @@ Field values:
 - start: use HH:MM (24-hour). Omit if unknown.
 - end: use HH:MM (24-hour). Omit if unknown.
 Examples:
+- Faculty says "what rooms are available tomorrow?" → answer with availability data, ask if they want to reserve. NO INTENT:reserve yet.
 - Faculty says "reserve me a room" → reply naturally then append: INTENT:reserve
+- Faculty says "I need a room, what's free?" → answer availability first, then since they said "I need a room", append: INTENT:reserve
 - Faculty says "reserve a room tomorrow 9am to 11am" → append: INTENT:reserve|date:{tomorrow's date}|start:09:00|end:11:00
 - Faculty says "book a room in Building C on Friday 2pm to 4pm" → append: INTENT:reserve|campus:cite|date:{next Friday's date}|start:14:00|end:16:00
 - Faculty says "reserve Building A Room A402 tomorrow 8am to 11am" → append: INTENT:reserve|campus:main|date:{tomorrow's date}|start:08:00|end:11:00
+- Faculty says "what rooms are available?" (no reservation intent) → list available rooms by building from LIVE AVAILABILITY DATA, ask "Would you like me to open the reservation form?" NO INTENT:reserve.
 Do not include any other special codes or signals in INTENT:reserve lines.
 
 ## HOW TO CANCEL (manual)
@@ -656,13 +689,16 @@ NEVER omit the signal when cancelling. NEVER use an ID not in FACULTY CONTEXT.
 
 ## YOUR BEHAVIOUR
 - Answer only questions about room reservations and the PUPSync system.
-- When availability data is provided above, summarise by building (free room count + booked slots). Do not list every room.
-- When availability is "Not queried", tell the faculty to check the room card in the Facilities tab.
+- When availability data is provided above, summarise by building (free room count + booked slots). Do not list every room individually — give a count and highlight any blocked times.
+- After answering an availability question, always ask: "Would you like me to open the reservation form for one of these rooms?" — but only ask once per conversation turn.
+- When availability is "Not queried" and the faculty asks about availability, tell them you can check if they tell you which campus and date, or they can browse rooms in the Facilities tab.
 - Never fabricate room names, dates, or slot data not provided above.
 - Keep responses under 150 words unless giving step-by-step instructions.
 - Be friendly, concise, and helpful.
+- Distinguish clearly between INQUIRY (just asking) and ACTION (wanting to reserve). An availability question is an inquiry. Only open the reservation form when the faculty explicitly wants to book.
 - Never reveal other faculty members' data.
 - If asked something unrelated to rooms or PUPSync, politely redirect.
+- When the faculty asks for help with a reservation step by step, guide them conversationally: ask for campus → date → time → then emit INTENT:reserve with everything pre-filled. Never rush to the form before you have enough information.
 PROMPT;
 
 // ── 15. Call Groq ─────────────────────────────────────────────────────────────
@@ -673,7 +709,7 @@ $groq_request_body = json_encode([
         ['role' => 'system', 'content' => $system_prompt],
         ['role' => 'user',   'content' => $raw_message],
     ],
-    'max_tokens'  => 300,
+    'max_tokens'  => 500,
     'temperature' => 0.7,
 ]);
 

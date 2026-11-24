@@ -238,7 +238,7 @@
                 <!-- Input bar -->
                 <div class="act-ai-chat-input-wrap">
                     <div class="act-ai-chat-counter" id="actAiCounterBar">
-                        <span id="actAiCounter">—</span> messages remaining this hour
+                        <span id="actAiCounter">—</span> messages remaining today
                     </div>
                     <div class="act-ai-chat-input">
                         <input type="text" id="actAiInput" placeholder="Ask about rooms or reservations..."
