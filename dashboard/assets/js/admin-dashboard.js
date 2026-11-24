@@ -571,6 +571,14 @@
         _markCardRead(card);
         psCloseModal('notifOverlay');
 
+        if (tab === 'faculty') {
+            // Password-reset request (Super Admin): open that faculty's account on its Reset password panel.
+            _switchTabDOM('faculty');
+            const email = card.dataset.linkEmail;
+            if (email) setTimeout(() => { if (window.psFacOpenResetFor) window.psFacOpenResetFor(email); }, 150);
+            return;
+        }
+
         if (tab === 'rooms') {
             _switchTabDOM('rooms');
             if (card.dataset.linkSub) switchRoomsTab(card.dataset.linkSub);
@@ -1014,6 +1022,7 @@
         wrap.dataset.linkSub = (n.link && n.link.sub) || '';
         wrap.dataset.linkRequestId = (n.link && n.link.request_id) || '';
         wrap.dataset.linkIssueId = (n.link && n.link.issue_id) || '';
+        wrap.dataset.linkEmail = (n.link && n.link.email) || '';
         wrap.dataset.linkItemId = (n.link && n.link.item_id) || '';
 
         const detailRows = (n.detail || []).map(d =>

@@ -416,5 +416,10 @@ function remember_me_restore(mysqli $conn): void
         $_SESSION['faculty_name'] = (string)$account['fullname'];
         $_SESSION['faculty_email'] = (string)$account['email'];
         $_SESSION['login_time'] = $authTime;
+
+        // Getting back in through "stay logged in" counts as signing in: an open password-reset request
+        // (auth/core/password-reset.php) is withdrawn automatically.
+        require_once __DIR__ . '/password-reset.php';
+        pwr_clear_on_success($conn, (string)$account['email']);
     }
 }

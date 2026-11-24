@@ -23,6 +23,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
 
     <link rel="stylesheet" href="auth/assets/css/landing-page.css">
+    <link rel="stylesheet" href="auth/assets/css/password-reset.css?v=<?= (int)@filemtime(PS_ROOT . '/auth/assets/css/password-reset.css') ?>">
 </head>
 
 <body>
@@ -100,6 +101,35 @@
                             <?php endif; ?>
                         </div>
                     <?php endif; ?>
+
+                    <?php if (!empty($pw_reset_offer)): ?>
+                        <!-- Shown only after this faculty account used all 5 sign-in attempts. The server knows which
+                             account it is (session), so nothing but the CSRF token is sent. -->
+                        <div class="pw-reset-offer" id="pwResetOffer"
+                            data-endpoint="auth/api/request-password-reset.php"
+                            data-state="<?= !empty($pw_reset_offer['notified']) ? 'sent' : 'ready' ?>">
+                            <div class="pw-reset-offer-text">
+                                <i class="fa-solid fa-key" aria-hidden="true"></i>
+                                <div>
+                                    <strong>Can&rsquo;t remember your password?</strong>
+                                    <span id="pwResetOfferMsg" aria-live="polite">
+                                        <?php if (!empty($pw_reset_offer['notified'])): ?>
+                                            The Super Admin has been notified. They will give you a temporary password.
+                                        <?php else: ?>
+                                            You have used all 5 attempts for <span class="pw-reset-offer-email"><?= htmlspecialchars($pw_reset_offer['email']) ?></span>.
+                                            Ask the Super Admin to reset your password.
+                                        <?php endif; ?>
+                                    </span>
+                                </div>
+                            </div>
+                            <button type="button" class="pw-reset-offer-btn" id="pwResetNotifyBtn"
+                                <?= !empty($pw_reset_offer['notified']) ? 'disabled' : '' ?>>
+                                <i class="fa-solid <?= !empty($pw_reset_offer['notified']) ? 'fa-circle-check' : 'fa-bell' ?>" aria-hidden="true"></i>
+                                <span><?= !empty($pw_reset_offer['notified']) ? 'Super Admin notified' : 'Notify Super Admin' ?></span>
+                            </button>
+                            <p class="pw-reset-offer-err" id="pwResetOfferErr" role="alert" hidden></p>
+                        </div>
+                    <?php endif; ?>
                     <form method="POST" action="" id="loginForm">
                         <?= csrf_field() ?>
                         <div class="form-group">
@@ -159,6 +189,7 @@
 
 
     <script src="auth/assets/js/landing-page.js"></script>
+    <script src="auth/assets/js/password-reset.js?v=<?= (int)@filemtime(PS_ROOT . '/auth/assets/js/password-reset.js') ?>"></script>
 
 
 </body>
