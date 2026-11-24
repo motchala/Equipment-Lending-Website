@@ -23,7 +23,7 @@ If a faculty member forgets their password, a **Super Admin** can now give them 
 
 ## Good to know
 
-- The existing 3-try lockout still works. The 5-attempt count keeps going across those lockouts.
+- The 5-try lockout (5 minutes at first) starts on the same wrong password that unlocks the Notify Super Admin button. The 5-attempt count keeps going across later lockouts.
 - The password is handed over by the Super Admin. It is not emailed.
 
 ## Quick test

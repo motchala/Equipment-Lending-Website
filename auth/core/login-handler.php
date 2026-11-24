@@ -305,7 +305,7 @@ if (isset($_POST['login'])) {
             $_SESSION['flash_login_error'] = $rl_result['message'];
             // Faculty "forgot password" counter (auth/core/password-reset.php): PWR_MAX_ATTEMPTS wrong passwords
             // in a row make the sign-in form offer "Notify Super Admin". Counted per account, so it keeps
-            // counting across the 3-try lockout rounds above.
+            // counting across the 5-try lockout rounds above.
             if (pwr_record_failed_login($conn, $email) >= PWR_MAX_ATTEMPTS) {
                 $_SESSION['pw_reset_offer_email'] = strtolower($email);
                 if (!$rl_result['locked']) {
