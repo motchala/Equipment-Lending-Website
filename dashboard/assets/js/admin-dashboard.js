@@ -613,7 +613,7 @@
                     row.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     row.classList.add('notif-target-flash');
                     setTimeout(() => row.classList.remove('notif-target-flash'), 1800);
-                    const trigger = row.querySelector('[data-modal="ps-req-detail-modal"]');
+                    const trigger = row.querySelector('[data-eq-review]') || row.querySelector('[data-modal="ps-req-detail-modal"]');
                     if (card.dataset.linkChip === 'waiting' && trigger) setTimeout(() => trigger.click(), 280);
                 }, 120);
                 return;
@@ -4551,7 +4551,9 @@
         function rowCtx(el) {
             // Fast path: Approve/Decline buttons carry data-req-id directly
             const directId = el.dataset && el.dataset.reqId;
-            const tr = el.closest('tr[data-id]');
+            // The review drawer's Approve / Decline buttons sit outside the table, so look the row up by that id
+            const tr = el.closest('tr[data-id]')
+                || (directId ? document.querySelector('#eq-loan-table tr.eq-loan-row[data-id="' + directId + '"]') : null);
             if (!tr && !directId) return null;
             const d = tr ? tr.dataset : {};
             return {
@@ -4886,6 +4888,10 @@
                 var trigger = e.target.closest ? e.target.closest('button[data-modal="ps-approve-modal"]') : null;
                 if (!trigger) return;
                 var row = trigger.closest('tr.eq-loan-row');
+                if (!row && trigger.dataset && trigger.dataset.reqId) {
+                    // the review drawer's Approve button: use the request the drawer is showing
+                    row = document.querySelector('#eq-loan-table tr.eq-loan-row[data-id="' + trigger.dataset.reqId + '"]');
+                }
                 if (!row) {
                     // the request detail screen's own Approve button: use the request it is showing
                     var shown = document.getElementById('detail-request-id');
@@ -4903,6 +4909,7 @@
                 e.preventDefault();
                 e.stopImmediatePropagation();
                 choice = { batchId: batchId, autoOk: row.dataset.autoOk === '1', trigger: trigger };
+                if (typeof psCloseModal === 'function') psCloseModal('ps-appr-drawer');   // one screen at a time
                 choiceItems.textContent = '';
                 items.forEach(function (item) {
                     var line = document.createElement('div');
@@ -5322,312 +5329,298 @@
                     }
 
                     function handleScanData(data, skipSummary) {
-                            if (data && data.success) closeCamera();   // valid QR: the camera is no longer needed
-                            if (isClaimQr && data.success && data.checklist && Array.isArray(data.items)) {
-                                if (!skipSummary) { showClaimSummary(data); return; }
-                                // Handover only covers items an admin has approved.
-                                data.items = data.items.filter(function (i) { return !i.status || i.status === 'Approved'; });
-                                if (!data.items.length) { showToast('❌ Nothing approved to hand over yet.'); backToCamera(); return; }
-                                document.getElementById('qrChecklistConfirm').disabled = false;
-                                document.getElementById('qrChecklistConfirm').textContent = 'Confirm';
-                            }
-                            if (data.success && data.checklist) {
-                                // Show inline checklist inside the scanner modal
-                                scanning = false;
-                                const cameraView = document.getElementById('qrCameraView');
-                                const checklistView = document.getElementById('qrChecklistView');
-                                const itemsEl = document.getElementById('qrChecklistItems');
-                                const hintEl = document.getElementById('qrChecklistHint');
-                                const confirmBtn = document.getElementById('qrChecklistConfirm');
-                                const cancelBtn = document.getElementById('qrChecklistCancel');
-                                const titleEl = document.getElementById('qrScannerTitle');
-                                const subtitleEl = document.getElementById('qrScannerSubtitle');
+                        if (data && data.success) closeCamera();   // valid QR: the camera is no longer needed
+                        if (isClaimQr && data.success && data.checklist && Array.isArray(data.items)) {
+                            if (!skipSummary) { showClaimSummary(data); return; }
+                            // Handover only covers items an admin has approved.
+                            data.items = data.items.filter(function (i) { return !i.status || i.status === 'Approved'; });
+                            if (!data.items.length) { showToast('❌ Nothing approved to hand over yet.'); backToCamera(); return; }
+                            document.getElementById('qrChecklistConfirm').disabled = false;
+                            document.getElementById('qrChecklistConfirm').textContent = 'Confirm';
+                        }
+                        if (data.success && data.checklist) {
+                            // Show inline checklist inside the scanner modal
+                            scanning = false;
+                            const cameraView = document.getElementById('qrCameraView');
+                            const checklistView = document.getElementById('qrChecklistView');
+                            const itemsEl = document.getElementById('qrChecklistItems');
+                            const hintEl = document.getElementById('qrChecklistHint');
+                            const confirmBtn = document.getElementById('qrChecklistConfirm');
+                            const cancelBtn = document.getElementById('qrChecklistCancel');
+                            const titleEl = document.getElementById('qrScannerTitle');
+                            const subtitleEl = document.getElementById('qrScannerSubtitle');
 
-                                // Switch view
-                                cameraView.style.display = 'none';
-                                checklistView.style.display = '';
-                                titleEl.textContent = isClaimQr ? 'Claim Checklist' : 'Return Checklist';
-                                subtitleEl.textContent = isClaimQr
-                                    ? 'Hand over to ' + (data.collector || data.borrower)
-                                    : 'Return from ' + data.borrower;
+                            // Switch view
+                            cameraView.style.display = 'none';
+                            checklistView.style.display = '';
+                            titleEl.textContent = isClaimQr ? 'Claim Checklist' : 'Return Checklist';
+                            subtitleEl.textContent = isClaimQr
+                                ? 'Hand over to ' + (data.collector || data.borrower)
+                                : 'Return from ' + data.borrower;
 
-                                // Build item rows (the request's status first)
-                                cancelBtn.textContent = 'Back';
-                                itemsEl.innerHTML = '';
-                                itemsEl.insertAdjacentHTML('beforeend', statusBannerHtml(data.items));
-                                const CONDITIONS = ['Good', 'Fair', 'Damaged', 'Missing'];
-                                data.items.forEach(function (item, idx) {
-                                    const bg = idx % 2 === 0 ? '#fff' : '#fafafa';
-                                    const row = document.createElement('div');
-                                    row.style.cssText = 'display:flex;align-items:center;gap:.65rem;padding:.75rem 1rem;background:' + bg + ';border-bottom:1px solid #f0f0f0;';
-                                    if (isClaimQr) {
-                                        // Claim row: qty spinner (how many units actually handed over)
-                                        // + condition for units NOT handed over.
-                                        // Admin sets actual_qty = how many go with faculty.
-                                        // Remainder = borrow_qty - actual_qty stays in cabinet.
-                                        const maxQty = item.borrow_qty;
-                                        const notHandedOpts = ['Good', 'Damaged', 'Missing'].map(c =>
-                                            '<option value="' + c + '">' + c + '</option>'
-                                        ).join('');
-                                        row.innerHTML =
-                                            '<span style="flex:1;"><strong style="display:block;font-size:.9rem;">' + item.equipment_name + '</strong>' +
-                                            '<span style="font-size:.78rem;color:#888;">Requested: ' + maxQty + '</span></span>' +
-                                            '<div style="display:flex;align-items:center;gap:.4rem;flex-shrink:0;">' +
-                                            '<span style="font-size:.78rem;color:#555;white-space:nowrap;">Give:</span>' +
-                                            '<button type="button" data-claim-dec data-req-id="' + item.id + '" ' +
-                                            'style="width:26px;height:26px;border:1px solid #d1d5db;border-radius:6px;background:#f9f9f9;font-size:1rem;cursor:pointer;line-height:1;">−</button>' +
-                                            '<input type="number" data-claim-qty data-req-id="' + item.id + '" data-max-qty="' + maxQty + '" ' +
-                                            'value="' + maxQty + '" min="0" max="' + maxQty + '" ' +
-                                            'style="width:42px;text-align:center;border:1px solid #d1d5db;border-radius:6px;padding:.25rem;font-size:.9rem;">' +
-                                            '<button type="button" data-claim-inc data-req-id="' + item.id + '" ' +
-                                            'style="width:26px;height:26px;border:1px solid #d1d5db;border-radius:6px;background:#f9f9f9;font-size:1rem;cursor:pointer;line-height:1;">+</button>' +
-                                            '</div>' +
-                                            '<select data-claim-cond data-req-id="' + item.id + '" ' +
-                                            'title="Condition of units NOT given" ' +
-                                            'style="padding:.3rem .5rem;border:1px solid #d1d5db;border-radius:6px;font-size:.82rem;background:#fff;cursor:pointer;display:none;" >' +
-                                            notHandedOpts + '</select>';
-                                    } else {
-                                        const opts = CONDITIONS.map(c =>
-                                            '<option value="' + c + '">' + c + '</option>'
-                                        ).join('');
-                                        const itemToken = item.return_token || token;
-                                        // Checkbox: admin ticks only the items being returned RIGHT NOW.
-                                        // Unticked items stay On Loan — their Return QR remains valid.
-                                        row.innerHTML =
-                                            '<input type="checkbox" data-req-id="' + item.id + '" checked ' +
-                                            'style="width:17px;height:17px;accent-color:#800000;flex-shrink:0;cursor:pointer;">' +
-                                            '<span style="flex:1;"><strong style="display:block;font-size:.9rem;">' + item.equipment_name + '</strong>' +
-                                            '<span style="font-size:.78rem;color:#888;">Qty: ' + item.borrow_qty + ' · ' + item.status + '</span></span>' +
-                                            '<select data-req-id="' + item.id + '" data-return-token="' + itemToken + '" ' +
-                                            'style="padding:.35rem .6rem;border:1px solid #d1d5db;border-radius:6px;font-size:.85rem;background:#fff;">' +
-                                            opts + '</select>';
-                                    }
-                                    itemsEl.appendChild(row);
-                                });
-
-                                // Wire qty +/- buttons and condition dropdown visibility
+                            // Build item rows (the request's status first)
+                            cancelBtn.textContent = 'Back';
+                            itemsEl.innerHTML = '';
+                            itemsEl.insertAdjacentHTML('beforeend', statusBannerHtml(data.items));
+                            const CONDITIONS = ['Good', 'Fair', 'Damaged', 'Missing'];
+                            data.items.forEach(function (item, idx) {
+                                const bg = idx % 2 === 0 ? '#fff' : '#fafafa';
+                                const row = document.createElement('div');
+                                row.style.cssText = 'display:flex;align-items:center;gap:.65rem;padding:.75rem 1rem;background:' + bg + ';border-bottom:1px solid #f0f0f0;';
                                 if (isClaimQr) {
-                                    itemsEl.onclick = function (e) {
-                                        var dec = e.target.closest('[data-claim-dec]');
-                                        var inc = e.target.closest('[data-claim-inc]');
-                                        var btn = dec || inc;
-                                        if (!btn) return;
-                                        var rid = btn.dataset.reqId || btn.getAttribute('data-req-id');
-                                        var inp = itemsEl.querySelector('input[data-claim-qty][data-req-id="' + rid + '"]');
-                                        var cond = itemsEl.querySelector('select[data-claim-cond][data-req-id="' + rid + '"]');
-                                        if (!inp) return;
-                                        var max = parseInt(inp.dataset.maxQty || inp.max, 10);
-                                        var v = parseInt(inp.value, 10);
-                                        if (dec) v = Math.max(0, v - 1);
-                                        if (inc) v = Math.min(max, v + 1);
-                                        inp.value = v;
-                                        // Show condition dropdown only when some units are withheld
-                                        if (cond) cond.style.display = (v < max) ? '' : 'none';
-                                    };
-                                    itemsEl.onchange = function (e) {
-                                        var inp = e.target.closest('input[data-claim-qty]');
-                                        if (!inp) return;
-                                        var max = parseInt(inp.dataset.maxQty || inp.max, 10);
-                                        var v = Math.max(0, Math.min(max, parseInt(inp.value, 10) || 0));
-                                        inp.value = v;
-                                        var rid = inp.getAttribute('data-req-id');
-                                        var cond = itemsEl.querySelector('select[data-claim-cond][data-req-id="' + rid + '"]');
-                                        if (cond) cond.style.display = (v < max) ? '' : 'none';
-                                    };
+                                    // Claim row: qty spinner (how many units actually handed over)
+                                    // + condition for units NOT handed over.
+                                    // Admin sets actual_qty = how many go with faculty.
+                                    // Remainder = borrow_qty - actual_qty stays in cabinet.
+                                    const maxQty = item.borrow_qty;
+                                    const notHandedOpts = ['Good', 'Damaged', 'Missing'].map(c =>
+                                        '<option value="' + c + '">' + c + '</option>'
+                                    ).join('');
+                                    row.innerHTML =
+                                        '<span style="flex:1;"><strong style="display:block;font-size:.9rem;">' + item.equipment_name + '</strong>' +
+                                        '<span style="font-size:.78rem;color:#888;">Requested: ' + maxQty + '</span></span>' +
+                                        '<div style="display:flex;align-items:center;gap:.4rem;flex-shrink:0;">' +
+                                        '<span style="font-size:.78rem;color:#555;white-space:nowrap;">Give:</span>' +
+                                        '<button type="button" data-claim-dec data-req-id="' + item.id + '" ' +
+                                        'style="width:26px;height:26px;border:1px solid #d1d5db;border-radius:6px;background:#f9f9f9;font-size:1rem;cursor:pointer;line-height:1;">−</button>' +
+                                        '<input type="number" data-claim-qty data-req-id="' + item.id + '" data-max-qty="' + maxQty + '" ' +
+                                        'value="' + maxQty + '" min="0" max="' + maxQty + '" ' +
+                                        'style="width:42px;text-align:center;border:1px solid #d1d5db;border-radius:6px;padding:.25rem;font-size:.9rem;">' +
+                                        '<button type="button" data-claim-inc data-req-id="' + item.id + '" ' +
+                                        'style="width:26px;height:26px;border:1px solid #d1d5db;border-radius:6px;background:#f9f9f9;font-size:1rem;cursor:pointer;line-height:1;">+</button>' +
+                                        '</div>' +
+                                        '<select data-claim-cond data-req-id="' + item.id + '" ' +
+                                        'title="Condition of units NOT given" ' +
+                                        'style="padding:.3rem .5rem;border:1px solid #d1d5db;border-radius:6px;font-size:.82rem;background:#fff;cursor:pointer;display:none;" >' +
+                                        notHandedOpts + '</select>';
+                                } else {
+                                    const opts = CONDITIONS.map(c =>
+                                        '<option value="' + c + '">' + c + '</option>'
+                                    ).join('');
+                                    const itemToken = item.return_token || token;
+                                    // Checkbox: admin ticks only the items being returned RIGHT NOW.
+                                    // Unticked items stay On Loan — their Return QR remains valid.
+                                    row.innerHTML =
+                                        '<input type="checkbox" data-req-id="' + item.id + '" checked ' +
+                                        'style="width:17px;height:17px;accent-color:#800000;flex-shrink:0;cursor:pointer;">' +
+                                        '<span style="flex:1;"><strong style="display:block;font-size:.9rem;">' + item.equipment_name + '</strong>' +
+                                        '<span style="font-size:.78rem;color:#888;">Qty: ' + item.borrow_qty + ' · ' + item.status + '</span></span>' +
+                                        '<select data-req-id="' + item.id + '" data-return-token="' + itemToken + '" ' +
+                                        'style="padding:.35rem .6rem;border:1px solid #d1d5db;border-radius:6px;font-size:.85rem;background:#fff;">' +
+                                        opts + '</select>';
                                 }
+                                itemsEl.appendChild(row);
+                            });
 
-                                hintEl.textContent = isClaimQr
-                                    ? 'Set how many units to give. If less than requested, choose why (Damaged/Missing/Good). A reason is required.'
-                                    : 'Tick only items being returned now. Unticked items stay On Loan. "Damaged" or "Missing" flags the record.';
+                            // Wire qty +/- buttons and condition dropdown visibility
+                            if (isClaimQr) {
+                                itemsEl.onclick = function (e) {
+                                    var dec = e.target.closest('[data-claim-dec]');
+                                    var inc = e.target.closest('[data-claim-inc]');
+                                    var btn = dec || inc;
+                                    if (!btn) return;
+                                    var rid = btn.dataset.reqId || btn.getAttribute('data-req-id');
+                                    var inp = itemsEl.querySelector('input[data-claim-qty][data-req-id="' + rid + '"]');
+                                    var cond = itemsEl.querySelector('select[data-claim-cond][data-req-id="' + rid + '"]');
+                                    if (!inp) return;
+                                    var max = parseInt(inp.dataset.maxQty || inp.max, 10);
+                                    var v = parseInt(inp.value, 10);
+                                    if (dec) v = Math.max(0, v - 1);
+                                    if (inc) v = Math.min(max, v + 1);
+                                    inp.value = v;
+                                    // Show condition dropdown only when some units are withheld
+                                    if (cond) cond.style.display = (v < max) ? '' : 'none';
+                                };
+                                itemsEl.onchange = function (e) {
+                                    var inp = e.target.closest('input[data-claim-qty]');
+                                    if (!inp) return;
+                                    var max = parseInt(inp.dataset.maxQty || inp.max, 10);
+                                    var v = Math.max(0, Math.min(max, parseInt(inp.value, 10) || 0));
+                                    inp.value = v;
+                                    var rid = inp.getAttribute('data-req-id');
+                                    var cond = itemsEl.querySelector('select[data-claim-cond][data-req-id="' + rid + '"]');
+                                    if (cond) cond.style.display = (v < max) ? '' : 'none';
+                                };
+                            }
 
-                                // Confirm handler
-                                confirmBtn.onclick = function () {
-                                    confirmBtn.disabled = true;
-                                    confirmBtn.textContent = 'Saving...';
+                            hintEl.textContent = isClaimQr
+                                ? 'Set how many units to give. If less than requested, choose why (Damaged/Missing/Good). A reason is required.'
+                                : 'Tick only items being returned now. Unticked items stay On Loan. "Damaged" or "Missing" flags the record.';
 
-                                    const formData = new FormData();
-                                    formData.append('token', token);
+                            // Confirm handler
+                            confirmBtn.onclick = function () {
+                                confirmBtn.disabled = true;
+                                confirmBtn.textContent = 'Saving...';
 
-                                    // Get CSRF from the page
-                                    const csrfInput = document.querySelector('input[name="csrf_token"]');
-                                    if (csrfInput) formData.append('csrf_token', csrfInput.value);
+                                const formData = new FormData();
+                                formData.append('token', token);
 
-                                    if (isClaimQr) {
-                                        // Collect actual qty per item from the spinners
-                                        const claimRows = [];
-                                        itemsEl.querySelectorAll('input[data-claim-qty][data-req-id]').forEach(function (inp) {
-                                            const rid = inp.getAttribute('data-req-id');
-                                            const maxQty = parseInt(inp.dataset.maxQty || inp.max, 10);
-                                            const giveQty = Math.max(0, Math.min(maxQty, parseInt(inp.value, 10) || 0));
-                                            const condSel = itemsEl.querySelector('select[data-claim-cond][data-req-id="' + rid + '"]');
-                                            const held = maxQty - giveQty;
-                                            const cond = (held > 0 && condSel) ? condSel.value : 'Good';
-                                            claimRows.push({ id: rid, give: giveQty, max: maxQty, withheld: held, condition: cond });
+                                // Get CSRF from the page
+                                const csrfInput = document.querySelector('input[name="csrf_token"]');
+                                if (csrfInput) formData.append('csrf_token', csrfInput.value);
+
+                                if (isClaimQr) {
+                                    // Collect actual qty per item from the spinners
+                                    const claimRows = [];
+                                    itemsEl.querySelectorAll('input[data-claim-qty][data-req-id]').forEach(function (inp) {
+                                        const rid = inp.getAttribute('data-req-id');
+                                        const maxQty = parseInt(inp.dataset.maxQty || inp.max, 10);
+                                        const giveQty = Math.max(0, Math.min(maxQty, parseInt(inp.value, 10) || 0));
+                                        const condSel = itemsEl.querySelector('select[data-claim-cond][data-req-id="' + rid + '"]');
+                                        const held = maxQty - giveQty;
+                                        const cond = (held > 0 && condSel) ? condSel.value : 'Good';
+                                        claimRows.push({ id: rid, give: giveQty, max: maxQty, withheld: held, condition: cond });
+                                    });
+
+                                    // Reason required only when a GOOD-condition item is withheld.
+                                    // Damaged / Missing are self-explanatory — automatic reason applied.
+                                    const needReason = claimRows.filter(function (r) { return r.withheld > 0 && r.condition === 'Good'; });
+                                    if (needReason.length > 0) {
+                                        const lines = needReason.map(function (r) {
+                                            const inp2 = itemsEl.querySelector('input[data-claim-qty][data-req-id="' + r.id + '"]');
+                                            const prev = inp2 ? inp2.closest('div') : null;
+                                            const nameEl = prev ? prev.previousElementSibling.querySelector('strong') : null;
+                                            const name = nameEl ? nameEl.textContent : 'Item #' + r.id;
+                                            return name + ': giving ' + r.give + ' of ' + r.max;
+                                        }).join('\n');
+                                        const reason = window.prompt(
+                                            'You are withholding a Good-condition item:\n' + lines +
+                                            '\n\nReason is required (e.g. "Reserved for another faculty"):',
+                                            ''
+                                        );
+                                        if (reason === null || reason.trim() === '') {
+                                            confirmBtn.disabled = false;
+                                            confirmBtn.textContent = 'Confirm';
+                                            return;
+                                        }
+                                        needReason.forEach(function (r) {
+                                            formData.append('reason[' + r.id + ']', reason.trim());
                                         });
+                                    }
 
-                                        // Reason required only when a GOOD-condition item is withheld.
-                                        // Damaged / Missing are self-explanatory — automatic reason applied.
-                                        const needReason = claimRows.filter(function (r) { return r.withheld > 0 && r.condition === 'Good'; });
-                                        if (needReason.length > 0) {
-                                            const lines = needReason.map(function (r) {
-                                                const inp2 = itemsEl.querySelector('input[data-claim-qty][data-req-id="' + r.id + '"]');
-                                                const prev = inp2 ? inp2.closest('div') : null;
-                                                const nameEl = prev ? prev.previousElementSibling.querySelector('strong') : null;
-                                                const name = nameEl ? nameEl.textContent : 'Item #' + r.id;
-                                                return name + ': giving ' + r.give + ' of ' + r.max;
-                                            }).join('\n');
-                                            const reason = window.prompt(
-                                                'You are withholding a Good-condition item:\n' + lines +
-                                                '\n\nReason is required (e.g. "Reserved for another faculty"):',
-                                                ''
-                                            );
-                                            if (reason === null || reason.trim() === '') {
+                                    // Damaged / Missing: automatic reason, no prompt needed
+                                    claimRows.filter(function (r) { return r.withheld > 0 && r.condition !== 'Good'; }).forEach(function (r) {
+                                        formData.append('reason[' + r.id + ']', r.condition + ' at handover — item kept in cabinet.');
+                                    });
+
+                                    claimRows.forEach(function (r) {
+                                        formData.append('give_qty[' + r.id + ']', r.give);
+                                        if (r.withheld > 0) {
+                                            formData.append('withheld_qty[' + r.id + ']', r.withheld);
+                                            formData.append('withheld_cond[' + r.id + ']', r.condition);
+                                        }
+                                    });
+
+                                    fetch('equipment-booking/api/partial-claim.php', {
+                                        method: 'POST', credentials: 'same-origin', body: formData
+                                    }).then(function (r) { return r.json(); })
+                                        .then(function (result) {
+                                            if (!result || !result.success) {
+                                                showToast('❌ ' + ((result && (result.error || result.message)) || 'Could not save the handover.'));
                                                 confirmBtn.disabled = false;
                                                 confirmBtn.textContent = 'Confirm';
                                                 return;
                                             }
-                                            needReason.forEach(function (r) {
-                                                formData.append('reason[' + r.id + ']', reason.trim());
-                                            });
+                                            const msg = (result.claimed || 0) + ' item(s) handed over' +
+                                                (result.withheld > 0 ? ', ' + result.withheld + ' unit(s) withheld.' : '.');
+                                            showToast('✅ ' + msg);
+                                            showResult('Handover complete', (result.claimed || 0) > 0 ? 'On loan' : 'No items handed over',
+                                                (result.claimed || 0) > 0 ? '#2e7d32' : '#856404',
+                                                (result.claimed || 0) + (result.claimed === 1 ? ' item' : ' items') + ' handed over to ' + (data.collector || data.borrower) +
+                                                (result.withheld > 0 ? ' · ' + result.withheld + ' unit(s) withheld.' : '.'));
+                                            if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
+                                        }).catch(function () {
+                                            showToast('Network error. Please try again.');
+                                            confirmBtn.disabled = false;
+                                            confirmBtn.textContent = 'Confirm';
+                                        });
+
+                                } else {
+                                    // Only process items whose checkbox is ticked
+                                    const rowsTotal = itemsEl.querySelectorAll('input[type="checkbox"][data-req-id]').length;
+                                    itemsEl.querySelectorAll('input[type="checkbox"]:checked[data-req-id]').forEach(function (cb) {
+                                        const rid = cb.dataset.reqId;
+                                        const sel = itemsEl.querySelector('select[data-req-id="' + rid + '"]');
+                                        if (sel) {
+                                            formData.append('condition[' + rid + ']', sel.value);
+                                            if (sel.dataset.returnToken) {
+                                                formData.append('item_token[' + rid + ']', sel.dataset.returnToken);
+                                            }
                                         }
-
-                                        // Damaged / Missing: automatic reason, no prompt needed
-                                        claimRows.filter(function (r) { return r.withheld > 0 && r.condition !== 'Good'; }).forEach(function (r) {
-                                            formData.append('reason[' + r.id + ']', r.condition + ' at handover — item kept in cabinet.');
-                                        });
-
-                                        claimRows.forEach(function (r) {
-                                            formData.append('give_qty[' + r.id + ']', r.give);
-                                            if (r.withheld > 0) {
-                                                formData.append('withheld_qty[' + r.id + ']', r.withheld);
-                                                formData.append('withheld_cond[' + r.id + ']', r.condition);
-                                            }
-                                        });
-
-                                        fetch('equipment-booking/api/partial-claim.php', {
-                                            method: 'POST', credentials: 'same-origin', body: formData
-                                        }).then(function (r) { return r.json(); })
-                                            .then(function (result) {
-                                                if (!result || !result.success) {
-                                                    showToast('❌ ' + ((result && (result.error || result.message)) || 'Could not save the handover.'));
-                                                    confirmBtn.disabled = false;
-                                                    confirmBtn.textContent = 'Confirm';
-                                                    return;
-                                                }
-                                                const msg = (result.claimed || 0) + ' item(s) handed over' +
-                                                    (result.withheld > 0 ? ', ' + result.withheld + ' unit(s) withheld.' : '.');
-                                                showToast('✅ ' + msg);
-                                                showResult('Handover complete', (result.claimed || 0) > 0 ? 'On loan' : 'No items handed over',
-                                                    (result.claimed || 0) > 0 ? '#2e7d32' : '#856404',
-                                                    (result.claimed || 0) + (result.claimed === 1 ? ' item' : ' items') + ' handed over to ' + (data.collector || data.borrower) +
-                                                    (result.withheld > 0 ? ' · ' + result.withheld + ' unit(s) withheld.' : '.'));
-                                                if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
-                                            }).catch(function () {
-                                                showToast('Network error. Please try again.');
+                                    });
+                                    fetch('equipment-booking/api/partial-return.php', {
+                                        method: 'POST', credentials: 'same-origin', body: formData
+                                    }).then(function (r) { return r.json(); })
+                                        .then(function (result) {
+                                            if (!result || result.success === false) {
+                                                showToast('❌ ' + ((result && (result.error || result.message)) || 'Could not save the return.'));
                                                 confirmBtn.disabled = false;
                                                 confirmBtn.textContent = 'Confirm';
-                                            });
-
-                                    } else {
-                                        // Only process items whose checkbox is ticked
-                                        const rowsTotal = itemsEl.querySelectorAll('input[type="checkbox"][data-req-id]').length;
-                                        itemsEl.querySelectorAll('input[type="checkbox"]:checked[data-req-id]').forEach(function (cb) {
-                                            const rid = cb.dataset.reqId;
-                                            const sel = itemsEl.querySelector('select[data-req-id="' + rid + '"]');
-                                            if (sel) {
-                                                formData.append('condition[' + rid + ']', sel.value);
-                                                if (sel.dataset.returnToken) {
-                                                    formData.append('item_token[' + rid + ']', sel.dataset.returnToken);
-                                                }
+                                                return;
                                             }
+                                            const n = result.returned || 0;
+                                            showToast('✅ ' + n + ' item' + (n === 1 ? '' : 's') + ' marked as returned.');
+                                            const stillOut = Math.max(0, rowsTotal - n);
+                                            showResult(n > 0 ? 'Return recorded' : 'Nothing was returned', n > 0 ? 'Returned' : 'Still on loan',
+                                                n > 0 ? '#2e7d32' : '#856404',
+                                                n + (n === 1 ? ' item' : ' items') + ' marked as returned' +
+                                                (stillOut > 0 ? ' · ' + stillOut + ' still on loan.' : '.'));
+                                            if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
+                                        }).catch(function () {
+                                            showToast('Network error. Please try again.');
+                                            confirmBtn.disabled = false;
+                                            confirmBtn.textContent = 'Confirm';
                                         });
-                                        fetch('equipment-booking/api/partial-return.php', {
-                                            method: 'POST', credentials: 'same-origin', body: formData
-                                        }).then(function (r) { return r.json(); })
-                                            .then(function (result) {
-                                                if (!result || result.success === false) {
-                                                    showToast('❌ ' + ((result && (result.error || result.message)) || 'Could not save the return.'));
-                                                    confirmBtn.disabled = false;
-                                                    confirmBtn.textContent = 'Confirm';
-                                                    return;
-                                                }
-                                                const n = result.returned || 0;
-                                                showToast('✅ ' + n + ' item' + (n === 1 ? '' : 's') + ' marked as returned.');
-                                                const stillOut = Math.max(0, rowsTotal - n);
-                                                showResult(n > 0 ? 'Return recorded' : 'Nothing was returned', n > 0 ? 'Returned' : 'Still on loan',
-                                                    n > 0 ? '#2e7d32' : '#856404',
-                                                    n + (n === 1 ? ' item' : ' items') + ' marked as returned' +
-                                                    (stillOut > 0 ? ' · ' + stillOut + ' still on loan.' : '.'));
-                                                if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
-                                            }).catch(function () {
-                                                showToast('Network error. Please try again.');
-                                                confirmBtn.disabled = false;
-                                                confirmBtn.textContent = 'Confirm';
-                                            });
-                                    }
-                                };
-
-                                // Cancel — go back to camera view
-                                cancelBtn.onclick = resetToCamera;
-
-                                function resetToCamera() {
-                                    confirmBtn.disabled = false;
-                                    confirmBtn.textContent = 'Confirm';
-                                    checklistView.style.display = 'none';
-                                    cameraView.style.display = '';
-                                    titleEl.textContent = 'Scan QR Code';
-                                    subtitleEl.textContent = 'Point the camera at the faculty member\'s QR code.';
-                                    cancelBtn.textContent = 'Back';
-                                    status.textContent = 'Point camera at the next QR code.';
-                                    status.style.color = '#888';
-                                    resumeCamera();
                                 }
+                            };
 
-                                /* After the handover / return is saved: show the request's new status (camera stays off) */
-                                function showResult(title, statusLabel, color, detail) {
-                                    titleEl.textContent = 'Request Status';
-                                    subtitleEl.textContent = title;
-                                    itemsEl.innerHTML =
-                                        '<div style="padding:1.5rem 1rem;text-align:center;">' +
-                                        '<div style="font-size:.78rem;color:#888;margin-bottom:.35rem;">Request status</div>' +
-                                        '<div style="display:inline-block;padding:.4rem 1.1rem;border-radius:999px;font-weight:700;font-size:1rem;background:#f5f5f5;color:' + color + ';">' + statusLabel + '</div>' +
-                                        '<p style="margin:.85rem 0 0;font-size:.88rem;color:#555;">' + scanEsc(detail) + '</p></div>';
-                                    hintEl.textContent = '';
-                                    confirmBtn.disabled = false;
-                                    confirmBtn.textContent = 'Scan Another';
-                                    confirmBtn.onclick = resetToCamera;
-                                    cancelBtn.textContent = 'Close';
-                                    cancelBtn.onclick = stopScanner;
-                                }
+                            // Cancel — go back to camera view
+                            cancelBtn.onclick = resetToCamera;
 
-                            } else if (data.success) {
-                                scannedCount++;
-                                status.textContent = isClaimQr ? '✅ Claim confirmed!' : '✅ Return confirmed!';
-                                status.style.color = '#22c55e';
-                                showToast(isClaimQr ? '✅ Equipment claim confirmed.' : '✅ Equipment return confirmed via QR.');
-                                setTimeout(() => {
-                                    status.textContent = scannedCount > 1
-                                        ? `Point camera at the next QR code. (${scannedCount} confirmed this session)`
-                                        : 'Point camera at the next QR code.';
-                                    status.style.color = '#888';
-                                    resumeCamera();
-                                }, 1500);
-                            } else {
-                                status.textContent = '❌ ' + (data.message || 'Invalid or already-used QR token.');
-                                status.style.color = '#e53e3e';
-                                setTimeout(() => {
-                                    status.textContent = 'Point camera at a valid QR code.';
-                                    status.style.color = '#888';
-                                    scanning = true;
-                                    tick();
-                                }, 2500);
+                            function resetToCamera() {
+                                confirmBtn.disabled = false;
+                                confirmBtn.textContent = 'Confirm';
+                                checklistView.style.display = 'none';
+                                cameraView.style.display = '';
+                                titleEl.textContent = 'Scan QR Code';
+                                subtitleEl.textContent = 'Point the camera at the faculty member\'s QR code.';
+                                cancelBtn.textContent = 'Back';
+                                status.textContent = 'Point camera at the next QR code.';
+                                status.style.color = '#888';
+                                resumeCamera();
                             }
-                    }
 
-                    function onScanFail(err) {
-                            status.textContent = (err && err.message === 'session')
-                                ? '❌ Your session expired. Refresh the page and sign in again.'
-                                : '❌ Network error. Please try again.';
+                            /* After the handover / return is saved: show the request's new status (camera stays off) */
+                            function showResult(title, statusLabel, color, detail) {
+                                titleEl.textContent = 'Request Status';
+                                subtitleEl.textContent = title;
+                                itemsEl.innerHTML =
+                                    '<div style="padding:1.5rem 1rem;text-align:center;">' +
+                                    '<div style="font-size:.78rem;color:#888;margin-bottom:.35rem;">Request status</div>' +
+                                    '<div style="display:inline-block;padding:.4rem 1.1rem;border-radius:999px;font-weight:700;font-size:1rem;background:#f5f5f5;color:' + color + ';">' + statusLabel + '</div>' +
+                                    '<p style="margin:.85rem 0 0;font-size:.88rem;color:#555;">' + scanEsc(detail) + '</p></div>';
+                                hintEl.textContent = '';
+                                confirmBtn.disabled = false;
+                                confirmBtn.textContent = 'Scan Another';
+                                confirmBtn.onclick = resetToCamera;
+                                cancelBtn.textContent = 'Close';
+                                cancelBtn.onclick = stopScanner;
+                            }
+
+                        } else if (data.success) {
+                            scannedCount++;
+                            status.textContent = isClaimQr ? '✅ Claim confirmed!' : '✅ Return confirmed!';
+                            status.style.color = '#22c55e';
+                            showToast(isClaimQr ? '✅ Equipment claim confirmed.' : '✅ Equipment return confirmed via QR.');
+                            setTimeout(() => {
+                                status.textContent = scannedCount > 1
+                                    ? `Point camera at the next QR code. (${scannedCount} confirmed this session)`
+                                    : 'Point camera at the next QR code.';
+                                status.style.color = '#888';
+                                resumeCamera();
+                            }, 1500);
+                        } else {
+                            status.textContent = '❌ ' + (data.message || 'Invalid or already-used QR token.');
                             status.style.color = '#e53e3e';
                             setTimeout(() => {
                                 status.textContent = 'Point camera at a valid QR code.';
@@ -5635,6 +5628,20 @@
                                 scanning = true;
                                 tick();
                             }, 2500);
+                        }
+                    }
+
+                    function onScanFail(err) {
+                        status.textContent = (err && err.message === 'session')
+                            ? '❌ Your session expired. Refresh the page and sign in again.'
+                            : '❌ Network error. Please try again.';
+                        status.style.color = '#e53e3e';
+                        setTimeout(() => {
+                            status.textContent = 'Point camera at a valid QR code.';
+                            status.style.color = '#888';
+                            scanning = true;
+                            tick();
+                        }, 2500);
                     }
 
                     fetch(endpoint, scanFetchOpts)
@@ -5728,11 +5735,16 @@ function psSelectFmt(btn) {
 
 /* ═══════════════════════════════════════════════════════════════
    APPROVALS — review drawer for the Equipment > On Loan table
-   Additive block. Opens from the request ID in each row (and from the
-   notification deep link, which clicks the same ID element). Approve /
-   Decline in the drawer hand off to the EXISTING approve / decline
-   modals by clicking the row's own buttons, so the confirm flow and the
-   admin-override.php call are untouched.
+   Additive block. A Waiting row has ONE action, the Review button (like the
+   Reservations table). It opens this drawer, which shows the request letter and
+   every detail and is the only place the request is decided. The same drawer opens
+   from the request ID in the row and from the notification deep link ("View in
+   Loans"), which click those same elements.
+   The drawer's Approve / Decline buttons carry data-action="ps-open-modal" and the
+   request's id (data-req-id), so they open the EXISTING approve / decline confirm
+   screens exactly like the old row buttons did: same fields, same bundle question,
+   same admin-override.php call. This block only fills them with the right id and
+   closes the drawer so just one screen is on top.
    ═══════════════════════════════════════════════════════════════ */
 (function () {
     var drawer = document.getElementById('ps-appr-drawer');
@@ -5748,6 +5760,10 @@ function psSelectFmt(btn) {
     function openFor(row) {
         var d = row.dataset;
         currentId = d.id;
+        // Tell the Approve / Decline buttons which request they act on
+        Array.prototype.forEach.call(drawer.querySelectorAll('[data-appr-decide]'), function (b) {
+            b.setAttribute('data-req-id', d.id || '');
+        });
 
         txt('ps-appr-reqno', '#' + String(d.id || 0).padStart(4, '0'));
         txt('ps-appr-submitted', d.submitted);
@@ -5757,7 +5773,9 @@ function psSelectFmt(btn) {
         txt('ps-appr-item', d.equipment);
         txt('ps-appr-qty', d.qty);
         txt('ps-appr-needed', d.dateNeeded);
-        txt('ps-appr-return', d.returnDateDisplay);
+        // Date AND time: the duration the borrower picked (e.g. 2 hours) was already turned into the real return
+        // time when the request was sent, and the row carries it as "Nov 25, 2026 \u00b7 11:00 AM". Date only as a fallback.
+        txt('ps-appr-return', d.dueLabel || d.returnDateDisplay);
         txt('ps-appr-room', d.room);
         txt('ps-appr-instr', d.instructor);
         txt('ps-appr-note', d.note);
@@ -5789,10 +5807,12 @@ function psSelectFmt(btn) {
         if (typeof psOpenModal === 'function') psOpenModal('ps-appr-drawer');
     }
 
-    // Capture phase: runs before the generic data-action handler, so the ID
-    // in the waiting list opens this drawer instead of the old detail modal.
+    // Capture phase: runs before the generic data-action handler, so the Review button (and the request ID)
+    // in the waiting list open this drawer instead of the old detail modal.
     document.addEventListener('click', function (e) {
-        var t = e.target.closest('#eq-loan-table tr[data-loan-state="waiting"] [data-modal="ps-req-detail-modal"]');
+        var t = e.target.closest(
+            '#eq-loan-table tr[data-loan-state="waiting"] [data-eq-review], ' +
+            '#eq-loan-table tr[data-loan-state="waiting"] [data-modal="ps-req-detail-modal"]');
         if (!t) return;
         var row = t.closest('tr.eq-loan-row');
         if (!row) return;
@@ -5802,18 +5822,21 @@ function psSelectFmt(btn) {
         openFor(row);
     }, true);
 
+    // Approve / Decline in the drawer: the buttons open the confirm screens themselves (see the header).
+    // Here we only make sure the request is still waiting, then close the drawer.
     drawer.addEventListener('click', function (e) {
         var b = e.target.closest('[data-appr-decide]');
-        if (!b || !currentId) return;
-        var row = document.querySelector('#eq-loan-table tr.eq-loan-row[data-loan-state="waiting"][data-id="' + currentId + '"]');
-        if (!row) return;
-        var sel = b.getAttribute('data-appr-decide') === 'approve'
-            ? '[data-modal="ps-approve-modal"]'
-            : '[data-modal="ps-decline-modal"]';
-        var btn = row.querySelector(sel);
-        if (!btn) return;
+        if (!b) return;
+        var id = b.getAttribute('data-req-id') || currentId;
+        var row = id ? document.querySelector('#eq-loan-table tr.eq-loan-row[data-loan-state="waiting"][data-id="' + id + '"]') : null;
+        if (!row) {
+            // decided meanwhile (another admin, or the 10-minute buffer ran out): don't open a confirm screen for it
+            e.stopPropagation();
+            if (typeof psCloseModal === 'function') psCloseModal('ps-appr-drawer');
+            if (typeof window.showToast === 'function') window.showToast('This request is no longer waiting.');
+            return;
+        }
         if (typeof psCloseModal === 'function') psCloseModal('ps-appr-drawer');
-        btn.click();
     });
 
     document.addEventListener('keydown', function (e) {

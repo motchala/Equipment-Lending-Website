@@ -191,9 +191,12 @@
     </div>
 </div>
 
-<!-- DRAWER: REQUEST REVIEW (Equipment > On Loan). Reuses the ps-modal-backdrop open/close
-         mechanism, so psOpenModal/psCloseModal, backdrop click and Esc all work unchanged.
-         Approve / Decline here hand off to the existing approve/decline modals. -->
+<!-- DRAWER: REQUEST REVIEW (Equipment > On Loan > Waiting). Opened by the Review button on a waiting row
+         (and by the request ID, and by the notification's "View in Loans"). Reuses the ps-modal-backdrop
+         open/close mechanism, so psOpenModal/psCloseModal, backdrop click and Esc all work unchanged.
+         This is the ONLY place a waiting request is decided: the table row has no Approve / Decline buttons.
+         The two buttons below open the existing approve/decline confirm screens; data-req-id is filled in
+         by the drawer script (admin-dashboard.js, "review drawer") each time the drawer opens. -->
 <div class="ps-modal-backdrop ps-drawer-backdrop" id="ps-appr-drawer">
     <aside class="ps-drawer" role="dialog" aria-modal="true" aria-labelledby="ps-appr-title">
         <div class="ps-modal-head">
@@ -265,10 +268,10 @@
         </div>
         <div class="ps-drawer-foot">
             <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-appr-drawer">Close</button>
-            <button class="ps-btn ps-btn--danger" type="button" data-appr-decide="decline">
+            <button class="ps-btn ps-btn--danger" type="button" data-action="ps-open-modal" data-modal="ps-decline-modal" data-appr-decide="decline" data-req-id="">
                 <span class="material-symbols-outlined">close</span> Decline
             </button>
-            <button class="ps-btn ps-btn--success" type="button" data-appr-decide="approve">
+            <button class="ps-btn ps-btn--success" type="button" data-action="ps-open-modal" data-modal="ps-approve-modal" data-appr-decide="approve" data-req-id="">
                 <span class="material-symbols-outlined">check</span> Approve
             </button>
         </div>
