@@ -393,6 +393,65 @@ function ai_is_availability_query(string $msg): bool
     return false;
 }
 
+/**
+ * PHP-side reservation intent classifier.
+ *
+ * Returns true ONLY when the faculty is asking you (the AI) to perform
+ * the booking action right now — not when they are asking for information.
+ *
+ * Rules:
+ *   DENY (information requests) — checked first
+ *     - starts with question words: how, what, why, when, where, can i, is it, do i
+ *     - contains "how do", "how to", "what is", "what are", "explain", "tell me how",
+ *       "steps", "process", "guide", "help me understand"
+ *   ALLOW (action requests) — checked second
+ *     - explicit booking verbs targeted at the AI:
+ *       "reserve me", "book me", "book a room for me", "make a reservation",
+ *       "get me a room", "i want to reserve", "i need to reserve", "i want to book",
+ *       "i need to book", "can you reserve", "can you book", "please reserve",
+ *       "please book", "help me reserve", "set up a reservation"
+ */
+function ai_is_reserve_intent(string $msg): bool
+{
+    $lower = mb_strtolower(trim($msg));
+
+    // ── Deny list: information / how-to requests ─────────────────────────────
+    $deny_starts = [
+        'how do', 'how to', 'how can', 'how should', 'how would',
+        'what is', 'what are', 'what\'s', 'why ', 'when can', 'when do',
+        'where can', 'where do', 'can i ', 'can i?', 'is it possible',
+        'is there a way', 'do i need', 'do i have to',
+    ];
+    foreach ($deny_starts as $pattern) {
+        if (str_starts_with($lower, $pattern)) return false;
+    }
+    $deny_contains = [
+        'explain', 'tell me how', 'show me how', 'what are the steps',
+        'what is the process', 'what is the procedure', 'step by step',
+        'instructions for', 'guide me', 'help me understand', 'how does',
+    ];
+    foreach ($deny_contains as $pattern) {
+        if (str_contains($lower, $pattern)) return false;
+    }
+
+    // ── Allow list: explicit action requests targeting the AI ─────────────────
+    $allow = [
+        'reserve me', 'book me', 'book a room for me', 'make a reservation',
+        'get me a room', 'i want to reserve', 'i need to reserve',
+        'i want to book', 'i need to book', 'i would like to reserve',
+        'i\'d like to reserve', 'i would like to book', 'i\'d like to book',
+        'can you reserve', 'can you book', 'could you reserve', 'could you book',
+        'please reserve', 'please book', 'help me reserve', 'help me book',
+        'set up a reservation', 'open the reservation form', 'open the form',
+        'do it for me',
+    ];
+    foreach ($allow as $pattern) {
+        if (str_contains($lower, $pattern)) return true;
+    }
+
+    return false;
+}
+
 function ai_detect_campus(string $msg): ?string
 {
     $lower = mb_strtolower($msg);
@@ -557,9 +616,19 @@ $avail_section = $ctx_availability !== ''
     ? $ctx_availability
     : 'Not queried — the faculty did not ask about availability.';
 
+// $intent_gate is appended after the PROMPT heredoc below.
+// Keeping it separate makes the heredoc readable and the gate auditable.
+
 $campus_instruction = $ask_campus
     ? "\n## IMPORTANT — CAMPUS UNKNOWN\nThe faculty asked about availability but did not specify a campus. You MUST ask: \"Which campus are you at?\" and present exactly two options:\n→ PUP Main (Buildings A & B)\n→ PUP CITE (Building C)\nDo not answer until you know the campus."
     : '';
+
+// PHP-side intent decision — overrides whatever the LLM would decide on its own.
+// This is injected into the system prompt so the LLM receives a clear directive.
+$php_reserve_intent = ai_is_reserve_intent($raw_message);
+$intent_gate = $php_reserve_intent
+    ? "\n## PHP INTENT DECISION: RESERVE\nThis message is a reservation request. You MUST include INTENT:reserve (with any detected prefill fields) at the end of your reply."
+    : "\n## PHP INTENT DECISION: NO FORM\nThis message is NOT a reservation request — it is a question or information request. You MUST NOT include INTENT:reserve in your reply under any circumstances. Answer with text only.";
 
 $system_prompt = <<<PROMPT
 You are PUPSync Room Assistant, an AI assistant for the Polytechnic University of the Philippines (PUP) Biñan Campus room reservation system. You help faculty members with room reservations only.
@@ -720,6 +789,9 @@ NEVER omit the signal when cancelling. NEVER use an ID not in FACULTY CONTEXT.
 - If asked something unrelated to rooms or PUPSync, politely redirect.
 - When the faculty asks for help with a reservation step by step, guide them conversationally: ask for campus → date → time → then emit INTENT:reserve with everything pre-filled. Never rush to the form before you have enough information.
 PROMPT;
+
+// Append the PHP intent gate — this overrides the LLM's own judgment.
+$system_prompt .= $intent_gate;
 
 // ── 15. Call Groq ─────────────────────────────────────────────────────────────
 $groq_url          = 'https://api.groq.com/openai/v1/chat/completions';
