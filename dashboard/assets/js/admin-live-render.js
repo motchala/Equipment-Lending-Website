@@ -279,10 +279,16 @@
 
     /* ── Polling loop ────────────────────────────────────────────────────── */
     function startPolling() {
+        let pollBusy = false;      // never let slow responses pile up
+        let lastSseAt = 0;         // when the SSE stream last pushed an update
+
         function doPoll() {
+            if (pollBusy) return;
+            pollBusy = true;
             fetch('equipment-booking/api/poll-requests-data.php', {
                 method: 'GET',
-                credentials: 'same-origin'
+                credentials: 'same-origin',
+                cache: 'no-store'
             })
                 .then(function (r) {
                     if (r.status === 401) return null;
@@ -299,13 +305,14 @@
 
                     // Equipment > Loans is built by the server, not by this script: re-read it whenever the
                     // numbers move (a new request, an approval, a return), so new requests are listed at once.
-                    const sig = [curr.waiting, curr.approved, curr.overdue, curr.declined, curr.total_req, data.last_return || ''].join('|');
+                    const sig = [curr.waiting, curr.approved, curr.overdue, curr.declined, curr.total_req, data.last_return || '', data.loans_sig || ''].join('|');
                     if (window._adminLoansSig === undefined) {
                         window._adminLoansSig = sig;                       // first poll: the page was just rendered
                     } else if (sig !== window._adminLoansSig && !document.hidden
                         && typeof window.psRefreshLoansTable === 'function') {
-                        window._adminLoansSig = sig;
-                        window.psRefreshLoansTable();
+                        // Remember this state only once the table really refreshed, so a failed
+                        // or skipped refresh is retried on the next poll instead of being lost.
+                        window.psRefreshLoansTable().then(function (ok) { if (ok) window._adminLoansSig = sig; });
                     }
 
                     if (prev.waiting !== undefined && curr.waiting > prev.waiting) {
@@ -317,23 +324,36 @@
 
                     window._adminLastStats = curr;
                 })
-                .catch(function () { });
+                .catch(function () { })
+                .then(function () { pollBusy = false; });
         }
 
         window.adminDoPoll = doPoll;   // expose globally for inventory/faculty AJAX callers
 
-        // ── SSE: replace setInterval when SSE is active ───────────────────
+        // ── Live updates ──────────────────────────────────────────────────
+        // SSE pushes changes the moment they happen. It can silently stop delivering on some hosts
+        // (buffering, proxies, a stream that opens and then dies), and the browser will not report that
+        // as a failure — so a timer ALWAYS runs as a safety net. While SSE is clearly alive (a healthy
+        // stream pushes an update at every reconnect, at least once a minute) the timer stays quiet.
+        function onSseUpdate() { lastSseAt = Date.now(); doPoll(); }
+
         if (window.PupSyncSSE && !window.PupSyncSSE.fallback) {
             PupSyncSSE.init({
-                streams: [{ url: 'sse/api/admin-equipment.php', onUpdate: doPoll }]
+                streams: [{ url: 'sse/api/admin-equipment.php', onUpdate: onSseUpdate }]
             });
-            // If SSE falls back to polling later, start the interval at that point
-            document.addEventListener('pupsync:sse-fallback', function () {
-                setInterval(doPoll, INTERVAL);
-            }, { once: true });
-        } else {
-            setInterval(doPoll, INTERVAL);
         }
+
+        setInterval(function () {
+            if (document.hidden) return;                               // nobody is looking
+            if (lastSseAt && Date.now() - lastSseAt < 75000) return;   // SSE is delivering
+            doPoll();
+        }, INTERVAL);
+
+        // Coming back to the tab (or the window): catch up immediately
+        document.addEventListener('visibilitychange', function () {
+            if (!document.hidden) doPoll();
+        });
+        window.addEventListener('focus', function () { doPoll(); });
 
         doPoll();              // ← fire immediately on page load (always runs regardless of SSE)
     }

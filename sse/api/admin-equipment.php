@@ -63,7 +63,16 @@ function sse_admin_equipment_snapshot(mysqli $conn): string
     $r3 = $conn->query("SELECT COUNT(*) AS v FROM tbl_requests WHERE status='Waiting'");
     $countWaiting = $r3 ? ($r3->fetch_assoc()['v'] ?? '0') : '0';
 
-    return sse_make_sig([$maxReqDate, $maxReturnedAt, $countWaiting]);
+    // Fingerprint of every request (same idea as loans_sig in poll-requests-data.php)
+    $r4 = $conn->query(
+        "SELECT COUNT(*) AS n, COALESCE(MAX(id),0) AS max_id,
+                COALESCE(SUM(CRC32(CONCAT(status,'|',COALESCE(return_date,''),'|',COALESCE(returned_at,'')))),0) AS chk
+           FROM tbl_requests"
+    );
+    $fp = $r4 ? $r4->fetch_assoc() : null;
+    $fingerprint = $fp ? ($fp['n'] . '-' . $fp['max_id'] . '-' . $fp['chk']) : '';
+
+    return sse_make_sig([$maxReqDate, $maxReturnedAt, $countWaiting, $fingerprint]);
 }
 
 // ─── Setup ───────────────────────────────────────────────────────────────────

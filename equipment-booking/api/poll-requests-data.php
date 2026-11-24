@@ -117,9 +117,24 @@ $hw = mysqli_fetch_assoc(mysqli_query(
     "SELECT MAX(returned_at) AS last_return FROM tbl_requests"
 ))['last_return'] ?? null;
 
+// Fingerprint of every request (how many, the newest id, and each one's status / return date / return time).
+// It changes whenever ANY request is added, decided, cancelled, extended or returned, so the Loans table
+// is refreshed even when two changes cancel each other out in the plain counts above.
+$loans_sig = '';
+$sig_row = mysqli_fetch_assoc(mysqli_query(
+    $conn,
+    "SELECT COUNT(*) AS n, COALESCE(MAX(id),0) AS max_id,
+            COALESCE(SUM(CRC32(CONCAT(status,'|',COALESCE(return_date,''),'|',COALESCE(returned_at,'')))),0) AS chk
+       FROM tbl_requests"
+));
+if ($sig_row) {
+    $loans_sig = $sig_row['n'] . '-' . $sig_row['max_id'] . '-' . $sig_row['chk'];
+}
+
 $conn->close();
 
 echo json_encode([
+    'loans_sig' => $loans_sig,
     'today'    => $today,
     'stats'    => $stats,
     'waiting'  => $waiting,
