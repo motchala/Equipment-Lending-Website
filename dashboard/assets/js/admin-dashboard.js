@@ -2504,7 +2504,7 @@
     /* The Loans table and its tab counts, re-read from the server (keeps the active filter + page). */
     let _psLoansBusy = false;
     function _psRefreshLoansTable() {
-        if (_psLoansBusy) return Promise.resolve();
+        if (_psLoansBusy) return Promise.resolve(false);
         _psLoansBusy = true;
         return _psFetchPageDoc().then(function (doc) {
             const fresh = doc.querySelector('#eq-loan-table tbody');
@@ -2518,11 +2518,11 @@
                 if (cur && nw) { cur.textContent = nw.textContent; cur.className = nw.className; }
             });
             if (typeof window.psRefreshEquipmentLoans === 'function') window.psRefreshEquipmentLoans(true);   // keeps filter + page
-        }).then(function () { _psLoansBusy = false; }, function (e) { _psLoansBusy = false; throw e; });
+        }).then(function () { _psLoansBusy = false; return true; }, function (e) { _psLoansBusy = false; throw e; });
     }
     // The live poller (admin-live-render.js) calls this when a request arrives or changes, so a new
     // student / faculty request shows up in Equipment > Loans without anyone reloading the page.
-    window.psRefreshLoansTable = function () { return _psRefreshLoansTable().catch(function () { /* try again on the next change */ }); };
+    window.psRefreshLoansTable = function () { return _psRefreshLoansTable().catch(function () { return false; /* try again on the next poll */ }); };
 
     /* Equipment: Catalog numbers (fragment endpoint) + the Loans table and its tab counts. */
     function _psRefreshEquipment() {

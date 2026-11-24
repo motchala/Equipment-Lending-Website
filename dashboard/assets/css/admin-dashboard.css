@@ -2297,36 +2297,43 @@ main#app-main {
     table-layout: fixed;
 }
 
+/* 6 columns: Borrower | Equipment | col3 | col4 | Document / Info | Actions */
 #eq-loan-table th:nth-child(1),
 #eq-loan-table td:nth-child(1) {
-    width: 145px;
+    width: 150px;
 }
 
 #eq-loan-table th:nth-child(2),
 #eq-loan-table td:nth-child(2) {
-    width: 145px;
+    width: 170px;
 }
 
 #eq-loan-table th:nth-child(3),
 #eq-loan-table td:nth-child(3),
 #eq-loan-table th:nth-child(4),
 #eq-loan-table td:nth-child(4) {
-    width: 105px;
+    width: 110px;
 }
 
 #eq-loan-table th:nth-child(5),
 #eq-loan-table td:nth-child(5) {
-    width: 115px;
+    width: 200px;
 }
 
 #eq-loan-table th:nth-child(6),
 #eq-loan-table td:nth-child(6) {
-    width: 105px;
+    width: 240px;
 }
 
-#eq-loan-table th:nth-child(7),
-#eq-loan-table td:nth-child(7) {
-    width: 360px;
+/* The attached letter must stay inside its own column and never run under Actions */
+#eq-loan-table td[data-col="col5"] {
+    overflow: hidden;
+}
+
+#eq-loan-table td[data-col="col5"] .ps-doc-chip {
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
 }
 
 .ps-table th {
