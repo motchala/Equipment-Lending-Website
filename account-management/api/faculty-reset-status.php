@@ -8,7 +8,8 @@ ini_set('display_errors', '0');
  * Used by Faculty > Edit > Reset password to show "3 of 5 wrong attempts" or "ready to reset".
  *
  * GET: faculty_id
- * JSON: { status, fail_count, max, eligible, notified_at (label|null) }
+ * JSON: { status, fail_count, max, eligible, requested, notified_at (label|null) }
+ * requested = used all attempts AND pressed "Notify Super Admin" (the only time the reset UI is shown).
  */
 
 require_once __DIR__ . '/../../config/security-headers.php';
@@ -66,5 +67,6 @@ frs_respond(200, [
     'fail_count'  => min($s['fail_count'], $s['max']),
     'max'         => $s['max'],
     'eligible'    => $s['eligible'],
+    'requested'   => $s['eligible'] && $s['notified_at'] !== null,
     'notified_at' => $notified_label,
 ]);

@@ -41,8 +41,10 @@
                     <input type="email" id="fac-edit-email" class="form-control-custom" placeholder="email@example.com">
                 </div>
 
-                <!-- Password reset (Super Admin only). Works only after the faculty used all 5 sign-in attempts.
-                     Flow: Reset password -> check -> enter YOUR password -> Generate. See faculty-password-reset.js -->
+                <!-- Password reset (Super Admin only). Hidden by default: faculty-password-reset.js reveals this whole
+                     section only when the faculty used all 5 sign-in attempts AND pressed "Notify Super Admin" on the landing page.
+                     Flow: Reset password -> check -> enter YOUR password -> Generate. -->
+                <div id="fac-reset-section" class="hidden">
                 <div class="fac-edit-section">Password</div>
                 <div class="fac-reset" id="fac-reset" data-view="idle">
                     <button type="button" class="ps-btn ps-btn--ghost fac-reset-open" id="fac-reset-open">
@@ -98,6 +100,7 @@
                         <p class="fac-del-error hidden" id="fac-reset-error" role="alert"></p>
                     </div>
                 </div>
+                </div><!-- /#fac-reset-section -->
 
                 <div id="fac-edit-alert" class="alert-banner hidden" role="alert" style="margin-bottom:0"></div>
             </div>

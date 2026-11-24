@@ -34,6 +34,8 @@
     var VIEWS = ['checking', 'blocked', 'ready', 'done'];
 
     var row = null;            // the <tr> being edited
+    var openSeq = 0;           // guards against a slow answer for a previously opened faculty
+    var autoOpen = false;      // opened from a notification: go straight to the reset panel
     var requests = {};         // email (lower-case) -> "requested at" label
     var busy = false;
 
@@ -53,6 +55,7 @@
 
     function resetPanel() {
         busy = false;
+        hide('fac-reset-section');         // hidden unless this faculty has an open reset request
         hide('fac-reset-panel');
         VIEWS.forEach(function (v) { hide('fac-reset-view-' + v); });
         showError('');
@@ -63,6 +66,25 @@
         var lbl = $('fac-reset-copy-label');
         if (lbl) lbl.textContent = 'Copy';
         if (openBtn) openBtn.disabled = false;
+    }
+
+    // Show the Password section only if the server says this faculty used all attempts AND pressed Notify.
+    function revealIfRequested() {
+        if (!row) return;
+        var seq = ++openSeq;
+        var want = autoOpen;
+        autoOpen = false;
+        fetch(API + 'faculty-reset-status.php?faculty_id=' + encodeURIComponent(row.dataset.facultyId || ''), {
+            credentials: 'same-origin', cache: 'no-store'
+        })
+            .then(function (r) { return r.json().catch(function () { return {}; }); })
+            .then(function (d) {
+                if (seq !== openSeq || !modal.classList.contains('ps-modal-open')) return;
+                if (!d || d.status !== 'success' || !d.requested) return;
+                show('fac-reset-section');
+                if (want) checkStatus();
+            })
+            .catch(function () { /* stay hidden */ });
     }
 
     function drawDots(n, max) {
@@ -190,6 +212,7 @@
         if (edit) {                                   // a faculty row's Edit button opened the modal
             row = edit.closest('tr');
             resetPanel();
+            revealIfRequested();
         }
     });
 
@@ -284,7 +307,7 @@
         });
         var btn = target && target.querySelector('.fac-edit-btn');
         if (!btn) return;
+        autoOpen = true;                   // revealIfRequested() opens the panel once the section is allowed
         btn.click();
-        setTimeout(function () { if (openBtn && !openBtn.disabled) openBtn.click(); }, 150);
     };
 }());

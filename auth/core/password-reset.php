@@ -265,7 +265,7 @@ function pwr_claim_reset(mysqli $conn, string $email, string $issued_by): bool
         'UPDATE tbl_faculty_pw_reset
             SET fail_count = 0, notified_at = NULL, reset_pending = 1,
                 reset_issued_at = ?, reset_issued_ts = ?, reset_issued_by = ?
-          WHERE email = ? AND fail_count >= ?'
+          WHERE email = ? AND fail_count >= ? AND notified_at IS NOT NULL'
     );
     if (!$st) {
         return false;

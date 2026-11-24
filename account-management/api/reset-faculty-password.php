@@ -13,8 +13,8 @@
  *
  * Rules enforced here (never trusted to the UI):
  *   - POST only, valid CSRF token, logged-in admin who is a Super Admin (re-checked in the DB).
- *   - The faculty account must have used all PWR_MAX_ATTEMPTS (5) wrong passwords and not signed in
- *     correctly since (auth/core/password-reset.php). Otherwise: 409, nothing changes.
+ *   - The faculty account must have used all PWR_MAX_ATTEMPTS (5) wrong passwords, pressed "Notify Super Admin"
+ *     on the landing page, and not signed in correctly since (auth/core/password-reset.php). Otherwise: 409, nothing changes.
  *   - The Super Admin must confirm with their own password. Wrong guesses are throttled per session
  *     (5 tries, then 5 minutes) and share the counter used by Manage Admins and Delete Faculty.
  *   - A random password is generated on the server (faculty_fl_generate_password) and OVERWRITES the
@@ -103,8 +103,8 @@ if (!faculty_fl_ensure_schema($conn)) {
 
 // -- Validation first: only after 5 wrong passwords ------------------------------
 $status = pwr_status($conn, $target_email);
-if (!$status['eligible']) {
-    rfp_respond(409, 'error', 'This account has not used all ' . PWR_MAX_ATTEMPTS . ' sign-in attempts, so its password cannot be reset.', [
+if (!$status['eligible'] || $status['notified_at'] === null) {
+    rfp_respond(409, 'error', 'This account has no open reset request, so its password cannot be reset.', [
         'code'       => 'not_eligible',
         'fail_count' => min($status['fail_count'], PWR_MAX_ATTEMPTS),
         'max'        => PWR_MAX_ATTEMPTS,
