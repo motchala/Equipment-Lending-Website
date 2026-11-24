@@ -26,6 +26,7 @@
     var STEP_MIN = 60;
     var BORROW_HOURS = [1, 2, 3, 6];
     var BORROW_ADVANCE_DAYS = 14;
+    var MAX_STUDENT_ITEMS = 0;   /* most DIFFERENT items in one request (Settings → Arbitration); 0 = not known, no limit shown */
     var ROOM_ADVANCE_DAYS = 21;       /* how far ahead a room can be reserved (Settings → Arbitration; loadBorrowRules() updates it) */
     var BORROW_CLOSE_MIN = 20 * 60;   /* borrowing closes (equipment only; rooms use CLOSE_MIN) */
     /* The six values above are only defaults: loadBorrowRules() replaces them with the booking
@@ -120,6 +121,8 @@
             if (r.roomDayEnd) ROOM_END_MIN = hhmmToMin(r.roomDayEnd);
             if (r.roomOpenDays && r.roomOpenDays.length) ROOM_OPEN_DOW = r.roomOpenDays.map(function (n) { return n % 7; });
             if (r.roomMaxHours) ROOM_MAX_MIN = +r.roomMaxHours * 60;
+            if (r.maxStudentItems) MAX_STUDENT_ITEMS = +r.maxStudentItems;
+            if ($('eqSummary')) updateSummary();   /* the grid may already be on screen: show the limit on it */
         }).catch(function () { /* keep the defaults */ });
     }
     /* Latest date a room can be reserved (Settings → Arbitration → Book ahead) */
@@ -322,7 +325,10 @@
     function brief(msg, n) {
         msg = String(msg == null ? '' : msg).replace(/\s+/g, ' ').trim();
         if (!msg) return '';
-        return msg.replace(/([.!?])\s+(?=[A-Z\u201C"])/g, '$1\u0001').split('\u0001').slice(0, n || 2).join(' ');
+        /* a full stop after a title (Prof., Dr., Engr.) or an initial (Maria C. Santos) does not end a sentence */
+        msg = msg.replace(/\b(Prof|Dr|Mr|Mrs|Ms|Mx|Engr|Atty|Arch|Sr|Jr|St|No|Dir|Hon|Rev|Asst|Assoc|vs)\.\s+(?=[A-Z])/g, '$1.\u0002')
+                 .replace(/\b([A-Z])\.\s+(?=[A-Z])/g, '$1.\u0002');
+        return msg.replace(/([.!?])\s+(?=[A-Z\u201C"])/g, '$1\u0001').split('\u0001').slice(0, n || 2).join(' ').replace(/\u0002/g, ' ');
     }
 
     /* Something not filled in yet is shown, not explained: the field flashes red for about a second (same
@@ -345,6 +351,7 @@
     function showAlert(id, msg) {
         var el = $(id);
         if (!el) return;
+        if (id === 'flowError') slotNote('');   /* one red banner at a time: the slot warning gives way to the real error */
         el.innerHTML = icon('error') + '<span></span>';
         el.lastChild.textContent = brief(msg, 2);
         el.hidden = false;
@@ -604,7 +611,9 @@
                 '</div>' +
                 '<button type="button" class="st-icon-btn" data-action="eq-remove" aria-label="Remove ' + esc(name) + '">' + icon('delete') + '</button>';
         } else {
-            foot = '<button type="button" class="st-btn st-btn-soft st-btn-block st-btn-sm" data-action="eq-add">' + icon('add') + 'Add</button>';
+            var limited = atItemLimit();
+            foot = '<button type="button" class="st-btn st-btn-soft st-btn-block st-btn-sm" data-action="eq-add"' +
+                (limited ? ' disabled title="' + esc(limitTitle()) + '"' : '') + '>' + addBtnHTML(limited) + '</button>';
         }
         return '<article class="st-eq' + (selected ? ' is-selected' : '') + '" data-name="' + esc(name) + '">' +
             '<div class="st-eq-img">' + photo(item.image_path, name, 'inventory_2') +
@@ -712,6 +721,7 @@
         var item = st.invMap[name];
         if (!item || isDoneName(name)) return;
         var max = toInt(item.quantity, 1);
+        if (!st.cart[name] && atItemLimit()) return;   /* a new, different item past the limit */
         qty = Math.max(1, Math.min(max, toInt(qty, 1)));
         var had = !!st.cart[name];
         st.cart[name] = qty;
@@ -735,14 +745,31 @@
     }
     function isDoneName(n) { return st.done.some(function (d) { return d.equipment === n; }); }
 
+    /* The most DIFFERENT items one student request can hold. Items already submitted from this cart count too
+       (the server counts the whole bundle), so the limit is checked against everything in the cart. */
+    function atItemLimit() { return MAX_STUDENT_ITEMS > 0 && Object.keys(st.cart).length >= MAX_STUDENT_ITEMS; }
+    function limitTitle() { return 'Up to ' + plural(MAX_STUDENT_ITEMS, 'different item') + ' per request'; }
+    function addBtnHTML(limited) { return limited ? icon('block') + 'Limit reached' : icon('add') + 'Add'; }
+    /* Cards that are not in the cart: switch their Add button off / on as the cart reaches / leaves the limit */
+    function syncItemLimit() {
+        var limited = atItemLimit();
+        Array.prototype.forEach.call(document.querySelectorAll('#eqGrid .st-eq:not(.is-selected) [data-action="eq-add"]'), function (b) {
+            if (b.disabled === limited) return;
+            b.disabled = limited;
+            b.innerHTML = addBtnHTML(limited);
+            if (limited) b.setAttribute('title', limitTitle()); else b.removeAttribute('title');
+        });
+    }
+
     function updateSummary() {
         var el = $('eqSummary'), btn = $('btnSubmitBorrow'), openBtn = $('btnOpenBorrow');
         if (!el) return;
         var items = pendingItems();
         var units = items.reduce(function (s, i) { return s + i.qty; }, 0);
         el.innerHTML = items.length
-            ? '<strong>' + plural(items.length, 'item') + ' selected</strong><span>' + plural(units, 'unit') + ' in total</span>'
-            : '<strong>No items selected</strong><span>Add at least one item to continue.</span>';
+            ? '<strong>' + plural(items.length, 'item') + ' selected</strong><span>' + plural(units, 'unit') + ' in total' + (atItemLimit() ? ' \u00b7 limit reached' : '') + '</span>'
+            : '<strong>No items selected</strong><span>Add at least one item to continue' + (MAX_STUDENT_ITEMS > 0 ? ' (up to ' + MAX_STUDENT_ITEMS + ' different items)' : '') + '.</span>';
+        syncItemLimit();
         if (btn && btn.getAttribute('data-html') == null) btn.disabled = !items.length;
         if (openBtn) openBtn.disabled = !items.length;
     }
@@ -754,7 +781,9 @@
     function slotNote(msg) {
         var el = $('slotNote');
         if (!el) return;
+        msg = brief(msg, 2);
         if (!msg) { el.hidden = true; el.textContent = ''; return; }
+        hideAlert('flowError');   /* one red banner at a time: the newest message wins */
         el.innerHTML = icon('event_busy') + '<span></span>';
         el.lastChild.textContent = msg;
         el.hidden = false;

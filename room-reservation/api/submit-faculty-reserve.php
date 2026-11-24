@@ -19,7 +19,7 @@
  * Rules (see core/faculty-room-quota.php):
  *   • Equipment never blocks a room — overdue / outstanding equipment is fine.
  *   • A faculty account may hold at most 2 active room reservations at once.
- *   • A request letter (JPG, PNG, PDF; 5 MB) may be attached to any reservation, same-day
+ *   • A request letter (JPG, PNG, WEBP, PDF; 5 MB) may be attached to any reservation, same-day
  *     or later. It is optional (unless Settings require one for a LATER date) and is stored
  *     in document_path for the reviewing admin. A same-day reservation never needs one and
  *     is still decided on availability alone.
@@ -172,9 +172,9 @@ if ($is_multipart && isset($_FILES['document']) && $_FILES['document']['error'] 
     $finfo = finfo_open(FILEINFO_MIME_TYPE);
     $mime  = finfo_file($finfo, $f['tmp_name']);
     finfo_close($finfo);
-    $ext_by_mime = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'application/pdf' => 'pdf'];
+    $ext_by_mime = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'application/pdf' => 'pdf'];
     if (!isset($ext_by_mime[$mime])) {
-        echo json_encode(['error' => 'Unsupported file type. Please attach a JPG, PNG or PDF.']);
+        echo json_encode(['error' => 'Unsupported file type. Please attach a JPG, PNG, WEBP or PDF.']);
         exit();
     }
     if ($mime === 'application/pdf') {

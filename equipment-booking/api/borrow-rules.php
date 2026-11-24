@@ -7,7 +7,7 @@ declare(strict_types=1);
  * (booking hours, how far ahead, hours offered). The Student Portal reads it so its
  * pickers match what the server will accept. Nothing sensitive is returned.
  *
- * Returns: { ok: true, rules: { dayStart, lastStart, dayEnd, slot, maxAhead, durationHours, graceMin, ..., roomMaxAdvanceDays } }
+ * Returns: { ok: true, rules: { dayStart, lastStart, dayEnd, slot, maxAhead, durationHours, graceMin, ..., maxStudentItems, roomMaxAdvanceDays } }
  */
 ini_set('display_errors', '0');
 require_once __DIR__ . '/../../config/security-headers.php';

@@ -68,7 +68,7 @@ $overdue_chk->close();
 if ($has_overdue) {
     $conn->close();
     echo json_encode([
-        'error' => 'Your faculty advisor currently has an overdue item. Borrowing is not allowed until it is returned. Please coordinate with ' . htmlspecialchars($row['faculty_name']) . '.'
+        'error' => 'Borrowing is not allowed until your faculty advisor, ' . htmlspecialchars($row['faculty_name']) . ', returns an overdue item. Please coordinate with them.'
     ]);
     exit();
 }

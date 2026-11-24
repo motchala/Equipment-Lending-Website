@@ -6,10 +6,9 @@
  * Included from settings/views/admin-screen.php as a direct child of #panel-settings,
  * so the existing Settings sub-tab switcher can show and hide it.
  *
- * LIVE cards (marked data-arb-live): "Current semester", "Borrowing rules", "Borrowing points", "Booking window", "Reservation rules" and "Room schedule". They load their
- * values through ArbitrationConfig and save through settings/api/save-arbitration.php.
- * The other cards (role weights, priority faculty) are still UI only
- * and carry a "Not connected yet" badge.
+ * LIVE cards (marked data-arb-live): "Current semester", "Borrowing rules", "Borrowing points", "Booking window", "Reservation rules", "Room schedule", "Role weights" and "Priority faculty".
+ * They load their values through ArbitrationConfig and save through settings/api/save-arbitration.php.
+ * Every card on this tab is now connected.
  *
  * Styles : settings/assets/css/admin-arbitration.css  (all classes are arb-*)
  * Script : settings/assets/js/admin-arbitration.js
@@ -22,6 +21,9 @@ if (empty($is_super_admin)) {
 /* ── Current values (read-only) ───────────────────────────────────────────── */
 require_once __DIR__ . '/../../shared/core/arbitration-config.php';
 $arb_live = ArbitrationConfig::all($conn, true);   // typed values for the cards that are connected
+// Length of the same-day review buffers (fixed in code today; the text below follows the constants)
+$arb_eq_buf   = defined('EQ_BUFFER_MINUTES') ? (int)EQ_BUFFER_MINUTES : 10;           // equipment-booking/core/request-buffer.php
+$arb_room_buf = defined('PS_ROOM_BUFFER_MINUTES') ? (int)PS_ROOM_BUFFER_MINUTES : 10; // room-reservation/core/room-buffer.php
 $arb_cfg = [];
 if (isset($conn) && $conn instanceof mysqli) {
     $arb_res = @$conn->query('SELECT config_key, config_value FROM tbl_arbitration_config');
@@ -210,7 +212,7 @@ $arb_date = static function (string $key, string $title, string $sub, string $va
     <!-- ═══ EQUIPMENT ═══════════════════════════════════════════════ -->
     <div class="arb-section">
         <h3 class="arb-section__title"><span class="material-symbols-outlined">inventory_2</span> Equipment borrowing</h3>
-        <p class="arb-section__sub">How borrow requests are checked and decided.</p>
+        <p class="arb-section__sub">How borrow requests are checked and decided. A same-day request waits <?php echo $arb_eq_buf; ?> minutes for an admin, then is approved automatically if the equipment is free, otherwise declined.</p>
     </div>
 
     <div class="arb-grid">
@@ -239,7 +241,7 @@ $arb_date = static function (string $key, string $title, string $sub, string $va
                 <?php
                 $arb_time('Booking hours', 'Earliest pickup and latest return on a booking day. Start times are on the hour.', 'equip_day_start', (string)$arb_live['equip_day_start'], 'equip_day_end', (string)$arb_live['equip_day_end']);
                 $arb_stepper('equip_max_advance_days', 'Book ahead up to', 'How far in advance a later-date request can start.', (int)$arb_live['equip_max_advance_days'], 1, 60, 1, 'days');
-                $arb_stepper('equip_immediate_grace_min', 'Same-day grace', 'A same-day booking starting within this time takes stock right away.', (int)$arb_live['equip_immediate_grace_min'], 0, 60, 5, 'min');
+                $arb_stepper('equip_immediate_grace_min', 'Same-day grace', 'A same-day booking that starts within this time takes its stock as soon as it is approved.', (int)$arb_live['equip_immediate_grace_min'], 0, 60, 5, 'min');
                 $arb_stepper('equip_cancel_cutoff_min', 'Cancellation cutoff', 'Borrowers can cancel an approved booking until this long before it starts. 0 allows it until the start.', (int)$arb_live['equip_cancel_cutoff_min'], 0, 240, 15, 'min');
                 $arb_chips('equip_dur', 'Booking lengths offered', 'Hours a borrower can pick, for today and for later dates. At least one is needed.', [1 => '1 hr', 2 => '2 hrs', 3 => '3 hrs', 4 => '4 hrs', 5 => '5 hrs', 6 => '6 hrs'], array_map('intval', (array)$arb_live['equip_durations']));
                 ?>
@@ -297,9 +299,9 @@ $arb_date = static function (string $key, string $title, string $sub, string $va
                 $arb_stepper('room_max_active', 'Active reservations per faculty', 'Reservations a faculty account can hold at the same time.', (int)$arb_live['room_max_active'], 1, 10, 1, 'rooms');
                 $arb_stepper('room_max_advance_weeks', 'Book ahead up to', 'How far in advance a room can be reserved, on every reservation form.', (int)$arb_live['room_max_advance_weeks'], 1, 8, 1, 'weeks');
                 $arb_stepper('room_cancel_cutoff_min', 'Cancellation cutoff', 'Faculty can cancel an approved reservation until this long before it starts. 0 allows it until the start.', (int)$arb_live['room_cancel_cutoff_min'], 0, 240, 15, 'min');
-                $arb_toggle('room_same_day_auto', 'Confirm same-day reservations automatically', 'When off, a same-day reservation waits for an admin like a later-date one.', (bool)$arb_live['room_same_day_auto']);
+                $arb_toggle('room_same_day_auto', 'Confirm same-day reservations automatically', 'On: a same-day faculty reservation waits ' . $arb_room_buf . ' minutes for an admin, then is confirmed if the room is free. Off: it waits for an admin like a later-date one. Student reservations always wait for an admin.', (bool)$arb_live['room_same_day_auto']);
                 $arb_toggle('room_letter_required', 'Require a request letter for later dates', 'A faculty member\'s own later-date reservation needs a letter. Same-day and student reservations never do.', (bool)$arb_live['room_letter_required']);
-                $arb_select('room_expiry_mode', 'Undecided requests', 'What happens to a waiting reservation that nobody has decided.', [
+                $arb_select('room_expiry_mode', 'Undecided requests', 'What happens to a waiting later-date reservation that nobody has decided. A same-day request is decided when its ' . $arb_room_buf . ' minutes end, whatever you pick here.', [
                     'day'   => 'Decline at 12:01 AM on the date',
                     'start' => 'Decline at the start time',
                     'never' => 'Keep waiting for an admin',
@@ -332,26 +334,25 @@ $arb_date = static function (string $key, string $title, string $sub, string $va
     </div>
 
     <div class="arb-grid">
-        <div class="sett-card arb-card">
+        <div class="sett-card arb-card" data-arb-live>
             <div class="sett-card-head">
                 <span class="material-symbols-outlined">groups</span>
                 <h3>Role weights</h3>
-                <span class="arb-badge">Not connected yet</span>
             </div>
             <div class="sett-card-body">
                 <?php
-                $arb_stepper('role_priority_student', 'Student representative', 'Higher number wins when requests compete.', $arb_num('role_priority_student', 1), 1, 10, 1, 'pts');
-                $arb_stepper('role_priority_faculty', 'Regular faculty', 'Higher number wins when requests compete.', $arb_num('role_priority_faculty', 2), 1, 10, 1, 'pts');
-                $arb_stepper('role_priority_director', 'Priority', 'Applies to the faculty you mark as priority. Higher number wins.', $arb_num('role_priority_director', 4), 1, 10, 1, 'pts');
+                $arb_stepper('role_priority_student', 'Student representative', 'For a request a student files with a faculty code. Higher number wins a tie.', (int)$arb_live['role_priority_student'], 1, 10, 1, 'pts');
+                $arb_stepper('role_priority_faculty', 'Regular faculty', 'For a faculty member\'s own request. Higher number wins a tie.', (int)$arb_live['role_priority_faculty'], 1, 10, 1, 'pts');
+                $arb_stepper('role_priority_priority', 'Priority', 'For the faculty you mark as priority, and their students. Higher number wins a tie.', (int)$arb_live['role_priority_priority'], 1, 10, 1, 'pts');
                 ?>
+                <p class="arb-note-inline">Weights only break a tie between requests filed within a few seconds of each other. Otherwise the earlier request wins.</p>
             </div>
         </div>
 
-        <div class="sett-card arb-card" id="arbPriorityCard" data-arb-max="10">
+        <div class="sett-card arb-card" id="arbPriorityCard" data-arb-live data-arb-max="10" data-arb-chosen="<?php echo $arb_e(implode(',', array_map('strval', (array)$arb_live['priority_faculty']))); ?>">
             <div class="sett-card-head">
                 <span class="material-symbols-outlined">star</span>
                 <h3>Priority faculty</h3>
-                <span class="arb-badge">Not connected yet</span>
             </div>
             <div class="sett-card-body">
                 <div class="arb-prio">
