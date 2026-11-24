@@ -8,7 +8,7 @@ ini_set('log_errors', '1');
 $csp_nonce = base64_encode(random_bytes(16));
 // The student portal no longer uses Bootstrap / Font Awesome, so only Google Fonts (CSS + font files)
 // and the QR library (jsDelivr) are allowed beyond 'self'.
-header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$csp_nonce}' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self';");
+header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$csp_nonce}' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://res.cloudinary.com; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self';");
 header("X-Frame-Options: DENY");
 
 require_once __DIR__ . '/config/session.php';      // needed to read the one-shot role-splash flag

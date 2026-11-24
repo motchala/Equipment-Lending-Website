@@ -285,7 +285,7 @@
                             <p id="equipNoResultsMsg">No equipment matches your search.</p>
                         </div>
 
-                        <!-- ── Pagination (12 items per page; featured cards above are not counted) ── -->
+                        <!-- ── Pagination (20 items per page — 4 columns × 5 rows; featured cards above are not counted) ── -->
                         <div class="eq-pagination" id="equipPagination" style="display:none;">
                             <div class="eq-pg-info" id="equipPageInfo"></div>
                             <div class="eq-pg-controls">

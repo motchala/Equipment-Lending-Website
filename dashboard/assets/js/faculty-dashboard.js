@@ -476,12 +476,12 @@
     // }
 
     /* ── Equipment Search/Filter + Pagination ──────────────────────────
-       12 items per page. The 2 featured cards above the catalog are
+       20 items per page (4 columns × 5 rows). The 2 featured cards above the catalog are
        separate markup and are never counted here.
        Filtering always resets you to page 1 so you don't land on an
        empty page after narrowing the results.
     ─────────────────────────────────────────────────────────────────── */
-    const EQ_PER_PAGE = 12;
+    const EQ_PER_PAGE = 20;
     let eqCurrentPage = 1;
 
     function getMatchingEquipment() {

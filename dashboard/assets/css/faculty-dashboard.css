@@ -4314,6 +4314,13 @@ body {
     gap: 20px;
 }
 
+/* Desktop/tablet: fixed 4 columns (4 × 5 = 20 items per page) */
+@media (min-width: 769px) {
+    #panel-lending .eq-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+
 /* ── Empty state ─────────────────────────────────────────────── */
 #panel-lending .eq-empty {
     grid-column: 1 / -1;

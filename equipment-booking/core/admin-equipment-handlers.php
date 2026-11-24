@@ -92,6 +92,75 @@ if (!function_exists('equipment_delete_image_file')) {
 }
 
 
+// ================= EQUIPMENT IMAGE UPLOAD HELPER =================
+
+if (!function_exists('equipment_store_uploaded_image')) {
+    /**
+     * Validates and stores an uploaded equipment photo (Cloudinary first, local /uploads as fallback).
+     *
+     * The file type is checked from the file's real contents, not from the browser-supplied
+     * type, and PHP's own upload error code is reported as a readable message.
+     *
+     * @param array $file one entry of $_FILES
+     * @return array{ok:bool, path:string, abs:?string, message:string}
+     *         path = value for tbl_inventory.image_path; abs = absolute path when stored locally
+     */
+    function equipment_store_uploaded_image(array $file): array
+    {
+        $fail = static fn(string $m): array => ['ok' => false, 'path' => '', 'abs' => null, 'message' => $m];
+
+        $err = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
+        if ($err !== UPLOAD_ERR_OK) {
+            return $fail(match ($err) {
+                UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => 'Image too large. Maximum size is 2 MB.',
+                UPLOAD_ERR_PARTIAL                        => 'The image upload was interrupted. Please try again.',
+                UPLOAD_ERR_NO_TMP_DIR, UPLOAD_ERR_CANT_WRITE => 'The server could not receive the image (no temporary storage). Please try again later.',
+                default                                   => 'The image could not be uploaded. Please try again.',
+            });
+        }
+
+        $tmp = (string)($file['tmp_name'] ?? '');
+        if ($tmp === '' || !is_uploaded_file($tmp)) {
+            return $fail('The image could not be uploaded. Please try again.');
+        }
+        if ((int)($file['size'] ?? 0) > 2 * 1024 * 1024) {
+            return $fail('Image too large. Maximum size is 2 MB.');
+        }
+
+        // Real type check (JPG / PNG only)
+        $info = @getimagesize($tmp);
+        $ext_by_type = [IMAGETYPE_JPEG => 'jpg', IMAGETYPE_PNG => 'png'];
+        if ($info === false || !isset($ext_by_type[$info[2]])) {
+            return $fail('Only JPG and PNG images are allowed.');
+        }
+        $ext = $ext_by_type[$info[2]];
+
+        // 1) Cloudinary
+        $orig = (string)($file['name'] ?? 'image.' . $ext);
+        $cloud_url = cloudinary_upload($tmp, $orig);
+        if ($cloud_url !== '') {
+            return ['ok' => true, 'path' => $cloud_url, 'abs' => null, 'message' => ''];
+        }
+        $cloud_reason = cloudinary_last_error();
+
+        // 2) Local fallback — the extension comes from the verified type, never from the file name
+        $uploads = dirname(__DIR__, 2) . '/uploads';
+        if (!is_dir($uploads)) {
+            @mkdir($uploads, 0755, true);
+        }
+        $base = trim((string)preg_replace('/[^a-zA-Z0-9_-]/', '_', pathinfo($orig, PATHINFO_FILENAME)), '_');
+        $name = time() . '_' . substr($base !== '' ? $base : 'image', 0, 60) . '.' . $ext;
+        $target = $uploads . '/' . $name;
+        if (!@move_uploaded_file($tmp, $target)) {
+            error_log('[PUPSync] equipment image: Cloudinary failed (' . $cloud_reason . ') and local save to ' . $target . ' failed');
+            return $fail('The image could not be saved. ' . ($cloud_reason !== '' ? $cloud_reason . ' ' : '') . 'The local uploads folder is not writable either.');
+        }
+        @chmod($target, 0644);
+        return ['ok' => true, 'path' => 'uploads/' . $name, 'abs' => $target, 'message' => ''];
+    }
+}
+
+
 // ================= ADD ITEM =================
 
 if (isset($_POST['add_item'])) {
@@ -111,45 +180,20 @@ if (isset($_POST['add_item'])) {
     $image_path = "uploads/default.png";
 
     // Handle image upload
+    $new_image_abs = null;   // locally stored file (removed again if the DB insert fails)
     if (!empty($_FILES['item_image']['name'])) {
-        $allowed_types = ['image/jpeg', 'image/png'];
-        $file_type = $_FILES['item_image']['type'];
-
-        if (!in_array($file_type, $allowed_types)) {
+        $up = equipment_store_uploaded_image($_FILES['item_image']);
+        if (!$up['ok']) {
             if ($is_ajax) {
                 header('Content-Type: application/json');
-                echo json_encode(['status' => 'error', 'message' => 'Only JPG and PNG images are allowed.']);
+                echo json_encode(['status' => 'error', 'message' => $up['message']]);
                 exit();
             }
-            header("Location: {$base}/admin-dashboard.php?view=inventory&error=filetype");
+            header("Location: {$base}/admin-dashboard.php?view=inventory&error=dberror");
             exit();
         }
-
-        $max_size = 2 * 1024 * 1024;
-        if ($_FILES['item_image']['size'] > $max_size) {
-            if ($is_ajax) {
-                header('Content-Type: application/json');
-                echo json_encode(['status' => 'error', 'message' => 'Image too large. Maximum size is 2 MB.']);
-                exit();
-            }
-            header("Location: {$base}/admin-dashboard.php?view=inventory&error=filesize");
-            exit();
-        }
-
-        $cloud_url = cloudinary_upload(
-            $_FILES['item_image']['tmp_name'],
-            $_FILES['item_image']['name']
-        );
-        if ($cloud_url !== '') {
-            $image_path = $cloud_url;
-        } else {
-            // Cloudinary failed — fall back to local storage
-            $image_name = time() . "_" . preg_replace("/[^a-zA-Z0-9.]/", "_", $_FILES['item_image']['name']);
-            $target = __DIR__ . '/../../uploads/' . $image_name;
-            if (move_uploaded_file($_FILES['item_image']['tmp_name'], $target)) {
-                $image_path = "uploads/" . $image_name;
-            }
-        }
+        $image_path = $up['path'];
+        $new_image_abs = $up['abs'];
     }
 
     $campus_id = max(1, (int)($_POST['campus_id'] ?? 1));
@@ -174,6 +218,9 @@ if (isset($_POST['add_item'])) {
         exit();
     } else {
         error_log('[PUPSync] admin add_item DB insert failed: ' . $conn->error);
+        if ($new_image_abs !== null && is_file($new_image_abs)) {
+            @unlink($new_image_abs);
+        }
         if ($is_ajax) {
             header('Content-Type: application/json');
             echo json_encode(['status' => 'error', 'message' => 'Could not save to database. Please try again.']);
@@ -218,55 +265,19 @@ if (isset($_POST['update_item'])) {
 
     // Upload new image if provided
     if (!empty($_FILES['item_image']['name'])) {
-
-        $allowed_types = ['image/jpeg', 'image/png'];
-        $file_type = $_FILES['item_image']['type'];
-
-        if (!in_array($file_type, $allowed_types)) {
+        $up = equipment_store_uploaded_image($_FILES['item_image']);
+        if (!$up['ok']) {
             if ($is_ajax) {
                 header('Content-Type: application/json');
-                echo json_encode(['status' => 'error', 'message' => 'Only JPG and PNG images are allowed.']);
+                echo json_encode(['status' => 'error', 'message' => $up['message']]);
                 exit();
             }
-            header("Location: {$base}/admin-dashboard.php?view=inventory&error=filetype");
+            header("Location: {$base}/admin-dashboard.php?view=inventory&error=dberror");
             exit();
         }
-
-        $max_size = 2 * 1024 * 1024;
-        if ($_FILES['item_image']['size'] > $max_size) {
-            if ($is_ajax) {
-                header('Content-Type: application/json');
-                echo json_encode(['status' => 'error', 'message' => 'Image too large. Maximum size is 2 MB.']);
-                exit();
-            }
-            header("Location: {$base}/admin-dashboard.php?view=inventory&error=filesize");
-            exit();
-        }
-
-        $cloud_url = cloudinary_upload(
-            $_FILES['item_image']['tmp_name'],
-            $_FILES['item_image']['name']
-        );
-        if ($cloud_url !== '') {
-            $image_path = $cloud_url;
-            $old_image_to_delete = $current_image;
-        } else {
-            // Cloudinary failed — fall back to local storage
-            $image_name = time() . "_" . preg_replace("/[^a-zA-Z0-9.]/", "_", $_FILES['item_image']['name']);
-            $target = __DIR__ . '/../../uploads/' . $image_name;
-            if (!move_uploaded_file($_FILES['item_image']['tmp_name'], $target)) {
-                if ($is_ajax) {
-                    header('Content-Type: application/json');
-                    echo json_encode(['status' => 'error', 'message' => 'Could not save the image. Please try again.']);
-                    exit();
-                }
-                header("Location: {$base}/admin-dashboard.php?view=inventory&error=dberror");
-                exit();
-            }
-            $new_image_abs = $target;
-            $image_path = "uploads/" . $image_name;
-            $old_image_to_delete = $current_image;
-        }
+        $image_path = $up['path'];
+        $new_image_abs = $up['abs'];
+        $old_image_to_delete = $current_image;
     } elseif (($_POST['remove_image'] ?? '0') === '1') {
         // Explicit "Remove image" click — revert to the default placeholder and
         // (after the save succeeds) delete the old upload from disk.
