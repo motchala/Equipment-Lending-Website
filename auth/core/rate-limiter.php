@@ -23,7 +23,7 @@
  *       counters and the lockout_level for this (email, IP) pair.
  *
  * Lockout escalation:
- *   After 3 failures  → lockout triggered; attempt_count resets to 0;
+ *   After 5 failures  → lockout triggered; attempt_count resets to 0;
  *                        lockout_level increments (persists until success).
  *   Level 1 → 5 min  |  Level 2 → 15 min  |  Level 3+ → 60 min
  *
@@ -39,8 +39,12 @@
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-/** Failed attempts allowed before a lockout is triggered. */
-define('RL_MAX_ATTEMPTS', 3);
+/**
+ * Failed attempts allowed before a lockout is triggered.
+ * Keep equal to PWR_MAX_ATTEMPTS (auth/core/password-reset.php) so the lockout and the
+ * "Notify Super Admin" offer both start on the same wrong password.
+ */
+define('RL_MAX_ATTEMPTS', 5);
 
 /**
  * Hours of complete dormancy after which lockout_level steps down by 1.

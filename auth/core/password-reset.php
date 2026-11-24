@@ -9,7 +9,7 @@
  * ------------
  *   1. Every wrong password typed for a faculty account is counted PER ACCOUNT in
  *      tbl_faculty_pw_reset.fail_count (not per browser or IP). A correct sign-in sets it back to 0.
- *      This is separate from the 3-try lockout in rate-limiter.php, which only slows guessing down and
+ *      This is separate from the 5-try lockout in rate-limiter.php, which only slows guessing down and
  *      starts again after every lockout round.
  *   2. At PWR_MAX_ATTEMPTS (5) wrong passwords the sign-in form offers "Notify Super Admin"
  *      (auth/api/request-password-reset.php). That stamps notified_at, which makes a notification appear
@@ -265,7 +265,7 @@ function pwr_claim_reset(mysqli $conn, string $email, string $issued_by): bool
         'UPDATE tbl_faculty_pw_reset
             SET fail_count = 0, notified_at = NULL, reset_pending = 1,
                 reset_issued_at = ?, reset_issued_ts = ?, reset_issued_by = ?
-          WHERE email = ? AND fail_count >= ?'
+          WHERE email = ? AND fail_count >= ? AND notified_at IS NOT NULL'
     );
     if (!$st) {
         return false;
