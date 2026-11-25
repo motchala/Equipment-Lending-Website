@@ -161,7 +161,8 @@ function ps_room_settle_buffers(mysqli $conn, ?DateTimeInterface $now = null): a
 
         $sel = $conn->prepare(
             "SELECT rr.id, rr.room_id, rr.faculty_id, rr.faculty_name, rr.reservation_date,
-                    rr.start_time, rr.end_time, r.room_name, r.status AS room_status, r.is_archived
+                    rr.start_time, rr.end_time, rr.request_date, rr.submitted_as, rr.document_path,
+                    r.room_name, r.status AS room_status, r.is_archived
                FROM tbl_room_reservations rr
                JOIN tbl_rooms r ON r.room_id = rr.room_id
               WHERE rr.status = 'Waiting' AND rr.buffer_until IS NOT NULL AND rr.buffer_until <= ?
@@ -177,6 +178,9 @@ function ps_room_settle_buffers(mysqli $conn, ?DateTimeInterface $now = null): a
         if (!$due) {
             return $out;
         }
+        // Requests filed within a few seconds of each other are decided in priority order (Settings -> Arbitration)
+        require_once __DIR__ . '/../../equipment-booking/core/arbitration-engine.php';
+        $due = ArbitrationEngine::tieSort($conn, $due);
 
         // One settler at a time, so two page loads cannot both approve overlapping requests.
         $lk = $conn->prepare("SELECT GET_LOCK('pup_room_buffer_settle', 5)");
@@ -194,6 +198,27 @@ function ps_room_settle_buffers(mysqli $conn, ?DateTimeInterface $now = null): a
             $date    = (string)$row['reservation_date'];
             $start   = (string)$row['start_time'];
             $end     = (string)$row['end_time'];
+
+            // A higher-priority request for an overlapping time, filed within the tie-break window, is about to
+            // come due (seconds): leave this one for the next pass so that one is decided first.
+            $tw   = ArbitrationEngine::tieWindow($conn);
+            $capS = $now->modify('+' . ($tw + 2) . ' seconds')->format('Y-m-d H:i:s');
+            $riv  = $conn->prepare(
+                "SELECT rr.id, rr.faculty_id, rr.request_date, rr.submitted_as, rr.document_path
+                   FROM tbl_room_reservations rr
+                  WHERE rr.room_id = ? AND rr.reservation_date = ? AND rr.status = 'Waiting'
+                    AND rr.buffer_until IS NOT NULL AND rr.buffer_until > ? AND rr.buffer_until <= ?
+                    AND rr.start_time < ? AND rr.end_time > ? AND rr.id <> ?"
+            );
+            if ($riv) {
+                $riv->bind_param('isssssi', $room_id, $date, $now_s, $capS, $end, $start, $id);
+                $riv->execute();
+                $rivals = $riv->get_result()->fetch_all(MYSQLI_ASSOC);
+                $riv->close();
+                if ($rivals && ArbitrationEngine::outrankedBy($conn, $row, $rivals)) {
+                    continue;
+                }
+            }
 
             $decision = 'Approved';
             $reason   = 'Automatically approved when the review window closed: no conflicts with other reservations or classes.';

@@ -724,6 +724,121 @@ class ArbitrationEngine
         return 0;
     }
 
+    // ── Priority tie-break for the review-window settlers ─────────────────────
+    // The equipment buffer (request-buffer.php) and the room buffer (room-buffer.php) decide requests one by
+    // one when their review window ends, which used to be strictly first-come-first-served. These helpers
+    // apply the same rule as the arbitration above: requests filed within tie_break_window_seconds of each
+    // other are ranked by Signatory, then Role weight (including the Priority faculty picked in
+    // Settings -> Arbitration), then overdue history; everything else stays first-come-first-served.
+
+    /** Seconds within which two requests count as filed "at the same time". */
+    public static function tieWindow(mysqli $conn): int
+    {
+        return max(0, (int)(self::loadConfig($conn)['tie_break_window_seconds'] ?? 5));
+    }
+
+    /**
+     * @param  array<string, mixed>  $row    needs id, faculty_id; uses submitted_as, role, document_path when present
+     * @param  array<string, string> $config
+     * @return array{signatory: int, role: int, has_overdue: bool, id: int}
+     */
+    private static function tieRank(mysqli $conn, array $row, array $config): array
+    {
+        $row['has_overdue'] = self::checkOverdueBlock($conn, (string)($row['faculty_id'] ?? ''));
+        $doc = (string)($row['document_path'] ?? '');
+        return self::computePriorityScore($row, $config, $doc !== '' ? self::validateDocument($doc) : 0);
+    }
+
+    /** Negative when $a ranks better than $b. $useId = false compares only the three rules, never the id. */
+    private static function tieCompare(array $a, array $b, bool $useId = true): int
+    {
+        if ($a['signatory'] !== $b['signatory']) {
+            return $b['signatory'] - $a['signatory'];
+        }
+        if ($a['role'] !== $b['role']) {
+            return $b['role'] - $a['role'];
+        }
+        $ao = $a['has_overdue'] ? 1 : 0;
+        $bo = $b['has_overdue'] ? 1 : 0;
+        if ($ao !== $bo) {
+            return $ao - $bo;
+        }
+        return $useId ? $a['id'] - $b['id'] : 0;
+    }
+
+    /**
+     * Puts rows that were filed within the tie-break window of each other in priority order.
+     * Rows must already be in first-come-first-served order and carry request_date.
+     *
+     * @param  array<int, array<string, mixed>> $rows
+     * @return array<int, array<string, mixed>>
+     */
+    public static function tieSort(mysqli $conn, array $rows): array
+    {
+        if (count($rows) < 2) {
+            return $rows;
+        }
+        $config  = self::loadConfig($conn);
+        $window  = max(0, (int)($config['tie_break_window_seconds'] ?? 5));
+        $out     = [];
+        $cluster = [];
+        $start   = 0;
+        $flush = static function () use (&$out, &$cluster, $conn, $config): void {
+            if (count($cluster) > 1) {
+                foreach ($cluster as $i => $c) {
+                    $cluster[$i]['_rank'] = self::tieRank($conn, $c, $config);
+                }
+                usort($cluster, static fn (array $a, array $b): int => self::tieCompare($a['_rank'], $b['_rank']));
+            }
+            foreach ($cluster as $c) {
+                unset($c['_rank']);
+                $out[] = $c;
+            }
+            $cluster = [];
+        };
+        foreach ($rows as $r) {
+            $t = strtotime((string)$r['request_date']);
+            if ($cluster && ($t - $start) > $window) {
+                $flush();
+            }
+            if (!$cluster) {
+                $start = $t;
+            }
+            $cluster[] = $r;
+        }
+        $flush();
+        return $out;
+    }
+
+    /**
+     * True when one of $others (requests still inside their review window) was filed within the tie-break
+     * window of $row AND beats it on Signatory, Role weight or overdue history. The settler then leaves $row
+     * for its next pass, a few seconds later, so the higher-ranked request is decided first.
+     *
+     * @param array<string, mixed>             $row
+     * @param array<int, array<string, mixed>> $others
+     */
+    public static function outrankedBy(mysqli $conn, array $row, array $others): bool
+    {
+        if (!$others) {
+            return false;
+        }
+        $config = self::loadConfig($conn);
+        $window = max(0, (int)($config['tie_break_window_seconds'] ?? 5));
+        $t      = strtotime((string)$row['request_date']);
+        $mine   = null;
+        foreach ($others as $o) {
+            if (abs(strtotime((string)$o['request_date']) - $t) > $window) {
+                continue;
+            }
+            $mine ??= self::tieRank($conn, $row, $config);
+            if (self::tieCompare(self::tieRank($conn, $o, $config), $mine, false) < 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * Compute the priority score tuple for a request.
      *

@@ -316,12 +316,14 @@ function eq_buffer_settle(mysqli $conn, ?DateTimeInterface $now = null): array
         // Re-read under the lock: another settler may have decided some of them meanwhile.
         // Every Waiting row still inside a buffer, oldest first, so groups are decided in submission order.
         $sel = $conn->prepare(
-            "SELECT id, equipment_name, COALESCE(borrow_qty, 1) AS qty, borrow_date, return_date, borrow_time, return_time,
-                    COALESCE(batch_id, '') AS batch_id, request_date, buffer_until
-               FROM tbl_requests
-              WHERE status = 'Waiting' AND buffer_until IS NOT NULL
-                AND arbitration_rule = ?
-              ORDER BY request_date ASC, id ASC"
+            "SELECT r.id, r.equipment_name, COALESCE(r.borrow_qty, 1) AS qty, r.borrow_date, r.return_date, r.borrow_time, r.return_time,
+                    COALESCE(r.batch_id, '') AS batch_id, r.request_date, r.buffer_until,
+                    r.faculty_id, r.submitted_as, r.document_path, u.role
+               FROM tbl_requests r
+               LEFT JOIN tbl_users u ON u.faculty_id = r.faculty_id
+              WHERE r.status = 'Waiting' AND r.buffer_until IS NOT NULL
+                AND r.arbitration_rule = ?
+              ORDER BY r.request_date ASC, r.id ASC"
         );
         if (!$sel) {
             return $out;
@@ -331,6 +333,13 @@ function eq_buffer_settle(mysqli $conn, ?DateTimeInterface $now = null): array
         $sel->execute();
         $rows = $sel->get_result()->fetch_all(MYSQLI_ASSOC);
         $sel->close();
+
+        // Requests filed within a few seconds of each other are decided in priority order (Settings -> Arbitration),
+        // not just first come first served. Rows still inside their own window are the ones a due request may have to wait for.
+        $rows    = ArbitrationEngine::tieSort($conn, $rows);
+        $tie_win = ArbitrationEngine::tieWindow($conn);
+        $cap_s   = $now->modify('+' . ($tie_win + 2) . ' seconds')->format('Y-m-d H:i:s');
+        $pending = array_values(array_filter($rows, static fn (array $r): bool => (string)$r['buffer_until'] > $now_s && (string)$r['buffer_until'] <= $cap_s));
 
         // Group by cart (a single item is its own group)
         $groups = [];
@@ -344,6 +353,20 @@ function eq_buffer_settle(mysqli $conn, ?DateTimeInterface $now = null): array
             // Due only when the whole cart's buffers have ended
             $latest = max(array_map(static fn (array $m): string => (string)$m['buffer_until'], $members));
             if ($latest > $now_s) {
+                continue;
+            }
+
+            // A higher-priority request for the same item, filed within the tie-break window, is about to
+            // come due (seconds): leave this one for the next pass so that one is decided first.
+            $outranked = false;
+            foreach ($members as $m) {
+                $rivals = array_filter($pending, static fn (array $p): bool => $p['equipment_name'] === $m['equipment_name'] && (int)$p['id'] !== (int)$m['id']);
+                if ($rivals && ArbitrationEngine::outrankedBy($conn, $m, $rivals)) {
+                    $outranked = true;
+                    break;
+                }
+            }
+            if ($outranked) {
                 continue;
             }
 
