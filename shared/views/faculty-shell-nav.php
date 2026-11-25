@@ -3,6 +3,8 @@
 <link rel="stylesheet" href="dashboard/assets/css/faculty-dashboard-responsive.css?v=<?php echo @filemtime(PS_ROOT . '/dashboard/assets/css/faculty-dashboard-responsive.css'); ?>">
 <!-- Phone app layout (only active when <html class="rx-mobile">) -->
 <link rel="stylesheet" href="dashboard/assets/css/faculty-dashboard-mobile.css?v=<?php echo @filemtime(PS_ROOT . '/dashboard/assets/css/faculty-dashboard-mobile.css'); ?>">
+<!-- Dark-mode refinements (every rule is scoped to html[data-theme="dark"], so light mode is unaffected). Loaded last. -->
+<link rel="stylesheet" href="shared/assets/css/faculty-dark.css?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/css/faculty-dark.css'); ?>">
 <?php role_splash_head(); ?>
 </head>
 

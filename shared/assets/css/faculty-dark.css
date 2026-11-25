@@ -1,0 +1,221 @@
+/* ============================================================================
+   PUPSync - Faculty interface: dark-mode refinements
+   ----------------------------------------------------------------------------
+   Purpose : fix places where the Faculty dark theme was hard on the eyes
+             (large bright-white blocks) or had weak contrast (dark text on
+             dark surfaces, white text on pale fills, dark-red icons on dark).
+   Safety  : EVERY rule below is scoped to html[data-theme="dark"], so Light
+             and High-Contrast themes are not affected in any way. No existing
+             stylesheet, script or markup logic was changed - this file only
+             adds overrides and is loaded last (see shared/views/faculty-shell-nav.php).
+   Revert  : delete the <link> to this file in faculty-shell-nav.php.
+   Colours : reuse the Faculty dark tokens (--color-primary, --color-surface-*,
+             --color-on-surface, --color-error, --color-success, ...) so the
+             existing look and brand hue are preserved.
+   ========================================================================= */
+
+html[data-theme="dark"] {
+    --fdk-info-text: #6fc3e0;
+    --fdk-info-fill: #1f6f8b;
+    --fdk-purple-text: #c4a3f5;
+    --fdk-purple-bg: rgba(167, 139, 250, 0.16);
+    --fdk-gold: #f0c04a;
+}
+
+/* ---- Top bar: expanded global search was a glaring white pill ------------- */
+html[data-theme="dark"] .top-bar-global-search.expanded {
+    background: var(--color-surface-container);
+    border-color: var(--color-outline-variant);
+}
+html[data-theme="dark"] .top-bar-global-search.expanded:focus-within {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(244, 160, 160, 0.2);
+}
+html[data-theme="dark"] .top-bar-global-search.expanded .top-bar-global-search-toggle {
+    color: var(--color-primary);
+}
+html[data-theme="dark"] .top-bar-global-search input {
+    color: var(--color-on-surface);
+}
+html[data-theme="dark"] .top-bar-global-search input::placeholder {
+    color: var(--color-on-surface-variant);
+    opacity: 0.7;
+}
+
+/* ---- Equipment browse: dark-red placeholder icons were invisible ---------- */
+html[data-theme="dark"] #panel-lending .eq-empty .material-symbols-outlined,
+html[data-theme="dark"] #panel-lending .eq-item-img-placeholder,
+html[data-theme="dark"] #panel-lending .eq-item-img-placeholder .material-symbols-outlined,
+html[data-theme="dark"] #panel-lending .feat-hero-img-placeholder .material-symbols-outlined,
+html[data-theme="dark"] #panel-lending .feat-secondary-img .material-symbols-outlined {
+    color: var(--color-primary) !important;
+}
+html[data-theme="dark"] #panel-lending .eq-item-cat .material-symbols-outlined,
+html[data-theme="dark"] #panel-lending .feat-secondary-cat .material-symbols-outlined {
+    color: var(--color-on-surface-variant) !important;
+}
+html[data-theme="dark"] .eq-ic-regen-btn {
+    color: var(--color-primary);
+}
+
+/* ---- Cart: white chips / pills / button on dark cards --------------------- */
+html[data-theme="dark"] .eq-cart-chk {
+    background: rgba(44, 26, 26, 0.92);
+    color: var(--color-on-surface-variant);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+}
+html[data-theme="dark"] .eq-cart-chk:hover {
+    background: var(--color-surface-high);
+    color: var(--color-primary);
+}
+html[data-theme="dark"] .eq-item-card--in-cart .eq-cart-chk {
+    background: var(--color-primary);
+    color: var(--color-on-primary-accent);
+}
+html[data-theme="dark"] .eq-item-card--in-cart {
+    box-shadow: 0 0 0 2.5px var(--color-primary), 0 6px 24px rgba(0, 0, 0, 0.45);
+}
+html[data-theme="dark"] .eq-cco-qty {
+    background: var(--color-surface-lowest);
+    border-color: var(--color-outline-variant);
+}
+html[data-theme="dark"] .eq-cco-qty-btn {
+    color: var(--color-primary);
+}
+html[data-theme="dark"] .eq-cco-qty-btn:hover {
+    background: var(--color-surface-high);
+}
+html[data-theme="dark"] .eq-cart-bar-submit,
+html[data-theme="dark"].rx-mobile #panel-lending .eq-cart-bar-submit {
+    background: var(--color-primary);
+    color: var(--color-on-primary-accent);
+}
+
+/* ---- Filled pills / buttons: white text on pale salmon fill --------------- */
+html[data-theme="dark"] .act-chat-ai-avatar,
+html[data-theme="dark"] .act-mini-submit,
+html[data-theme="dark"] .bf-tick,
+html[data-theme="dark"] .bf-floor[aria-selected="true"] {
+    color: var(--color-on-primary-accent);
+}
+html[data-theme="dark"] .fnotif-tabs .notif-tab.active .fnotif-pill-count {
+    background: rgba(43, 0, 0, 0.22);
+    color: var(--color-on-primary-accent);
+}
+
+/* ---- Chat: own-message bubble had near-black text on deep red ------------- */
+html[data-theme="dark"] body .act-chat-bubble-user {
+    color: #ffffff;
+}
+
+/* ---- Red badges / destructive confirm: white on pastel red ---------------- */
+html[data-theme="dark"] body .side-nav .side-nav-badge,
+html[data-theme="dark"] .fd-dash-top-actions .fd-top-badge {
+    background: var(--color-error-solid);
+    color: #ffffff;
+}
+
+/* ---- Status text colours: darker brand reds / greens / blues on dark ------ */
+html[data-theme="dark"] .bm-seg-btn .bm-mode-info,
+html[data-theme="dark"] .rxm-list--danger .rxm-row-label,
+html[data-theme="dark"] .rxm-list--danger .rxm-row-icon {
+    color: var(--color-error);
+}
+html[data-theme="dark"] .svy-error {
+    color: var(--color-error);
+    background: rgba(248, 113, 113, 0.12);
+}
+html[data-theme="dark"] #panel-home .fdbc-item.is-live .fdbc-when {
+    color: var(--color-success);
+}
+html[data-theme="dark"] .fcty-dtl-item.is-class .fcty-dtl-state,
+html[data-theme="dark"] .fcty-dtl-tag {
+    color: var(--fdk-info-text);
+}
+html[data-theme="dark"] .fcty-dtl-block.is-class,
+html[data-theme="dark"] .fcty-dtl-block.is-class.is-ongoing {
+    color: #ffffff;
+}
+html[data-theme="dark"] .fcty-tt-head.is-today strong,
+html[data-theme="dark"] .fcty-tt-head.is-today span {
+    color: var(--color-primary);
+}
+html[data-theme="dark"] #rooms-browse .fcs-cls.is-week .fcs-cls-title {
+    color: var(--color-primary);
+}
+html[data-theme="dark"] .fcty-tt-now {
+    color: #ffffff;
+}
+
+/* ---- Purple "cancelled" / waitlist: was too dark / too pale --------------- */
+html[data-theme="dark"] .pill-cancelled {
+    background: var(--fdk-purple-bg);
+    color: var(--fdk-purple-text);
+}
+html[data-theme="dark"] .btn-waitlist-rr,
+html[data-theme="dark"] .btn-waitlist-rr:hover {
+    color: var(--fdk-purple-text);
+}
+
+/* ---- Icons that fell to a low-contrast grey on raised surfaces ------------ */
+html[data-theme="dark"] .myact-row-icon,
+html[data-theme="dark"] .myact-history-icon {
+    color: var(--color-on-surface-variant);
+}
+
+/* ---- Survey stars: unselected outline was almost invisible ---------------- */
+html[data-theme="dark"] .svy-star {
+    color: var(--color-outline);
+}
+html[data-theme="dark"] .svy-radio:checked ~ .svy-star,
+html[data-theme="dark"] .svy-star:hover,
+html[data-theme="dark"] .svy-star:hover ~ .svy-star {
+    color: var(--fdk-gold);
+}
+
+/* ---- Room timetable picks / switch chips that were solid white ------------ */
+html[data-theme="dark"] .fcty-open-form .fcty-open-chip.is-on,
+html[data-theme="dark"] #rooms-browse .fcty-sw-btn[aria-selected="true"] {
+    background: var(--color-surface-high);
+    color: var(--color-primary);
+}
+html[data-theme="dark"] .ps-multisel.is-open .ps-multisel-trigger,
+html[data-theme="dark"] .ps-multisel.is-invalid .ps-multisel-trigger {
+    background: var(--color-surface-container);
+}
+
+/* ---- Cancel-reservation confirm: original forces the (pastel) error token
+        with white text via !important, so it needs !important here too ------- */
+html[data-theme="dark"] .act-cancel-confirm-btn {
+    background: var(--color-error-solid) !important;
+    color: #ffffff !important;
+}
+html[data-theme="dark"] .act-cancel-confirm-btn:hover {
+    background: #991b1b !important;
+}
+
+/* ---- Phone view, My Activity pager: buttons were solid white -------------- */
+html[data-theme="dark"].rx-mobile #panel-activity .fact-pager-btn:not(.is-active):not(:disabled) {
+    background: var(--color-surface-container) !important;
+}
+
+/* ---- Inline-styled badges on the featured equipment image (written in the
+        PHP view as style="background:rgba(...)"), so they need !important ---- */
+html[data-theme="dark"] .stock-badge[style*="rgba(209,250,229"] {
+    background: rgba(20, 83, 45, 0.92) !important;
+    color: #86efac !important;
+}
+html[data-theme="dark"] .stock-badge[style*="rgba(255,255,255,.85)"] {
+    background: rgba(44, 26, 26, 0.9) !important;
+    color: var(--color-on-surface) !important;
+}
+
+/* ---- Equipment image wells: light pink gradients showed as big pale blocks
+        behind / around product photos in dark mode ---------------------------- */
+html[data-theme="dark"] #panel-lending .feat-hero-img,
+html[data-theme="dark"]:not(.rx-mobile) #panel-lending #featuredSection .feat-hero-img {
+    background: linear-gradient(145deg, #3a2222, #2c1a1a);
+}
+html[data-theme="dark"] #panel-lending .eq-item-img-wrap {
+    background: linear-gradient(160deg, #3a2222 0%, #2c1a1a 100%);
+}
