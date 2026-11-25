@@ -3467,30 +3467,48 @@
                 .catch(function () { });
         }
 
+        // The live hub (faculty-live.js) re-reads stock when the database says it changed
+        window._pupsyncInventoryPoll = doPoll;
+
+        /* A stream event only means "something changed": hand it to the live hub, which checks exactly what
+           changed and refreshes My Activity, the bell, the Home figures and the stock. Without the hub, each
+           stream does its old, narrower job. */
+        function liveNudge(legacy) {
+            if (window._pupsyncLive && typeof window._pupsyncLive.nudge === 'function') window._pupsyncLive.nudge();
+            else legacy();
+        }
+
         // ── SSE: register all three faculty streams here, guard the interval ─
         if (window.PupSyncSSE && !window.PupSyncSSE.fallback) {
             PupSyncSSE.init({
                 streams: [
-                    { url: 'sse/api/faculty-equipment.php',     onUpdate: doPoll },
+                    { url: 'sse/api/faculty-equipment.php',     onUpdate: function() { liveNudge(doPoll); } },
                     // Use an indirection wrapper so the SSE client always calls whatever
                     // window._sseReservationsDoPoll points to at event-fire time, not the
                     // stub that existed when startInventoryPolling ran (before
                     // startReservationsPolling had a chance to install the real doPoll).
-                    { url: 'sse/api/faculty-reservations.php',  onUpdate: function() { window._sseReservationsDoPoll(); } },
-                    { url: 'sse/api/faculty-notifications.php', onUpdate: function() { window._sseNotifRefresh(); } }
+                    { url: 'sse/api/faculty-reservations.php',  onUpdate: function() { liveNudge(function() { window._sseReservationsDoPoll(); }); } },
+                    { url: 'sse/api/faculty-notifications.php', onUpdate: function() { liveNudge(function() { window._sseNotifRefresh(); }); } }
                 ]
             });
             document.addEventListener('pupsync:sse-fallback', function () {
-                setInterval(doPoll, INTERVAL);
+                setInterval(function () { if (!hubIsLive()) doPoll(); }, INTERVAL);
             }, { once: true });
         } else {
-            setInterval(doPoll, INTERVAL);
+            setInterval(function () { if (!hubIsLive()) doPoll(); }, INTERVAL);
         }
 
         doPoll();                        // run immediately on page load
     }
 
     /* ── Real-time Requests Polling ────────────────────────────────────── */
+    /* True while the live hub (dashboard/assets/js/faculty-live.js) is getting answers: it then does the
+       checking for every screen, and the older timers below stay quiet. If the hub is missing or failing
+       they carry on exactly as before, so nothing depends on it. */
+    function hubIsLive() {
+        return !!(window._pupsyncLive && typeof window._pupsyncLive.healthy === 'function' && window._pupsyncLive.healthy());
+    }
+
     function startRequestsPolling() {
         const INTERVAL = 5000; // check every 5 seconds
         let lastStatuses = {};
@@ -3500,9 +3518,10 @@
             lastStatuses[r.id] = r.status;
         });
 
-        if (!window.PupSyncSSE || window.PupSyncSSE.fallback) {
-        setInterval(function () {
-            fetch('equipment-booking/api/poll-requests.php', { method: 'GET' })
+        /* Fetch the faculty's requests; when a status changed (or `force` is true, because the live hub saw the
+           database change) refresh the cached data, the Home key figures and My Activity. Returns the promise. */
+        function doRequestsPoll(force) {
+            return fetch('equipment-booking/api/poll-requests.php', { method: 'GET', credentials: 'same-origin', cache: 'no-store' })
                 .then(r => r.json())
                 .then(fresh => {
                     if (!Array.isArray(fresh)) return;
@@ -3538,7 +3557,7 @@
                         }
                     });
 
-                    if (changed) {
+                    if (changed || force) {
                         // Update the global data and re-render
                         window.REQUESTS_DATA = fresh;
                         window.OVERDUE_COUNT = fresh.filter(r => r.status === 'Overdue').length; // keep checkOverdueState in sync
@@ -3549,21 +3568,18 @@
                     }
                 })
                 .catch(() => { }); // silently ignore network errors
-        }, INTERVAL);
-        } // end SSE guard
+        }
+
+        // The live hub calls this when the database says this faculty's requests changed
+        window._pupsyncRequestsPoll = doRequestsPoll;
+
+        if (!window.PupSyncSSE || window.PupSyncSSE.fallback) {
+            setInterval(function () { if (!hubIsLive()) doRequestsPoll(); }, INTERVAL);
+        }
         // SSE fallback listener for requests polling
         if (window.PupSyncSSE && !window.PupSyncSSE.fallback) {
             document.addEventListener('pupsync:sse-fallback', function () {
-                setInterval(function () {
-                    fetch('equipment-booking/api/poll-requests.php', { method: 'GET' })
-                        .then(r => r.json())
-                        .then(fresh => {
-                            if (!Array.isArray(fresh)) return;
-                            let changed = false;
-                            fresh.forEach(r => { if (lastStatuses[r.id] !== r.status) { changed = true; lastStatuses[r.id] = r.status; } });
-                            if (changed) { window.REQUESTS_DATA = fresh; window.OVERDUE_COUNT = fresh.filter(r => r.status === 'Overdue').length; checkOverdueState(); _updateFacultyStatCards(fresh); document.dispatchEvent(new CustomEvent('pupsync:requests-changed')); }
-                        }).catch(() => {});
-                }, INTERVAL);
+                setInterval(function () { if (!hubIsLive()) doRequestsPoll(); }, INTERVAL);
             }, { once: true });
         }
     }
@@ -3604,10 +3620,10 @@
         doPoll();                       // establish the baseline immediately
 
         if (!window.PupSyncSSE || window.PupSyncSSE.fallback) {
-            setInterval(doPoll, INTERVAL);
+            setInterval(function () { if (!hubIsLive()) doPoll(); }, INTERVAL);
         } else {
             document.addEventListener('pupsync:sse-fallback', function () {
-                setInterval(doPoll, INTERVAL);
+                setInterval(function () { if (!hubIsLive()) doPoll(); }, INTERVAL);
             }, { once: true });
         }
 

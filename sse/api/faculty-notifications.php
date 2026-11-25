@@ -43,6 +43,7 @@ session_write_close();
 require_once __DIR__ . '/../core/stream.php';
 require_once __DIR__ . '/../core/change-detection.php';
 require_once __DIR__ . '/../core/connection-table.php';
+require_once __DIR__ . '/../core/faculty-signature.php';
 
 sse_send_headers();
 
@@ -55,67 +56,17 @@ require_once __DIR__ . '/../../shared/core/pseudo-cron.php';   // scheduled work
 /**
  * Build a cheap change signature for the faculty member's notification feed.
  *
- * Four scalar probes, each in its own try/catch:
- *  1. MAX(request_date) on tbl_requests for this faculty — detects new borrows
- *     and any status change that gets recorded as a request_date update.
- *  2. MAX(id) on tbl_room_reservations — detects new reservation rows or (via
- *     the fact that IDs are monotonic) any reservation activity.
- *  3. MAX(id) on tbl_faculty_admin_notice — detects overdue notices pushed by
- *     admin. The table may not exist on older installs; if missing, falls back
- *     to an empty string rather than crashing the stream.
- *  4. COUNT(*) of unread rows in tbl_faculty_notif_state — detects when the
- *     faculty reads or dismisses a notification from another device/tab.
+ * The feed is computed live from the faculty member's requests, reservations, waitlist, room issues and
+ * admin notices (see notifications/core/faculty-data.php), with the read / deleted state in
+ * tbl_faculty_notif_state. So the signature is those same sources, via the shared helper:
+ * any new row OR status change anywhere in them moves it.
+ *
+ * (The previous version read tbl_faculty_notif_state.user_id, a column that does not exist - the real one is
+ * faculty_id - and watched only MAX(request_date) / MAX(id), which never move on an approve or a decline.)
  */
 function sse_faculty_notifications_snapshot(mysqli $conn, string $uid): string {
-    $parts = [];
-
-    // 1. Latest equipment request date for this faculty
-    try {
-        $s = $conn->prepare("SELECT MAX(request_date) AS v FROM tbl_requests WHERE faculty_id = ?");
-        $s->bind_param('s', $uid);
-        $s->execute();
-        $parts[] = $s->get_result()->fetch_assoc()['v'] ?? '';
-        $s->close();
-    } catch (Throwable $e) { $parts[] = ''; }
-
-    // 2. Latest room reservation id for this faculty
-    try {
-        $s = $conn->prepare("SELECT MAX(id) AS v FROM tbl_room_reservations WHERE faculty_id = ?");
-        $s->bind_param('s', $uid);
-        $s->execute();
-        $parts[] = $s->get_result()->fetch_assoc()['v'] ?? '';
-        $s->close();
-    } catch (Throwable $e) { $parts[] = ''; }
-
-    // 3. Latest admin notice (table may not exist on older installs)
-    try {
-        $check = $conn->query("SHOW TABLES LIKE 'tbl_faculty_admin_notice'");
-        if ($check && $check->num_rows > 0) {
-            $s = $conn->prepare("SELECT MAX(id) AS v FROM tbl_faculty_admin_notice WHERE faculty_id = ?");
-            $s->bind_param('s', $uid);
-            $s->execute();
-            $parts[] = $s->get_result()->fetch_assoc()['v'] ?? '';
-            $s->close();
-        } else {
-            $parts[] = '';
-        }
-    } catch (Throwable $e) { $parts[] = ''; }
-
-    // 4. Unread notification count
-    try {
-        $check2 = $conn->query("SHOW TABLES LIKE 'tbl_faculty_notif_state'");
-        if ($check2 && $check2->num_rows > 0) {
-            $s = $conn->prepare("SELECT COUNT(*) AS v FROM tbl_faculty_notif_state WHERE user_id = ? AND is_read = 0");
-            $s->bind_param('s', $uid);
-            $s->execute();
-            $parts[] = (string)($s->get_result()->fetch_assoc()['v'] ?? '0');
-            $s->close();
-        } else {
-            $parts[] = '0';
-        }
-    } catch (Throwable $e) { $parts[] = '0'; }
-
-    return sse_make_sig($parts);
+    $p = ps_faculty_live_parts($conn, $uid, ['requests', 'rooms', 'notifs']);
+    return sse_make_sig([$p['requests'] ?? '', $p['rooms'] ?? '', $p['notifs'] ?? '']);
 }
 
 // ─── Main loop ───────────────────────────────────────────────────────────────

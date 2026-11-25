@@ -28,6 +28,7 @@ session_write_close();
 require_once __DIR__ . '/../core/stream.php';
 require_once __DIR__ . '/../core/change-detection.php';
 require_once __DIR__ . '/../core/connection-table.php';
+require_once __DIR__ . '/../core/faculty-signature.php';
 
 sse_send_headers();
 
@@ -40,34 +41,13 @@ require_once __DIR__ . '/../../shared/core/pseudo-cron.php';   // scheduled work
 /**
  * Build a cheap change signature for a faculty member's room reservations.
  *
- * Two queries are combined into a single signature:
- *  - MAX(id): detects new reservation rows.
- *  - GROUP_CONCAT of the 10 most-recent (id:status) pairs: detects status
- *    changes on existing rows (e.g. admin approving a Waiting reservation).
+ * Fingerprints every reservation (status, date, times, cancelled_at, reason) and the waitlist entries,
+ * so new rows, approvals, declines, cancellations and expiries are all noticed - not only the last 10.
  */
 function sse_faculty_reservations_snapshot(mysqli $conn, string $uid): string
 {
-    $stmt1 = $conn->prepare(
-        'SELECT MAX(id) AS v FROM tbl_room_reservations WHERE faculty_id = ?'
-    );
-    $stmt1->bind_param('s', $uid);
-    $stmt1->execute();
-    $maxId = $stmt1->get_result()->fetch_assoc()['v'] ?? '0';
-    $stmt1->close();
-
-    // GROUP_CONCAT catches status changes on existing rows
-    // (e.g. admin approves a waiting reservation)
-    $stmt2 = $conn->prepare(
-        "SELECT GROUP_CONCAT(id, ':', status ORDER BY id SEPARATOR ',') AS v
-         FROM (SELECT id, status FROM tbl_room_reservations
-               WHERE faculty_id = ? ORDER BY id DESC LIMIT 10) sub"
-    );
-    $stmt2->bind_param('s', $uid);
-    $stmt2->execute();
-    $statusList = $stmt2->get_result()->fetch_assoc()['v'] ?? '';
-    $stmt2->close();
-
-    return sse_make_sig([$maxId, $statusList]);
+    $p = ps_faculty_live_parts($conn, $uid, ['rooms']);
+    return sse_make_sig([$p['rooms'] ?? '']);
 }
 
 // ─── Main loop ───────────────────────────────────────────────────────────────
