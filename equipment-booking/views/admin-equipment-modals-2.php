@@ -191,87 +191,100 @@
     </div>
 </div>
 
-<!-- DRAWER: REQUEST REVIEW (Equipment > On Loan > Waiting). Opened by the Review button on a waiting row
-         (and by the request ID, and by the notification's "View in Loans"). Reuses the ps-modal-backdrop
-         open/close mechanism, so psOpenModal/psCloseModal, backdrop click and Esc all work unchanged.
-         This is the ONLY place a waiting request is decided: the table row has no Approve / Decline buttons.
-         The two buttons below open the existing approve/decline confirm screens; data-req-id is filled in
-         by the drawer script (admin-dashboard.js, "review drawer") each time the drawer opens. -->
-<div class="ps-modal-backdrop ps-drawer-backdrop" id="ps-appr-drawer">
-    <aside class="ps-drawer" role="dialog" aria-modal="true" aria-labelledby="ps-appr-title">
+<!-- DRAWER: REQUEST DETAILS (Equipment > Loans). ONE drawer, ONE layout, for every row: a waiting request
+         (opened by its Review button, its #ID, or the notification's "View in Loans") and any other loan
+         (opened by View or its #ID). Only the footer differs: Approve / Decline appear for a waiting request
+         and nowhere else, so this is the only place a request is decided (the table rows have no such buttons).
+         Reuses the ps-modal-backdrop open/close mechanism (psOpenModal / psCloseModal, backdrop click, Esc).
+         Approve / Decline open the existing confirm screens; data-req-id is set by the drawer script
+         (admin-dashboard.js, "loan drawer") each time it opens. Rows are .ps-ld-row; optional rows start hidden. -->
+<div class="ps-modal-backdrop ps-drawer-backdrop" id="ps-loan-drawer">
+    <aside class="ps-drawer" role="dialog" aria-modal="true" aria-labelledby="ps-ld-title">
         <div class="ps-modal-head">
             <div class="ps-modal-head-icon ps-mhi--maroon">
-                <span class="material-symbols-outlined">fact_check</span>
+                <span class="material-symbols-outlined">assignment</span>
             </div>
-            <h3 id="ps-appr-title">Review <span id="ps-appr-reqno">#0000</span></h3>
-            <button class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-appr-drawer" aria-label="Close">
+            <h3 id="ps-ld-title">Request <span id="ps-ld-no">#0000</span></h3>
+            <button type="button" class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-loan-drawer" aria-label="Close">
                 <span class="material-symbols-outlined">close</span>
             </button>
         </div>
         <div class="ps-drawer-body">
             <div class="ps-drawer-status">
-                <span class="ps-badge ps-badge--dot ps-badge--waiting">Pending Review</span>
-                <span class="ps-drawer-muted">Submitted <span id="ps-appr-submitted">—</span></span>
+                <span class="ps-badge ps-badge--dot ps-badge--active" id="ps-ld-status">Active</span>
+                <span class="ps-drawer-muted">Submitted <span id="ps-ld-submitted">—</span></span>
             </div>
 
-            <section class="ps-drawer-sec">
-                <h4>Supporting document</h4>
-                <div class="ps-doc-card" id="ps-appr-doc">
-                    <div class="ps-doc-card__icon"><span class="material-symbols-outlined" id="ps-appr-doc-icon">draft</span></div>
+            <section class="ps-drawer-sec" id="ps-ld-doc-sec">
+                <h4>Request letter</h4>
+                <div class="ps-doc-card" id="ps-ld-doc">
+                    <div class="ps-doc-card__icon"><span class="material-symbols-outlined" id="ps-ld-doc-icon">draft</span></div>
                     <div class="ps-doc-card__meta">
-                        <div class="ps-doc-card__name" id="ps-appr-doc-name">—</div>
-                        <div class="ps-drawer-muted" id="ps-appr-doc-kind">—</div>
+                        <div class="ps-doc-card__name" id="ps-ld-doc-name">—</div>
+                        <div class="ps-drawer-muted" id="ps-ld-doc-kind">—</div>
                     </div>
                     <div class="ps-doc-card__btns">
-                        <a class="ps-btn ps-btn--primary ps-btn--sm" id="ps-appr-doc-open" href="#" target="_blank" rel="noopener noreferrer">
+                        <a class="ps-btn ps-btn--primary ps-btn--sm" id="ps-ld-doc-open" href="#" target="_blank" rel="noopener noreferrer">
                             <span class="material-symbols-outlined">open_in_new</span> Open
                         </a>
-                        <a class="ps-btn ps-btn--outline ps-btn--sm" id="ps-appr-doc-dl" href="#" download>
+                        <a class="ps-btn ps-btn--outline ps-btn--sm" id="ps-ld-doc-dl" href="#" download aria-label="Download">
                             <span class="material-symbols-outlined">download</span>
                         </a>
                     </div>
                 </div>
-                <div class="ps-doc-preview" id="ps-appr-doc-preview" hidden>
-                    <img id="ps-appr-doc-img" alt="Attached document preview">
+                <div class="ps-doc-preview" id="ps-ld-doc-preview" hidden>
+                    <img id="ps-ld-doc-img" alt="Request letter preview">
                 </div>
-                <div class="ps-doc-none" id="ps-appr-doc-none" hidden>
+                <div class="ps-doc-none" id="ps-ld-doc-none" hidden>
                     <span class="material-symbols-outlined">warning</span>
-                    <span>No supporting document is attached. Standard requests are handled automatically, so check why this one needs a manual decision.</span>
+                    <span>No request letter attached.</span>
                 </div>
             </section>
 
             <section class="ps-drawer-sec">
-                <h4>Requester</h4>
-                <div class="ps-kv">
-                    <div><span>Name</span><strong id="ps-appr-who">—</strong></div>
-                    <div><span>Type</span><strong id="ps-appr-type">—</strong></div>
-                    <div><span>ID</span><strong id="ps-appr-idno">—</strong></div>
+                <h4>Equipment</h4>
+                <div class="ps-ld-list">
+                    <div class="ps-ld-row"><span>Item</span><strong id="ps-ld-item">—</strong></div>
+                    <div class="ps-ld-row"><span>Used in</span><strong id="ps-ld-room">—</strong></div>
+                    <div class="ps-ld-row" id="ps-ld-cond-row" hidden><span>Condition</span><strong id="ps-ld-cond">—</strong></div>
                 </div>
             </section>
 
             <section class="ps-drawer-sec">
-                <h4>Request</h4>
-                <div class="ps-kv">
-                    <div><span>Item</span><strong id="ps-appr-item">—</strong></div>
-                    <div><span>Quantity</span><strong id="ps-appr-qty">—</strong></div>
-                    <div><span>Date needed</span><strong id="ps-appr-needed">—</strong></div>
-                    <div><span>Return by</span><strong id="ps-appr-return">—</strong></div>
-                    <div><span>Facility</span><strong id="ps-appr-room">—</strong></div>
-                    <div><span>Instructor</span><strong id="ps-appr-instr">—</strong></div>
+                <h4>Schedule</h4>
+                <div class="ps-ld-list">
+                    <div class="ps-ld-row"><span>Starts</span><strong id="ps-ld-start">—</strong></div>
+                    <div class="ps-ld-row"><span>Return by</span><strong id="ps-ld-due">—</strong></div>
+                    <div class="ps-ld-row" id="ps-ld-ext-row" hidden><span>Extended</span><strong id="ps-ld-ext">—</strong></div>
+                    <div class="ps-ld-row" id="ps-ld-returned-row" hidden><span>Returned</span><strong id="ps-ld-returned">—</strong></div>
                 </div>
             </section>
 
-            <section class="ps-drawer-sec" id="ps-appr-note-sec">
-                <h4>Notes</h4>
-                <div class="ps-drawer-note" id="ps-appr-note">—</div>
+            <section class="ps-drawer-sec">
+                <h4>Borrower</h4>
+                <div class="ps-ld-list">
+                    <div class="ps-ld-row"><span>Name</span><strong id="ps-ld-who">—</strong></div>
+                    <div class="ps-ld-row"><span id="ps-ld-id-label">ID</span><strong id="ps-ld-idno">—</strong></div>
+                    <div class="ps-ld-row" id="ps-ld-auth-row" hidden><span>Authorized by</span><strong id="ps-ld-auth">—</strong></div>
+                    <div class="ps-ld-row" id="ps-ld-pickup-row" hidden><span>Collected by</span><strong id="ps-ld-pickup">—</strong></div>
+                </div>
+            </section>
+
+            <section class="ps-drawer-sec" id="ps-ld-handling-sec" hidden>
+                <h4>Handling</h4>
+                <div class="ps-ld-list">
+                    <div class="ps-ld-row" id="ps-ld-by-row" hidden><span id="ps-ld-by-label">Approved by</span><strong id="ps-ld-by">—</strong></div>
+                    <div class="ps-ld-row" id="ps-ld-notice-row" hidden><span>Overdue notices</span><strong id="ps-ld-notice">—</strong></div>
+                    <div class="ps-ld-row ps-ld-row--stack" id="ps-ld-note-row" hidden><span title="Internal: not visible to faculty">Internal note</span><strong id="ps-ld-note">—</strong></div>
+                </div>
             </section>
         </div>
         <div class="ps-drawer-foot">
-            <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-appr-drawer">Close</button>
-            <button class="ps-btn ps-btn--danger" type="button" data-action="ps-open-modal" data-modal="ps-decline-modal" data-appr-decide="decline" data-req-id="">
+            <button class="ps-btn ps-btn--ghost" type="button" data-action="ps-close-modal" data-modal="ps-loan-drawer">Close</button>
+            <button class="ps-btn ps-btn--danger" type="button" data-action="ps-open-modal" data-modal="ps-decline-modal" data-appr-decide="decline" data-req-id="" hidden>
                 <span class="material-symbols-outlined">close</span> Decline
             </button>
-            <button class="ps-btn ps-btn--success" type="button" data-action="ps-open-modal" data-modal="ps-approve-modal" data-appr-decide="approve" data-req-id="">
+            <button class="ps-btn ps-btn--success" type="button" data-action="ps-open-modal" data-modal="ps-approve-modal" data-appr-decide="approve" data-req-id="" hidden>
                 <span class="material-symbols-outlined">check</span> Approve
             </button>
         </div>

@@ -749,6 +749,8 @@
                                         data-handled-by="<?php echo htmlspecialchars($ldec['by'] ?? ''); ?>"
                                         data-notice-count="<?php echo isset($eq_notices[(int)$r['id']]) ? (int)$eq_notices[(int)$r['id']]['count'] : 0; ?>"
                                         data-notice-last="<?php echo isset($eq_notices[(int)$r['id']]) ? date('M j, Y g:i A', strtotime($eq_notices[(int)$r['id']]['last_at'])) : ''; ?>"
+                                        data-extensions="<?php echo (int)($r['extension_count'] ?? 0); ?>"
+                                        data-original-return="<?php echo !empty($r['original_return_date']) ? htmlspecialchars(date('M d, Y', strtotime($r['original_return_date']))) : ''; ?>"
                                         data-faculty-key="<?php echo htmlspecialchars((string)($r['faculty_id'] ?? ''), ENT_QUOTES); ?>"
                                         data-admin-note="<?php echo htmlspecialchars($eq_arb_notes[(int)$r['id']] ?? '', ENT_QUOTES); ?>">
                                         <?php $lbundle = trim((string)($r['batch_id'] ?? '')); ?>

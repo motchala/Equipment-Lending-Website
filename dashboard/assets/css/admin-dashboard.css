@@ -9848,6 +9848,57 @@ a.ps-doc-chip:hover {
     overflow-wrap: anywhere;
 }
 
+/* Equipment > Loans drawer (#ps-loan-drawer): one label-left / value-right row per fact, so it scans like a receipt */
+.ps-ld-list {
+    border: 1px solid var(--khaki-border);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.ps-ld-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 9px 12px;
+}
+
+.ps-ld-row+.ps-ld-row {
+    border-top: 1px solid var(--khaki-border);
+}
+
+.ps-ld-row>span {
+    flex-shrink: 0;
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+.ps-ld-row>strong {
+    min-width: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dark);
+    text-align: right;
+    overflow-wrap: anywhere;
+}
+
+.ps-ld-row--stack {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+}
+
+.ps-ld-row--stack>strong {
+    font-weight: 500;
+    text-align: left;
+    white-space: pre-wrap;
+}
+
+.ps-ld-row[hidden],
+.ps-drawer-sec[hidden] {
+    display: none;
+}
+
 .eq-bundle-tag {
     display: inline-flex;
     align-items: center;
