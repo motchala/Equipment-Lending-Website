@@ -82,19 +82,38 @@ document.addEventListener('DOMContentLoaded', function () {
             return String(m).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
         }
 
-        span.textContent = formatTime(secondsLeft);
+        // Fixed end time instead of "subtract 1 every second": browsers slow down or pause
+        // timers in background tabs and while a phone sleeps, which made the old counter fall
+        // behind the real lockout. Each tick now recomputes what is left from the clock.
+        const deadline = Date.now() + secondsLeft * 1000;
+        let finished = false;
 
-        const interval = setInterval(function () {
-            secondsLeft -= 1;
+        function remaining() {
+            return Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+        }
 
-            if (secondsLeft <= 0) {
+        function tick() {
+            if (finished) return;
+            const left = remaining();
+            if (left <= 0) {
+                finished = true;
                 clearInterval(interval);
                 window.location.reload();
                 return;
             }
+            span.textContent = formatTime(left);
+        }
 
-            span.textContent = formatTime(secondsLeft);
-        }, 1000);
+        span.textContent = formatTime(remaining());
+        const interval = setInterval(tick, 250);
+
+        // Catch up immediately when the tab comes back or the page is restored from the back button.
+        document.addEventListener('visibilitychange', function () {
+            if (!document.hidden) tick();
+        });
+        window.addEventListener('pageshow', function (e) {
+            if (e.persisted) tick();
+        });
     }
 
     document.addEventListener('DOMContentLoaded', function () {
