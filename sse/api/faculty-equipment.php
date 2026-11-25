@@ -34,6 +34,7 @@ session_write_close();
 require_once __DIR__ . '/../core/stream.php';
 require_once __DIR__ . '/../core/change-detection.php';
 require_once __DIR__ . '/../core/connection-table.php';
+require_once __DIR__ . '/../core/faculty-signature.php';
 
 sse_send_headers();
 
@@ -46,23 +47,13 @@ require_once __DIR__ . '/../../shared/core/pseudo-cron.php';   // scheduled work
 /**
  * Build a cheap change signature for the signed-in faculty member.
  *
- * Two scalar queries:
- *   1. MAX(request_date) for this faculty's requests — detects new borrows,
- *      status changes recorded via request_date updates, or returns.
- *   2. SUM(quantity) across all non-archived inventory — detects restocks,
- *      edits, or archive/restore actions that would affect availability.
+ * Uses the shared helper (sse/core/faculty-signature.php), which fingerprints EVERY one of this
+ * faculty member's requests (status, dates, claim / return times ...), so an admin approving or
+ * declining a request is noticed - not just a brand-new row - plus the shared stock levels.
  */
 function sse_faculty_equipment_snapshot(mysqli $conn, string $uid): string {
-    $stmt = $conn->prepare("SELECT MAX(request_date) AS v FROM tbl_requests WHERE faculty_id = ?");
-    $stmt->bind_param('s', $uid);
-    $stmt->execute();
-    $maxReqDate = $stmt->get_result()->fetch_assoc()['v'] ?? '';
-    $stmt->close();
-
-    $r2 = $conn->query("SELECT SUM(quantity) AS v FROM tbl_inventory WHERE is_archived = 0");
-    $invSum = $r2 ? ($r2->fetch_assoc()['v'] ?? '0') : '0';
-
-    return sse_make_sig([$maxReqDate, $invSum]);
+    $p = ps_faculty_live_parts($conn, $uid, ['requests', 'inventory']);
+    return sse_make_sig([$p['requests'] ?? '', $p['inventory'] ?? '']);
 }
 
 // ─── Main loop ───────────────────────────────────────────────────────────────
