@@ -1616,8 +1616,8 @@
         var later = !!f.reservation_date && f.reservation_date > todayStr();
         var note = waiting
             ? (later
-                ? 'This reservation is for a later date, so an admin has to approve it. If it is not reviewed before the reservation time has ended, it is automatically declined.'
-                : 'An admin has to approve your reservation first. If it is not reviewed before the reservation time has ended, it is automatically declined.')
+                ? 'This reservation is for a later date, so an admin has to approve it. If it is not reviewed in time, it is automatically declined at 12:01 AM on the reservation date.'
+                : 'An admin has to approve your reservation first. If it is not reviewed before the start time, it is automatically declined.')
             : (res.reason ? res.reason : '');
         flow(
             '<div class="st-result"><div class="st-result-top">' +
