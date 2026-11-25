@@ -242,6 +242,8 @@ if (
     <link rel="stylesheet" href="shared/assets/css/admin-shell.css?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/css/admin-shell.css'); ?>">
     <!-- Phone app layout (only active when <html class="rx-mobile">). Loaded LAST on purpose. -->
     <link rel="stylesheet" href="dashboard/assets/css/admin-dashboard-mobile.css?v=<?php echo @filemtime(PS_ROOT . '/dashboard/assets/css/admin-dashboard-mobile.css'); ?>">
+    <!-- Dark-mode refinements (every rule is scoped to html[data-theme="dark"], so light mode is unaffected). Loaded last. -->
+    <link rel="stylesheet" href="shared/assets/css/admin-dark.css?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/css/admin-dark.css'); ?>">
 </head>
 
 <body>
