@@ -276,6 +276,17 @@
                 ms: Date.parse(d.bufferEnd)
             };
         }
+        // A student request waits for an admin until the reservation has ENDED (core/room-expiry.php).
+        if (/^student/i.test(d.type || '')) {
+            var endHm = d.endTime || '23:59:00';
+            if (/^\d{1,2}:\d{2}$/.test(endHm)) endHm += ':00';
+            if (/^\d:/.test(endHm)) endHm = '0' + endHm;
+            return {
+                onDay: true,
+                untilEnd: true,
+                ms: Date.parse(d.isoDate + 'T' + endHm + '+08:00')
+            };
+        }
         var onDay = !!d.submittedRaw && d.submittedRaw >= (d.isoDate + ' 00:01:00');
         var hhmm = onDay ? (d.startTime || '00:01:00') : '00:01:00';
         if (/^\d{1,2}:\d{2}$/.test(hhmm)) hhmm += ':00';
@@ -335,7 +346,8 @@
                 out.push(docChip(d));
                 return out;
             }
-            var text = dl.onDay ? 'Decide before it starts (' + fmtTime(d.startTime) + ')' : 'Decide by ' + fmtDay(d.isoDate) + ', 12:01 AM';
+            var text = dl.untilEnd ? 'Open until it ends (' + fmtTime(d.endTime) + ')' :
+                dl.onDay ? 'Decide before it starts (' + fmtTime(d.startTime) + ')' : 'Decide by ' + fmtDay(d.isoDate) + ', 12:01 AM';
             if (isNaN(left)) {
                 out.push(ctx(text));
             } else if (left <= 0) {

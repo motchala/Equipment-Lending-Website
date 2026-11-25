@@ -90,6 +90,19 @@ try {
         send_bundle_json(409, 'error', 'At least two bundled requests must still be pending to approve them together.');
     }
 
+    // Same-day / later-date items are judged against the schedule, like the automatic decision:
+    // refuse the whole bundle if any one of them would overbook its item.
+    require_once __DIR__ . '/../core/approval-check.php';
+    foreach ($waiting as $row) {
+        if (in_array((string)($row['booking_mode'] ?? ''), ['today', 'future'], true)) {
+            $blocker = equipment_approval_blocker($conn, (int)$row['id']);
+            if ($blocker !== null) {
+                $conn->rollback();
+                send_bundle_json(409, 'error', 'Cannot approve the whole bundle: ' . $blocker);
+            }
+        }
+    }
+
     $inventoryNeeds = [];
     foreach ($waiting as $row) {
         if (!in_array((string)($row['booking_mode'] ?? ''), ['today', 'future'], true)) {

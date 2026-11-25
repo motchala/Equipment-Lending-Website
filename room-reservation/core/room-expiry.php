@@ -21,6 +21,12 @@
  * 12:01 AM of its own reservation day has no "before the day" left, so its deadline is
  * its start time.
  *
+ * STUDENT requests (made with a faculty code) follow a different rule: they are never approved
+ * automatically, so they wait for an admin for as long as the reservation could still happen, and are
+ * declined automatically only once the reservation's END time has passed (nothing is left to approve).
+ * They are therefore left out of the 12:01 AM / start-time rule below. Mode "never" still turns every
+ * automatic decline off.
+ *
  * The Super Admin can change this (Settings → Arbitration → Reservation rules):
  *   day   (default) the rule above
  *   start           the deadline is always the start time the requester asked for
@@ -43,6 +49,9 @@ if (!defined('PS_ROOM_EXPIRY_RULE')) {
 }
 if (!defined('PS_ROOM_EXPIRY_REASON_DAY')) {
     define('PS_ROOM_EXPIRY_REASON_DAY', 'Not reviewed in time – automatically declined at 12:01 AM on the reservation date.');
+}
+if (!defined('PS_ROOM_EXPIRY_REASON_END')) {
+    define('PS_ROOM_EXPIRY_REASON_END', 'Not reviewed before the reservation ended – automatically declined.');
 }
 if (!defined('PS_ROOM_EXPIRY_REASON_START')) {
     define('PS_ROOM_EXPIRY_REASON_START', 'Not reviewed before the reservation start time – automatically declined.');
@@ -91,6 +100,7 @@ function ps_room_expire_unreviewed(mysqli $conn, ?DateTimeInterface $now = null)
                JOIN tbl_rooms r ON r.room_id = rr.room_id
               WHERE rr.status = 'Waiting'
                 AND rr.buffer_until IS NULL   /* a buffered same-day request is decided by ps_room_settle_buffers() */
+                AND COALESCE(rr.submitted_as, '') <> 'student'   /* students wait until the reservation ends (below) */
                 AND " . $deadline_sql
         );
         if (!$sel) {
@@ -105,8 +115,28 @@ function ps_room_expire_unreviewed(mysqli $conn, ?DateTimeInterface $now = null)
         $rows = $sel->get_result()->fetch_all(MYSQLI_ASSOC);
         $sel->close();
 
+        // Student requests: declined only after the reservation's END time has passed.
+        $stu = $conn->prepare(
+            "SELECT rr.id, rr.room_id, rr.faculty_id, rr.faculty_name, r.room_name,
+                    0 AS submitted_on_the_day
+               FROM tbl_room_reservations rr
+               JOIN tbl_rooms r ON r.room_id = rr.room_id
+              WHERE rr.status = 'Waiting'
+                AND rr.submitted_as = 'student'
+                AND ? >= TIMESTAMP(rr.reservation_date, rr.end_time)"
+        );
+        if ($stu) {
+            $stu->bind_param('s', $now_s);
+            $stu->execute();
+            foreach ($stu->get_result()->fetch_all(MYSQLI_ASSOC) as $srow) {
+                $srow['_reason'] = PS_ROOM_EXPIRY_REASON_END;
+                $rows[] = $srow;
+            }
+            $stu->close();
+        }
+
         foreach ($rows as $row) {
-            $reason = ($mode === 'start' || (int)$row['submitted_on_the_day'] === 1) ? PS_ROOM_EXPIRY_REASON_START : PS_ROOM_EXPIRY_REASON_DAY;
+            $reason = $row['_reason'] ?? (($mode === 'start' || (int)$row['submitted_on_the_day'] === 1) ? PS_ROOM_EXPIRY_REASON_START : PS_ROOM_EXPIRY_REASON_DAY);
 
             $upd = $conn->prepare("UPDATE tbl_room_reservations SET status = 'Declined', reason = ? WHERE id = ? AND status = 'Waiting'");
             if (!$upd) {

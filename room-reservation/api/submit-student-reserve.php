@@ -271,8 +271,8 @@ if ($fac_row && !empty($fac_row['email']) && notif_family_enabled($conn, 'facult
             <p style="margin:0 0 20px;color:#333;font-size:.95rem;">
                 ' . ($is_pending
         ? ($is_future_day
-            ? 'The room reservation you authorized is for a later date, so it is waiting for an admin to approve it. If no decision is made, it is automatically declined at 12:01 AM on the reservation date.'
-            : 'The room reservation you authorized is waiting for an admin to approve it. If no decision is made before the start time, it is automatically declined.')
+            ? 'The room reservation you authorized is for a later date, so it is waiting for an admin to approve it. If no decision is made before the reservation time has ended, it is automatically declined.'
+            : 'The room reservation you authorized is waiting for an admin to approve it. If no decision is made before the reservation time has ended, it is automatically declined.')
         : 'The room reservation you authorized has been processed by the system.') . '
             </p>
             <table style="width:100%;border-collapse:collapse;font-size:.9rem;">

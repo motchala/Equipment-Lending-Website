@@ -20,7 +20,7 @@ declare(strict_types=1);
  *     (tomorrow, or Monday when tomorrow is a Sunday; the office is closed on Sundays).
  *   - NEAR-DUE hourly ("today") loan: +1 / 2 / 3 / 5 hours counted from the return moment, rounded up
  *     to the next 5 minutes, never past closing time (BookingSchedule::dayEnd()).
- *   - NEAR-DUE day loan: +1 / 2 / 3 days from the return date, keeping the return time of day.
+ *   - NEAR-DUE day loan: +1 day from the return date, keeping the return time of day (one day at most).
  *
  * AVAILABILITY (the same ledger the Borrow form and the arbitration engine use)
  *   The units already in the faculty member's hands stay theirs; what must hold is that no
@@ -71,7 +71,7 @@ final class BorrowExtension
     public const OVERDUE_CHOICE = 24;
     private const EXTENSION_DAY_START = '07:00';
     private const EXTENSION_HOURS = [1, 2, 3, 5];
-    private const EXTENSION_DAYS = [1, 2, 3];
+    private const EXTENSION_DAYS = [1];   // an extension adds one day at most
 
     private static ?bool $ready = null;
 
