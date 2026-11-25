@@ -80,7 +80,7 @@ If your request is turned down, you are told why **immediately** and nothing is 
 3. Choose the room, the date and the time.
 
 The same hours, days and limits apply. A few things are different for students:
-- Every student request waits for an **admin to decide**. There is no 10-minute automatic approval.
+- Every student request waits for an **admin to decide**. There is no 10-minute automatic approval. The request stays open until the reservation time has ended, and is declined automatically only after that.
 - You **cannot** reserve if the faculty member who gave you the code has an overdue equipment item.
 - Your request counts toward that faculty member's 2 active reservations. If they already have 2, they must cancel one first.
 
@@ -91,7 +91,7 @@ The same hours, days and limits apply. A few things are different for students:
 - **Cancel:** a waiting reservation any time, an approved one until 1 hour before it starts. Anyone on the waitlist for that slot gets an email when it opens up.
 - **Join a waitlist:** if the slot you want is taken, you can join the waitlist. You will be emailed if it becomes free. Joining does not hold the slot for you.
 - **Report a problem:** tell the admins if something is wrong with a room. This does not close the room by itself. An admin looks at it first.
-- **Ask the room assistant:** a chat helper that answers questions about rooms and your reservations. It can also help you start a reservation, with the same rules as the normal form. You can send up to 20 messages per hour.
+- **Ask the room assistant:** a chat helper that answers questions about rooms and your reservations. It can also help you start a reservation, with the same rules as the normal form. You can send up to 20 messages per day. The assistant also has a daily limit shared by everyone, so on a very busy day it may ask you to try again tomorrow.
 
 ---
 
@@ -129,7 +129,7 @@ No. Sundays are closed.
 Not instantly. It waits up to 10 minutes. An admin can approve it sooner.
 
 **What if nobody approves my later-date reservation?**
-It is declined automatically at 12:01 AM on the day of the reservation.
+For faculty, it is declined automatically at 12:01 AM on the day of the reservation. For students, it stays open until the reservation time has ended, and is declined automatically only then.
 
 **Do I have to keep the page open?**
 No. Check **My Activity** later to see the result.

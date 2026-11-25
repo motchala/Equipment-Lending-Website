@@ -104,7 +104,7 @@ If an approved item is **never picked up** and the time passes, the request is c
 
 - You can extend **one time** per loan.
 - You can ask when the item is **due in 15 minutes or less**, or when it is already **overdue**.
-- You can add **1, 2, 3 or 5 hours** (or **1, 2 or 3 days** for a day loan).
+- You can add **1, 2, 3 or 5 hours** (or **1 day** for a day loan).
 - It only works if nobody else has booked the item for that extra time.
 
 ---
@@ -122,7 +122,7 @@ An item is **Overdue** when it is not returned by its return time.
 ## 8. What admins do
 
 **Every Admin can:**
-- Approve or decline requests. **Declining needs a reason** (at least 5 letters). Approving does not.
+- Approve or decline requests. **Declining needs a reason** (at least 5 letters). Approving does not, but the system will not let you approve a request that would overbook the item.
 - Scan the Claim and Return QR codes.
 - Hand out or receive equipment by hand, and handle partial handovers and returns.
 - Send overdue reminders.

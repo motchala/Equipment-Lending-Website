@@ -192,6 +192,18 @@ $log_rule        = $is_cancellation ? 'booking_cancelled' : 'override';
 $conn->begin_transaction();
 
 try {
+    // ── Same-day / later-date approval: judged against the schedule, like the automatic decision ──
+    // (so an admin can no longer approve over another booking and overbook the item).
+    // Only a request that is waiting or was declined is being approved here; an item already out is left alone.
+    if ($new_status === 'Approved' && $is_scheduled && in_array($current_status, ['Waiting', 'Declined'], true)) {
+        require_once __DIR__ . '/../core/approval-check.php';
+        $approval_blocker = equipment_approval_blocker($conn, $request_id);
+        if ($approval_blocker !== null) {
+            $conn->rollback();
+            send_json(409, 'error', 'Cannot approve: ' . $approval_blocker);
+        }
+    }
+
     // ── Task 7.3: If approving, check inventory quantity > 0 ─────────────────
     if ($new_status === 'Approved' && !$is_scheduled) {
         $inv_stmt = $conn->prepare(
