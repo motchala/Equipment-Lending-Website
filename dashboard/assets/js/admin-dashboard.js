@@ -4909,7 +4909,7 @@
                 e.preventDefault();
                 e.stopImmediatePropagation();
                 choice = { batchId: batchId, autoOk: row.dataset.autoOk === '1', trigger: trigger };
-                if (typeof psCloseModal === 'function') psCloseModal('ps-appr-drawer');   // one screen at a time
+                if (typeof psCloseModal === 'function') psCloseModal('ps-loan-drawer');   // one screen at a time
                 choiceItems.textContent = '';
                 items.forEach(function (item) {
                     var line = document.createElement('div');
@@ -5734,85 +5734,143 @@ function psSelectFmt(btn) {
 
 
 /* ═══════════════════════════════════════════════════════════════
-   APPROVALS — review drawer for the Equipment > On Loan table
-   Additive block. A Waiting row has ONE action, the Review button (like the
-   Reservations table). It opens this drawer, which shows the request letter and
-   every detail and is the only place the request is decided. The same drawer opens
-   from the request ID in the row and from the notification deep link ("View in
-   Loans"), which click those same elements.
-   The drawer's Approve / Decline buttons carry data-action="ps-open-modal" and the
-   request's id (data-req-id), so they open the EXISTING approve / decline confirm
-   screens exactly like the old row buttons did: same fields, same bundle question,
-   same admin-override.php call. This block only fills them with the right id and
-   closes the drawer so just one screen is on top.
+   EQUIPMENT > LOANS — one request drawer for every row (#ps-loan-drawer)
+   Additive block. It replaces the old separate "review" and "view" drawers, so a
+   waiting request and any other loan look the same: request letter, equipment,
+   schedule, borrower, and (only when there is something to say) handling.
+   Opened by: the Review button, the #ID, and the View button of a row, and by the
+   notification's "View in Loans" (which clicks the Review button).
+   Only the footer differs. Approve / Decline are shown for a WAITING request only;
+   they carry data-action="ps-open-modal" and the request's id (data-req-id), so they
+   open the existing approve / decline confirm screens (same fields, same multi-item
+   question, same admin-override.php call). This block only fills in the id and closes
+   the drawer so just one screen is on top.
    ═══════════════════════════════════════════════════════════════ */
 (function () {
-    var drawer = document.getElementById('ps-appr-drawer');
+    var drawer = document.getElementById('ps-loan-drawer');
     if (!drawer) return;
     var currentId = null;
 
     function el(id) { return document.getElementById(id); }
+    function has(v) { return v !== undefined && v !== null && String(v).trim() !== ''; }
     function txt(id, v) {
         var n = el(id);
-        if (n) n.textContent = (v !== undefined && v !== null && String(v).trim() !== '') ? v : '\u2014';
+        if (n) n.textContent = has(v) ? v : '\u2014';
+    }
+    // An optional row: shown only when it has something to say
+    function opt(rowId, valId, v) {
+        var row = el(rowId);
+        if (!row) return;
+        row.hidden = !has(v);
+        if (has(v)) txt(valId, v);
     }
 
     function openFor(row) {
         var d = row.dataset;
+        var state = d.loanState || '';
+        var waiting = state === 'waiting';
         currentId = d.id;
-        // Tell the Approve / Decline buttons which request they act on
-        Array.prototype.forEach.call(drawer.querySelectorAll('[data-appr-decide]'), function (b) {
-            b.setAttribute('data-req-id', d.id || '');
-        });
 
-        txt('ps-appr-reqno', '#' + String(d.id || 0).padStart(4, '0'));
-        txt('ps-appr-submitted', d.submitted);
-        txt('ps-appr-who', d.borrower);
-        txt('ps-appr-type', d.reqType);
-        txt('ps-appr-idno', d.idNumber);
-        txt('ps-appr-item', d.equipment);
-        txt('ps-appr-qty', d.qty);
-        txt('ps-appr-needed', d.dateNeeded);
-        // Date AND time: the duration the borrower picked (e.g. 2 hours) was already turned into the real return
-        // time when the request was sent, and the row carries it as "Nov 25, 2026 \u00b7 11:00 AM". Date only as a fallback.
-        txt('ps-appr-return', d.dueLabel || d.returnDateDisplay);
-        txt('ps-appr-room', d.room);
-        txt('ps-appr-instr', d.instructor);
-        txt('ps-appr-note', d.note);
+        // ── header: status + when it was submitted ─────────────────────
+        var days = Math.max(1, Number(d.daysOverdue) || 0);
+        var labels = {
+            scheduled: 'Scheduled', returned: 'Returned',
+            overdue: 'Overdue by ' + days + ' day' + (days === 1 ? '' : 's'),
+            due: 'Due today', pickup: 'Ready for pickup', waiting: 'Pending review', ok: 'Active'
+        };
+        var classes = {
+            scheduled: 'ps-badge--scheduled', returned: 'ps-badge--returned', overdue: 'ps-badge--overdue',
+            due: 'ps-badge--waiting', pickup: 'ps-badge--waiting', waiting: 'ps-badge--waiting', ok: 'ps-badge--active'
+        };
+        var badge = el('ps-ld-status');
+        if (badge) {
+            badge.className = 'ps-badge ps-badge--dot ' + (classes[state] || 'ps-badge--active');
+            badge.textContent = labels[state] || d.status || '\u2014';
+        }
+        txt('ps-ld-no', '#' + String(d.id || 0).padStart(4, '0'));
+        txt('ps-ld-submitted', d.submitted);
 
-        var hasDoc = !!d.docUrl;
-        var card = el('ps-appr-doc'), none = el('ps-appr-doc-none'), prev = el('ps-appr-doc-preview');
+        // ── request letter: always for a waiting request (so a missing one is flagged), otherwise only if attached ──
+        var hasDoc = has(d.docUrl);
+        var docSec = el('ps-ld-doc-sec'), card = el('ps-ld-doc'), none = el('ps-ld-doc-none'), prev = el('ps-ld-doc-preview');
+        if (docSec) docSec.hidden = !hasDoc && !waiting;
         if (card) card.hidden = !hasDoc;
-        if (none) none.hidden = hasDoc;
+        if (none) none.hidden = hasDoc || !waiting;
         if (prev) prev.hidden = true;
-
         if (hasDoc) {
             var kind = d.docKind || 'file';
-            var icon = kind === 'pdf' ? 'picture_as_pdf' : (kind === 'image' ? 'image' : 'draft');
-            var ext = (d.docName.split('.').pop() || '').toUpperCase();
-            txt('ps-appr-doc-name', d.docName);
-            txt('ps-appr-doc-kind', (kind === 'pdf' ? 'PDF document' : kind === 'image' ? 'Image' : 'File') + (ext ? ' \u00b7 ' + ext : ''));
-            el('ps-appr-doc-icon').textContent = icon;
-            el('ps-appr-doc-open').setAttribute('href', d.docOpenUrl);
-            var dl = el('ps-appr-doc-dl');
+            var name = d.docName || 'Request letter';
+            var fileExt = (name.split('.').pop() || '').toUpperCase();
+            txt('ps-ld-doc-name', name);
+            var hasExt = fileExt && fileExt !== name.toUpperCase();
+            txt('ps-ld-doc-kind', kind === 'pdf' ? 'PDF document'
+                : kind === 'image' ? 'Image' + (hasExt ? ' \u00b7 ' + fileExt : '')
+                : (hasExt ? fileExt + ' file' : 'File'));
+            el('ps-ld-doc-icon').textContent = kind === 'pdf' ? 'picture_as_pdf' : (kind === 'image' ? 'image' : 'draft');
+            el('ps-ld-doc-open').setAttribute('href', d.docOpenUrl || d.docUrl);
+            var dl = el('ps-ld-doc-dl');
             dl.setAttribute('href', d.docUrl);
-            dl.setAttribute('download', d.docName);
-            // Keep inline previews and downloads on the original file URL; the
-            // Open link uses the branded document viewer.
+            dl.setAttribute('download', name);
+            // Inline preview and download use the original file URL; Open uses the branded document viewer.
             if (kind === 'image' && prev) {
-                el('ps-appr-doc-img').setAttribute('src', d.docUrl);
+                el('ps-ld-doc-img').setAttribute('src', d.docUrl);
                 prev.hidden = false;
             }
         }
-        if (typeof psOpenModal === 'function') psOpenModal('ps-appr-drawer');
+
+        // ── equipment ───────────────────────────────────────────────────
+        txt('ps-ld-item', d.equipment + (Number(d.qty) > 1 ? ' \u00d7' + d.qty : ''));
+        txt('ps-ld-room', d.room);
+        opt('ps-ld-cond-row', 'ps-ld-cond', waiting ? '' : d.condition);
+
+        // ── schedule: the duration the borrower picked is already stored as the real return time ──
+        txt('ps-ld-start', d.startLabel || d.dateNeeded);
+        txt('ps-ld-due', d.dueLabel || d.returnDateDisplay);
+        var extCount = parseInt(d.extensions || '0', 10);
+        opt('ps-ld-ext-row', 'ps-ld-ext', extCount > 0
+            ? (extCount === 1 ? 'Once' : extCount + ' times') + (has(d.originalReturn) ? ' \u00b7 was ' + d.originalReturn : '')
+            : '');
+        opt('ps-ld-returned-row', 'ps-ld-returned', state === 'returned' ? (d.returnedAtDisplay || 'Not recorded') : '');
+
+        // ── borrower: ONE person. A student request shows the student, authorized by the faculty account.
+        //    (The old "Instructor" field is dropped: new requests always store the faculty's own name in it.) ──
+        var student = d.submittedAs === 'student' && has(d.studentName);
+        txt('ps-ld-who', student ? d.studentName : d.borrower);
+        txt('ps-ld-id-label', student ? 'Student ID' : 'Faculty ID');
+        txt('ps-ld-idno', student ? (d.studentId || 'Not recorded') : d.idNumber);
+        opt('ps-ld-auth-row', 'ps-ld-auth', student ? d.borrower : '');
+        opt('ps-ld-pickup-row', 'ps-ld-pickup', student ? '' : d.pickupName);
+
+        // ── handling: only what exists. Nothing for a request still waiting. ──
+        var by = waiting ? '' : d.handledBy;
+        var nCount = parseInt(d.noticeCount || '0', 10);
+        var note = (d.adminNote || '').trim();
+        txt('ps-ld-by-label', state === 'returned' ? 'Return handled by' : 'Approved by');
+        opt('ps-ld-by-row', 'ps-ld-by', by);
+        opt('ps-ld-notice-row', 'ps-ld-notice', nCount > 0
+            ? nCount + ' sent' + (has(d.noticeLast) ? ' \u00b7 last ' + d.noticeLast : '') : '');
+        opt('ps-ld-note-row', 'ps-ld-note', note);
+        var handling = el('ps-ld-handling-sec');
+        if (handling) handling.hidden = !(has(by) || nCount > 0 || note !== '');
+
+        // ── footer: Approve / Decline only for a waiting request ─────────
+        Array.prototype.forEach.call(drawer.querySelectorAll('[data-appr-decide]'), function (b) {
+            b.hidden = !waiting;
+            b.setAttribute('data-req-id', waiting ? (d.id || '') : '');
+        });
+
+        var body = drawer.querySelector('.ps-drawer-body');
+        if (body) body.scrollTop = 0;
+        if (typeof psOpenModal === 'function') psOpenModal('ps-loan-drawer');
     }
 
-    // Capture phase: runs before the generic data-action handler, so the Review button (and the request ID)
-    // in the waiting list open this drawer instead of the old detail modal.
+    // Capture phase: runs before the generic data-action handler, so every way into a loan row
+    // (Review, View, the #ID) opens this drawer rather than the old detail modal.
     document.addEventListener('click', function (e) {
         var t = e.target.closest(
-            '#eq-loan-table tr[data-loan-state="waiting"] [data-eq-review], ' +
-            '#eq-loan-table tr[data-loan-state="waiting"] [data-modal="ps-req-detail-modal"]');
+            '#eq-loan-table [data-eq-review], ' +
+            '#eq-loan-table [data-action="eq-open-loan-detail"], ' +
+            '#eq-loan-table tr.eq-loan-row [data-modal="ps-req-detail-modal"]');
         if (!t) return;
         var row = t.closest('tr.eq-loan-row');
         if (!row) return;
@@ -5832,117 +5890,18 @@ function psSelectFmt(btn) {
         if (!row) {
             // decided meanwhile (another admin, or the 10-minute buffer ran out): don't open a confirm screen for it
             e.stopPropagation();
-            if (typeof psCloseModal === 'function') psCloseModal('ps-appr-drawer');
+            if (typeof psCloseModal === 'function') psCloseModal('ps-loan-drawer');
             if (typeof window.showToast === 'function') window.showToast('This request is no longer waiting.');
             return;
         }
-        if (typeof psCloseModal === 'function') psCloseModal('ps-appr-drawer');
+        if (typeof psCloseModal === 'function') psCloseModal('ps-loan-drawer');
     });
 
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape' && drawer.classList.contains('ps-modal-open') && typeof psCloseModal === 'function') {
-            psCloseModal('ps-appr-drawer');
+            psCloseModal('ps-loan-drawer');
         }
     });
-})();
-
-/* Equipment > On Loan: show the loan's full record in a side drawer. */
-(function () {
-    function el(id) { return document.getElementById(id); }
-    function txt(id, value) {
-        var node = el(id);
-        if (node) node.textContent = value !== undefined && value !== null && String(value).trim() !== ''
-            ? value
-            : '\u2014';
-    }
-
-    function openFor(row) {
-        if (!el('ps-loan-detail-drawer')) return;
-        var d = row.dataset;
-        var state = d.loanState || '';
-        var labels = {
-            scheduled: 'Scheduled',
-            returned: 'Returned',
-            overdue: 'Overdue by ' + Math.max(1, Number(d.daysOverdue) || 0) + ' day' + (Number(d.daysOverdue) === 1 ? '' : 's'),
-            due: 'Due today',
-            pickup: 'Ready for pickup',
-            waiting: 'Pending review',
-            ok: 'Active'
-        };
-        var classes = {
-            scheduled: 'ps-badge--scheduled',
-            returned: 'ps-badge--returned',
-            overdue: 'ps-badge--overdue',
-            due: 'ps-badge--waiting',
-            pickup: 'ps-badge--waiting',
-            waiting: 'ps-badge--waiting',
-            ok: 'ps-badge--active'
-        };
-        var status = el('ps-loan-detail-status');
-        if (status) {
-            status.className = 'ps-badge ps-badge--dot ' + (classes[state] || 'ps-badge--active');
-            status.textContent = labels[state] || d.status || '—';
-        }
-
-        txt('ps-loan-detail-number', '#' + String(d.id || 0).padStart(4, '0'));
-        txt('ps-loan-detail-submitted', d.submitted);
-        txt('ps-loan-detail-equipment', d.equipment);
-        txt('ps-loan-detail-quantity', d.qty ? d.qty + (Number(d.qty) === 1 ? ' unit' : ' units') : '');
-        txt('ps-loan-detail-issued', d.startLabel);
-        txt('ps-loan-detail-due', d.dueLabel);
-        txt('ps-loan-detail-returned', d.returnedAtDisplay || 'Not recorded');
-        var returnedSection = el('ps-loan-detail-returned-section');
-        if (returnedSection) returnedSection.hidden = state !== 'returned';
-        txt('ps-loan-detail-condition', d.condition);
-        txt('ps-loan-detail-room', d.room);
-        txt('ps-loan-detail-instructor', d.instructor);
-        var studentRequest = d.submittedAs === 'student' && d.studentName;
-        txt('ps-loan-detail-borrower', studentRequest ? d.studentName : d.borrower);
-        txt('ps-loan-detail-type', studentRequest ? 'Student (faculty-authorized)' : d.reqType);
-        txt('ps-loan-detail-id-number', studentRequest ? (d.studentId || 'Not recorded') : d.idNumber);
-        txt('ps-loan-detail-authorizer', studentRequest
-            ? (d.borrower || 'Faculty account') + (d.idNumber ? ' (' + d.idNumber + ')' : '')
-            : '');
-        var authorizerRow = el('ps-loan-detail-authorizer-row');
-        if (authorizerRow) authorizerRow.hidden = !studentRequest;
-        txt('ps-loan-detail-pickup', d.pickupName || '');
-        var pickupRow = el('ps-loan-detail-pickup-row');
-        if (pickupRow) pickupRow.hidden = !d.pickupName;
-        txt('ps-loan-detail-note', d.note);
-        var adminNote = (d.adminNote || '').trim();
-        var adminNoteSection = el('ps-loan-detail-admin-note-section');
-        if (adminNoteSection) {
-            if (adminNote !== '') {
-                adminNoteSection.hidden = false;
-                txt('ps-loan-detail-admin-note', adminNote);
-            } else {
-                adminNoteSection.hidden = true;
-            }
-        }
-        var noticeCount = parseInt(d.noticeCount || '0', 10);
-        var noticeSection = el('ps-loan-detail-notice-section');
-        if (noticeSection) {
-            if (noticeCount > 0) {
-                noticeSection.hidden = false;
-                txt('ps-loan-detail-notice', noticeCount + ' overdue notice' + (noticeCount === 1 ? '' : 's') + ' sent to borrower (last sent: ' + (d.noticeLast || 'recent') + ')');
-            } else {
-                noticeSection.hidden = true;
-            }
-        }
-        txt('ps-loan-detail-handled-by', d.handledBy || 'Not recorded');
-        if (typeof psOpenModal === 'function') psOpenModal('ps-loan-detail-drawer');
-    }
-
-    document.addEventListener('click', function (e) {
-        var trigger = e.target.closest('#eq-loan-table [data-action="eq-open-loan-detail"]');
-        if (!trigger) return;
-        var row = trigger.closest('tr.eq-loan-row');
-        if (!row) return;
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-        openFor(row);
-    }, true);
 })();
 
 
