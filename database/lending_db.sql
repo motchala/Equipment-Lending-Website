@@ -3232,6 +3232,15 @@ ALTER TABLE `tbl_sse_connections`
 --
 -- AUTO_INCREMENT for table `tbl_sync_pending_deletions`
 --
+ALTER TABLE `tbl_equipment_categories`
+  MODIFY `category_id` int(11) NOT NULL AUTO_INCREMENT;
+
+ALTER TABLE `tbl_equipment_categories`
+  MODIFY `category_id` int(11) NOT NULL AUTO_INCREMENT;
+
+ALTER TABLE `tbl_inventory`
+  MODIFY `item_id` int(11) NOT NULL AUTO_INCREMENT;
+
 ALTER TABLE `tbl_sync_pending_deletions`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 COMMIT;
