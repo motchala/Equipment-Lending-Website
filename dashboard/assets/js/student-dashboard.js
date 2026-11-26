@@ -237,10 +237,14 @@
     }
     function scheduleMode(date) { return date === todayStr() ? 'today' : 'future'; }
 
-    /* Image paths come from the database as "uploads/…" or "assets/…". Anything else is ignored. */
+    /* Image paths come from the database as "uploads/…", "assets/…", or Cloudinary URLs. */
     function safeImg(p) {
         p = String(p == null ? '' : p).trim();
-        if (!p || p.charAt(0) === '/' || p.indexOf('\\') !== -1 || p.indexOf('..') !== -1 ||
+        if (!p) return '';
+        // Cloudinary absolute URLs are the only allowed external URLs
+        if (/^https:\/\/res\.cloudinary\.com\//i.test(p)) return p;
+        // Block absolute paths, traversal, and any other protocol
+        if (p.charAt(0) === '/' || p.indexOf('\\') !== -1 || p.indexOf('..') !== -1 ||
             /^[a-z][a-z0-9+.\-]*:/i.test(p)) return '';
         return encodeURI(p);
     }

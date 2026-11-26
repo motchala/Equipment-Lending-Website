@@ -95,7 +95,7 @@ if (($_GET['fragment'] ?? '') === 'inventory-tbody') {
         <?php else:
         foreach ($arch_rows as $item): ?>
             <tr>
-                <td><img src="<?php echo htmlspecialchars(equipment_image_path($item['image_path'], $root_url, $item['category'] ?? '')); ?>" class="item-img" onerror="this.src='<?php echo $root_url; ?>uploads/default.png'"></td>
+                <td><img src="<?php echo htmlspecialchars(equipment_image_path($item['image_path'], $root_url, $item['category'] ?? '')); ?>" class="item-img" data-fallback="<?php echo htmlspecialchars($root_url . 'uploads/default.png', ENT_QUOTES); ?>"></td>
                 <td class="fw-bold"><?php echo htmlspecialchars($item['item_name']); ?></td>
                 <td><?php echo htmlspecialchars($item['category']); ?></td>
                 <td>

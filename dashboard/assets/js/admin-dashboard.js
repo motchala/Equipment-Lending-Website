@@ -1378,6 +1378,16 @@
             if (img.complete && img.naturalWidth === 0) broken();
         });
 
+        // data-fallback fallback: for any img with data-fallback, swap src on error (no inline handler needed).
+        rows.forEach(function (row) {
+            row.querySelectorAll('img[data-fallback]').forEach(function (img) {
+                const fb = img.dataset.fallback;
+                if (!fb) return;
+                img.addEventListener('error', function () { if (img.src !== fb) img.src = fb; }, { once: true });
+                if (img.complete && img.naturalWidth === 0 && img.src !== fb) img.src = fb;
+            });
+        });
+
         /* The search box is also a filter. A row matches when EVERY word of the query matches something on it:
              name / category / condition  - the text itself        (laptop, cables, good, fair, "for repair")
              stock status                 - the Stock column pill  ("in stock", "low stock", "no stock", "out of stock")
