@@ -39,10 +39,24 @@ if (!function_exists('cloudinary_last_error')) {
 }
 
 if (!function_exists('cloudinary_env')) {
-    /** Reads a setting from $_ENV, getenv() or $_SERVER (shared hosts differ on which is filled). */
+    /**
+     * Reads a setting from $_ENV, getenv(), or $_SERVER.
+     * On shared hosts (e.g. InfinityFree) putenv() values are not visible via getenv() in PHP-FPM.
+     * If all three sources return empty, call load_env() as a last-resort fallback (idempotent —
+     * it skips keys already set) then re-check $_ENV so credentials are always found.
+     */
     function cloudinary_env(string $key, string $default = ''): string
     {
         foreach ([$_ENV[$key] ?? null, getenv($key) ?: null, $_SERVER[$key] ?? null] as $v) {
+            if (is_string($v) && trim($v) !== '') {
+                return trim($v);
+            }
+        }
+        // Last resort: force .env to load (idempotent — skips already-set keys).
+        // Needed on hosts where PHP-FPM does not propagate putenv() back to getenv()/$_ENV.
+        if (function_exists('load_env')) {
+            load_env();
+            $v = $_ENV[$key] ?? '';
             if (is_string($v) && trim($v) !== '') {
                 return trim($v);
             }
@@ -85,6 +99,10 @@ if (!function_exists('cloudinary_post')) {
             }
             curl_close($ch);
         } else {
+            if (!ini_get('allow_url_fopen')) {
+                cloudinary_last_error('allow_url_fopen is disabled on this host — cannot reach Cloudinary. Enable cURL or set allow_url_fopen = On in php.ini.');
+                return null;
+            }
             $boundary = '----PUPSyncBoundary' . bin2hex(random_bytes(8));
             $body = '';
             foreach ($fields as $name => $value) {
@@ -155,6 +173,16 @@ if (!function_exists('cloudinary_upload')) {
             error_log('[PUPSync Cloudinary] Temp file not readable: ' . $tmp_path);
             return '';
         }
+
+        // Startup diagnostic — visible in the PHP error log so developers can self-diagnose
+        $transport = function_exists('curl_init') ? 'cURL' : (ini_get('allow_url_fopen') ? 'stream' : 'NONE');
+        error_log(sprintf(
+            '[PUPSync Cloudinary] upload starting — cloud=%s key=%s transport=%s file=%s',
+            $cloud,
+            substr($key, 0, 4) . '***',
+            $transport,
+            basename($original_filename)
+        ));
 
         // Build a safe public_id from the original filename (no extension)
         $base_name = pathinfo($original_filename, PATHINFO_FILENAME);
