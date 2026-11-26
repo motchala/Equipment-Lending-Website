@@ -39,7 +39,7 @@ set_exception_handler(function (Throwable $e): void {
     if (!headers_sent()) {
         http_response_code(500);
     }
-    echo json_encode(['status' => 'error', 'code' => 'server', 'error' => 'Something went wrong. Please try again.']);
+    echo json_encode(['status' => 'error', 'code' => 'server', 'error' => $e->getMessage() . ' in ' . basename($e->getFile()) . ':' . $e->getLine()]);
 });
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
