@@ -213,26 +213,39 @@ function gs_sync_item(mysqli $conn, int $item_id, string $action): void
             if (empty($matching_rows)) {
                 // Item not in sheet — append $qty new rows
                 if ($qty > 0) {
-                    // Find the last ITEM NO. to continue the sequence
-                    $last_no = 0;
+                    // Scan ALL control numbers in the tab to find the dominant prefix
+                    // and the highest numeric suffix used so far.
+                    $prefix_counts = [];  // prefix => count of occurrences
+                    $prefix_max    = [];  // prefix => highest numeric suffix seen
+                    $last_item_no  = 0;
                     foreach ($rows as $row) {
                         $no = (int)($row[0] ?? 0);
-                        if ($no > $last_no) $last_no = $no;
-                    }
-                    // Derive prefix from existing control numbers in the tab (e.g. BIN-CL- from BIN-CL-001)
-                    $prefix = 'BIN-NEW-';
-                    foreach ($rows as $row) {
+                        if ($no > $last_item_no) $last_item_no = $no;
+
                         $ctrl = trim((string)($row[2] ?? ''));
-                        if ($ctrl !== '' && preg_match('/^(BIN-[A-Z]+-)/i', $ctrl, $pm)) {
-                            $prefix = strtoupper($pm[1]);
-                            break;
+                        if ($ctrl === '') continue;
+                        // Match any BIN-XX- or BIN-XX-XX- style prefix followed by digits
+                        if (preg_match('/^(BIN(?:-[A-Z0-9]+)+-)(\d+)$/i', $ctrl, $pm)) {
+                            $p = strtoupper($pm[1]);
+                            $n = (int)$pm[2];
+                            $prefix_counts[$p] = ($prefix_counts[$p] ?? 0) + 1;
+                            if ($n > ($prefix_max[$p] ?? 0)) $prefix_max[$p] = $n;
                         }
+                    }
+                    // Use the prefix with the most rows — that is the sheet's real format
+                    $prefix       = 'BIN-NEW-';
+                    $last_ctrl_no = 0;
+                    if (!empty($prefix_counts)) {
+                        arsort($prefix_counts);
+                        $prefix       = array_key_first($prefix_counts);
+                        $last_ctrl_no = $prefix_max[$prefix] ?? 0;
                     }
                     $new_rows = [];
                     for ($n = 1; $n <= $qty; $n++) {
-                        $no         = $last_no + $n;
-                        $ctrl       = $prefix . str_pad((string)$no, 3, '0', STR_PAD_LEFT);
-                        $new_rows[] = [$no, $item_name, $ctrl, $category, $condition, ''];
+                        $item_no    = $last_item_no + $n;
+                        $ctrl_no    = $last_ctrl_no + $n;
+                        $ctrl       = $prefix . str_pad((string)$ctrl_no, 3, '0', STR_PAD_LEFT);
+                        $new_rows[] = [$item_no, $item_name, $ctrl, $category, $condition, ''];
                     }
                     $append_range = gs_tab_ref($category) . '!A:F';
                     $url = 'https://sheets.googleapis.com/v4/spreadsheets/' . $sheet_id
