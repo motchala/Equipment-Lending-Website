@@ -322,6 +322,16 @@
                         showAdminToast('✅ An item was returned. Tables updated.');
                     }
 
+                    // Refresh the inventory catalog when stock counts change (add/edit/archive)
+                    const invSig = [curr.inv_total, curr.inv_low].join('|');
+                    if (window._adminInvSig === undefined) {
+                        window._adminInvSig = invSig;
+                    } else if (invSig !== window._adminInvSig && !document.hidden
+                        && typeof window.psRefreshInventoryTbody === 'function') {
+                        window._adminInvSig = invSig;
+                        window.psRefreshInventoryTbody();
+                    }
+
                     window._adminLastStats = curr;
                 })
                 .catch(function () { })
