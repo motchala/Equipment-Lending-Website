@@ -56,7 +56,12 @@ function actEquipImage(string $equipmentName): ?string
     global $equip_image_map, $root_url;
     $key = strtolower(trim($equipmentName));
     if (isset($equip_image_map[$key])) {
-        return $root_url . htmlspecialchars($equip_image_map[$key]);
+        $img = $equip_image_map[$key];
+        // Cloudinary URLs are already absolute — don't prepend root_url
+        if (str_starts_with($img, 'https://')) {
+            return htmlspecialchars($img);
+        }
+        return $root_url . htmlspecialchars($img);
     }
     return null;
 }

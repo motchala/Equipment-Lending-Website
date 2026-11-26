@@ -24,7 +24,7 @@ header('Server: Web Server');
 // ── Anti-clickjacking ─────────────────────────────────────────────────────────
 // X-Frame-Options covers older browsers; CSP frame-ancestors covers modern ones.
 header("X-Frame-Options: DENY");
-header("Content-Security-Policy: default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self';");
+header("Content-Security-Policy: default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob: https://res.cloudinary.com; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self';");
 
 // ── HSTS (HTTPS-only) ─────────────────────────────────────────────────────────
 $is_https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
