@@ -63,7 +63,7 @@ function sse_admin_equipment_snapshot(mysqli $conn): string
     $r3 = $conn->query("SELECT COUNT(*) AS v FROM tbl_requests WHERE status='Waiting'");
     $countWaiting = $r3 ? ($r3->fetch_assoc()['v'] ?? '0') : '0';
 
-    // Fingerprint of every request (same idea as loans_sig in poll-requests-data.php)
+    // Fingerprint of every request
     $r4 = $conn->query(
         "SELECT COUNT(*) AS n, COALESCE(MAX(id),0) AS max_id,
                 COALESCE(SUM(CRC32(CONCAT(status,'|',COALESCE(return_date,''),'|',COALESCE(returned_at,'')))),0) AS chk
@@ -72,7 +72,16 @@ function sse_admin_equipment_snapshot(mysqli $conn): string
     $fp = $r4 ? $r4->fetch_assoc() : null;
     $fingerprint = $fp ? ($fp['n'] . '-' . $fp['max_id'] . '-' . $fp['chk']) : '';
 
-    return sse_make_sig([$maxReqDate, $maxReturnedAt, $countWaiting, $fingerprint]);
+    // Fingerprint of inventory — catches add/edit/archive without a page reload
+    $r5 = $conn->query(
+        "SELECT COUNT(*) AS n, COALESCE(MAX(item_id),0) AS max_id,
+                COALESCE(SUM(CRC32(CONCAT(item_name,'|',quantity,'|',`condition`,'|',is_archived))),0) AS chk
+           FROM tbl_inventory"
+    );
+    $inv = $r5 ? $r5->fetch_assoc() : null;
+    $invFingerprint = $inv ? ($inv['n'] . '-' . $inv['max_id'] . '-' . $inv['chk']) : '';
+
+    return sse_make_sig([$maxReqDate, $maxReturnedAt, $countWaiting, $fingerprint, $invFingerprint]);
 }
 
 // ─── Setup ───────────────────────────────────────────────────────────────────

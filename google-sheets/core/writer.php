@@ -32,14 +32,19 @@ require_once __DIR__ . '/client.php';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Map PUPSync condition to the sheet STATUS value. */
-function gs_condition_to_status(string $condition): string
+/**
+ * Map PUPSync condition to the sheet STATUS value.
+ * Format A sheets (one row per unit, CONTROL NO. column): OK / NG
+ * Format B sheets (one row per item type, Quantity column): Working / Not Working
+ * Fair maps to the "usable" value in both formats — it means the item still works.
+ */
+function gs_condition_to_status(string $condition, string $format = 'A'): string
 {
-    return match ($condition) {
-        'Good'       => 'OK',
-        'For Repair' => 'NG',
-        default      => 'Fair',
-    };
+    if ($format === 'B') {
+        return $condition === 'For Repair' ? 'Not Working' : 'Working';
+    }
+    // Format A: binary OK / NG
+    return $condition === 'For Repair' ? 'NG' : 'OK';
 }
 
 /**
@@ -174,10 +179,10 @@ function gs_sync_item(mysqli $conn, int $item_id, string $action): void
         $is->close();
         if (!$item) return;
 
-        $item_name = (string)$item['item_name'];
-        $category  = (string)$item['category'];   // = tab name
-        $qty       = $action === 'archive' ? 0 : (int)$item['quantity'];
-        $condition = $action === 'archive' ? 'NG' : gs_condition_to_status((string)$item['condition']);
+        $item_name    = (string)$item['item_name'];
+        $category     = (string)$item['category'];   // = tab name
+        $qty          = $action === 'archive' ? 0 : (int)$item['quantity'];
+        $item_cond    = (string)$item['condition'];  // resolved after format detection
 
         // ── 4. Read the tab ───────────────────────────────────────────────────
         $rows = gs_read_tab($sheet_id, $category, $token);
@@ -188,6 +193,8 @@ function gs_sync_item(mysqli $conn, int $item_id, string $action): void
 
         $format        = gs_detect_format($rows);
         $header_idx    = gs_header_row_index($rows);
+        // Now that we know the format, map condition to the correct status string
+        $condition     = $action === 'archive' ? ($format === 'B' ? 'Not Working' : 'NG') : gs_condition_to_status($item_cond, $format);
         if ($header_idx < 0) {
             error_log('[gs_sync_item] No header row found in tab "' . $category . '"');
             return;
