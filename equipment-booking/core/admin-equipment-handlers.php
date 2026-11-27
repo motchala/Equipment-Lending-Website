@@ -212,6 +212,17 @@ if (isset($_POST['add_item'])) {
     $description = trim($_POST['remarks'] ?? $_POST['description'] ?? '');
     if ($description === '') $description = null;
 
+    // Block quantity = 0 on new items — a new item must have at least 1 unit
+    if ($qty < 1) {
+        if ($is_ajax) {
+            header('Content-Type: application/json');
+            echo json_encode(['status' => 'error', 'message' => 'Quantity must be at least 1 when adding a new item.']);
+            exit();
+        }
+        header("Location: {$base}/admin-dashboard.php?view=inventory&error=qty");
+        exit();
+    }
+
     // Duplicate name check (space-stripped, case-insensitive)
     if (equipment_name_exists($conn, $name)) {
         if ($is_ajax) {

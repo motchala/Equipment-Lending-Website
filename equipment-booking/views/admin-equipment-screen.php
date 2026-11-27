@@ -301,13 +301,13 @@
                                 <div class="form-group">
                                     <label for="inv-quantity">Quantity <span class="req-star">*</span></label>
                                     <input type="number" id="inv-quantity" name="quantity"
-                                        class="form-control-custom" min="0"
+                                        class="form-control-custom" min="<?php echo $edit_item ? '0' : '1'; ?>"
                                         value="<?php echo $edit_item ? (int)$edit_item['quantity'] : '1'; ?>"
                                         required>
                                 </div>
                                 <div class="form-group">
                                     <label>Condition</label>
-                                    <div id="inv-condition-display" class="form-control-custom" style="background:var(--bg-secondary,#f5f5f5);cursor:default;">Good</div>
+                                    <div id="inv-condition-display" class="form-control-custom" style="background:var(--bg-secondary,#f5f5f5);cursor:default;"><?php echo $edit_item ? htmlspecialchars($edit_item['condition'] ?? 'Good') : 'Fair'; ?></div>
                                 </div>
                             </div>
 

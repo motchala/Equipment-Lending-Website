@@ -239,6 +239,8 @@ foreach ($sheet_names as $sheet_idx => $sheet_name) {
 
             $qty_raw   = trim((string)($row[$qty_col] ?? '1'));
             $qty       = max(0, (int)filter_var($qty_raw, FILTER_SANITIZE_NUMBER_INT));
+            if ($qty < 1) continue; // skip zero-stock rows — new items must have at least 1 unit
+
             $condition = gsheet_condition_from_qty($qty);
 
             $key = strtolower($item_name) . '||' . $campus_id;
@@ -299,7 +301,7 @@ foreach ($sheet_names as $sheet_idx => $sheet_name) {
 
         foreach ($item_counts as $item_name => $counts) {
             $qty       = $counts['ok'];
-            $condition = $counts['ok'] === 0 ? 'For Repair' : ($counts['ok'] < $counts['total'] ? 'Fair' : 'Good');
+            $condition = gsheet_condition_from_qty($qty);
 
             $key = strtolower($item_name) . '||' . $campus_id;
             $synced_item_keys[$key] = ['name' => $item_name, 'campus_id' => $campus_id];
