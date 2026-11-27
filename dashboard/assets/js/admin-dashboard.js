@@ -2534,6 +2534,64 @@
     // student / faculty request shows up in Equipment > Loans without anyone reloading the page.
     window.psRefreshLoansTable = function () { return _psRefreshLoansTable().catch(function () { return false; /* try again on the next poll */ }); };
 
+    /* Facilities > Reservations: re-read the rows from the server and merge them into the table that is on screen.
+       Rows that already exist keep their element (an open drawer or dialog still points at it) and only get the new
+       data-* values and cell contents; new reservations are added, removed ones dropped. The table script
+       (admin-rooms-reservations-table.js) then re-sorts, re-filters and re-counts on "rr:rows-changed", so the active
+       tab, search, sort and page stay where they were. Used by the live hub (admin-live.js). */
+    let _psRoomsBusy = false;
+    function _psRefreshRoomReservations() {
+        const live = document.querySelector('#rrTable tbody');
+        if (!live) return Promise.resolve(true);          // Facilities screen not on this page
+        if (_psRoomsBusy) return Promise.resolve(false);
+        _psRoomsBusy = true;
+        return _psFetchPageDoc().then(function (doc) {
+            const fresh = doc.querySelector('#rrTable tbody');
+            if (!fresh) return;
+            const freshRows = Array.prototype.slice.call(fresh.querySelectorAll('tr.ps-rr-row'));
+            // The table script keeps hold of the hidden "No reservations match" row (#rrNoMatch) inside this tbody,
+            // so it must never be removed or replaced. Only the "No reservations yet" placeholder is ours to manage.
+            const placeholder = function (root) {
+                return Array.prototype.filter.call(root.children, function (r) {
+                    return r.id !== 'rrNoMatch' && !r.classList.contains('ps-rr-row') && r.querySelector('td.rm-empty-cell');
+                })[0] || null;
+            };
+            const liveById = {};
+            Array.prototype.forEach.call(live.querySelectorAll('tr.ps-rr-row'), function (r) { liveById[r.getAttribute('data-rr-id')] = r; });
+            const keep = {};
+            freshRows.forEach(function (fr) {
+                const id = fr.getAttribute('data-rr-id');
+                keep[id] = true;
+                const lr = liveById[id];
+                if (!lr) {                                 // a new reservation
+                    live.insertBefore(document.importNode(fr, true), live.firstElementChild);
+                    return;
+                }
+                // existing row: same element, new values
+                Array.prototype.slice.call(lr.attributes).forEach(function (a) {
+                    if (a.name.indexOf('data-') === 0 && !fr.hasAttribute(a.name)) lr.removeAttribute(a.name);
+                });
+                Array.prototype.forEach.call(fr.attributes, function (a) {
+                    if (a.name.indexOf('data-') === 0 && lr.getAttribute(a.name) !== a.value) lr.setAttribute(a.name, a.value);
+                });
+                const lc = lr.children, fc = fr.children;
+                for (let i = 0; i < fc.length && i < lc.length; i++) {
+                    if (lc[i].innerHTML !== fc[i].innerHTML) lc[i].innerHTML = fc[i].innerHTML;
+                }
+            });
+            Object.keys(liveById).forEach(function (id) { if (!keep[id]) liveById[id].remove(); });
+            const livePh = placeholder(live);
+            if (freshRows.length) {
+                if (livePh) livePh.remove();
+            } else if (!livePh) {
+                const freshPh = placeholder(fresh);
+                if (freshPh) live.insertBefore(document.importNode(freshPh, true), live.firstElementChild);
+            }
+            document.dispatchEvent(new CustomEvent('rr:rows-changed'));   // re-sort, re-filter, re-count, re-draw statuses
+        }).then(function () { _psRoomsBusy = false; return true; }, function (e) { _psRoomsBusy = false; throw e; });
+    }
+    window.psRefreshRoomReservations = function () { return _psRefreshRoomReservations().catch(function () { return false; }); };
+
     /* Equipment: Catalog numbers (fragment endpoint) + the Loans table and its tab counts. */
     function _psRefreshEquipment() {
         const catalog = new Promise(function (resolve) {

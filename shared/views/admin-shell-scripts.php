@@ -9,6 +9,7 @@
     <script src="settings/assets/js/admin-clear-history.js?v=<?php echo @filemtime('settings/assets/js/admin-clear-history.js'); ?>" defer></script>
     <script src="reports/assets/js/reports.js?v=<?php echo @filemtime(PS_ROOT . '/reports/assets/js/reports.js'); ?>" defer></script>
     <script src="dashboard/assets/js/admin-live-render.js?v=<?php echo @filemtime(PS_ROOT . '/dashboard/assets/js/admin-live-render.js'); ?>"></script>
+    <script src="dashboard/assets/js/admin-live.js?v=<?php echo @filemtime(PS_ROOT . '/dashboard/assets/js/admin-live.js'); ?>"></script>
     <script src="equipment-booking/assets/js/equipment-buffer-countdown.js?v=<?php echo @filemtime(PS_ROOT . '/equipment-booking/assets/js/equipment-buffer-countdown.js'); ?>"></script>
     <script src="dashboard/assets/js/admin-dashboard-responsive.js?v=<?php echo @filemtime('dashboard/assets/js/admin-dashboard-responsive.js'); ?>" defer></script>
     <!-- Phone app shell (top bar, bottom tabs, account sheet). Does nothing unless <html class="rx-mobile">. -->

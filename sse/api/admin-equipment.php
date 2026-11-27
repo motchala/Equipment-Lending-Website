@@ -36,6 +36,7 @@ session_write_close();
 require_once __DIR__ . '/../core/stream.php';
 require_once __DIR__ . '/../core/change-detection.php';
 require_once __DIR__ . '/../core/connection-table.php';
+require_once __DIR__ . '/../core/admin-signature.php';
 
 sse_send_headers();
 
@@ -46,42 +47,13 @@ require_once __DIR__ . '/../../shared/core/pseudo-cron.php';   // scheduled work
 // ─── Snapshot ────────────────────────────────────────────────────────────────
 
 /**
- * Build a cheap change signature for the admin equipment view.
- *
- * Three fast scalar queries — no joins, no user input.
- * Covers new requests (request_date), returns (returned_at), and
- * waiting-queue depth (countWaiting).
+ * Change signature for everything an admin watches live: equipment requests (ANY status change, not just
+ * new ones), room reservations and the catalog. It is the same signature the plain-HTTP pulse
+ * (sse/api/admin-pulse.php) uses, so the stream and the pulse always agree on what counts as a change.
  */
 function sse_admin_equipment_snapshot(mysqli $conn): string
 {
-    $r1 = $conn->query("SELECT MAX(request_date) AS v FROM tbl_requests");
-    $maxReqDate = $r1 ? ($r1->fetch_assoc()['v'] ?? '') : '';
-
-    $r2 = $conn->query("SELECT MAX(returned_at) AS v FROM tbl_requests");
-    $maxReturnedAt = $r2 ? ($r2->fetch_assoc()['v'] ?? '') : '';
-
-    $r3 = $conn->query("SELECT COUNT(*) AS v FROM tbl_requests WHERE status='Waiting'");
-    $countWaiting = $r3 ? ($r3->fetch_assoc()['v'] ?? '0') : '0';
-
-    // Fingerprint of every request
-    $r4 = $conn->query(
-        "SELECT COUNT(*) AS n, COALESCE(MAX(id),0) AS max_id,
-                COALESCE(SUM(CRC32(CONCAT(status,'|',COALESCE(return_date,''),'|',COALESCE(returned_at,'')))),0) AS chk
-           FROM tbl_requests"
-    );
-    $fp = $r4 ? $r4->fetch_assoc() : null;
-    $fingerprint = $fp ? ($fp['n'] . '-' . $fp['max_id'] . '-' . $fp['chk']) : '';
-
-    // Fingerprint of inventory — catches add/edit/archive without a page reload
-    $r5 = $conn->query(
-        "SELECT COUNT(*) AS n, COALESCE(MAX(item_id),0) AS max_id,
-                COALESCE(SUM(CRC32(CONCAT(item_name,'|',quantity,'|',`condition`,'|',is_archived))),0) AS chk
-           FROM tbl_inventory"
-    );
-    $inv = $r5 ? $r5->fetch_assoc() : null;
-    $invFingerprint = $inv ? ($inv['n'] . '-' . $inv['max_id'] . '-' . $inv['chk']) : '';
-
-    return sse_make_sig([$maxReqDate, $maxReturnedAt, $countWaiting, $fingerprint, $invFingerprint]);
+    return sse_make_sig(ps_admin_live_parts($conn, ['requests', 'rooms', 'inventory']));
 }
 
 // ─── Setup ───────────────────────────────────────────────────────────────────
