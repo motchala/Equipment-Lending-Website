@@ -46,11 +46,7 @@
                         </div>
                         <div class="form-group">
                             <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Condition</label>
-                            <select name="condition" id="eqm-condition" class="form-control-custom">
-                                <option value="Good">Good</option>
-                                <option value="Fair">Fair</option>
-                                <option value="For Repair">For Repair</option>
-                            </select>
+                            <div id="eqm-condition-display" class="form-control-custom" style="background:var(--bg-secondary,#f5f5f5);cursor:default;">Good</div>
                         </div>
                     </div>
 

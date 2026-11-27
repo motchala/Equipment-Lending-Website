@@ -304,16 +304,8 @@
                                         required>
                                 </div>
                                 <div class="form-group">
-                                    <label for="inv-condition">Condition</label>
-                                    <select id="inv-condition" name="condition" class="form-control-custom">
-                                        <?php
-                                        $cur_condition = $edit_item['condition'] ?? 'Good';
-                                        foreach (['Good', 'Fair', 'For Repair'] as $condOpt) {
-                                            $sel = ($cur_condition === $condOpt) ? 'selected' : '';
-                                            echo "<option value=\"$condOpt\" $sel>$condOpt</option>";
-                                        }
-                                        ?>
-                                    </select>
+                                    <label>Condition</label>
+                                    <div id="inv-condition-display" class="form-control-custom" style="background:var(--bg-secondary,#f5f5f5);cursor:default;">Good</div>
                                 </div>
                             </div>
 

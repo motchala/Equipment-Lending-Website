@@ -281,6 +281,57 @@ function gs_sync_item(mysqli $conn, int $item_id, string $action): void
                 gs_batch_update_status($sheet_id, $category, $ng_rows, 'NG', $token);
             }
 
+            // If qty increased beyond existing row count, append the missing rows
+            $existing_count = count($matching_rows);
+            if ($qty > $existing_count) {
+                $rows_to_add = $qty - $existing_count;
+
+                // Derive prefix and highest control number from all existing rows
+                $prefix_counts = [];
+                $prefix_max    = [];
+                $last_item_no  = 0;
+                foreach ($rows as $row) {
+                    $no = (int)($row[0] ?? 0);
+                    if ($no > $last_item_no) $last_item_no = $no;
+                    $ctrl = trim((string)($row[2] ?? ''));
+                    if ($ctrl === '') continue;
+                    if (preg_match('/^(BIN(?:-[A-Z0-9]+)+-)(\d+)$/i', $ctrl, $pm)) {
+                        $p = strtoupper($pm[1]);
+                        $n = (int)$pm[2];
+                        $prefix_counts[$p] = ($prefix_counts[$p] ?? 0) + 1;
+                        if ($n > ($prefix_max[$p] ?? 0)) $prefix_max[$p] = $n;
+                    }
+                }
+                $prefix       = 'BIN-NEW-';
+                $last_ctrl_no = 0;
+                if (!empty($prefix_counts)) {
+                    arsort($prefix_counts);
+                    $prefix       = array_key_first($prefix_counts);
+                    $last_ctrl_no = $prefix_max[$prefix] ?? 0;
+                }
+
+                $new_rows = [];
+                for ($n = 1; $n <= $rows_to_add; $n++) {
+                    $item_no    = $last_item_no + $n;
+                    $ctrl_no    = $last_ctrl_no + $n;
+                    $ctrl       = $prefix . str_pad((string)$ctrl_no, 3, '0', STR_PAD_LEFT);
+                    $new_rows[] = [$item_no, $item_name, $ctrl, $category, $condition, ''];
+                }
+
+                $append_range = gs_tab_ref($category) . '!A:F';
+                $url = 'https://sheets.googleapis.com/v4/spreadsheets/' . $sheet_id
+                     . '/values/' . rawurlencode($append_range)
+                     . ':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS';
+                $result = gs_api('POST', $url, [
+                    'range'          => $append_range,
+                    'values'         => $new_rows,
+                    'majorDimension' => 'ROWS',
+                ], $token);
+                if (isset($result['error'])) {
+                    error_log('[gs_sync_item] Format A qty-increase append error for "' . $item_name . '": ' . json_encode($result['error']));
+                }
+            }
+
         } else {
             // ── Format B: one row per item type, has Quantity column ──────────
             // Find the header to locate Quantity and Status column indices.

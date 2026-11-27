@@ -64,6 +64,21 @@
            data-* attributes, then open it. (ps-open-modal/close-modal
            are already handled by the main delegation in
            admin-dashboard.js — no need to duplicate that here.) ── */
+        function conditionFromQty(qty) {
+            if (qty === 0)  return 'For Repair';
+            if (qty <= 3)   return 'Fair';
+            return 'Good';
+        }
+
+        // Sidebar add/edit form — update condition display when quantity changes
+        var invQty = document.getElementById('inv-quantity');
+        var invCondDisplay = document.getElementById('inv-condition-display');
+        if (invQty && invCondDisplay) {
+            invQty.addEventListener('input', function () {
+                invCondDisplay.textContent = conditionFromQty(parseInt(this.value, 10) || 0);
+            });
+        }
+
         document.addEventListener('click', function(e) {
             var btn = e.target.closest('[data-action="eq-open-edit"]');
             if (!btn) return;
@@ -76,8 +91,11 @@
             document.getElementById('eqm-remove-image-flag').value = '0';
             document.getElementById('eqm-item-name').value = d.itemName;
             document.getElementById('eqm-category').value = d.itemCategory;
-            document.getElementById('eqm-quantity').value = d.itemQuantity;
-            document.getElementById('eqm-condition').value = d.itemCondition || 'Good';
+
+            var eqmQty = parseInt(d.itemQuantity, 10) || 0;
+            document.getElementById('eqm-quantity').value = eqmQty;
+            var eqmDisplay = document.getElementById('eqm-condition-display');
+            if (eqmDisplay) eqmDisplay.textContent = conditionFromQty(eqmQty);
 
             var preview = document.getElementById('eqm-imagePreview');
             var removeBtn = document.getElementById('eqm-removeImageBtn');

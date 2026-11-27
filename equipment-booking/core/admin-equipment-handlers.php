@@ -10,6 +10,21 @@ equipment_auto_approve_tick($conn);
 BookingSchedule::tick($conn);
 require_once __DIR__ . '/../../shared/core/cloudinary.php';
 
+if (!function_exists('equipment_condition_from_qty')) {
+    /**
+     * Derive item condition from quantity.
+     *   0        → For Repair
+     *   1–3      → Fair
+     *   4+       → Good
+     */
+    function equipment_condition_from_qty(int $qty): string
+    {
+        if ($qty === 0)  return 'For Repair';
+        if ($qty <= 3)   return 'Fair';
+        return 'Good';
+    }
+}
+
 
 // ================= EQUIPMENT IMAGE FILE HELPERS =================
 
@@ -158,7 +173,7 @@ if (isset($_POST['add_item'])) {
     $name = trim($_POST['item_name']);
     $category = $_POST['category'];
     $qty = (int) $_POST['quantity'];
-    $condition = in_array($_POST['condition'] ?? '', ['Good', 'Fair', 'For Repair']) ? $_POST['condition'] : 'Good';
+    $condition = equipment_condition_from_qty($qty);
     $description = trim($_POST['description'] ?? '');
     if ($description === '') $description = null;
 
@@ -230,7 +245,7 @@ if (isset($_POST['update_item'])) {
     $category  = $_POST['category'];
     $qty       = intval($_POST['quantity']);
     $campus_id = max(1, (int)($_POST['campus_id'] ?? 1));
-    $condition = in_array($_POST['condition'] ?? '', ['Good', 'Fair', 'For Repair']) ? $_POST['condition'] : 'Good';
+    $condition = equipment_condition_from_qty($qty);
 
     // The photo currently on record comes from the database, not from the form's
     // hidden "old_image" field - so the file we may delete below can never be a
