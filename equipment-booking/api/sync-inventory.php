@@ -62,6 +62,15 @@ function gsheet_condition(string $status): string
     return 'Fair'; // any other value
 }
 
+// ── Derive condition from quantity (keeps sync consistent with add/edit rule) ──
+function gsheet_condition_from_qty(int $qty): string
+{
+    if ($qty === 0)  return 'For Repair';
+    if ($qty <= 3)   return 'Fair';
+    return 'Good';
+}
+
+
 // ── Get or create a category for a campus ────────────────────────────────────
 function gsheet_ensure_category(mysqli $conn, int $campus_id, string $name): void
 {
@@ -230,8 +239,7 @@ foreach ($sheet_names as $sheet_idx => $sheet_name) {
 
             $qty_raw   = trim((string)($row[$qty_col] ?? '1'));
             $qty       = max(0, (int)filter_var($qty_raw, FILTER_SANITIZE_NUMBER_INT));
-            $status    = trim((string)($row[$status_col] ?? 'Working'));
-            $condition = gsheet_condition($status);
+            $condition = gsheet_condition_from_qty($qty);
 
             $key = strtolower($item_name) . '||' . $campus_id;
             $synced_item_keys[$key] = ['name' => $item_name, 'campus_id' => $campus_id];

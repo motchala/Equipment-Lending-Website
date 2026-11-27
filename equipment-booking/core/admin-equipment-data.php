@@ -69,6 +69,11 @@ $overdue_sql .= " ORDER BY return_date ASC";
 $overdue_result = mysqli_query($conn, $overdue_sql);
 
 
+// Total stock map: item_name => shelf qty + units currently out on active loans
+// Used by the Good/Total counter in the inventory list.
+require_once __DIR__ . '/../core/booking-schedule.php';
+$inv_total_stock_map = BookingSchedule::totalStockMap($conn);
+
 $inventory_sql = "SELECT * FROM tbl_inventory WHERE is_archived = 0";
 
 if (!empty($_GET['inventory_search'])) {

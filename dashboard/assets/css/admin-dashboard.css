@@ -14494,3 +14494,9 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     font-size: 11px;
     color: var(--text-light);
 }
+
+.inv-stock-sep {
+    margin: 0 2px;
+    opacity: 0.5;
+    font-weight: 400;
+}
