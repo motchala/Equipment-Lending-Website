@@ -247,7 +247,9 @@
                                 <input type="text" id="inv-item-name" name="item_name"
                                     class="form-control-custom" maxlength="150"
                                     value="<?php echo $edit_item ? htmlspecialchars($edit_item['item_name']) : ''; ?>"
-                                    placeholder="e.g. Extension Cord" required>
+                                    placeholder="e.g. Extension Cord" required
+                                    autocomplete="off">
+                                <span id="inv-name-hint" style="display:none;font-size:11.5px;color:var(--danger);margin-top:3px;display:none"></span>
                             </div>
 
                             <div class="form-group">
@@ -307,6 +309,15 @@
                                     <label>Condition</label>
                                     <div id="inv-condition-display" class="form-control-custom" style="background:var(--bg-secondary,#f5f5f5);cursor:default;">Good</div>
                                 </div>
+                            </div>
+
+                            <div class="fac-edit-section">Remarks <span class="inv-opt">(optional)</span></div>
+
+                            <div class="form-group">
+                                <textarea id="inv-remarks" name="remarks" class="form-control-custom"
+                                    rows="2" maxlength="500"
+                                    placeholder="e.g. Stored in cabinet 3, handle with care..."
+                                    ><?php echo $edit_item ? htmlspecialchars($edit_item['description'] ?? '') : ''; ?></textarea>
                             </div>
 
                             <div class="fac-edit-section">Image <span class="inv-opt">(optional)</span></div>
@@ -421,7 +432,8 @@
                                             data-item-quantity="<?php echo $inv_qty; ?>"
                                             data-item-condition="<?php echo htmlspecialchars($inv_cond, ENT_QUOTES); ?>"
                                             data-item-image="<?php echo htmlspecialchars(equipment_image_path($item['image_path'], $root_url), ENT_QUOTES); ?>"
-                                            data-item-image-full="<?php echo htmlspecialchars(equipment_image_path($item['image_path'], $root_url), ENT_QUOTES); ?>">
+                                            data-item-image-full="<?php echo htmlspecialchars(equipment_image_path($item['image_path'], $root_url), ENT_QUOTES); ?>"
+                                            data-item-description="<?php echo htmlspecialchars($item['description'] ?? '', ENT_QUOTES); ?>">
                                             <td>
                                                 <div class="fac-person">
                                                     <span class="inv-thumb">

@@ -51,6 +51,14 @@
                     </div>
 
                     <div class="form-group">
+                        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Remarks <span style="font-weight:400;color:var(--text-light)">(optional)</span></label>
+                        <textarea name="remarks" id="eqm-remarks" class="form-control-custom"
+                            rows="2" maxlength="500"
+                            placeholder="e.g. Stored in cabinet 3, handle with care..."></textarea>
+                        <span id="eqm-name-hint" style="display:none;font-size:11.5px;color:var(--danger);margin-top:3px"></span>
+                    </div>
+
+                    <div class="form-group">
                         <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Item Image</label>
                         <div class="drop-zone" id="eqm-dropZone">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
