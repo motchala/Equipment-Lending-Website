@@ -281,10 +281,12 @@
     function startPolling() {
         let pollBusy = false;      // never let slow responses pile up
         let lastSseAt = 0;         // when the SSE stream last pushed an update
+        let lastPollAt = 0;        // when the data poll last ran
 
         function doPoll() {
             if (pollBusy) return;
             pollBusy = true;
+            lastPollAt = Date.now();
             fetch('equipment-booking/api/poll-requests-data.php', {
                 method: 'GET',
                 credentials: 'same-origin',
@@ -345,7 +347,12 @@
         // (buffering, proxies, a stream that opens and then dies), and the browser will not report that
         // as a failure — so a timer ALWAYS runs as a safety net. While SSE is clearly alive (a healthy
         // stream pushes an update at every reconnect, at least once a minute) the timer stays quiet.
-        function onSseUpdate() { lastSseAt = Date.now(); doPoll(); }
+        // With the live hub (admin-live.js) a stream event just means "check what changed now"
+        function onSseUpdate() {
+            lastSseAt = Date.now();
+            if (window._pupsyncAdminLive && typeof window._pupsyncAdminLive.nudge === 'function') window._pupsyncAdminLive.nudge();
+            else doPoll();
+        }
 
         if (window.PupSyncSSE && !window.PupSyncSSE.fallback) {
             PupSyncSSE.init({
@@ -356,6 +363,10 @@
         setInterval(function () {
             if (document.hidden) return;                               // nobody is looking
             if (lastSseAt && Date.now() - lastSseAt < 75000) return;   // SSE is delivering
+            // The live hub (admin-live.js) already reacts to every change; this slower pass only keeps the
+            // time-based numbers (overdue counts, countdowns) honest. Without the hub it runs as before.
+            var hub = window._pupsyncAdminLive;
+            if (hub && typeof hub.healthy === 'function' && hub.healthy() && Date.now() - lastPollAt < 30000) return;
             doPoll();
         }, INTERVAL);
 
