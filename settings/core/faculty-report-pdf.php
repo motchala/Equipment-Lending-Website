@@ -9,6 +9,11 @@ declare(strict_types=1);
  * (settings/core/faculty-report.php) into a PDF (US Letter, landscape) using the bundled FPDF
  * (vendor/fpdf). Nothing in here touches the database or the session.
  *
+ * Every page carries the same letterhead and footer as the admin "Generate Reports" PDFs
+ * (reports/core/pdf.php): seal + university name + Bagong Pilipinas logo, double maroon rule, the
+ * not-an-official-document disclaimer and the report title on top; campus address, motto and the
+ * accreditation badges at the bottom. Keep the two in step if the letterhead ever changes.
+ *
  *   fr_render_pdf(array $report): string     the PDF file as a string
  *
  * FPDF's built-in fonts are single-byte (Windows-1252), so every string is converted once, in
@@ -23,8 +28,8 @@ class FacultyReportPdf extends FPDF
 {
     /** Page geometry (mm). US Letter landscape is 279.4 x 215.9. */
     private const MARGIN_X  = 10.0;
-    private const TOP       = 22.0;
-    private const BOTTOM    = 16.0;
+    private const TOP       = 77.0;      // the letterhead (see Header) fills the top of every page
+    private const BOTTOM    = 31.0;      // the footer (see Footer) fills the bottom of every page
 
     /** Palette. */
     private const MAROON    = [128, 0, 0];
@@ -34,6 +39,13 @@ class FacultyReportPdf extends FPDF
     private const RULE      = [220, 220, 220];
     private const ZEBRA     = [250, 247, 247];
     private const STUDENT   = [255, 246, 214];
+
+    /** Letterhead / footer colours (same values as reports/core/pdf.php). */
+    private const SUBTEXT   = [100, 100, 100];
+    private const TEXT      = [30, 30, 30];
+    private const AMBER_BG  = [255, 248, 225];
+    private const AMBER_BD  = [249, 168, 37];
+    private const AMBER_TXT = [93, 64, 33];
 
     /** Soft block colours for the timetable (fill, border). */
     private const BLOCKS = [
@@ -140,51 +152,167 @@ class FacultyReportPdf extends FPDF
 
     /* ── page furniture ───────────────────────────────────────────────── */
 
+    /**
+     * Letterhead, redrawn at the top of every page. Same layout as the admin report PDFs:
+     * [ PUP seal | university name block | Bagong Pilipinas ], double maroon rule, disclaimer box,
+     * report title + meta line, maroon rule. Ends at about y = 75 mm (TOP is 77).
+     */
     public function Header(): void
     {
-        $pw = $this->GetPageWidth();
-        if ($this->PageNo() === 1) {
-            $this->fill(self::MAROON);
-            $this->Rect(0, 0, $pw, 16, 'F');
-            $this->fill(self::GOLD);
-            $this->Rect(0, 16, $pw, 1.2, 'F');
-            $this->ink([255, 255, 255]);
-            $this->SetFont('Helvetica', 'B', 15);
-            $this->SetXY(self::MARGIN_X, 4.2);
-            $this->Cell(80, 8, 'PUPSync');
-            $this->SetFont('Helvetica', '', 11);
-            $this->SetXY($pw - self::MARGIN_X - 120, 4.6);
-            $this->Cell(120, 8, 'Faculty Activity Report', 0, 0, 'R');
-            $this->SetY(self::TOP + 2);
-            return;
+        $W    = $this->GetPageWidth();
+        $M    = self::MARGIN_X;
+        $yTop = 8.0;
+
+        $logoW  = 33.0;
+        $rightW = 28.0;
+        $rightH = 30.0;
+        $gap    = 3.0;
+        $textW  = $W - 2 * $M - $logoW - $gap - $rightW - $gap;
+        $textX  = $M + $logoW + $gap;
+
+        $sealPath = __DIR__ . '/../../assets/images/pup-seal.png';
+        if (is_file($sealPath)) {
+            $this->Image($sealPath, $M, $yTop, $logoW, $logoW);
         }
+        $bpPath = __DIR__ . '/../../assets/images/bagong-pilipinas.png';
+        if (is_file($bpPath)) {
+            $this->Image($bpPath, $W - $M - $rightW, $yTop, $rightW, $rightH);
+        }
+
+        // text block, vertically centred against the seal (22 mm of text in a 33 mm seal)
+        $this->SetFont('Helvetica', '', 8.5);
+        $this->ink(self::SUBTEXT);
+        $this->SetXY($textX, $yTop + ($logoW - 22.0) / 2);
+        $this->Cell($textW, 4.5, 'REPUBLIC OF THE PHILIPPINES', 0, 1, 'L');
+
+        $this->SetFont('Helvetica', 'B', 13);
+        $this->ink(self::MAROON);
+        $this->SetX($textX);
+        $this->Cell($textW, 7, 'POLYTECHNIC UNIVERSITY OF THE PHILIPPINES', 0, 1, 'L');
+
+        $this->SetFont('Helvetica', '', 8.5);
+        $this->ink(self::SUBTEXT);
+        $this->SetX($textX);
+        $this->Cell($textW, 5, 'OFFICE OF THE VICE PRESIDENT FOR CAMPUSES', 0, 1, 'L');
+
+        $this->SetFont('Helvetica', 'B', 10);
+        $this->ink(self::TEXT);
+        $this->SetX($textX);
+        $this->Cell($textW, 5.5, 'BINAN CAMPUS', 0, 1, 'L');
+
+        // double rule under the letterhead
+        $yRule1 = $yTop + $logoW + 1.5;
         $this->stroke(self::MAROON);
         $this->SetLineWidth(0.4);
-        $this->Line(self::MARGIN_X, 14, $pw - self::MARGIN_X, 14);
+        $this->Line($M, $yRule1, $W - $M, $yRule1);
+        $this->SetLineWidth(0.15);
+        $this->Line($M, $yRule1 + 1.2, $W - $M, $yRule1 + 1.2);
+
+        // disclaimer box
+        $yDisc = $yRule1 + 3.5;
+        $boxH  = 10.0;
+        $this->fill(self::AMBER_BG);
+        $this->stroke(self::AMBER_BD);
         $this->SetLineWidth(0.2);
+        $this->Rect($M, $yDisc, $W - 2 * $M, $boxH, 'FD');
+        $this->fill(self::AMBER_BD);
+        $this->Rect($M, $yDisc, 2.0, $boxH, 'F');
+
+        $this->SetFont('Helvetica', 'B', 6.5);
+        $this->ink(self::AMBER_TXT);
+        $this->SetXY($M + 3.0, $yDisc + 1.8);
+        $this->Cell(14, 3, 'DISCLAIMER:', 0, 0, 'L');
+
+        $this->SetFont('Helvetica', 'I', 6.5);
+        $this->SetXY($M + 18, $yDisc + 1.8);
+        $this->MultiCell(
+            $W - 2 * $M - 19,
+            3.3,
+            'This report is generated by the PUPSync Equipment Lending and Room Reservation System '
+            . 'and is for INTERNAL REFERENCE ONLY. This is NOT an official document of the '
+            . 'Polytechnic University of the Philippines. For official records, please coordinate '
+            . 'with the university administration.',
+            0,
+            'L'
+        );
+
+        // report title + meta line
+        $yTitle = $yDisc + $boxH + 4;
+        $this->SetFont('Helvetica', 'B', 12);
         $this->ink(self::MAROON);
-        $this->SetFont('Helvetica', 'B', 8.5);
-        $this->SetXY(self::MARGIN_X, 8.5);
-        $this->Cell(120, 4, $this->t('PUPSync · Faculty Activity Report'));
-        $this->ink(self::MUTED);
-        $this->SetFont('Helvetica', '', 8.5);
-        $this->SetXY($pw - self::MARGIN_X - 140, 8.5);
-        $this->Cell(140, 4, $this->t($this->who), 0, 0, 'R');
+        $this->SetXY($M, $yTitle);
+        $this->Cell(0, 6, 'FACULTY ACTIVITY REPORT', 0, 1, 'C');
+
+        $this->SetFont('Helvetica', '', 7.5);
+        $this->ink(self::SUBTEXT);
+        $this->SetX($M);
+        $meta = ($this->who !== '' ? 'Faculty: ' . $this->who . '   |   ' : '') . 'Generated: ' . $this->stamp . ' (Philippine time)';
+        $this->Cell(0, 4, $this->t($meta), 0, 1, 'C');
+
+        $yRule2 = $this->GetY() + 1;
+        $this->stroke(self::MAROON);
+        $this->SetLineWidth(0.5);
+        $this->Line($M, $yRule2, $W - $M, $yRule2);
+        $this->SetLineWidth(0.2);
+
         $this->SetY(self::TOP);
     }
 
+    /**
+     * Footer, redrawn at the bottom of every page. Same as the admin report PDFs: campus address,
+     * direct line, website + email and the motto on the left, the accreditation badges on the right.
+     * The page number (which the admin PDFs do not print) sits in the gap between the two.
+     */
     public function Footer(): void
     {
-        $pw = $this->GetPageWidth();
-        $y  = $this->GetPageHeight() - 10;
-        $this->stroke(self::RULE);
-        $this->Line(self::MARGIN_X, $y - 1.5, $pw - self::MARGIN_X, $y - 1.5);
-        $this->ink(self::MUTED);
+        $M = self::MARGIN_X;
+        $W = $this->GetPageWidth();
+
+        $this->SetY(-27);                   // footer block is ~21 mm tall, which leaves ~5.5 mm below it
+        $footerStartY = $this->GetY();
+
+        $usable = $W - 2 * $M;
+        $leftW  = $usable * 0.44;
+
+        // Accreditation badges: height fixed, width from the image's real proportions so it is never stretched.
+        $badgePath = __DIR__ . '/../../assets/images/pup-accreditation.png';
+        $badgeH    = 20.0;
+        $ratio     = 395 / 107;                       // the shipped image; used when it cannot be measured
+        $info      = is_file($badgePath) ? @getimagesize($badgePath) : false;
+        if ($info && $info[0] > 0 && $info[1] > 0) {
+            $ratio = $info[0] / $info[1];
+        }
+        $badgeW = round($badgeH * $ratio, 1);
+        $rightX = $W - $M - $badgeW;
+
         $this->SetFont('Helvetica', '', 7.5);
-        $this->SetXY(self::MARGIN_X, $y);
-        $this->Cell(200, 4, $this->t('Generated ' . $this->stamp . ' (Philippine time) · Confidential: for the faculty member named in this report'));
-        $this->SetXY($pw - self::MARGIN_X - 60, $y);
-        $this->Cell(60, 4, 'Page ' . $this->PageNo() . ' of {nb}', 0, 0, 'R');
+        $this->ink(self::SUBTEXT);
+        $this->SetX($M);
+        $this->Cell($leftW, 3.8, 'Barangay Zapote, Binan City, Laguna 4024', 0, 1, 'L');
+        $this->SetX($M);
+        $this->Cell($leftW, 3.8, 'Direct Line: (049) 544-0627', 0, 1, 'L');
+        $this->SetX($M);
+        $this->Cell($leftW, 3.8, 'Website: www.pup.edu.ph  |  Email: binan@pup.edu.ph', 0, 1, 'L');
+
+        $this->SetFont('Helvetica', 'B', 10);
+        $this->ink(self::MAROON);
+        $this->SetX($M);
+        $this->Cell($leftW, 5, 'A LEADING COMPREHENSIVE', 0, 1, 'L');
+        $this->SetX($M);
+        $this->Cell($leftW, 5, 'POLYTECHNIC UNIVERSITY IN ASIA', 0, 0, 'L');
+
+        $pageText = 'Page ' . $this->PageNo() . ' of {nb}';
+        $this->SetFont('Helvetica', '', 7.5);
+        $this->ink(self::SUBTEXT);
+        if (is_file($badgePath)) {
+            $this->Image($badgePath, $rightX, $footerStartY, $badgeW, $badgeH);
+            $gapX = $M + $leftW;
+            $this->SetXY($gapX, $footerStartY + 8);
+            $this->Cell($rightX - $gapX, 4, $pageText, 0, 0, 'C');
+        } else {
+            $this->SetXY($rightX, $footerStartY);
+            $this->Cell($badgeW, 3.5, $pageText, 0, 0, 'R');
+        }
     }
 
     private function limitY(): float
@@ -549,7 +677,7 @@ class FacultyReportPdf extends FPDF
         $headH = 7.0;
         $top   = $this->GetY();
         $avail = $this->limitY() - $top - $headH - 2;
-        $hourH = max(7.5, min(16.0, $avail / $hours));
+        $hourH = max(4.5, min(16.0, $avail / $hours));
 
         // day headers
         $this->fill(self::MAROON);
