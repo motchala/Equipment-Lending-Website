@@ -29,8 +29,11 @@
         </div>
     </div>
 
-    <!-- DRAWER: ROOM RESERVATION DETAILS (Rooms > Reservations). Same shell/CSS as the
-         approvals drawer; Cancel hands off to the existing admin cancel-reservation modal. -->
+    <!-- DRAWER: RESERVATION DETAILS (Facilities > Reservations). One drawer, one layout, for every row; it uses the same
+         label-left / value-right rows (.ps-ld-list) as the Equipment > Loans drawer (#ps-loan-drawer). Only the footer
+         differs: Approve / Decline for a waiting reservation, Reschedule / Cancel for an approved one that has not ended.
+         Cancel and Reschedule hand off to the existing admin modals; Decline opens its own reason form below.
+         The drawer script (admin-dashboard.js, "reservation drawer") fills every id; optional rows start hidden. -->
     <div class="ps-modal-backdrop ps-drawer-backdrop" id="ps-room-drawer">
         <aside class="ps-drawer" role="dialog" aria-modal="true" aria-labelledby="ps-rr-title">
             <div class="ps-modal-head">
@@ -49,7 +52,7 @@
                 </div>
 
                 <section class="ps-drawer-sec" id="ps-rr-doc-sec">
-                    <h4>Supporting document</h4>
+                    <h4>Request letter</h4>
                     <div class="ps-doc-card" id="ps-rr-doc">
                         <div class="ps-doc-card__icon"><span class="material-symbols-outlined" id="ps-rr-doc-icon">draft</span></div>
                         <div class="ps-doc-card__meta">
@@ -60,57 +63,53 @@
                             <a class="ps-btn ps-btn--primary ps-btn--sm" id="ps-rr-doc-open" href="#" target="_blank" rel="noopener noreferrer">
                                 <span class="material-symbols-outlined">open_in_new</span> Open
                             </a>
-                            <a class="ps-btn ps-btn--outline ps-btn--sm" id="ps-rr-doc-dl" href="#" download>
+                            <a class="ps-btn ps-btn--outline ps-btn--sm" id="ps-rr-doc-dl" href="#" download aria-label="Download">
                                 <span class="material-symbols-outlined">download</span>
                             </a>
                         </div>
                     </div>
                     <div class="ps-doc-preview" id="ps-rr-doc-preview" hidden>
-                        <img id="ps-rr-doc-img" alt="Attached document preview">
+                        <img id="ps-rr-doc-img" alt="Request letter preview">
                     </div>
                 </section>
 
                 <section class="ps-drawer-sec">
                     <h4>Reservation</h4>
-                    <div class="ps-kv">
-                        <div><span>Facility</span><strong id="ps-rr-room">—</strong></div>
-                        <div><span>Location</span><strong id="ps-rr-where">—</strong></div>
-                        <div><span>Date</span><strong id="ps-rr-date">—</strong></div>
-                        <div><span>Time</span><strong id="ps-rr-time">—</strong></div>
-                        <div><span>Attendees</span><strong id="ps-rr-attendees">—</strong></div>
-                        <div><span>Purpose</span><strong id="ps-rr-purpose">—</strong></div>
+                    <div class="ps-ld-list">
+                        <div class="ps-ld-row"><span>Facility</span><strong id="ps-rr-room">—</strong></div>
+                        <div class="ps-ld-row"><span>Location</span><strong id="ps-rr-where">—</strong></div>
+                        <div class="ps-ld-row"><span>Purpose</span><strong id="ps-rr-purpose">—</strong></div>
+                        <div class="ps-ld-row" id="ps-rr-attendees-row" hidden><span>Attendees</span><strong id="ps-rr-attendees">—</strong></div>
+                    </div>
+                </section>
+
+                <section class="ps-drawer-sec">
+                    <h4>Schedule</h4>
+                    <div class="ps-ld-list">
+                        <div class="ps-ld-row"><span>Date</span><strong id="ps-rr-date">—</strong></div>
+                        <div class="ps-ld-row"><span>Time</span><strong id="ps-rr-time">—</strong></div>
                     </div>
                 </section>
 
                 <section class="ps-drawer-sec">
                     <h4>Requested by</h4>
-                    <div class="ps-kv">
-                        <div><span>Name</span><strong id="ps-rr-who">—</strong></div>
-                        <div><span>Type</span><strong id="ps-rr-type">—</strong></div>
-                        <div id="ps-rr-student-id-row" hidden><span>Student ID</span><strong id="ps-rr-student-id">—</strong></div>
+                    <div class="ps-ld-list">
+                        <div class="ps-ld-row"><span>Name</span><strong id="ps-rr-who">—</strong></div>
+                        <div class="ps-ld-row"><span id="ps-rr-id-label">Faculty ID</span><strong id="ps-rr-idno">—</strong></div>
+                        <div class="ps-ld-row" id="ps-rr-auth-row" hidden><span>Authorized by</span><strong id="ps-rr-auth">—</strong></div>
                     </div>
                 </section>
 
-                <section class="ps-drawer-sec" id="ps-rr-decision-sec">
-                    <h4>Decision</h4>
-                    <div class="ps-kv">
-                        <div><span>Method</span><strong id="ps-rr-dec-method">—</strong></div>
-                        <div id="ps-rr-dec-rule-row"><span>Rule</span><strong id="ps-rr-dec-rule">—</strong></div>
-                        <div id="ps-rr-dec-reason-row"><span>Reason</span><strong id="ps-rr-dec-reason">—</strong></div>
+                <section class="ps-drawer-sec" id="ps-rr-decision-sec" hidden>
+                    <h4 id="ps-rr-decision-h">Decision</h4>
+                    <div class="ps-ld-list">
+                        <div class="ps-ld-row" id="ps-rr-by-row" hidden><span id="ps-rr-by-label">Approved by</span><strong id="ps-rr-by">—</strong></div>
+                        <div class="ps-ld-row ps-ld-row--stack" id="ps-rr-reason-row" hidden><span>Reason</span><strong id="ps-rr-reason">—</strong></div>
+                        <div class="ps-ld-row" id="ps-rr-when-row" hidden><span>Cancelled on</span><strong id="ps-rr-when">—</strong></div>
                     </div>
                 </section>
 
-                <section class="ps-drawer-sec">
-                    <h4>Notes</h4>
-                    <div class="ps-drawer-note" id="ps-rr-notes">—</div>
-                </section>
-
-                <!-- Shown for Waiting requests. Open the attached request letter (if any) above, then decide. -->
-                <section class="ps-drawer-sec" id="ps-rr-review-sec" hidden>
-                    <h4>Your decision</h4>
-                    <p class="ps-drawer-muted">Approve to confirm this reservation &mdash; no reason is needed. To decline, use the Decline button and pick a reason.</p>
-                    <div class="ps-rr-review-err" id="ps-rr-review-err" role="alert" hidden></div>
-                </section>
+                <div class="ps-rr-review-err" id="ps-rr-review-err" role="alert" hidden></div>
             </div>
             <div class="ps-drawer-foot">
                 <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-room-drawer">Close</button>
