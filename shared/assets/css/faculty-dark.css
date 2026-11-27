@@ -14,6 +14,59 @@
              existing look and brand hue are preserved.
    ========================================================================= */
 
+/* ---- Palette -------------------------------------------------------------
+   The Faculty dark theme used red-brown surfaces (#1c1010 ... #472a2a), a
+   maroon sidebar and salmon accents, so the whole screen read as red.
+   It now uses the same calm graphite-indigo base as the Admin portal, with a
+   vivid rose accent and a crimson for banners and fills. Only the dark tokens change;
+   every component keeps using the same variables.                          */
+html[data-theme="dark"],
+html[data-theme="dark"] [data-theme="dark"] {
+    --color-primary: #f4809f;                 /* vivid rose: text, icons, active fills */
+    --color-primary-container: #c42a55;       /* vivid crimson: banners / filled buttons (white text) */
+    --color-on-primary: #ffffff;
+    --color-on-primary-accent: #2a1220;       /* dark text on a rose fill */
+    --color-secondary: #bdbdd0;
+    --color-surface: #181825;
+    --color-background: #181825;
+    --color-surface-lowest: #11111b;
+    --color-surface-low: #1b1b29;
+    --color-surface-container: #1e1e2e;
+    --color-surface-high: #272739;
+    --color-surface-highest: #313145;
+    --color-outline: #8b8ba0;
+    --color-outline-variant: #383850;
+    --color-on-surface: #e4e2ea;
+    --color-on-surface-variant: #b4b4c8;
+    --color-error-container: #4a2229;
+    --control-border: #7a7a94;
+    --focus-ring: #ff9db5;
+    --toast-info-bg: #c42a55;
+
+    --redesign-sidebar-bg: #13131f;
+    --redesign-sidebar-border: #26263a;
+    --redesign-active-bg: #36202f;
+    --redesign-active-color: #f4809f;
+    --redesign-nav-hover: #1f1f30;
+    --redesign-nav-color: #b4b4c8;
+    --redesign-nav-hover-color: #f0eef5;
+    --redesign-top-bg: #181825;
+    --redesign-top-border: #2a2a3c;
+    --redesign-main-bg: #181825;
+    --redesign-card-border: #34344a;
+    --redesign-gradient-start: #b02350;
+    --redesign-gradient-end: #5e1737;
+    --redesign-text-primary: #e4e2ea;
+    --redesign-text-secondary: #bdbdd0;
+    --redesign-text-muted: #9c9cb2;
+
+    --nav-bg-top: #181826;
+    --nav-bg-bottom: #0f0f1a;
+}
+html[data-theme="dark"].rx-mobile {
+    --rxm-on-primary: #2a1220;
+}
+
 html[data-theme="dark"] {
     --fdk-info-text: #6fc3e0;
     --fdk-info-fill: #1f6f8b;
@@ -29,7 +82,7 @@ html[data-theme="dark"] .top-bar-global-search.expanded {
 }
 html[data-theme="dark"] .top-bar-global-search.expanded:focus-within {
     border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px rgba(244, 160, 160, 0.2);
+    box-shadow: 0 0 0 3px rgba(244, 128, 159, 0.22);
 }
 html[data-theme="dark"] .top-bar-global-search.expanded .top-bar-global-search-toggle {
     color: var(--color-primary);
@@ -60,7 +113,7 @@ html[data-theme="dark"] .eq-ic-regen-btn {
 
 /* ---- Cart: white chips / pills / button on dark cards --------------------- */
 html[data-theme="dark"] .eq-cart-chk {
-    background: rgba(44, 26, 26, 0.92);
+    background: rgba(30, 30, 46, 0.92);
     color: var(--color-on-surface-variant);
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
 }
@@ -99,7 +152,7 @@ html[data-theme="dark"] .bf-floor[aria-selected="true"] {
     color: var(--color-on-primary-accent);
 }
 html[data-theme="dark"] .fnotif-tabs .notif-tab.active .fnotif-pill-count {
-    background: rgba(43, 0, 0, 0.22);
+    background: rgba(42, 18, 32, 0.22);
     color: var(--color-on-primary-accent);
 }
 
@@ -206,7 +259,7 @@ html[data-theme="dark"] .stock-badge[style*="rgba(209,250,229"] {
     color: #86efac !important;
 }
 html[data-theme="dark"] .stock-badge[style*="rgba(255,255,255,.85)"] {
-    background: rgba(44, 26, 26, 0.9) !important;
+    background: rgba(30, 30, 46, 0.9) !important;
     color: var(--color-on-surface) !important;
 }
 
@@ -214,8 +267,147 @@ html[data-theme="dark"] .stock-badge[style*="rgba(255,255,255,.85)"] {
         behind / around product photos in dark mode ---------------------------- */
 html[data-theme="dark"] #panel-lending .feat-hero-img,
 html[data-theme="dark"]:not(.rx-mobile) #panel-lending #featuredSection .feat-hero-img {
-    background: linear-gradient(145deg, #3a2222, #2c1a1a);
+    background: linear-gradient(145deg, #272739, #1e1e2e);
 }
 html[data-theme="dark"] #panel-lending .eq-item-img-wrap {
-    background: linear-gradient(160deg, #3a2222 0%, #2c1a1a 100%);
+    background: linear-gradient(160deg, #272739 0%, #1e1e2e 100%);
+}
+
+/* ============================================================================
+   Hard-coded maroon / red-brown colours in the original rules, re-tinted to the
+   graphite + crimson palette above (generated from the original rules, dark-only).
+   ========================================================================= */
+
+/* from faculty-dashboard.css */
+html[data-theme="dark"] .side-nav-brand { background: linear-gradient(135deg, #821c3b 0%, #5c142a 100%); }
+html[data-theme="dark"] .top-bar { box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15); }
+html[data-theme="dark"] .eq-campus-tab.active { background: var(--accent-maroon, #7a1b37); border-color: var(--accent-maroon, #7a1b37); }
+html[data-theme="dark"] .btn-submit-form { background: linear-gradient(135deg, #b02750 0%, #791a37 100%); }
+html[data-theme="dark"] .acc-avatar-large { background: linear-gradient(135deg, #b02750 0%, #791a37 100%); }
+html[data-theme="dark"] .tp-dark { background: #12121a; }
+html[data-theme="dark"] .side-nav { box-shadow: 6px 0 20px rgba(0, 0, 0, 0.35) !important; }
+html[data-theme="dark"] .top-bar { background: linear-gradient(90deg, #383853 0%, #1f1f2e 52%, #12121a 100%) !important; border-bottom-color: #383753 !important; }
+html[data-theme="dark"] .dash-bento-btn:hover { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); }
+html[data-theme="dark"] .dash-code-card .fcc-copy-btn:active { background: rgba(147, 32, 67, 0.2) !important; }
+html[data-theme="dark"] .dash-code-card .fcc-copy-btn:focus-visible { outline: 2px solid rgba(244, 128, 159, 0.45); }
+html[data-theme="dark"] .dash-timeline-dot.dot-active { background: #932043; box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.5); }
+html[data-theme="dark"] .dash-bento-btn { background: linear-gradient(135deg, #b02750 0%, #741934 100%); }
+html[data-theme="dark"] .dash-bar { background: #383853; }
+html[data-theme="dark"] #panel-lending .catalog-search-wrap:focus-within { box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.15); border-color: #f4809f; }
+html[data-theme="dark"] #panel-lending .catalog-filter-select:focus { box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.15); border-color: #f4809f; }
+html[data-theme="dark"] #panel-lending .eq-item-card:hover { box-shadow: 0 12px 25px -5px rgba(0, 0, 0, 0.18), 0 8px 10px -6px rgba(0, 0, 0, 0.11); border-color: rgba(244, 128, 159, 0.25); }
+html[data-theme="dark"] #panel-lending .item-node:hover { box-shadow: 0 12px 25px -5px rgba(0, 0, 0, 0.18), 0 8px 10px -6px rgba(0, 0, 0, 0.11); border-color: rgba(244, 128, 159, 0.25); }
+html[data-theme="dark"] #panel-lending .btn-borrow:hover:not(:disabled) { background: rgba(113, 25, 51, 0.88); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.43); }
+html[data-theme="dark"] #panel-lending .eq-item-body { background: rgba(18, 18, 26, 0.88); }
+html[data-theme="dark"] #panel-lending .catalog-card { background: rgba(23, 22, 34, 0.75); }
+html[data-theme="dark"] .act-ai-fab { box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5); }
+html[data-theme="dark"] .act-ai-fab-tooltip { background: #15141f; }
+html[data-theme="dark"] .act-ai-chat { box-shadow: 0 18px 48px rgba(0, 0, 0, 0.32), 0 4px 12px rgba(0, 0, 0, .08); }
+html[data-theme="dark"] .act-ai-online-dot { border: 2px solid #f4809f; }
+html[data-theme="dark"] .act-chat-bubble-user { background: linear-gradient(135deg, var(--color-primary-container), color-mix(in srgb, var(--color-primary-container) 82%, #12121a)); }
+html[data-theme="dark"] .acct-banner { background: radial-gradient(120% 150% at 100% 0%, rgba(255, 233, 160, 0.55) 0%, rgba(255, 233, 160, 0) 52%), linear-gradient(100deg, #711933 0%, var(--color-primary-container) 34%, #b02750 62%, #d99a1e 84%, #fbbf24 100%); }
+html[data-theme="dark"] .sov-profile-actions .sov-btn-outline { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.25); }
+html[data-theme="dark"] .sov-profile-actions .sov-btn-outline:hover { box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.25); }
+html[data-theme="dark"] .sov-profile-actions .sov-profile-cancel-btn { background: rgba(113, 25, 51, 0.62); }
+html[data-theme="dark"] .sov-profile-actions .sov-profile-cancel-btn:hover:not(:disabled) { background: rgba(113, 25, 51, 0.85); }
+html[data-theme="dark"] .sov-nav-item.acct-banner-edit-btn { background: #711933; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5); }
+html[data-theme="dark"] .sov-nav-item.acct-banner-edit-btn:hover { background: #891e3e; }
+html[data-theme="dark"] .sov-nav-item.acct-banner-edit-btn.active { background: #711933; }
+html[data-theme="dark"] .sov-swatch-dark .sov-swatch-topbar { background: #12121a; border-bottom: 1px solid #252537; }
+html[data-theme="dark"] .sov-swatch-dark .sov-swatch-sidebar { background: #111019; border-right: 1px solid #252537; }
+html[data-theme="dark"] .sov-swatch-dark .sov-swatch-content { background: #171622; }
+html[data-theme="dark"] .side-nav-logo { background: #932043 !important; }
+html[data-theme="dark"] .side-nav-logo:hover { background: #821c3b !important; }
+html[data-theme="dark"] .myact-loan-card { border-left: 4px solid #f4809f !important; }
+html[data-theme="dark"] .myact-row { border-left: 4px solid #f4809f !important; }
+html[data-theme="dark"] .side-nav-avatar { background: linear-gradient(135deg, #b02750 0%, #791a37 100%); }
+html[data-theme="dark"] body .side-nav { box-shadow: 6px 0 24px rgba(0, 0, 0, 0.46) !important; }
+html[data-theme="dark"] body .side-nav .side-nav-logo { background: #932043 !important; }
+html[data-theme="dark"] body .side-nav .side-nav-item:hover .side-nav-avatar { background: #6e1832; box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.46); }
+html[data-theme="dark"] .fd-dash-top-actions .fd-top-btn { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
+html[data-theme="dark"] .fd-dash-top-actions .fd-top-avatar { background: linear-gradient(135deg, #b02750 0%, #711933 100%); }
+html[data-theme="dark"] #panel-lending .btn-borrow.btn-borrow-ahead:not(:disabled):hover { background: rgba(113, 25, 51, 0.07) !important; }
+html[data-theme="dark"] .fact-item.is-bundle { border-left: 3px solid #f4809f; }
+html[data-theme="dark"] .eq-ic-btn:hover:not(:disabled) { background: rgba(147, 32, 67, 0.1); }
+html[data-theme="dark"] .eq-item-card--in-cart { box-shadow: 0 0 0 2.5px var(--accent-maroon, rgba(0, 0, 0, 0.5)), 0 6px 24px rgba(0, 0, 0, 0.29); }
+html[data-theme="dark"] .eq-item-card--in-cart .eq-cart-chk { background: var(--accent-maroon, #932043); }
+html[data-theme="dark"] .eq-cart-bar { background: var(--accent-maroon, #932043); box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.39); }
+
+/* from faculty-dashboard.css */
+@media (max-width: 768px) {
+    html[data-theme="dark"] .acct-banner { background: radial-gradient(130% 90% at 100% 100%, rgba(255, 233, 160, 0.5) 0%, rgba(255, 233, 160, 0) 55%), linear-gradient(165deg, #711933 0%, var(--color-primary-container) 46%, #b02750 74%, #e0a21f 100%); }
+    html[data-theme="dark"] body .mobile-menu-btn:hover { background: #821c3b; }
+    html[data-theme="dark"] body .mobile-menu-btn:active { background: #821c3b; }
+}
+
+/* from faculty-dashboard-mobile.css */
+html[data-theme="dark"].rx-mobile .rxm-tabbar { box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.26), 0 -1px 4px rgba(0, 0, 0, 0.18); }
+html[data-theme="dark"] .rxm-sheet-scrim { background: rgba(14, 14, 21, 0.45); }
+html[data-theme="dark"].rx-mobile #panel-home .fdb-btn--primary { box-shadow: 0 6px 16px rgba(0, 0, 0, 0.43) !important; }
+html[data-theme="dark"].rx-mobile #panel-home .dash-code-generate-btn { box-shadow: 0 6px 16px rgba(0, 0, 0, 0.39) !important; }
+html[data-theme="dark"] .rxm-chip.is-on { box-shadow: 0 6px 14px rgba(0, 0, 0, 0.39); }
+html[data-theme="dark"].rx-mobile #panel-lending .eq-item-body .btn-borrow { box-shadow: 0 6px 14px rgba(0, 0, 0, 0.39) !important; }
+html[data-theme="dark"].rx-mobile #panel-lending .eq-cart-bar { box-shadow: 0 6px 20px rgba(0, 0, 0, 0.43); }
+
+/* from faculty-add-button.css */
+@media (min-width: 601px) {
+    html[data-theme="dark"]:not(.rx-mobile) body #panel-lending .bf-slot .btn-borrow.bf-add:not(:disabled):not(.btn-borrow-ahead):hover { box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5), 0 0 0 3px rgba(236, 212, 143, .22), inset 0 1px 0 rgba(255, 255, 255, .22) !important; }
+    html[data-theme="dark"]:not(.rx-mobile) body #panel-lending .bf-slot .btn-borrow-primary.bf-add:not(:disabled):not(.btn-borrow-ahead):hover { box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5), 0 0 0 3px rgba(236, 212, 143, .22), inset 0 1px 0 rgba(255, 255, 255, .22) !important; }
+    html[data-theme="dark"]:not(.rx-mobile) body #panel-lending .bf-slot .btn-borrow.bf-add:not(:disabled):not(.btn-borrow-ahead):active { box-shadow: 0 2px 6px rgba(0, 0, 0, 0.46), inset 0 1px 3px rgba(0, 0, 0, .25) !important; }
+    html[data-theme="dark"]:not(.rx-mobile) body #panel-lending .bf-slot .btn-borrow-primary.bf-add:not(:disabled):not(.btn-borrow-ahead):active { box-shadow: 0 2px 6px rgba(0, 0, 0, 0.46), inset 0 1px 3px rgba(0, 0, 0, .25) !important; }
+    html[data-theme="dark"]:not(.rx-mobile) body #panel-lending .bf-slot .bf-stepper { box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.12); }
+    html[data-theme="dark"]:not(.rx-mobile) body #panel-lending .bf-slot .bf-stepper:focus-within { box-shadow: 0 0 0 3px rgba(236, 212, 143, .38), inset 0 1px 2px rgba(0, 0, 0, 0.12); }
+    html:not(.rx-mobile)[data-theme="dark"] body #panel-lending .bf-slot .btn-borrow.bf-add:not(:disabled):not(.btn-borrow-ahead) { background: linear-gradient(135deg, #b02750 0%, #b02750 55%, #a02349 100%) !important; }
+    html:not(.rx-mobile)[data-theme="dark"] body #panel-lending .bf-slot .btn-borrow-primary.bf-add:not(:disabled):not(.btn-borrow-ahead) { background: linear-gradient(135deg, #b02750 0%, #b02750 55%, #a02349 100%) !important; }
+    html:not(.rx-mobile)[data-theme="dark"] body #panel-lending .bf-slot .btn-borrow.bf-add.btn-borrow-ahead:not(:disabled):hover { background: linear-gradient(135deg, #b02750 0%, #b02750 100%) !important; }
+    html:not(.rx-mobile)[data-theme="dark"] body #panel-lending .bf-slot .btn-borrow-primary.bf-add.btn-borrow-ahead:not(:disabled):hover { background: linear-gradient(135deg, #b02750 0%, #b02750 100%) !important; }
+    html:not(.rx-mobile)[data-theme="dark"] body #panel-lending .bf-slot .bf-step-btn:not(:disabled) { background: #b02750; }
+}
+
+/* from faculty-borrow-flow.css */
+html[data-theme="dark"] .feat-hero.is-picked { box-shadow: 0 0 0 2.5px var(--color-primary), 0 6px 24px rgba(0, 0, 0, 0.29); }
+html[data-theme="dark"] .feat-secondary.is-picked { box-shadow: 0 0 0 2.5px var(--color-primary), 0 6px 24px rgba(0, 0, 0, 0.29); }
+html[data-theme="dark"] .bf-panel { background: linear-gradient(160deg, #711933, #932043 60%, #b02750); }
+html[data-theme="dark"] .bf-panel-shade { background: linear-gradient(180deg, rgba(16, 16, 24, 0.05) 25%, rgba(16, 16, 24, 0.85) 100%); }
+html[data-theme="dark"] .bf-hero-b { background: linear-gradient(160deg, #711933, #932043 60%, #b02750); }
+
+/* from fcty-facilities.css */
+html[data-theme="dark"] #rooms-browse .fcty-panel { background: linear-gradient(160deg, #932043, #171622); }
+html[data-theme="dark"] #rooms-browse .fcty-panel-shade { background: linear-gradient(to bottom, rgba(14, 14, 21, 0.45) 0%, transparent 32%), linear-gradient(to top, rgba(14, 14, 21, 0.92) 0%, rgba(14, 14, 21, 0.45) 42%, rgba(14, 14, 21, 0.05) 100%); }
+html[data-theme="dark"] #rooms-browse .fcty-hero { background: linear-gradient(160deg, #932043, #171622); }
+html[data-theme="dark"] #rooms-browse .fcty-hero-shade { background: linear-gradient(100deg, rgba(14, 14, 21, 0.92) 0%, rgba(14, 14, 21, 0.62) 55%, rgba(14, 14, 21, 0.3) 100%); }
+html[data-theme="dark"] #rooms-browse .fcty-sw-btn[aria-selected="true"] .fcty-sw-letter { background: #711933; }
+html[data-theme="dark"] .fcty-overlay { background: rgba(14, 14, 21, 0.55); }
+html[data-theme="dark"] #rooms-browse .fcs-gutter { border-top: 1px solid rgba(244, 128, 159, 0.14); }
+
+/* from faculty-shell.css */
+html[data-theme="dark"] .dash-hero { background: linear-gradient(135deg, #67162e 0%, #111119 100%); }
+html[data-theme="dark"] #panel-home .qa-btn:hover { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.21); }
+html[data-theme="dark"] #panel-home .fdb-btn--primary { background: linear-gradient(135deg, #932043 0%, #741934 100%); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35); }
+html[data-theme="dark"] #panel-home .fdb-btn--primary:hover { background: linear-gradient(135deg, #932043 0%, #741934 100%); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.46); }
+html[data-theme="dark"] #panel-home .fdb-tip { background: #171723; }
+html[data-theme="dark"] #panel-lending .feat-hero { box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.18); }
+html[data-theme="dark"] #panel-lending .feat-hero:hover { box-shadow: 0 12px 32px -6px rgba(0, 0, 0, 0.24); }
+html[data-theme="dark"] #panel-lending .feat-secondary { box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.15); }
+html[data-theme="dark"] #panel-lending .feat-secondary:hover { box-shadow: 0 12px 28px -6px rgba(0, 0, 0, 0.22); }
+html[data-theme="dark"] #panel-lending .catalog-card { box-shadow: 0 4px 24px rgba(0, 0, 0, 0.11) !important; }
+html[data-theme="dark"] #panel-lending .eq-item-card { box-shadow: 0 2px 12px -2px rgba(0, 0, 0, 0.14) !important; }
+html[data-theme="dark"] #panel-lending .item-node { box-shadow: 0 2px 12px -2px rgba(0, 0, 0, 0.14) !important; }
+html[data-theme="dark"] #panel-lending .eq-item-card:hover { box-shadow: 0 12px 28px -5px rgba(0, 0, 0, 0.22), 0 4px 10px -4px rgba(0, 0, 0, 0.14) !important; }
+html[data-theme="dark"] #panel-lending .item-node:hover { box-shadow: 0 12px 28px -5px rgba(0, 0, 0, 0.22), 0 4px 10px -4px rgba(0, 0, 0, 0.14) !important; }
+html[data-theme="dark"] #panel-lending .btn-borrow:hover:not(:disabled) { background: #5c142a !important; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.49) !important; }
+html[data-theme="dark"] #panel-lending .btn-borrow:active:not(:disabled) { box-shadow: 0 1px 4px rgba(0, 0, 0, 0.39) !important; }
+html[data-theme="dark"] #panel-lending .btn-borrow-ghost:hover { border-color: #f4809f; }
+html[data-theme="dark"] #panel-lending .btn-borrow-primary:hover:not(:disabled) { background: #5c142a; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.49); }
+html[data-theme="dark"] #panel-lending .catalog-card { background: rgba(23, 22, 34, 0.85) !important; border-top-color: #711933 !important; }
+
+/* from letter-camera.css */
+html[data-theme="dark"] .pslc-overlay { background: rgba(14, 14, 21, 0.58); }
+html[data-theme="dark"] .pslc-card { box-shadow: 0 14px 40px rgba(0, 0, 0, 0.35), 0 4px 14px rgba(0, 0, 0, .14); }
+html[data-theme="dark"] .pslc-stage { background: #0f0f16; }
+
+/* ---- Small leftovers ---- */
+html[data-theme="dark"] .side-nav-signout,
+html[data-theme="dark"] .side-nav-signout .material-symbols-outlined {
+    color: var(--color-primary);
 }
