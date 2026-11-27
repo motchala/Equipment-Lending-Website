@@ -30,17 +30,15 @@ if (($_GET['fragment'] ?? '') === 'inventory-tbody') {
         <?php else:
         foreach ($inv_rows as $item):
             $inv_qty       = (int)$item['quantity'];
+            $inv_total     = (int)(($inv_total_stock_map ?? [])[$item['item_name']] ?? $inv_qty);
             $inv_cond      = $item['condition'] ?? 'Good';
             $inv_condClass = ($inv_cond === 'For Repair') ? 'repair' : (($inv_cond === 'Fair') ? 'fair' : 'good');
             if ($inv_qty === 0) {
                 $inv_stockClass = 'none';
-                $inv_stockLabel = 'No stock';
             } elseif ($inv_qty <= 2) {
                 $inv_stockClass = 'low';
-                $inv_stockLabel = 'Low stock';
             } else {
                 $inv_stockClass = 'ok';
-                $inv_stockLabel = 'In stock';
             }
             $inv_addedTs = !empty($item['created_at']) ? strtotime($item['created_at']) : false;
         ?>
@@ -68,7 +66,7 @@ if (($_GET['fragment'] ?? '') === 'inventory-tbody') {
                 </td>
                 <td><span class="inv-pill inv-pill--cat"><?php echo htmlspecialchars($item['category']); ?></span></td>
                 <td><span class="inv-pill inv-pill--<?php echo $inv_condClass; ?>"><?php echo htmlspecialchars($inv_cond); ?></span></td>
-                <td><span class="inv-pill inv-pill--stock inv-pill--<?php echo $inv_stockClass; ?>"><strong><?php echo $inv_qty; ?></strong> <?php echo $inv_stockLabel; ?></span></td>
+                <td><span class="inv-pill inv-pill--stock inv-pill--<?php echo $inv_stockClass; ?>" title="<?php echo $inv_qty; ?> available / <?php echo $inv_total; ?> total"><strong><?php echo $inv_qty; ?></strong><span class="inv-stock-sep">/</span><?php echo $inv_total; ?></span></td>
                 <td class="fac-actions">
                     <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm inv-edit-btn"
                         data-action="eq-open-edit" aria-label="Edit equipment">

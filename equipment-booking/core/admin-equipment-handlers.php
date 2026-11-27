@@ -10,6 +10,56 @@ equipment_auto_approve_tick($conn);
 BookingSchedule::tick($conn);
 require_once __DIR__ . '/../../shared/core/cloudinary.php';
 
+if (!function_exists('equipment_condition_from_qty')) {
+    /**
+     * Derive item condition from quantity.
+     *   0        → For Repair
+     *   1–3      → Fair
+     *   4+       → Good
+     */
+    function equipment_condition_from_qty(int $qty): string
+    {
+        if ($qty === 0)  return 'For Repair';
+        if ($qty <= 3)   return 'Fair';
+        return 'Good';
+    }
+}
+
+if (!function_exists('equipment_name_normalized')) {
+    /** Strip all spaces and lowercase — used for duplicate detection. */
+    function equipment_name_normalized(string $name): string
+    {
+        return strtolower(str_replace(' ', '', $name));
+    }
+}
+
+if (!function_exists('equipment_name_exists')) {
+    /**
+     * Returns true if another active (non-archived) item has the same
+     * normalized name (spaces stripped, case-insensitive).
+     * Pass $exclude_id when editing so the item being edited does not
+     * match itself.
+     */
+    function equipment_name_exists(mysqli $conn, string $name, int $exclude_id = 0): bool
+    {
+        $stmt = $conn->prepare(
+            "SELECT item_id FROM tbl_inventory
+              WHERE REPLACE(LOWER(item_name), ' ', '') = ?
+                AND is_archived = 0
+                AND item_id <> ?
+              LIMIT 1"
+        );
+        if (!$stmt) return false;
+        $normalized = equipment_name_normalized($name);
+        $stmt->bind_param('si', $normalized, $exclude_id);
+        $stmt->execute();
+        $stmt->store_result();
+        $found = $stmt->num_rows > 0;
+        $stmt->close();
+        return $found;
+    }
+}
+
 
 // ================= EQUIPMENT IMAGE FILE HELPERS =================
 
@@ -158,9 +208,31 @@ if (isset($_POST['add_item'])) {
     $name = trim($_POST['item_name']);
     $category = $_POST['category'];
     $qty = (int) $_POST['quantity'];
-    $condition = in_array($_POST['condition'] ?? '', ['Good', 'Fair', 'For Repair']) ? $_POST['condition'] : 'Good';
-    $description = trim($_POST['description'] ?? '');
+    $condition = equipment_condition_from_qty($qty);
+    $description = trim($_POST['remarks'] ?? $_POST['description'] ?? '');
     if ($description === '') $description = null;
+
+    // Block quantity = 0 on new items — a new item must have at least 1 unit
+    if ($qty < 1) {
+        if ($is_ajax) {
+            header('Content-Type: application/json');
+            echo json_encode(['status' => 'error', 'message' => 'Quantity must be at least 1 when adding a new item.']);
+            exit();
+        }
+        header("Location: {$base}/admin-dashboard.php?view=inventory&error=qty");
+        exit();
+    }
+
+    // Duplicate name check (space-stripped, case-insensitive)
+    if (equipment_name_exists($conn, $name)) {
+        if ($is_ajax) {
+            header('Content-Type: application/json');
+            echo json_encode(['status' => 'error', 'message' => 'An item with this name already exists. Check the Equipment Inventory List on the right.']);
+            exit();
+        }
+        header("Location: {$base}/admin-dashboard.php?view=inventory&error=duplicate");
+        exit();
+    }
 
     // Default image path
     $image_path = "uploads/default.png";
@@ -226,11 +298,23 @@ if (isset($_POST['update_item'])) {
     $is_ajax = ($_POST['ajax'] ?? '') === '1';
 
     $item_id   = intval($_POST['item_id']);
-    $name      = $_POST['item_name'];
+    $name      = trim($_POST['item_name']);
     $category  = $_POST['category'];
     $qty       = intval($_POST['quantity']);
     $campus_id = max(1, (int)($_POST['campus_id'] ?? 1));
-    $condition = in_array($_POST['condition'] ?? '', ['Good', 'Fair', 'For Repair']) ? $_POST['condition'] : 'Good';
+    $condition = equipment_condition_from_qty($qty);
+    $remarks   = trim($_POST['remarks'] ?? '');
+
+    // Duplicate name check — exclude the item being edited
+    if (equipment_name_exists($conn, $name, $item_id)) {
+        if ($is_ajax) {
+            header('Content-Type: application/json');
+            echo json_encode(['status' => 'error', 'message' => 'Another item with this name already exists. Use a different name (e.g. "' . htmlspecialchars($name) . ' 2").']);
+            exit();
+        }
+        header("Location: {$base}/admin-dashboard.php?view=inventory&error=duplicate");
+        exit();
+    }
 
     // The photo currently on record comes from the database, not from the form's
     // hidden "old_image" field - so the file we may delete below can never be a
@@ -271,20 +355,20 @@ if (isset($_POST['update_item'])) {
         $image_path = 'uploads/default.png';
     }
 
-    // NOTE: description is intentionally not part of this UPDATE. The admin
-    // forms no longer have a Description field, so existing values are left as-is.
     try {
         $stmt = $conn->prepare(
             "UPDATE tbl_inventory
-             SET campus_id  = ?,
-                 item_name  = ?,
-                 category   = ?,
-                 quantity   = ?,
-                 image_path = ?,
-                 `condition` = ?
+             SET campus_id   = ?,
+                 item_name   = ?,
+                 category    = ?,
+                 quantity    = ?,
+                 image_path  = ?,
+                 `condition` = ?,
+                 description = ?
              WHERE item_id = ?"
         );
-        $stmt->bind_param("ississi", $campus_id, $name, $category, $qty, $image_path, $condition, $item_id);
+        $remarks_val = $remarks === '' ? null : $remarks;
+        $stmt->bind_param("ississsi", $campus_id, $name, $category, $qty, $image_path, $condition, $remarks_val, $item_id);
         $stmt->execute();
         $stmt->close();
     } catch (Throwable $e) {

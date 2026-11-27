@@ -95,13 +95,6 @@ if (!$is_super_admin) { return; }
                                     <select id="imp-eq-campus" class="imp-eq-input imp-eq-select" data-role="campus"></select>
                                 </div>
                                 <div class="imp-eq-catlist" data-role="cats" aria-live="polite"></div>
-                                <div class="imp-eq-row">
-                                    <input type="text" class="imp-eq-input" data-role="cat-input" placeholder="New category name" maxlength="100" autocomplete="off" aria-label="New category name">
-                                    <button type="button" class="ps-btn ps-btn--primary" data-role="cat-add" disabled>
-                                        <span class="material-symbols-outlined">add</span> Add
-                                    </button>
-                                </div>
-                                <p class="imp-eq-note hidden" data-role="cat-msg" role="status"></p>
                             </fieldset>
                         </div>
 

@@ -62,6 +62,15 @@ function gsheet_condition(string $status): string
     return 'Fair'; // any other value
 }
 
+// ── Derive condition from quantity (keeps sync consistent with add/edit rule) ──
+function gsheet_condition_from_qty(int $qty): string
+{
+    if ($qty === 0)  return 'For Repair';
+    if ($qty <= 3)   return 'Fair';
+    return 'Good';
+}
+
+
 // ── Get or create a category for a campus ────────────────────────────────────
 function gsheet_ensure_category(mysqli $conn, int $campus_id, string $name): void
 {
@@ -230,8 +239,9 @@ foreach ($sheet_names as $sheet_idx => $sheet_name) {
 
             $qty_raw   = trim((string)($row[$qty_col] ?? '1'));
             $qty       = max(0, (int)filter_var($qty_raw, FILTER_SANITIZE_NUMBER_INT));
-            $status    = trim((string)($row[$status_col] ?? 'Working'));
-            $condition = gsheet_condition($status);
+            if ($qty < 1) continue; // skip zero-stock rows — new items must have at least 1 unit
+
+            $condition = gsheet_condition_from_qty($qty);
 
             $key = strtolower($item_name) . '||' . $campus_id;
             $synced_item_keys[$key] = ['name' => $item_name, 'campus_id' => $campus_id];
@@ -291,7 +301,7 @@ foreach ($sheet_names as $sheet_idx => $sheet_name) {
 
         foreach ($item_counts as $item_name => $counts) {
             $qty       = $counts['ok'];
-            $condition = $counts['ok'] === 0 ? 'For Repair' : ($counts['ok'] < $counts['total'] ? 'Fair' : 'Good');
+            $condition = gsheet_condition_from_qty($qty);
 
             $key = strtolower($item_name) . '||' . $campus_id;
             $synced_item_keys[$key] = ['name' => $item_name, 'campus_id' => $campus_id];
@@ -421,5 +431,26 @@ $ts->bind_param('ss', $now, $now);
 $ts->execute();
 $ts->close();
 
+// Build category list grouped by campus for the client-side dropdown rebuild
+$cat_rows = $conn->query(
+    "SELECT campus_id, name FROM tbl_equipment_categories ORDER BY campus_id ASC, sort_order ASC, name ASC"
+);
+$cats_by_campus_map = [];
+while ($cat_rows && ($cr = $cat_rows->fetch_assoc())) {
+    $cid = (int)$cr['campus_id'];
+    if (!isset($cats_by_campus_map[$cid])) {
+        $cats_by_campus_map[$cid] = [];
+    }
+    $cats_by_campus_map[$cid][] = $cr['name'];
+}
+$categories_by_campus = [];
+foreach ($cats_by_campus_map as $cid => $names) {
+    $categories_by_campus[] = ['campus_id' => $cid, 'categories' => $names];
+}
+
 ob_end_clean();
-echo json_encode(['status' => 'success', 'summary' => $summary]);
+echo json_encode([
+    'status'               => 'success',
+    'summary'              => $summary,
+    'categories_by_campus' => $categories_by_campus,
+]);

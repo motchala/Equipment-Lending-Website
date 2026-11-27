@@ -8079,6 +8079,7 @@ function psSelectFmt(btn) {
 
         campusSel.addEventListener('change', syncCategoryOptions);
         syncCategoryOptions(); // run once on page load for the edit form
+        window._syncCategoryOptions = syncCategoryOptions; // expose for post-sync rebuild
     }());
 
     // ── Live sync poller (always active — not gated on the Settings tab) ────────

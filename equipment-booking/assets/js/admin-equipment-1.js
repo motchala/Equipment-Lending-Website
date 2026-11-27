@@ -64,6 +64,80 @@
            data-* attributes, then open it. (ps-open-modal/close-modal
            are already handled by the main delegation in
            admin-dashboard.js — no need to duplicate that here.) ── */
+        function conditionFromQty(qty) {
+            if (qty === 0)  return 'For Repair';
+            if (qty <= 3)   return 'Fair';
+            return 'Good';
+        }
+
+        // Sidebar add/edit form — update condition display when quantity changes
+        var invQty = document.getElementById('inv-quantity');
+        var invCondDisplay = document.getElementById('inv-condition-display');
+        if (invQty && invCondDisplay) {
+            invQty.addEventListener('input', function () {
+                invCondDisplay.textContent = conditionFromQty(parseInt(this.value, 10) || 0);
+            });
+        }
+
+        // Live duplicate-name hint (sidebar form)
+        var invNameInput = document.getElementById('inv-item-name');
+        var invNameHint  = document.getElementById('inv-name-hint');
+        if (invNameInput && invNameHint) {
+            var _nameTimer = null;
+            invNameInput.addEventListener('input', function () {
+                clearTimeout(_nameTimer);
+                var val = this.value.replace(/\s/g, '').toLowerCase();
+                if (val.length < 2) {
+                    invNameHint.style.display = 'none';
+                    var submitBtn = document.querySelector('#itemForm [type="submit"]');
+                    if (submitBtn) submitBtn.disabled = false;
+                    return;
+                }
+                _nameTimer = setTimeout(function () {
+                    var rows = document.querySelectorAll('#inventory-body .inv-row-item');
+                    var editId = (document.querySelector('[name="item_id"]') || {}).value || '0';
+                    var duplicate = false;
+                    rows.forEach(function (r) {
+                        if (r.dataset.itemId === editId) return;
+                        var n = (r.dataset.itemName || '').replace(/\s/g, '').toLowerCase();
+                        if (n === val) duplicate = true;
+                    });
+                    invNameHint.textContent = duplicate
+                        ? 'An item with this name already exists. Check the Equipment Inventory List.'
+                        : '';
+                    invNameHint.style.display = duplicate ? 'block' : 'none';
+                    var submitBtn = document.querySelector('#itemForm [type="submit"]');
+                    if (submitBtn) submitBtn.disabled = duplicate;
+                }, 300);
+            });
+        }
+
+        // Live duplicate-name hint (Edit modal)
+        var eqmNameInput = document.getElementById('eqm-item-name');
+        var eqmNameHint  = document.getElementById('eqm-name-hint');
+        if (eqmNameInput && eqmNameHint) {
+            var _eqmNameTimer = null;
+            eqmNameInput.addEventListener('input', function () {
+                clearTimeout(_eqmNameTimer);
+                var val = this.value.replace(/\s/g, '').toLowerCase();
+                var editId = (document.getElementById('eqm-item-id') || {}).value || '0';
+                if (val.length < 2) { eqmNameHint.style.display = 'none'; return; }
+                _eqmNameTimer = setTimeout(function () {
+                    var rows = document.querySelectorAll('#inventory-body .inv-row-item');
+                    var duplicate = false;
+                    rows.forEach(function (r) {
+                        if (r.dataset.itemId === editId) return;
+                        var n = (r.dataset.itemName || '').replace(/\s/g, '').toLowerCase();
+                        if (n === val) duplicate = true;
+                    });
+                    eqmNameHint.textContent = duplicate
+                        ? 'Another item with this name already exists.'
+                        : '';
+                    eqmNameHint.style.display = duplicate ? 'block' : 'none';
+                }, 300);
+            });
+        }
+
         document.addEventListener('click', function(e) {
             var btn = e.target.closest('[data-action="eq-open-edit"]');
             if (!btn) return;
@@ -76,8 +150,15 @@
             document.getElementById('eqm-remove-image-flag').value = '0';
             document.getElementById('eqm-item-name').value = d.itemName;
             document.getElementById('eqm-category').value = d.itemCategory;
-            document.getElementById('eqm-quantity').value = d.itemQuantity;
-            document.getElementById('eqm-condition').value = d.itemCondition || 'Good';
+
+            var eqmQty = parseInt(d.itemQuantity, 10) || 0;
+            document.getElementById('eqm-quantity').value = eqmQty;
+            var eqmDisplay = document.getElementById('eqm-condition-display');
+            if (eqmDisplay) eqmDisplay.textContent = conditionFromQty(eqmQty);
+            var eqmRemarks = document.getElementById('eqm-remarks');
+            if (eqmRemarks) eqmRemarks.value = d.itemDescription || '';
+            var eqmHint = document.getElementById('eqm-name-hint');
+            if (eqmHint) eqmHint.style.display = 'none';
 
             var preview = document.getElementById('eqm-imagePreview');
             var removeBtn = document.getElementById('eqm-removeImageBtn');

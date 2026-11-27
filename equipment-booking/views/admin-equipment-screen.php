@@ -247,7 +247,9 @@
                                 <input type="text" id="inv-item-name" name="item_name"
                                     class="form-control-custom" maxlength="150"
                                     value="<?php echo $edit_item ? htmlspecialchars($edit_item['item_name']) : ''; ?>"
-                                    placeholder="e.g. Extension Cord" required>
+                                    placeholder="e.g. Extension Cord" required
+                                    autocomplete="off">
+                                <span id="inv-name-hint" style="display:none;font-size:11.5px;color:var(--danger);margin-top:3px;display:none"></span>
                             </div>
 
                             <div class="form-group">
@@ -299,22 +301,23 @@
                                 <div class="form-group">
                                     <label for="inv-quantity">Quantity <span class="req-star">*</span></label>
                                     <input type="number" id="inv-quantity" name="quantity"
-                                        class="form-control-custom" min="0"
+                                        class="form-control-custom" min="<?php echo $edit_item ? '0' : '1'; ?>"
                                         value="<?php echo $edit_item ? (int)$edit_item['quantity'] : '1'; ?>"
                                         required>
                                 </div>
                                 <div class="form-group">
-                                    <label for="inv-condition">Condition</label>
-                                    <select id="inv-condition" name="condition" class="form-control-custom">
-                                        <?php
-                                        $cur_condition = $edit_item['condition'] ?? 'Good';
-                                        foreach (['Good', 'Fair', 'For Repair'] as $condOpt) {
-                                            $sel = ($cur_condition === $condOpt) ? 'selected' : '';
-                                            echo "<option value=\"$condOpt\" $sel>$condOpt</option>";
-                                        }
-                                        ?>
-                                    </select>
+                                    <label>Condition</label>
+                                    <div id="inv-condition-display" class="form-control-custom" style="background:var(--bg-secondary,#f5f5f5);cursor:default;"><?php echo $edit_item ? htmlspecialchars($edit_item['condition'] ?? 'Good') : 'Fair'; ?></div>
                                 </div>
+                            </div>
+
+                            <div class="fac-edit-section">Remarks <span class="inv-opt">(optional)</span></div>
+
+                            <div class="form-group">
+                                <textarea id="inv-remarks" name="remarks" class="form-control-custom"
+                                    rows="2" maxlength="500"
+                                    placeholder="e.g. Stored in cabinet 3, handle with care..."
+                                    ><?php echo $edit_item ? htmlspecialchars($edit_item['description'] ?? '') : ''; ?></textarea>
                             </div>
 
                             <div class="fac-edit-section">Image <span class="inv-opt">(optional)</span></div>
@@ -408,17 +411,15 @@
                                     <?php else:
                                     while ($item = mysqli_fetch_assoc($inventory_result)):
                                         $inv_qty        = (int)$item['quantity'];
+                                        $inv_total      = (int)($inv_total_stock_map[$item['item_name']] ?? $inv_qty);
                                         $inv_cond       = $item['condition'] ?? 'Good';
                                         $inv_condClass  = ($inv_cond === 'For Repair') ? 'repair' : (($inv_cond === 'Fair') ? 'fair' : 'good');
                                         if ($inv_qty === 0) {
                                             $inv_stockClass = 'none';
-                                            $inv_stockLabel = 'No stock';
                                         } elseif ($inv_qty <= 2) {
                                             $inv_stockClass = 'low';
-                                            $inv_stockLabel = 'Low stock';
                                         } else {
                                             $inv_stockClass = 'ok';
-                                            $inv_stockLabel = 'In stock';
                                         }
                                         $inv_addedTs    = !empty($item['created_at']) ? strtotime($item['created_at']) : false;
                                     ?>
@@ -429,7 +430,8 @@
                                             data-item-quantity="<?php echo $inv_qty; ?>"
                                             data-item-condition="<?php echo htmlspecialchars($inv_cond, ENT_QUOTES); ?>"
                                             data-item-image="<?php echo htmlspecialchars(equipment_image_path($item['image_path'], $root_url), ENT_QUOTES); ?>"
-                                            data-item-image-full="<?php echo htmlspecialchars(equipment_image_path($item['image_path'], $root_url), ENT_QUOTES); ?>">
+                                            data-item-image-full="<?php echo htmlspecialchars(equipment_image_path($item['image_path'], $root_url), ENT_QUOTES); ?>"
+                                            data-item-description="<?php echo htmlspecialchars($item['description'] ?? '', ENT_QUOTES); ?>">
                                             <td>
                                                 <div class="fac-person">
                                                     <span class="inv-thumb">
@@ -449,7 +451,9 @@
                                             <td><span class="inv-pill inv-pill--cat"><?php echo htmlspecialchars($item['category']); ?></span></td>
                                             <td><span class="inv-pill inv-pill--<?php echo $inv_condClass; ?>"><?php echo htmlspecialchars($inv_cond); ?></span></td>
                                             <td>
-                                                <span class="inv-pill inv-pill--stock inv-pill--<?php echo $inv_stockClass; ?>"><strong><?php echo $inv_qty; ?></strong> <?php echo $inv_stockLabel; ?></span>
+                                                <span class="inv-pill inv-pill--stock inv-pill--<?php echo $inv_stockClass; ?>" title="<?php echo $inv_qty; ?> available / <?php echo $inv_total; ?> total">
+                                                    <strong><?php echo $inv_qty; ?></strong><span class="inv-stock-sep">/</span><?php echo $inv_total; ?>
+                                                </span>
                                             </td>
                                             <td class="fac-actions">
                                                 <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm inv-edit-btn"

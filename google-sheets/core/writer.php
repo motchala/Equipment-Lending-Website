@@ -170,7 +170,7 @@ function gs_sync_item(mysqli $conn, int $item_id, string $action): void
 
         // ── 3. Load item from DB ──────────────────────────────────────────────
         $is = $conn->prepare(
-            'SELECT item_name, category, quantity, `condition` FROM tbl_inventory WHERE item_id = ? LIMIT 1'
+            'SELECT item_name, category, quantity, `condition`, description FROM tbl_inventory WHERE item_id = ? LIMIT 1'
         );
         if (!$is) return;
         $is->bind_param('i', $item_id);
@@ -252,9 +252,10 @@ function gs_sync_item(mysqli $conn, int $item_id, string $action): void
                         $item_no    = $last_item_no + $n;
                         $ctrl_no    = $last_ctrl_no + $n;
                         $ctrl       = $prefix . str_pad((string)$ctrl_no, 3, '0', STR_PAD_LEFT);
-                        $new_rows[] = [$item_no, $item_name, $ctrl, $category, $condition, ''];
+                        $new_rows[] = [$item_no, $item_name, $ctrl, $category, $condition, $item['description'] ?? ''];
                     }
-                    $append_range = gs_tab_ref($category) . '!A:F';
+                    $last_col_letter  = chr(64 + count($rows[$header_idx]));
+                    $append_range = gs_tab_ref($category) . '!A:' . $last_col_letter;
                     $url = 'https://sheets.googleapis.com/v4/spreadsheets/' . $sheet_id
                          . '/values/' . rawurlencode($append_range)
                          . ':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS';
@@ -281,6 +282,74 @@ function gs_sync_item(mysqli $conn, int $item_id, string $action): void
                 gs_batch_update_status($sheet_id, $category, $ng_rows, 'NG', $token);
             }
 
+            // Update REMARKS column on all matching rows — column position derived from header
+            $remarks_val = trim((string)($item['description'] ?? ''));
+            $header_row_fa = array_map(fn($c) => strtolower(trim((string)$c)), $rows[$header_idx]);
+            $remarks_col_idx_fa = array_search('remarks', $header_row_fa);
+            if ($remarks_val !== '' && $remarks_col_idx_fa !== false) {
+                $remarks_col_letter = chr(65 + (int)$remarks_col_idx_fa);
+                $remarks_data = [];
+                foreach ($matching_rows as $row_no) {
+                    $range = gs_tab_ref($category) . '!' . $remarks_col_letter . $row_no;
+                    $remarks_data[] = ['range' => $range, 'values' => [[$remarks_val]], 'majorDimension' => 'ROWS'];
+                }
+                if (!empty($remarks_data)) {
+                    $url = 'https://sheets.googleapis.com/v4/spreadsheets/' . $sheet_id . '/values:batchUpdate';
+                    gs_api('POST', $url, ['valueInputOption' => 'RAW', 'data' => $remarks_data], $token);
+                }
+            }
+
+            // If qty increased beyond existing row count, append the missing rows
+            $existing_count = count($matching_rows);
+            if ($qty > $existing_count) {
+                $rows_to_add = $qty - $existing_count;
+
+                // Derive prefix and highest control number from all existing rows
+                $prefix_counts = [];
+                $prefix_max    = [];
+                $last_item_no  = 0;
+                foreach ($rows as $row) {
+                    $no = (int)($row[0] ?? 0);
+                    if ($no > $last_item_no) $last_item_no = $no;
+                    $ctrl = trim((string)($row[2] ?? ''));
+                    if ($ctrl === '') continue;
+                    if (preg_match('/^(BIN(?:-[A-Z0-9]+)+-)(\d+)$/i', $ctrl, $pm)) {
+                        $p = strtoupper($pm[1]);
+                        $n = (int)$pm[2];
+                        $prefix_counts[$p] = ($prefix_counts[$p] ?? 0) + 1;
+                        if ($n > ($prefix_max[$p] ?? 0)) $prefix_max[$p] = $n;
+                    }
+                }
+                $prefix       = 'BIN-NEW-';
+                $last_ctrl_no = 0;
+                if (!empty($prefix_counts)) {
+                    arsort($prefix_counts);
+                    $prefix       = array_key_first($prefix_counts);
+                    $last_ctrl_no = $prefix_max[$prefix] ?? 0;
+                }
+
+                $new_rows = [];
+                for ($n = 1; $n <= $rows_to_add; $n++) {
+                    $item_no    = $last_item_no + $n;
+                    $ctrl_no    = $last_ctrl_no + $n;
+                    $ctrl       = $prefix . str_pad((string)$ctrl_no, 3, '0', STR_PAD_LEFT);
+                    $new_rows[] = [$item_no, $item_name, $ctrl, $category, $condition, $item['description'] ?? ''];
+                }
+
+                $append_range = gs_tab_ref($category) . '!A:F';
+                $url = 'https://sheets.googleapis.com/v4/spreadsheets/' . $sheet_id
+                     . '/values/' . rawurlencode($append_range)
+                     . ':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS';
+                $result = gs_api('POST', $url, [
+                    'range'          => $append_range,
+                    'values'         => $new_rows,
+                    'majorDimension' => 'ROWS',
+                ], $token);
+                if (isset($result['error'])) {
+                    error_log('[gs_sync_item] Format A qty-increase append error for "' . $item_name . '": ' . json_encode($result['error']));
+                }
+            }
+
         } else {
             // ── Format B: one row per item type, has Quantity column ──────────
             // Find the header to locate Quantity and Status column indices.
@@ -300,14 +369,19 @@ function gs_sync_item(mysqli $conn, int $item_id, string $action): void
             }
 
             if ($found_row !== null) {
-                // Update Quantity and STATUS in-place
+                // Update Quantity, STATUS, and REMARKS in-place
                 if ($qty_col_idx !== false) {
-                    $qty_col_letter = chr(65 + (int)$qty_col_idx);   // 0→A, 3→D, etc.
+                    $qty_col_letter = chr(65 + (int)$qty_col_idx);
                     gs_update_cell($sheet_id, $category, $found_row, $qty_col_letter, $qty, $token);
                 }
                 if ($status_col_idx !== false) {
                     $status_col_letter = chr(65 + (int)$status_col_idx);
                     gs_update_cell($sheet_id, $category, $found_row, $status_col_letter, $condition, $token);
+                }
+                $remarks_col_idx = array_search('remarks', $header_row);
+                if ($remarks_col_idx !== false) {
+                    $remarks_col_letter = chr(65 + (int)$remarks_col_idx);
+                    gs_update_cell($sheet_id, $category, $found_row, $remarks_col_letter, (string)($item['description'] ?? ''), $token);
                 }
             } else {
                 // Not found — append a new row
@@ -323,6 +397,8 @@ function gs_sync_item(mysqli $conn, int $item_id, string $action): void
                     $new_row[$name_col_idx] = $item_name;
                     if ($qty_col_idx !== false)    $new_row[(int)$qty_col_idx]    = $qty;
                     if ($status_col_idx !== false) $new_row[(int)$status_col_idx] = $condition;
+                    $remarks_col_idx = array_search('remarks', $header_row);
+                    if ($remarks_col_idx !== false) $new_row[(int)$remarks_col_idx] = (string)($item['description'] ?? '');
 
                     $append_range = gs_tab_ref($category) . '!A:' . chr(65 + count($header_row) - 1);
                     $url = 'https://sheets.googleapis.com/v4/spreadsheets/' . $sheet_id
