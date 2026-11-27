@@ -421,5 +421,26 @@ $ts->bind_param('ss', $now, $now);
 $ts->execute();
 $ts->close();
 
+// Build category list grouped by campus for the client-side dropdown rebuild
+$cat_rows = $conn->query(
+    "SELECT campus_id, name FROM tbl_equipment_categories ORDER BY campus_id ASC, sort_order ASC, name ASC"
+);
+$cats_by_campus_map = [];
+while ($cat_rows && ($cr = $cat_rows->fetch_assoc())) {
+    $cid = (int)$cr['campus_id'];
+    if (!isset($cats_by_campus_map[$cid])) {
+        $cats_by_campus_map[$cid] = [];
+    }
+    $cats_by_campus_map[$cid][] = $cr['name'];
+}
+$categories_by_campus = [];
+foreach ($cats_by_campus_map as $cid => $names) {
+    $categories_by_campus[] = ['campus_id' => $cid, 'categories' => $names];
+}
+
 ob_end_clean();
-echo json_encode(['status' => 'success', 'summary' => $summary]);
+echo json_encode([
+    'status'               => 'success',
+    'summary'              => $summary,
+    'categories_by_campus' => $categories_by_campus,
+]);

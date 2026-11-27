@@ -810,7 +810,7 @@ var unlocked = true;      // no password lock any more: the screen is always ope
             var urlInput = role(card, 'url'), saveBtn = role(card, 'save-url'), syncBtn = role(card, 'sync');
             var alertEl = role(card, 'alert');
             var campusSel = role(card, 'campus'), catsEl = role(card, 'cats');
-            var catInput = role(card, 'cat-input'), catAdd = role(card, 'cat-add'), catMsg = role(card, 'cat-msg');
+            var catMsg = null;
             var listBtn = role(card, 'view-list'), sheetBtn = role(card, 'open-sheet');
             var syncHtml = syncBtn.innerHTML, saveHtml = saveBtn.innerHTML;
             var savedUrl = '', ready = false, busy = false, run = 0, msgTimer = null;
@@ -842,7 +842,7 @@ var unlocked = true;      // no password lock any more: the screen is always ope
             function refreshButtons() {
                 saveBtn.disabled = !ready || busy || typedUrl() === savedUrl;
                 syncBtn.disabled = !ready || busy || typedUrl() === '';
-                catAdd.disabled = !ready || busy || catInput.value.trim() === '' || !campusSel.value;
+                // category add removed — categories come from sheet tabs only
                 sheetBtn.disabled = !ready || savedUrl === '';
             }
 
@@ -870,19 +870,11 @@ var unlocked = true;      // no password lock any more: the screen is always ope
             /* ── Categories ── */
             function drawCats(list) {
                 catsEl.textContent = '';
-                if (!list.length) { catsEl.appendChild(el('p', 'imp-eq-empty', 'No categories for this campus yet. Add one below.')); return; }
+                if (!list.length) { catsEl.appendChild(el('p', 'imp-eq-empty', 'Categories will appear here after the first sync.')); return; }
                 list.forEach(function (c) {
                     var chipEl = el('span', 'imp-eq-cat');
                     chipEl.appendChild(el('span', 'imp-eq-cat-name', c.name));
                     if (c.items > 0) chipEl.appendChild(el('span', 'imp-eq-cat-n', String(c.items)));
-                    var x = el('button', 'imp-eq-cat-x');
-                    x.type = 'button';
-                    x.setAttribute('aria-label', 'Delete the category ' + c.name);
-                    x.title = c.items > 0 ? c.items + ' active item' + (c.items === 1 ? '' : 's') + ' use this category' : 'Delete this category';
-                    x.disabled = c.items > 0;
-                    x.appendChild(el('span', 'material-symbols-outlined', 'close'));
-                    x.addEventListener('click', function () { removeCat(c); });
-                    chipEl.appendChild(x);
                     catsEl.appendChild(chipEl);
                 });
             }
@@ -905,49 +897,6 @@ var unlocked = true;      // no password lock any more: the screen is always ope
                     if (my !== run) return;
                     catsEl.textContent = '';
                     catsEl.appendChild(el('p', 'imp-eq-empty', 'Network error. Please try again.'));
-                });
-            }
-            function addCat() {
-                var name = catInput.value.trim();
-                if (!name || !campusSel.value || busy) return;
-                busy = true; refreshButtons();
-                postJson('category_add', { campus_id: campusSel.value, name: name }, EP).then(function (d) {
-                    busy = false;
-                    if (guard(d)) return;
-                    if (d && d.status === 'success') {
-                        sync(d);
-                        catInput.value = '';
-                        counts.categories += 1; paint(counts);
-                        catNote('Category added.', false);
-                        loadCats();
-                    } else {
-                        catNote((d && d.error) || 'Could not add the category.', true);
-                    }
-                    refreshButtons();
-                }).catch(function () { busy = false; catNote('Network error. Please try again.', true); refreshButtons(); });
-            }
-            function removeCat(c) {
-                if (busy) return;
-                askConfirm({
-                    title: 'Delete this category?',
-                    message: 'Delete the category "' + c.name + '"? Items already assigned to it are not affected.',
-                    confirmText: 'Delete', tone: 'danger', icon: 'delete'
-                }).then(function (ok) {
-                    if (!ok || busy) return;
-                    busy = true; refreshButtons();
-                    postJson('category_delete', { category_id: c.category_id }, EP).then(function (d) {
-                        busy = false;
-                        if (guard(d)) return;
-                        if (d && d.status === 'success') {
-                            sync(d);
-                            counts.categories = Math.max(0, counts.categories - 1); paint(counts);
-                            catNote('Category deleted.', false);
-                            loadCats();
-                        } else {
-                            catNote((d && d.error) || 'Could not delete the category.', true);
-                        }
-                        refreshButtons();
-                    }).catch(function () { busy = false; catNote('Network error. Please try again.', true); refreshButtons(); });
                 });
             }
 
@@ -997,6 +946,40 @@ var unlocked = true;      // no password lock any more: the screen is always ope
                     })
                     .catch(function () { });
             }
+            function refreshCategoryDropdowns(categoriesByCampus) {
+                // Rebuilds the Add Equipment and Edit Equipment modal category <select> elements
+                // without a page reload after a sync brings in new tabs from the sheet.
+                var selectors = ['#inv-category', '#eqm-category'];
+                selectors.forEach(function (sel) {
+                    var dropdown = document.querySelector(sel);
+                    if (!dropdown) return;
+                    var currentVal = dropdown.value;
+                    // Remove all optgroups, keep the placeholder option
+                    Array.prototype.slice.call(dropdown.querySelectorAll('optgroup')).forEach(function (og) {
+                        dropdown.removeChild(og);
+                    });
+                    categoriesByCampus.forEach(function (campusGroup) {
+                        var og = document.createElement('optgroup');
+                        og.label = '';
+                        og.dataset.campusId = String(campusGroup.campus_id);
+                        (campusGroup.categories || []).forEach(function (name) {
+                            var opt = document.createElement('option');
+                            opt.value = name;
+                            opt.textContent = name;
+                            opt.dataset.campusId = String(campusGroup.campus_id);
+                            og.appendChild(opt);
+                        });
+                        dropdown.appendChild(og);
+                    });
+                    // Restore the previously selected value if it still exists
+                    if (currentVal) dropdown.value = currentVal;
+                });
+                // Re-apply the campus filter so only the currently selected campus shows
+                if (typeof window._syncCategoryOptions === 'function') {
+                    window._syncCategoryOptions();
+                }
+            }
+
             function runSync() {
                 var my = run;
                 syncBtn.innerHTML = '<span class="material-symbols-outlined imp-spin">sync</span> Syncing\u2026';
@@ -1015,6 +998,7 @@ var unlocked = true;      // no password lock any more: the screen is always ope
                         setCounts({ last_sync: d.last_sync || '', items: d.items, categories: d.categories, archived: d.archived });
                         loadCats();
                         refreshInventoryTable();
+                        refreshCategoryDropdowns(d.categories_by_campus || []);
                     } else {
                         alertShow((d && d.error) || 'The sync failed. Please try again.', 'err');
                     }
@@ -1039,9 +1023,6 @@ var unlocked = true;      // no password lock any more: the screen is always ope
 
             urlInput.addEventListener('input', refreshButtons);
             urlInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); if (!saveBtn.disabled) saveBtn.click(); } });
-            catInput.addEventListener('input', refreshButtons);
-            catInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); if (!catAdd.disabled) addCat(); } });
-            catAdd.addEventListener('click', addCat);
             campusSel.addEventListener('change', function () { refreshButtons(); loadCats(); });
             listBtn.addEventListener('click', function () { openList('equipment'); });
             sheetBtn.addEventListener('click', function () { if (savedUrl) window.open(savedUrl, '_blank', 'noopener'); });
