@@ -5975,11 +5975,11 @@ function psSelectFmt(btn) {
 
 /* ═══════════════════════════════════════════════════════════════
    ROOMS — reservation details drawer (Rooms > Reservations table)
-   Additive block. "Cancel reservation" in the drawer clicks the row's
-   own Cancel button, so the existing cancel modal + API are reused.
-   Waiting requests (reservations for a later date, with or without an attached
-   request letter) show a reason box and Approve / Decline buttons; the decision
-   goes to room-reservation/api/review-room-reservation.php (any admin).
+   Additive block. One drawer, one layout, for every row (same label-left / value-right rows
+   as the Equipment > Loans drawer). "Cancel reservation" and "Reschedule" in the drawer click
+   the row's own buttons, so the existing cancel / reschedule modals + APIs are reused.
+   Waiting reservations show Approve / Decline buttons: Approve saves straight away, Decline opens
+   its own reason form; the decision goes to room-reservation/api/review-room-reservation.php (any admin).
    ═══════════════════════════════════════════════════════════════ */
 (function () {
     var drawer = document.getElementById('ps-room-drawer');
@@ -5987,13 +5987,40 @@ function psSelectFmt(btn) {
     var currentRow = null;
 
     function el(id) { return document.getElementById(id); }
+    function has(v) { return v !== undefined && v !== null && String(v).trim() !== ''; }
     function txt(id, v) {
         var n = el(id);
-        if (n) n.textContent = (v !== undefined && v !== null && String(v).trim() !== '') ? v : '\u2014';
+        if (n) n.textContent = has(v) ? v : '\u2014';
+    }
+    // An optional row: shown only when it has something to say
+    function opt(rowId, valId, v) {
+        var row = el(rowId);
+        if (!row) return;
+        row.hidden = !has(v);
+        if (has(v)) txt(valId, v);
     }
 
-    var reviewSec = el('ps-rr-review-sec');
-    var reasonBox = el('ps-rr-review-reason');
+    // Plain wording for the rule behind an automatic decision (same wording faculty see in their notifications)
+    var RULE_LABELS = {
+        'rule_1_fifo': 'First come, first served',
+        'rule_2_signatory': 'Signatory priority',
+        'rule_3_role': 'Role priority',
+        'rule_4_return_history': 'Return history',
+        'rule_5_id_order': 'Tie-break by ID order',
+        'rule_past_datetime': 'Date or time already passed',
+        'rule_archived': 'Facility not available',
+        'rule_missing_doc_hold': 'Request letter missing',
+        'rule_schedule_conflict': 'Schedule conflict',
+        'rule_expired_unreviewed': 'Not reviewed in time',
+        'rule_buffer_approved': 'Approved when the 10-minute review ended',
+        'rule_buffer_declined': 'Declined when the 10-minute review ended'
+    };
+    function ruleLabel(rule) {
+        return RULE_LABELS[rule] || rule.replace(/^rule_\d+_/, '').replace(/^rule_/, '').replace(/_/g, ' ')
+            .replace(/^\w/, function (c) { return c.toUpperCase(); });
+    }
+
+    var reasonBox = el('ps-rr-review-reason');   // (no reason box in the drawer any more; Decline has its own form)
     var reviewErr = el('ps-rr-review-err');
     var decideBtns = Array.prototype.slice.call(drawer.querySelectorAll('[data-rr-decide]'));
 
@@ -6004,7 +6031,6 @@ function psSelectFmt(btn) {
     }
 
     function setReviewUI(on) {
-        if (reviewSec) reviewSec.hidden = !on;
         decideBtns.forEach(function (b) { b.hidden = !on; b.disabled = false; });
         if (reasonBox) reasonBox.value = '';
         if (reviewErr) { reviewErr.hidden = true; reviewErr.textContent = ''; }
@@ -6013,133 +6039,93 @@ function psSelectFmt(btn) {
     function openFor(row) {
         var d = row.dataset;
         currentRow = row;
+        var status = d.status;
+
+        // ── header: status (same name + colour as the table row) and when it was submitted ──
         txt('ps-rr-no', '#' + d.rrId);
         txt('ps-rr-submitted', d.submitted);
-        txt('ps-rr-room', d.room);
-        txt('ps-rr-where', d.where);
-        txt('ps-rr-date', d.date);
-        txt('ps-rr-time', d.time);
-        txt('ps-rr-attendees', d.attendees && d.attendees !== '0' ? d.attendees : '');
-        txt('ps-rr-purpose', d.purpose);
-        txt('ps-rr-who', d.whoSub && d.whoSub.indexOf('Student via') === 0 ? d.who + ' (' + d.whoSub + ')' : d.who);
-        txt('ps-rr-type', d.type);
-        txt('ps-rr-student-id', d.whoId);
-        var studentIdRow = el('ps-rr-student-id-row');
-        if (studentIdRow) studentIdRow.hidden = !(d.whoSub && d.whoSub.indexOf('Student via') === 0 && d.whoId);
-
         var badge = el('ps-rr-status');
         var cls = { Approved: 'ps-badge--active', Declined: 'ps-badge--overdue', Cancelled: 'ps-badge--cancelled', Waiting: 'ps-badge--waiting' };
-        // Same stage name + colour as the table row (the table script sets data-phase / data-phase-label)
+        // (the table script sets data-phase / data-phase-label)
         var phaseCls = { pending: 'ps-badge--waiting', upcoming: 'ps-badge--scheduled', live: 'ps-badge--active', completed: 'ps-badge--returned', cancelled: 'ps-badge--cancelled', declined: 'ps-badge--overdue' };
-        badge.className = 'ps-badge ps-badge--dot ' + (phaseCls[d.phase] || cls[d.status] || 'ps-badge--returned');
-        badge.textContent = d.phaseLabel || d.status;
+        badge.className = 'ps-badge ps-badge--dot ' + (phaseCls[d.phase] || cls[status] || 'ps-badge--returned');
+        badge.textContent = d.phaseLabel || status;
 
-        var notes = [];
-        if (d.notes) notes.push(d.notes);
-        if (d.reason) notes.push((d.status === 'Declined' ? 'Declined: ' : d.status === 'Cancelled' ? 'Cancelled: ' : 'Reason: ') + d.reason);
-        txt('ps-rr-notes', notes.join('\n\n'));
-
-        var hasDoc = !!d.docUrl;
+        // ── request letter: only when one is attached ──
+        var hasDoc = has(d.docUrl);
         el('ps-rr-doc-sec').hidden = !hasDoc;
         var prev = el('ps-rr-doc-preview');
         if (prev) prev.hidden = true;
         if (hasDoc) {
             var kind = d.docKind || 'file';
-            var ext = (d.docName.split('.').pop() || '').toUpperCase();
-            txt('ps-rr-doc-name', d.docName);
-            txt('ps-rr-doc-kind', (kind === 'pdf' ? 'PDF document' : kind === 'image' ? 'Image' : 'File') + (ext ? ' \u00b7 ' + ext : ''));
+            var name = d.docName || 'Request letter';
+            var fileExt = (name.split('.').pop() || '').toUpperCase();
+            var hasExt = fileExt && fileExt !== name.toUpperCase();
+            txt('ps-rr-doc-name', name);
+            txt('ps-rr-doc-kind', kind === 'pdf' ? 'PDF document'
+                : kind === 'image' ? 'Image' + (hasExt ? ' \u00b7 ' + fileExt : '')
+                : (hasExt ? fileExt + ' file' : 'File'));
             el('ps-rr-doc-icon').textContent = kind === 'pdf' ? 'picture_as_pdf' : (kind === 'image' ? 'image' : 'draft');
-            el('ps-rr-doc-open').setAttribute('href', d.docOpenUrl);
+            el('ps-rr-doc-open').setAttribute('href', d.docOpenUrl || d.docUrl);
             var dl = el('ps-rr-doc-dl');
             dl.setAttribute('href', d.docUrl);
-            dl.setAttribute('download', d.docName);
+            dl.setAttribute('download', name);
             if (kind === 'image' && prev) {
                 el('ps-rr-doc-img').setAttribute('src', d.docUrl);
                 prev.hidden = false;
             }
         }
 
-        // Cancel / Reschedule is only offered for Approved reservations that haven't ended yet (same rule as the table).
-        el('ps-rr-cancel-btn').hidden = row.dataset.cancellable !== '1';
+        // ── reservation + schedule ──
+        txt('ps-rr-room', d.room);
+        txt('ps-rr-where', d.where);
+        txt('ps-rr-purpose', d.purpose);
+        opt('ps-rr-attendees-row', 'ps-rr-attendees', Number(d.attendees) > 0 ? d.attendees : '');
+        txt('ps-rr-date', d.date);
+        txt('ps-rr-time', d.time);
+
+        // ── requested by: ONE person. A student request shows the student, authorized by the faculty account.
+        //    (The old "Type" row is gone: the ID label says Faculty or Student.) ──
+        var student = d.isStudent === '1' || (d.whoSub || '').indexOf('Student via') === 0;
+        var facultyName = d.facultyName || (d.whoSub || '').replace(/^Student via /, '');
+        txt('ps-rr-who', d.who);
+        txt('ps-rr-id-label', student ? 'Student ID' : 'Faculty ID');
+        txt('ps-rr-idno', student ? (d.whoId || 'Not recorded') : (d.facultyId || 'Not set'));
+        opt('ps-rr-auth-row', 'ps-rr-auth', student ? facultyName : '');
+
+        // ── footer: Cancel / Reschedule only for an Approved reservation that has not ended (same rule as the table) ──
+        el('ps-rr-cancel-btn').hidden = d.cancellable !== '1';
         var rBtn = el('ps-rr-reschedule-btn');
-        if (rBtn) rBtn.hidden = row.dataset.cancellable !== '1';
+        if (rBtn) rBtn.hidden = d.cancellable !== '1';
 
         // Review controls: Waiting requests (the table only flags the rows this admin may decide).
-        setReviewUI(d.status === 'Waiting' && d.canReview === '1');
+        setReviewUI(status === 'Waiting' && d.canReview === '1');
 
-        // Decision context. The room arbitration log records the rule used for
-        // automatic decisions; an override/manual value denotes an admin decision.
+        // ── decision: who decided, in one line. Nothing while a request is still waiting. ──
+        // The room decision log records the rule behind an automatic decision; 'override' / 'manual' is an admin.
         var arbRule = d.arbRule || '';
-        var arbReason = d.arbReason || d.reason || '';
-        var hasDoc = !!d.docUrl;
-        var decSec = el('ps-rr-decision-sec');
-        if (decSec) {
-            var ruleMap = {
-                'rule_1_fifo': 'FIFO (first submitted)',
-                'rule_2_signatory': 'Request-letter/signatory priority',
-                'rule_3_role': 'Submitter role priority',
-                'rule_4_return_history': 'Return-history priority',
-                'rule_5_id_order': 'ID order tie-breaker',
-                'rule_past_datetime': 'Past date or time',
-                'rule_archived': 'Facility availability policy',
-                'rule_missing_doc_hold': 'Supporting-document policy',
-                'rule_schedule_conflict': 'Schedule conflict',
-                'rule_expired_unreviewed': 'Not reviewed in time (12:01 AM on the day)',
-                'override': 'Admin override',
-                'manual': 'Manual admin decision'
-            };
-            var ruleLabel = ruleMap[arbRule] || (arbRule
-                ? arbRule.replace(/^rule_\d+_/, '').replace(/_/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); })
-                : 'Not recorded');
-            var isManual = arbRule === 'override' || arbRule === 'manual';
-            var isAuto = arbRule !== '' && !isManual;
-            var methodLabel;
-            if (isManual) {
-                methodLabel = 'Manual (admin decision)';
-            } else if (isAuto) {
-                methodLabel = arbRule === 'rule_1_fifo' ? 'Automatic (FIFO)' : (arbRule === 'rule_expired_unreviewed' ? 'Automatic (not reviewed in time)' : 'Automatic (priority rules)');
-            } else {
-                methodLabel = 'Not recorded';
-            }
-            var methodEl = el('ps-rr-dec-method');
-            if (methodEl) methodEl.textContent = methodLabel;
-
-            var ruleRow = el('ps-rr-dec-rule-row');
-            var ruleEl = el('ps-rr-dec-rule');
-            if (ruleRow && ruleEl) {
-                ruleRow.hidden = false;
-                ruleEl.textContent = ruleLabel;
-            }
-
-            // Reason row
-            var reasonRow = el('ps-rr-dec-reason-row');
-            var reasonEl = el('ps-rr-dec-reason');
-            if (reasonRow && reasonEl) {
-                reasonRow.hidden = false;
-                reasonEl.textContent = arbReason || (hasDoc ? 'Supporting document attached to this reservation.' : 'No decision reason recorded.');
-            }
-            // The Reason row is relabelled for cancelled reservations; put it back for everything else
-            var reasonLabel = reasonRow ? reasonRow.querySelector('span') : null;
-            if (reasonLabel) reasonLabel.textContent = 'Reason';
-            // Waiting: nothing has been decided yet (any admin can decide - a letter does not change who)
-            if (d.status === 'Waiting') {
-                if (methodEl) methodEl.textContent = 'Awaiting admin review';
-                if (ruleRow) ruleRow.hidden = true;
-                if (reasonRow) reasonRow.hidden = true;
-            }
-            // Cancelled: describe the cancellation, not the approval it replaced
-            if (d.status === 'Cancelled') {
-                if (methodEl) methodEl.textContent = d.cancelledBy === 'requester' ? 'Cancelled by the requester' : (d.cancelledBy === 'admin' ? 'Cancelled by an admin' : 'Cancelled');
-                if (ruleRow) ruleRow.hidden = true;
-                if (reasonRow && reasonEl) {
-                    reasonRow.hidden = false;
-                    if (reasonLabel) reasonLabel.textContent = 'When';
-                    reasonEl.textContent = d.cancelledAt || 'Time not recorded.';
-                }
-            }
-            decSec.hidden = false;
+        var manual = arbRule === 'override' || arbRule === 'manual';
+        var heading = 'Decision', byLabel = '', byVal = '', reasonVal = '', whenVal = '';
+        if (status === 'Cancelled') {
+            heading = 'Cancellation';
+            byLabel = 'Cancelled by';
+            byVal = d.cancelledBy === 'requester' ? 'Requester' : (d.cancelledBy === 'admin' ? 'Admin' : '');
+            whenVal = d.cancelledAt;
+        } else if (status === 'Approved' || status === 'Declined') {
+            byLabel = status + ' by';
+            byVal = manual ? 'Admin' : (arbRule ? 'Automatic \u00b7 ' + ruleLabel(arbRule) : '');
+            // An approval always carries the same standard wording, so only a decline shows a reason
+            if (status === 'Declined') reasonVal = d.arbReason || d.reason;
         }
+        txt('ps-rr-decision-h', heading);
+        txt('ps-rr-by-label', byLabel);
+        opt('ps-rr-by-row', 'ps-rr-by', byVal);
+        opt('ps-rr-reason-row', 'ps-rr-reason', reasonVal);
+        opt('ps-rr-when-row', 'ps-rr-when', whenVal);
+        el('ps-rr-decision-sec').hidden = !(has(byVal) || has(reasonVal) || has(whenVal));
 
+        var body = drawer.querySelector('.ps-drawer-body');
+        if (body) body.scrollTop = 0;
         if (typeof psOpenModal === 'function') psOpenModal('ps-room-drawer');
     }
 
