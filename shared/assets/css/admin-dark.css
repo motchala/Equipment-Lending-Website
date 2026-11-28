@@ -21,19 +21,28 @@
    ══════════════════════════════════════════════════════════════════════════ */
 
 /* ── 1 · Tokens ──────────────────────────────────────────────────────────── */
-html[data-theme="dark"] {
+html[data-theme="dark"],
+html[data-theme="dark"] [data-theme="dark"] {
     /* text */
     --text-dark: #e4e2ea;
     --text-light: #aeaebf;
     /* borders: a touch more visible than before, still quiet */
     --khaki-border: #383850;
     /* accents: the LIGHT variant is for text, outlines and icons … */
-    --accent-maroon: #e9879c;
+    --accent-maroon: #f4809f;          /* vivid rose: text, outlines, icons */
+    --accent-dark: #a01f47;            /* deep crimson: hover fills */
+    --accent-light: #2e2030;           /* neutral violet-grey tint (was a red-brown) */
+    --hover-bg: #2e2030;
+    --section-tint-start: rgba(244, 128, 159, 0.07);
+    --section-tint-end: rgba(244, 128, 159, 0);
+    /* sidebar: graphite-navy instead of deep maroon */
+    --nav-bg-top: #181826;
+    --nav-bg-bottom: #0f0f1a;
     --danger: #f08a80;
     --success: #62d396;
     --warning: #f2b45a;
     /* … and a DEEP variant for filled buttons / badges that carry white text */
-    --accent-fill: #b23a54;
+    --accent-fill: #c42a55;           /* crimson fill for buttons carrying white text */
     --danger-fill: #b3322a;
     --success-fill: #1f7a45;
 
@@ -183,12 +192,12 @@ html[data-theme="dark"] .fac-created-icon { background: rgba(82, 214, 148, 0.16)
 html[data-theme="dark"] .fac-created-bar { background: var(--success-fill); }
 html[data-theme="dark"] #eq-loan-table .eq-loan-row.eq-bundle-link-start td:last-child::after,
 html[data-theme="dark"] #eq-loan-table .eq-loan-row.eq-bundle-link-middle td:last-child::after,
-html[data-theme="dark"] #eq-loan-table .eq-loan-row.eq-bundle-link-end td:last-child::after { border: 2px solid #b5637f; }
-html[data-theme="dark"] .dash-btn:hover { background: var(--accent-light, rgba(196, 100, 107, 0.16)); }
+html[data-theme="dark"] #eq-loan-table .eq-loan-row.eq-bundle-link-end td:last-child::after { border: 2px solid #d6456b; }
+html[data-theme="dark"] .dash-btn:hover { background: var(--accent-light, rgba(244, 128, 159, 0.16)); }
 html[data-theme="dark"] .dash-btn--primary { background: linear-gradient(135deg, var(--accent-fill) 0%, var(--accent-dark) 100%); }
 html[data-theme="dark"] .dash-btn--primary:hover { background: linear-gradient(135deg, var(--accent-fill) 0%, var(--accent-dark) 100%); }
-html[data-theme="dark"] .dash-link:hover { background: var(--accent-light, rgba(196, 100, 107, 0.16)); }
-html[data-theme="dark"] .dash-ins-toggle:hover { background: var(--accent-light, rgba(196, 100, 107, 0.16)); }
+html[data-theme="dark"] .dash-link:hover { background: var(--accent-light, rgba(244, 128, 159, 0.16)); }
+html[data-theme="dark"] .dash-ins-toggle:hover { background: var(--accent-light, rgba(244, 128, 159, 0.16)); }
 html[data-theme="dark"] .rm-bld[aria-pressed="true"] { background: var(--accent-fill); border-color: var(--accent-fill); }
 html[data-theme="dark"] #panel-rooms .pr-rooms-table.rm-grid tr.pr-room-row>td.rm-ico[class] { color: #42d782; }
 html[data-theme="dark"] #panel-rooms .pr-rooms-table.rm-grid tr.pr-row-maint>td.rm-ico[class] { color: #e67a33; }
@@ -221,7 +230,7 @@ html[data-theme="dark"] .ps-reason-chip.is-selected { background: var(--accent-f
 @media (max-width: 768px) {
     html[data-theme="dark"] #eq-loan-table .eq-loan-row.eq-bundle-link-start::after,
     html[data-theme="dark"] #eq-loan-table .eq-loan-row.eq-bundle-link-middle::after,
-    html[data-theme="dark"] #eq-loan-table .eq-loan-row.eq-bundle-link-end::after { border: 2px solid #b5637f; }
+    html[data-theme="dark"] #eq-loan-table .eq-loan-row.eq-bundle-link-end::after { border: 2px solid #d6456b; }
 }
 
 /* ── from dashboard/assets/css/admin-dashboard-responsive.css ── */
@@ -454,4 +463,67 @@ html[data-theme="dark"] .fac-reset-flag {
 html[data-theme="dark"] tr.fac-row--reset-request {
     background: rgba(242, 180, 90, 0.07);
     box-shadow: inset 3px 0 0 var(--warning);
+}
+
+/* ============================================================================
+   Hard-coded maroon / red-brown colours in the original rules, re-tinted to the
+   graphite + crimson palette above (generated from the original rules, dark-only).
+   ========================================================================= */
+
+/* from admin-dashboard.css */
+html[data-theme="dark"] .act-event-jump { background: rgba(147, 32, 67, 0.06); border: 1px solid rgba(147, 32, 67, 0.15); }
+html[data-theme="dark"] nav.sidebar { box-shadow: 6px 0 24px rgba(0, 0, 0, 0.46); }
+html[data-theme="dark"] .sidebar-logo { background: #932043; }
+html[data-theme="dark"] .nav-item:hover .nav-account-avatar { background: #6e1832; box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.46); }
+html[data-theme="dark"] .ps-qa-card:hover { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25); }
+html[data-theme="dark"] .btn-borrow:hover { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.46); }
+html[data-theme="dark"] .btn-submit-form:hover { box-shadow: 0 6px 20px rgba(0, 0, 0, 0.46); }
+html[data-theme="dark"] .btn-add-item:hover { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.46); }
+html[data-theme="dark"] #app-toast { box-shadow: 0 10px 32px rgba(0, 0, 0, 0.24), 0 4px 12px rgba(0, 0, 0, 0.08); }
+html[data-theme="dark"] .ov-profile-hero { background: radial-gradient(120% 150% at 100% 0%, rgba(255, 233, 160, 0.55) 0%, rgba(255, 233, 160, 0) 52%), linear-gradient(100deg, #711933 0%, #932043 34%, #b02750 62%, #d99a1e 84%, #fbbf24 100%); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.29), inset 0 1px 0 rgba(255, 255, 255, 0.18); }
+html[data-theme="dark"] #panel-settings[data-sett-size="narrow"] .ov-profile-hero { background: radial-gradient(130% 90% at 100% 100%, rgba(255, 233, 160, 0.5) 0%, rgba(255, 233, 160, 0) 55%), linear-gradient(165deg, #711933 0%, #932043 46%, #b02750 74%, #e0a21f 100%); }
+html[data-theme="dark"] #panel-settings[data-sett-size="tiny"] .ov-profile-hero { background: radial-gradient(130% 90% at 100% 100%, rgba(255, 233, 160, 0.5) 0%, rgba(255, 233, 160, 0) 55%), linear-gradient(165deg, #711933 0%, #932043 46%, #b02750 74%, #e0a21f 100%); }
+html[data-theme="dark"] .ov-profile-hero .btn-edit-acc { background: #7d1c39; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.43); }
+html[data-theme="dark"] .ov-profile-hero .btn-edit-acc:hover { background: #5d152a; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.5); }
+html[data-theme="dark"] .ov-profile-hero .btn-cancel-acc { background: rgba(113, 25, 51, 0.62); }
+html[data-theme="dark"] .ov-profile-hero .btn-cancel-acc:hover { background: rgba(113, 25, 51, 0.85); }
+html[data-theme="dark"] .ov-access-badge { border: 1px solid rgba(244, 128, 159, 0.15); }
+html[data-theme="dark"] .ps-dash-top-actions .notif-btn { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
+html[data-theme="dark"] .dash-btn--primary { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35); }
+html[data-theme="dark"] .dash-btn--primary:hover { box-shadow: 0 6px 16px rgba(0, 0, 0, 0.46); }
+html[data-theme="dark"] .dash-tip { background: #171723; }
+html[data-theme="dark"] .faculty-form-card .fac-lookup-btn { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.24); }
+html[data-theme="dark"] #eqLoanFilter .eq-loan-tab.active .eq-loan-tab-count { background: rgba(147, 32, 67, 0.12); }
+
+/* from admin-imports.css */
+html[data-theme="dark"] .imp-lock-btn { box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5), 0 0 0 6px color-mix(in srgb, var(--accent-gold) 30%, transparent), inset 0 1px 0 rgba(255, 255, 255, .18); }
+html[data-theme="dark"] .imp-lock-btn:hover { box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5), 0 0 0 8px color-mix(in srgb, var(--accent-gold) 38%, transparent), inset 0 1px 0 rgba(255, 255, 255, .22); }
+html[data-theme="dark"] .imp-card-icon { box-shadow: 0 5px 14px rgba(0, 0, 0, 0.39); }
+
+/* from admin-dashboard-mobile.css */
+html[data-theme="dark"] .rxm-sheet-scrim { background: rgba(14, 14, 21, 0.45); }
+
+/* from admin-ratings.css */
+html[data-theme="dark"] .svr-confirm { background: rgba(176, 39, 80, 0.07); border: 1px solid #b02750; }
+
+/* from letter-camera.css */
+html[data-theme="dark"] .pslc-overlay { background: rgba(14, 14, 21, 0.58); }
+html[data-theme="dark"] .pslc-card { box-shadow: 0 14px 40px rgba(0, 0, 0, 0.35), 0 4px 14px rgba(0, 0, 0, .14); }
+html[data-theme="dark"] .pslc-stage { background: #0f0f16; }
+
+/* ---- Toast (default / neutral type): was a red-brown card ---- */
+html[data-theme="dark"] #app-toast {
+    --toast-bg: #1e1e2e;
+    --toast-fg: #e4e2ea;
+    --toast-edge: #3c3c58;
+}
+
+/* ---- Equipment form: read-only "Condition" field is written in the PHP view as
+        style="background:var(--bg-secondary,#f5f5f5)" (variable not defined) so it
+        showed as a bright box with light text in dark mode ---- */
+html[data-theme="dark"] #eqm-condition-display,
+html[data-theme="dark"] #inv-condition-display,
+html[data-theme="dark"] [style*="--bg-secondary"] {
+    background: var(--input-bg) !important;
+    color: var(--text-dark) !important;
 }

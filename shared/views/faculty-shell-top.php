@@ -29,6 +29,8 @@ if (strpos($fac_cache_ctl, 'max-age=0') !== false && strpos($fac_cache_ctl, 'no-
          External file on purpose (not inline): it judges the real screen size, not only window.innerWidth,
          which real phones can report wider than the screen. Add ?rxdebug=1 to the URL to see what it reads. -->
     <script src="dashboard/assets/js/faculty-phone-detect.js?v=<?php echo @filemtime(PS_ROOT . '/dashboard/assets/js/faculty-phone-detect.js'); ?>"></script>
+    <!-- Saved Dark theme, applied before first paint so a refresh never flashes Light -->
+    <script src="shared/assets/js/theme-boot.js?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/js/theme-boot.js'); ?>" data-key="eq_theme"></script>
     <!-- Refresh behaviour (faculty interface). Same rules as the admin interface:
          - Soft refresh (F5 / reload button): stay on the screen you are on.
          - Hard refresh (Ctrl+Shift+R / Ctrl+F5): back to the Dashboard.

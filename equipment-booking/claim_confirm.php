@@ -25,14 +25,13 @@ $is_ajax  = (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest');
 $items    = [];
 $borrower = '';
 $collector = '';
-$collector_id = '';
 $collector_role = 'requester';   // 'pickup' = a faculty's own request where a student was named to collect it
 
 // Everything the admin needs to see BEFORE handing anything over: what was requested, how many, and its state.
 // Waiting items are included on purpose: a student's Claim QR is issued at submission, so it is scanned
 // before an admin has approved the request. The admin must be able to see it (and approve it) at that point.
 $cols = "id, faculty_id, faculty_name, equipment_name, borrow_qty, status, room,
-         borrow_date, borrow_time, return_date, return_time, submitted_by_name, submitted_by_id, submitted_as";
+         borrow_date, borrow_time, return_date, return_time, submitted_by_name, submitted_as";
 
 if ($token !== '') {
     // ── Try bundle token first ────────────────────────────────────────────
@@ -87,7 +86,6 @@ $return_by    = '';
 if (!empty($items)) {
     $borrower     = (string)$items[0]['faculty_name'];
     $collector    = trim((string)($items[0]['submitted_by_name'] ?? ''));
-    $collector_id = trim((string)($items[0]['submitted_by_id'] ?? ''));
     if ($collector !== '' && (string)($items[0]['submitted_as'] ?? '') !== 'student') {
         $collector_role = 'pickup';   // the faculty borrowed it; the named student only picks it up
     }
@@ -108,7 +106,6 @@ if ($is_ajax) {
             'token'          => $token,
             'borrower'       => $borrower,
             'collector'      => $collector,
-            'collector_id'   => $collector_id,
             'collector_role' => $collector_role,
             'room'           => $room_label,
             'borrow_start'   => $borrow_start,
@@ -262,7 +259,7 @@ if ($is_ajax) {
             <div><b>Borrowed by (faculty):</b> <?= htmlspecialchars($borrower) ?></div>
             <div><b>Pick-up by (student):</b> <?= htmlspecialchars($collector) ?></div>
         <?php elseif ($collector !== ''): ?>
-            <div><b>Requested by:</b> <?= htmlspecialchars($collector) ?><?= $collector_id !== '' ? ' · ' . htmlspecialchars($collector_id) : '' ?></div>
+            <div><b>Requested by:</b> <?= htmlspecialchars($collector) ?></div>
             <div><b>Faculty:</b> <?= htmlspecialchars($borrower) ?></div>
         <?php else: ?>
             <div><b>Borrower:</b> <?= htmlspecialchars($borrower) ?></div>

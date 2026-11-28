@@ -722,7 +722,6 @@
                                         data-req-type="<?php echo htmlspecialchars($ltype); ?>"
                                         data-submitted-as="<?php echo htmlspecialchars((string)($r['submitted_as'] ?? '')); ?>"
                                         data-student-name="<?php echo $lstudent ? htmlspecialchars((string)$r['submitted_by_name']) : ''; ?>"
-                                        data-student-id="<?php echo $lstudent ? htmlspecialchars((string)($r['submitted_by_id'] ?? '')) : ''; ?>"
                                         data-pickup-name="<?php echo htmlspecialchars($lpickup); ?>"
                                         data-equipment="<?php echo htmlspecialchars($r['equipment_name']); ?>"
                                         data-qty="<?php echo $lqty; ?>"
@@ -761,7 +760,7 @@
                                         <td data-col="borrower">
                                             <div class="eq-cell-name"><?php echo htmlspecialchars($lstudent ? (string)$r['submitted_by_name'] : $r['faculty_name']); ?></div>
                                             <div class="eq-cell-sub">
-                                                <?php if ($lstudent): ?>Student<?php if (!empty($r['submitted_by_id'])): ?> &middot; <?php echo htmlspecialchars((string)$r['submitted_by_id']); ?><?php endif; ?> &middot; via <?php echo htmlspecialchars($r['faculty_name']); ?>
+                                                <?php if ($lstudent): ?>Student &middot; via <?php echo htmlspecialchars($r['faculty_name']); ?>
                                                 <?php else: ?><?php echo htmlspecialchars(faculty_id_display($r['faculty_id'], 'Not set')); ?>
                                             <?php endif; ?>
                                             </div>

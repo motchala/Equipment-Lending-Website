@@ -42,6 +42,7 @@
     var DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     var QR_SRC = 'https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js';
     var RECEIPT_KEY = 'pup_last_receipt';
+    var ROOM_RECEIPT_KEY = 'pup_last_room_receipt';
     var SNAP_KEY = 'pup_student_view';   /* sessionStorage: the screen + entries to bring back after a refresh */
     /* Longest name the Student Portal accepts (spaces count, runs of spaces count once). Validation only: the form
        shows no hint. Keep equal to STUDENT_NAME_MAX_LENGTH in shared/core/student-name.php. */
@@ -55,6 +56,7 @@
         borrow: 'equipment-booking/api/submit-student-borrow.php',
         requestStatus: 'equipment-booking/api/student-request-status.php',
         reserve: 'room-reservation/api/submit-student-reserve.php',
+        roomStatus: 'room-reservation/api/student-room-status.php',
         roomSchedule: 'room-reservation/api/student-room-schedule.php',
         slotStatus: 'equipment-booking/api/student-slot-status.php'
     };
@@ -479,7 +481,6 @@
         var name = $('studentName').value.trim();
         var id = '';
         var course = $('studentCourse').value.trim();
-
         /* Not filled in yet: those fields flash red (no message), all at once */
         var missing = [];
         if (!code) missing.push($('facultyCode'));
@@ -500,7 +501,7 @@
         var btn = $('btnVerifyCode');
         setBusy(btn, true, 'Verifying…');
 
-        post(url, { code: code, student_name: name, student_id: id, student_course: course }).then(function (data) {
+        post(url, { code: code, student_name: name, student_course: course }).then(function (data) {
             setBusy(btn, false);
             if (data.error) return showAlert('detailsError', data.error);
             st.kind = kind;
@@ -508,7 +509,6 @@
             st.verified = {};
             Object.keys(data).forEach(function (k) { st.verified[k] = data[k]; });
             st.verified.student_name = name;
-            st.verified.student_id = id;
             st.verified.student_course = course;
             enterChoose();
         });
@@ -911,7 +911,6 @@
                 faculty_id: v.faculty_id,
                 faculty_name: v.faculty_name,
                 student_name: v.student_name,
-                student_id: v.student_id,
                 equipment_name: cur.name,
                 quantity: cur.qty,
                 room_id: roomId,
@@ -961,7 +960,7 @@
         var v = st.verified;
         var receipt = {
             kind: 'borrow',
-            student_name: v.student_name, student_id: v.student_id, faculty_name: v.faculty_name,
+            student_name: v.student_name, faculty_name: v.faculty_name,
             room: room, borrow_date: borrow, return_date: ret,
             requested_at: nowStamp(),
             items: st.done.slice()
@@ -1585,7 +1584,7 @@
         setBusy(btn, true, 'Submitting…');
 
         var form = {
-            student_name: v.student_name, student_id: v.student_id, faculty_name: v.faculty_name,
+            student_name: v.student_name, faculty_name: v.faculty_name,
             reservation_date: date, start_time: start, end_time: end, purpose: purpose,
             building: currentBuilding() ? currentBuilding().name : ''
         };
@@ -1595,7 +1594,6 @@
             faculty_id: v.faculty_id,
             faculty_name: v.faculty_name,
             student_name: v.student_name,
-            student_id: v.student_id,
             room_id: toInt(room.room_id),
             reservation_date: date,
             start_time: start,
@@ -1614,23 +1612,28 @@
 
     function showRoomResult(res, f) {
         nav = { screen: 'roomResult', res: res, f: f };
-        var approved = res.status === 'Approved';
-        var waiting = res.status === 'Waiting';   /* a later date waits for an admin's decision */
-        var title = approved ? 'Reservation approved' : (waiting ? 'Request sent — pending admin review' : 'Reservation ' + esc(res.status || 'received'));
+        stopRoomPoll();
+        var status = res.status || '';
+        var approved = status === 'Approved';
+        var declined = status === 'Declined' || status === 'Cancelled';
+        var waiting = status === 'Waiting';
         var later = !!f.reservation_date && f.reservation_date > todayStr();
         var note = waiting
             ? (later
                 ? 'This reservation is for a later date, so an admin has to approve it. If it is not reviewed in time, it is automatically declined at 12:01 AM on the reservation date.'
                 : 'An admin has to approve your reservation first. If it is not reviewed before the start time, it is automatically declined.')
             : (res.reason ? res.reason : '');
+        var title = approved ? 'Reservation approved'
+            : (declined ? 'Reservation ' + esc(status)
+            : (waiting ? 'Request sent — pending admin review' : 'Reservation ' + esc(status || 'received')));
         flow(
-            '<div class="st-result"><div class="st-result-top">' +
-            '<span class="st-result-icon' + (waiting ? ' is-wait' : '') + '">' + icon(approved ? 'check_circle' : (waiting ? 'hourglass_top' : 'info')) + '</span>' +
-            '<h2 class="st-h2">' + (approved ? 'Reservation approved' : (waiting ? 'Request sent — pending admin review' : esc(title))) + '</h2>' +
+            '<div class="st-result"><div class="st-result-top" role="status" aria-live="polite">' +
+            '<span class="st-result-icon' + (waiting ? ' is-wait' : '') + '">' + icon(approved ? 'check_circle' : (waiting ? 'hourglass_top' : (declined ? 'cancel' : 'info'))) + '</span>' +
+            '<h2 class="st-h2">' + esc(title) + '</h2>' +
             '<p>Room reservation #' + esc(String(res.reservation_id)) + '</p>' +
             (note ? '<p>' + esc(note) + '</p>' : '') + '</div>' +
             '<div class="st-card"><dl class="st-summary">' +
-            row('Student', f.student_name + (f.student_id ? ' · ' + f.student_id : '')) +
+            row('Student', f.student_name) +
             row('Authorized by', f.faculty_name) +
             row('Room', (res.room_name || '') + (f.building ? ' — ' + f.building : '')) +
             row('Date', niceDate(f.reservation_date)) +
@@ -1638,6 +1641,7 @@
             row('Purpose', f.purpose) +
             '</dl></div>' +
             '<div class="st-actions st-result-actions"><button type="button" class="st-btn st-btn-primary" data-action="home">Done</button></div></div>', 3);
+        if (waiting && res.reservation_id && res.status_key) startRoomPoll();
     }
 
     function row(k, v) { return '<div><dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd></div>'; }
@@ -1876,7 +1880,7 @@
             '<h2 class="st-h2">' + esc(title) + '</h2>' +
             '<p>' + esc(lead) + '</p></div>' +
             '<div class="st-card st-summary-card"><dl class="st-summary is-grid">' +
-            row('Student', r.student_name + (r.student_id ? ' · ' + r.student_id : '')) +
+            row('Student', r.student_name) +
             row('Authorized by', r.faculty_name) +
             row('Room', r.room) +
             (r.requested_at ? row('Requested', fmtWhen(r.requested_at)) : '') +
@@ -1961,7 +1965,45 @@
     }
     document.addEventListener('visibilitychange', function () {
         if (!document.hidden && receiptWatchable(st.receipt)) pollReceipt(true);
+        if (!document.hidden && roomResultWatchable()) pollRoom(true);
     });
+    /* ── Room reservation live status polling ───────────────────── */
+    var roomPollTimer = 0, roomPollBusy = false;
+    function roomResultWatchable() {
+        return !!(nav && nav.screen === 'roomResult' && nav.res && nav.res.reservation_id &&
+                  nav.res.status_key && nav.res.status === 'Waiting');
+    }
+    function stopRoomPoll() { if (roomPollTimer) { clearTimeout(roomPollTimer); roomPollTimer = 0; } }
+    function startRoomPoll() {
+        stopRoomPoll();
+        if (!roomResultWatchable()) return;
+        roomPollTimer = setTimeout(function () { pollRoom(false); }, POLL_MS);
+    }
+    function pollRoom(manual) {
+        stopRoomPoll();
+        if (!roomResultWatchable()) return;
+        if (document.hidden && !manual) { startRoomPoll(); return; }
+        if (roomPollBusy) return;
+        roomPollBusy = true;
+        var res = nav.res;
+        post(URLS.roomStatus, { reservation_id: res.reservation_id, key: res.status_key })
+            .then(function (d) {
+                roomPollBusy = false;
+                if (!d || d.error || !d.success) return;
+                if (!nav || nav.screen !== 'roomResult' || nav.res !== res) return;
+                var newStatus = d.status || '';
+                if (newStatus === res.status) return;
+                /* Status changed — update the stored result and re-render the screen */
+                res.status = newStatus;
+                res.reason = d.reason || '';
+                if (d.room_name && !res.room_name) res.room_name = d.room_name;
+                var y = window.scrollY;
+                showRoomResult(res, nav.f);
+                window.scrollTo(0, y);
+            })
+            .catch(function () { roomPollBusy = false; })
+            .then(function () { if (!roomPollTimer) startRoomPoll(); });
+    }
 
     /* ── QR codes (library loaded on demand) ───────────────────── */
     var qrState = 'idle', qrQueue = [];
