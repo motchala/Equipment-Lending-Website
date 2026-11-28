@@ -50,6 +50,8 @@ if (
          External file on purpose (not inline): it judges the real screen size, not only window.innerWidth or the
          browser's "mobile" flag, which real phones can get wrong. Add ?rxdebug=1 to the URL to see what it reads. -->
     <script src="dashboard/assets/js/admin-phone-detect.js?v=<?php echo @filemtime(PS_ROOT . '/dashboard/assets/js/admin-phone-detect.js'); ?>"></script>
+    <!-- Saved Dark theme, applied before first paint so a refresh never flashes Light -->
+    <script src="shared/assets/js/theme-boot.js?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/js/theme-boot.js'); ?>" data-key="adm_theme"></script>
     <title>PUP Sync | Admin Portal</title>
     <!-- Favicon: the PUPSync logo mark (maroon square + layers) -->
     <link rel="icon" href="shared/assets/images/favicon.ico" sizes="32x32">
