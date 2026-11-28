@@ -314,10 +314,15 @@ if ($fac_row && !empty($fac_row['email']) && notif_family_enabled($conn, 'facult
     sendPupSyncEmail($fac_row['email'], $fac_row['fullname'], $subject, $body_html);
 }
 
+// Issue a status_key so the portal can poll for status changes without a login.
+require_once __DIR__ . '/../core/room-expiry.php';
+$status_key = ps_room_issue_student_key($conn, $reservation_id);
+
 echo json_encode([
     'success'        => true,
     'reservation_id' => $reservation_id,
     'status'         => $final_status,
     'reason'         => $final_reason,
     'room_name'      => $room_name,
+    'status_key'     => $status_key,
 ]);

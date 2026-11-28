@@ -61,7 +61,7 @@ $_has_bid = $_bid_col && $_bid_col->num_rows > 0;
 $base_cols = ['id', 'faculty_name', 'faculty_id', 'equipment_name', 'instructor', 'room',
               'borrow_date', 'return_date', 'return_token', 'returned_at', 'status',
               'request_date', 'reason', 'document_path', 'arbitration_rule',
-              'submitted_by_name', 'submitted_by_id'];
+              'submitted_by_name'];
 $extra_cols = [];
 if ($_has_sa)  $extra_cols[] = 'submitted_as';
 if ($_has_bid) $extra_cols[] = 'batch_id';

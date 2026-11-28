@@ -198,3 +198,48 @@ function ps_room_is_future_date(string $res_date): bool
     $today = (new DateTimeImmutable('now', new DateTimeZone('Asia/Manila')))->format('Y-m-d');
     return $res_date > $today;
 }
+
+/**
+ * Make sure tbl_room_reservations has the student_key column used for status polling.
+ * Idempotent; safe to call on every request.
+ */
+function ps_room_ensure_student_key(mysqli $conn): void
+{
+    static $done = false;
+    if ($done) return;
+    $col = $conn->query("SHOW COLUMNS FROM tbl_room_reservations LIKE 'student_key'");
+    if (!$col || $col->num_rows === 0) {
+        $conn->query("ALTER TABLE tbl_room_reservations ADD COLUMN student_key VARCHAR(64) DEFAULT NULL");
+    }
+    $done = true;
+}
+
+/**
+ * Generate and store a secure random status_key for the given reservation.
+ * Returns the key (hex string). Returns '' on failure.
+ */
+function ps_room_issue_student_key(mysqli $conn, int $reservation_id): string
+{
+    ps_room_ensure_student_key($conn);
+    try {
+        $key = bin2hex(random_bytes(32));
+    } catch (Exception $e) {
+        return '';
+    }
+    $upd = $conn->prepare("UPDATE tbl_room_reservations SET student_key = ? WHERE id = ?");
+    if (!$upd) return '';
+    $upd->bind_param('si', $key, $reservation_id);
+    $upd->execute();
+    $upd->close();
+    return $key;
+}
+
+/**
+ * Expire waiting reservations and also run ps_room_ensure_student_key so the
+ * student status endpoint always gets a usable schema.
+ */
+function ps_room_expire_waiting(mysqli $conn): void
+{
+    ps_room_ensure_student_key($conn);
+    ps_room_expire_unreviewed($conn);
+}

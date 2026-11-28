@@ -95,7 +95,6 @@
                     <h4>Requested by</h4>
                     <div class="ps-ld-list">
                         <div class="ps-ld-row"><span>Name</span><strong id="ps-rr-who">—</strong></div>
-                        <div class="ps-ld-row"><span id="ps-rr-id-label">Faculty ID</span><strong id="ps-rr-idno">—</strong></div>
                         <div class="ps-ld-row" id="ps-rr-auth-row" hidden><span>Authorized by</span><strong id="ps-rr-auth">—</strong></div>
                     </div>
                 </section>

@@ -131,10 +131,6 @@
                     <div class="ps-detail-value" id="detail-requester" style="font-weight:600">—</div>
                 </div>
                 <div class="ps-detail-item">
-                    <div class="ps-detail-label">Student / Faculty ID</div>
-                    <div class="ps-detail-value" id="detail-id-number">—</div>
-                </div>
-                <div class="ps-detail-item">
                     <div class="ps-detail-label">Requester Type</div>
                     <div class="ps-detail-value" id="detail-req-type">Faculty</div>
                 </div>
@@ -264,7 +260,6 @@
                 <h4>Borrower</h4>
                 <div class="ps-ld-list">
                     <div class="ps-ld-row"><span>Name</span><strong id="ps-ld-who">—</strong></div>
-                    <div class="ps-ld-row"><span id="ps-ld-id-label">ID</span><strong id="ps-ld-idno">—</strong></div>
                     <div class="ps-ld-row" id="ps-ld-auth-row" hidden><span>Authorized by</span><strong id="ps-ld-auth">—</strong></div>
                     <div class="ps-ld-row" id="ps-ld-pickup-row" hidden><span>Collected by</span><strong id="ps-ld-pickup">—</strong></div>
                 </div>

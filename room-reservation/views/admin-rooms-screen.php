@@ -453,7 +453,6 @@
                                                 data-time="<?php echo htmlspecialchars($ar_time); ?>"
                                                 data-who="<?php echo htmlspecialchars($ar_name); ?>"
                                                 data-who-sub="<?php echo htmlspecialchars($ar_sub); ?>"
-                                                data-who-id="<?php echo $ar_is_stud ? htmlspecialchars((string)($ar['submitted_by_id'] ?? '')) : ''; ?>"
                                                 data-type="<?php echo htmlspecialchars($ar_type); ?>"
                                                 data-is-student="<?php echo $ar_is_stud ? '1' : '0'; ?>"
                                                 data-faculty-name="<?php echo htmlspecialchars((string)$ar['faculty_name']); ?>"

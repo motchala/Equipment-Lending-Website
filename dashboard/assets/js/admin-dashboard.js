@@ -4627,7 +4627,7 @@
             return {
                 id: directId || d.id, status: d.status, condition: d.condition, borrower: d.borrower, idNumber: d.idNumber,
                 reqType: d.reqType, equipment: d.equipment, instructor: d.instructor,
-                submittedAs: d.submittedAs, studentName: d.studentName, studentId: d.studentId,
+                submittedAs: d.submittedAs, studentName: d.studentName,
                 pickupName: d.pickupName,
                 room: d.room, submitted: d.submitted, dateNeeded: d.dateNeeded,
                 returnDate: d.returnDate, returnDateDisplay: d.returnDateDisplay,
@@ -4682,7 +4682,6 @@
             document.getElementById('detail-submitted').textContent = ctx.submitted || '—';
             const studentRequest = ctx.submittedAs === 'student' && ctx.studentName;
             document.getElementById('detail-requester').textContent = studentRequest ? ctx.studentName : (ctx.borrower || '—');
-            document.getElementById('detail-id-number').textContent = studentRequest ? (ctx.studentId || 'Not recorded') : (ctx.idNumber || '—');
             document.getElementById('detail-req-type').textContent = studentRequest ? 'Student (faculty-authorized)' : (ctx.reqType || 'Faculty');
             const authorizerItem = document.getElementById('detail-authorizer-item');
             const authorizer = document.getElementById('detail-authorizer');
@@ -5336,7 +5335,7 @@
                             ? (data.collector_role === 'pickup'
                                 ? '<div><b>Borrowed by (faculty):</b> ' + scanEsc(data.borrower) + '</div>' +
                                 '<div><b>Pick-up by (student):</b> ' + scanEsc(data.collector) + '</div>'
-                                : '<div><b>Requested by:</b> ' + scanEsc(data.collector) + (data.collector_id ? ' · ' + scanEsc(data.collector_id) : '') + '</div>' +
+                                : '<div><b>Requested by:</b> ' + scanEsc(data.collector) + '</div>' +
                                 '<div><b>Faculty:</b> ' + scanEsc(data.borrower) + '</div>')
                             : '<div><b>Borrower:</b> ' + scanEsc(data.borrower) + '</div>';
                         const meta = (data.room ? '<div><b>Room:</b> ' + scanEsc(data.room) + '</div>' : '') +
@@ -5904,8 +5903,6 @@ function psSelectFmt(btn) {
         //    (The old "Instructor" field is dropped: new requests always store the faculty's own name in it.) ──
         var student = d.submittedAs === 'student' && has(d.studentName);
         txt('ps-ld-who', student ? d.studentName : d.borrower);
-        txt('ps-ld-id-label', student ? 'Student ID' : 'Faculty ID');
-        txt('ps-ld-idno', student ? (d.studentId || 'Not recorded') : d.idNumber);
         opt('ps-ld-auth-row', 'ps-ld-auth', student ? d.borrower : '');
         opt('ps-ld-pickup-row', 'ps-ld-pickup', student ? '' : d.pickupName);
 
@@ -6089,8 +6086,6 @@ function psSelectFmt(btn) {
         var student = d.isStudent === '1' || (d.whoSub || '').indexOf('Student via') === 0;
         var facultyName = d.facultyName || (d.whoSub || '').replace(/^Student via /, '');
         txt('ps-rr-who', d.who);
-        txt('ps-rr-id-label', student ? 'Student ID' : 'Faculty ID');
-        txt('ps-rr-idno', student ? (d.whoId || 'Not recorded') : (d.facultyId || 'Not set'));
         opt('ps-rr-auth-row', 'ps-rr-auth', student ? facultyName : '');
 
         // ── footer: Cancel / Reschedule only for an Approved reservation that has not ended (same rule as the table) ──
